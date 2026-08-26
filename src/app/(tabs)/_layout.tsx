@@ -1,0 +1,199 @@
+import React from 'react';
+import { Tabs } from 'expo-router';
+import { View, Text, StyleSheet, Image } from 'react-native';
+import { Ionicons } from '@expo/vector-icons';
+import { useApp } from '../../contexts/AppContext';
+
+import { CreateProfileModal } from '../../components/CreateProfileModal';
+import { MatchCelebrationModal } from '../../components/MatchCelebrationModal';
+import { CallModal } from '../../components/CallModal';
+import { WebRTCService } from '../../services/webrtcService';
+import { CallSession } from '../../types';
+
+export default function TabsLayout() {
+  const { isDarkMode, incomingRequests, currentUser, acceptedMatchAlert, clearAcceptedMatchAlert } = useApp();
+  const [activeCall, setActiveCall] = React.useState<CallSession | null>(null);
+
+  React.useEffect(() => {
+    const unsubscribe = WebRTCService.subscribe(session => {
+      setActiveCall(session);
+    });
+    return () => unsubscribe();
+  }, []);
+
+  const tabBarBg = isDarkMode ? '#05060A' : '#FFFFFF';
+  const borderCol = isDarkMode ? 'rgba(255, 255, 255, 0.08)' : 'rgba(0, 0, 0, 0.08)';
+  const activeColor = '#FD3A73';
+  const inactiveColor = isDarkMode ? '#94A3B8' : '#64748B';
+
+  return (
+    <>
+      <Tabs
+        initialRouteName="index"
+        screenOptions={{
+          headerShown: false,
+          tabBarStyle: [styles.tabBar, { backgroundColor: tabBarBg, borderTopColor: borderCol }],
+          tabBarActiveTintColor: activeColor,
+          tabBarInactiveTintColor: inactiveColor,
+          tabBarShowLabel: true,
+          tabBarLabelStyle: styles.tabLabel,
+          tabBarItemStyle: styles.tabItem,
+        }}
+      >
+        {/* 1. Swipe */}
+        <Tabs.Screen
+          name="index"
+          options={{
+            title: 'Swipe',
+            tabBarIcon: ({ focused, color }) => (
+              <Ionicons name={focused ? 'flame' : 'flame-outline'} size={24} color={color} />
+            ),
+          }}
+        />
+
+        {/* 2. Explore / Spots */}
+        <Tabs.Screen
+          name="venues"
+          options={{
+            title: 'Explore',
+            tabBarIcon: ({ focused, color }) => (
+              <Ionicons name={focused ? 'compass' : 'compass-outline'} size={24} color={color} />
+            ),
+          }}
+        />
+
+        {/* 3. InSynk */}
+        <Tabs.Screen
+          name="matches"
+          options={{
+            title: 'InSynk',
+            tabBarIcon: ({ focused }) => (
+              <View style={styles.inSynkTabIconWrapper}>
+                <View style={[styles.inSynkCircle, focused ? styles.inSynkCircleActive : styles.inSynkCircleInactive]}>
+                  <Image
+                    source={require('../../../assets/images/logo_emblem.png')}
+                    style={styles.inSynkTabIcon}
+                    resizeMode="contain"
+                  />
+                </View>
+                {incomingRequests.length > 0 && (
+                  <View style={styles.tabBadge}>
+                    <Text style={styles.tabBadgeText}>{incomingRequests.length}</Text>
+                  </View>
+                )}
+              </View>
+            ),
+          }}
+        />
+
+        {/* 4. Chat */}
+        <Tabs.Screen
+          name="chats"
+          options={{
+            title: 'Chat',
+            tabBarIcon: ({ focused, color }) => (
+              <Ionicons name={focused ? 'chatbubbles' : 'chatbubbles-outline'} size={24} color={color} />
+            ),
+          }}
+        />
+
+        {/* 5. Profile */}
+        <Tabs.Screen
+          name="profile"
+          options={{
+            title: 'Profile',
+            tabBarIcon: ({ focused, color }) => (
+              <Ionicons name={focused ? 'person' : 'person-outline'} size={24} color={color} />
+            ),
+          }}
+        />
+      </Tabs>
+
+      {/* Real User Profile Creation Onboarding (Shows if no profile exists on this device) */}
+      <CreateProfileModal visible={!currentUser} />
+
+      {/* Live "Request Accepted" Celebration Alert (Triggers in 0ms when other user accepts) */}
+      <MatchCelebrationModal
+        matchedUser={acceptedMatchAlert}
+        onClose={clearAcceptedMatchAlert}
+      />
+
+      {/* Global Real-Time WebRTC Call Modal (Voice & Video Calls across devices) */}
+      <CallModal
+        session={activeCall}
+        onEndCall={() => WebRTCService.endCall()}
+        onAcceptCall={() => WebRTCService.acceptCall()}
+        onToggleMute={() => WebRTCService.toggleMute()}
+        onToggleVideo={() => WebRTCService.toggleVideo()}
+        onToggleSpeaker={() => WebRTCService.toggleSpeaker()}
+      />
+    </>
+  );
+}
+
+const styles = StyleSheet.create({
+  tabBar: {
+    height: 72,
+    paddingTop: 8,
+    paddingBottom: 14,
+    borderTopWidth: 1,
+  },
+  tabItem: {
+    paddingVertical: 2,
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  tabLabel: {
+    fontSize: 11,
+    fontWeight: '700',
+    marginTop: 2,
+  },
+  inSynkTabIconWrapper: {
+    width: 28,
+    height: 28,
+    alignItems: 'center',
+    justifyContent: 'center',
+    position: 'relative',
+  },
+  inSynkCircle: {
+    width: 26,
+    height: 26,
+    borderRadius: 13,
+    overflow: 'hidden',
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  inSynkCircleInactive: {
+    opacity: 0.7,
+  },
+  inSynkCircleActive: {
+    opacity: 1,
+    borderWidth: 2,
+    borderColor: '#FD3A73',
+    transform: [{ scale: 1.05 }],
+  },
+  inSynkTabIcon: {
+    width: '100%',
+    height: '100%',
+  },
+  tabBadge: {
+    position: 'absolute',
+    top: -3,
+    right: -5,
+    backgroundColor: '#EF4444',
+    minWidth: 16,
+    height: 16,
+    borderRadius: 8,
+    alignItems: 'center',
+    justifyContent: 'center',
+    paddingHorizontal: 3,
+    borderWidth: 1.5,
+    borderColor: '#05060A',
+    zIndex: 10,
+  },
+  tabBadgeText: {
+    color: '#FFF',
+    fontSize: 8.5,
+    fontWeight: '900',
+  },
+});

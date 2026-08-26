@@ -1,0 +1,306 @@
+{
+  "profiles": {
+    "user_rahul": {
+      "id": "user_rahul",
+      "name": "Rahul",
+      "age": 22,
+      "gender": "male",
+      "occupation": "Member",
+      "location": "Roorkee",
+      "distance": "0 km",
+      "bio": "Exploring cafes & dates in Roorkee ✨",
+      "photo": "https://images.unsplash.com/photo-1500648767791-00dcc994a43e?w=800",
+      "photos": [
+        "https://images.unsplash.com/photo-1500648767791-00dcc994a43e?w=800"
+      ],
+      "interests": [
+        "Coffee",
+        "Music",
+        "Travel"
+      ],
+      "compatibility": 98,
+      "isVerified": true,
+      "isVip": true,
+      "updatedAt": "2026-08-26T18:18:18.286Z"
+    },
+    "user_pinki": {
+      "id": "user_pinki",
+      "name": "Pinki",
+      "age": 22,
+      "gender": "female",
+      "occupation": "Member",
+      "location": "Roorkee",
+      "distance": "0 km",
+      "bio": "Exploring cafes & dates in Roorkee ✨",
+      "photo": "https://images.unsplash.com/photo-1494790108377-be9c29b29330?w=800",
+      "photos": [
+        "https://images.unsplash.com/photo-1494790108377-be9c29b29330?w=800"
+      ],
+      "interests": [
+        "Coffee",
+        "Music",
+        "Travel"
+      ],
+      "compatibility": 98,
+      "isVerified": true,
+      "isVip": true,
+      "updatedAt": "2026-08-26T18:20:08.830Z"
+    }
+  },
+  "requests": {
+    "req_1787766340967_4mfe": {
+      "id": "req_1787766340967_4mfe",
+      "fromUser": {
+        "id": "user_rahul",
+        "name": "Rahul",
+        "age": 22,
+        "gender": "male",
+        "occupation": "Member",
+        "location": "Roorkee",
+        "distance": "0 km",
+        "bio": "Exploring cafes & dates in Roorkee ✨",
+        "photo": "https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?w=800",
+        "photos": [
+          "https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?w=800"
+        ],
+        "interests": [
+          "Coffee",
+          "Music",
+          "Travel"
+        ],
+        "compatibility": 98,
+        "isVerified": true,
+        "isVip": true
+      },
+      "toUserId": "user_pinki",
+      "type": "like",
+      "timestamp": "Just now",
+      "status": "accepted"
+    },
+    "req_1787766806569_tnzx": {
+      "id": "req_1787766806569_tnzx",
+      "fromUser": {
+        "id": "user_pinki",
+        "name": "Pinki",
+        "age": 22,
+        "gender": "female",
+        "occupation": "Member",
+        "location": "Roorkee",
+        "distance": "0 km",
+        "bio": "Exploring cafes & dates in Roorkee ✨",
+        "photo": "https://images.unsplash.com/photo-1494790108377-be9c29b29330?w=800",
+        "photos": [
+          "https://images.unsplash.com/photo-1494790108377-be9c29b29330?w=800"
+        ],
+        "interests": [
+          "Coffee",
+          "Music",
+          "Travel"
+        ],
+        "compatibility": 98,
+        "isVerified": true,
+        "isVip": true
+      },
+      "toUserId": "user_rahul",
+      "type": "like",
+      "timestamp": "Just now",
+      "status": "accepted"
+    },
+    "req_1787767916547_m5p0": {
+      "id": "req_1787767916547_m5p0",
+      "fromUser": {
+        "id": "user_rahul",
+        "name": "Rahul",
+        "age": 22,
+        "gender": "male",
+        "occupation": "Member",
+        "location": "Roorkee",
+        "distance": "0 km",
+        "bio": "Exploring cafes & dates in Roorkee ✨",
+        "photo": "https://images.unsplash.com/photo-1500648767791-00dcc994a43e?w=800",
+        "photos": [
+          "https://images.unsplash.com/photo-1500648767791-00dcc994a43e?w=800"
+        ],
+        "interests": [
+          "Coffee",
+          "Music",
+          "Travel"
+        ],
+        "compatibility": 98,
+        "isVerified": true,
+        "isVip": true
+      },
+      "toUserId": "user_pinki",
+      "type": "supersynk",
+      "timestamp": "Just now",
+      "status": "pending"
+    }
+  },
+  "chats": [
+    {
+      "id": "msg_1787766374210_06gd",
+      "senderId": "user_rahul",
+      "receiverId": "user_pinki",
+      "cipherText": "E2EE::0062001400540000005e000000550043004e00420074000a005f0054005c00510014005a004000110077005c005700000010006d00540057000900412676",
+      "plainText": "Specialty Coffee or Boba Tea? ☕",
+      "isEncrypted": true,
+      "type": "text",
+      "timestamp": "2026-08-26T17:46:14.348Z",
+      "text": "Specialty Coffee or Boba Tea? ☕"
+    },
+    {
+      "id": "msg_1787766380657_8v6e",
+      "senderId": "user_pinki",
+      "receiverId": "user_rahul",
+      "cipherText": "E2EE::00650013005e004300430013004c0043005f001100170004005700560019005b005a00500012005d005c00560015207500100040005e004300160007000a00400015004300430018d85ddfd3",
+      "plainText": "Two truths and one lie — you first! 🎲",
+      "isEncrypted": true,
+      "type": "text",
+      "timestamp": "2026-08-26T17:46:20.948Z",
+      "text": "Two truths and one lie — you first! 🎲"
+    },
+    {
+      "id": "msg_1787766419459_rhaf",
+      "senderId": "user_pinki",
+      "receiverId": "user_rahul",
+      "cipherText": "E2EE::d80cdcba0011003500580008005a0052001700210056000900550012008e001400040005000800000002",
+      "plainText": "📞 Voice Call · 00:17",
+      "isEncrypted": true,
+      "type": "text",
+      "timestamp": "2026-08-26T17:46:59.668Z",
+      "text": "📞 Voice Call · 00:17"
+    },
+    {
+      "id": "msg_1787766439577_b1mo",
+      "senderId": "user_rahul",
+      "receiverId": "user_pinki",
+      "cipherText": "E2EE::d80cdc9d00110035005e0005005c0058001700210056000900550012008e001400040005000800000001",
+      "plainText": "📹 Video Call · 00:14",
+      "isEncrypted": true,
+      "type": "text",
+      "timestamp": "2026-08-26T17:47:19.720Z",
+      "text": "📹 Video Call · 00:14"
+    },
+    {
+      "id": "msg_1787766774890_7jly",
+      "senderId": "user_rahul",
+      "receiverId": "user_pinki",
+      "cipherText": "Specialty Coffee or Boba Tea? ☕",
+      "plainText": "Specialty Coffee or Boba Tea? ☕",
+      "isEncrypted": true,
+      "type": "text",
+      "timestamp": "2026-08-26T17:52:54.957Z",
+      "text": "Specialty Coffee or Boba Tea? ☕"
+    },
+    {
+      "id": "msg_1787766866984_mk8l",
+      "senderId": "user_rahul",
+      "receiverId": "user_pinki",
+      "cipherText": "📞 Voice Call · 00:31",
+      "plainText": "📞 Voice Call · 00:31",
+      "isEncrypted": true,
+      "type": "text",
+      "timestamp": "2026-08-26T17:54:27.111Z",
+      "text": "📞 Voice Call · 00:31"
+    },
+    {
+      "id": "msg_1787767471863_kkkl",
+      "senderId": "user_rahul",
+      "receiverId": "user_pinki",
+      "cipherText": "📹 Video Call · 01:15",
+      "plainText": "📹 Video Call · 01:15",
+      "isEncrypted": true,
+      "type": "text",
+      "timestamp": "2026-08-26T18:04:31.904Z",
+      "text": "📹 Video Call · 01:15"
+    },
+    {
+      "id": "msg_1787767475934_81xp",
+      "senderId": "user_rahul",
+      "receiverId": "user_pinki",
+      "cipherText": "📹 Video Call · Missed",
+      "plainText": "📹 Video Call · Missed",
+      "isEncrypted": true,
+      "type": "text",
+      "timestamp": "2026-08-26T18:04:35.980Z",
+      "text": "📹 Video Call · Missed"
+    },
+    {
+      "id": "msg_1787767488163_mwme",
+      "senderId": "user_rahul",
+      "receiverId": "user_pinki",
+      "cipherText": "📞 Voice Call · 00:10",
+      "plainText": "📞 Voice Call · 00:10",
+      "isEncrypted": true,
+      "type": "text",
+      "timestamp": "2026-08-26T18:04:48.204Z",
+      "text": "📞 Voice Call · 00:10"
+    },
+    {
+      "id": "msg_1787767555591_otsj",
+      "senderId": "user_pinki",
+      "receiverId": "user_rahul",
+      "cipherText": "Best pizza slice in town? 🍕",
+      "plainText": "Best pizza slice in town? 🍕",
+      "isEncrypted": true,
+      "type": "text",
+      "timestamp": "2026-08-26T18:05:55.677Z",
+      "text": "Best pizza slice in town? 🍕"
+    },
+    {
+      "id": "msg_1787767668114_2mwr",
+      "senderId": "user_pinki",
+      "receiverId": "user_rahul",
+      "cipherText": "📞 Voice Call · 00:43",
+      "plainText": "📞 Voice Call · 00:43",
+      "isEncrypted": true,
+      "type": "text",
+      "timestamp": "2026-08-26T18:07:48.183Z",
+      "text": "📞 Voice Call · 00:43"
+    },
+    {
+      "id": "msg_1787767839014_5ifo",
+      "senderId": "user_pinki",
+      "receiverId": "user_rahul",
+      "cipherText": "📹 Video Call · 00:38",
+      "plainText": "📹 Video Call · 00:38",
+      "isEncrypted": true,
+      "type": "text",
+      "timestamp": "2026-08-26T18:10:39.136Z",
+      "text": "📹 Video Call · 00:38"
+    },
+    {
+      "id": "msg_1787767840741_9o18",
+      "senderId": "user_rahul",
+      "receiverId": "user_pinki",
+      "cipherText": "📹 Video Call · 00:39",
+      "plainText": "📹 Video Call · 00:39",
+      "isEncrypted": true,
+      "type": "text",
+      "timestamp": "2026-08-26T18:10:40.783Z",
+      "text": "📹 Video Call · 00:39"
+    },
+    {
+      "id": "msg_1787768020325_tevr",
+      "senderId": "user_pinki",
+      "receiverId": "user_rahul",
+      "cipherText": "📞 Voice Call · 00:31",
+      "plainText": "📞 Voice Call · 00:31",
+      "isEncrypted": true,
+      "type": "text",
+      "timestamp": "2026-08-26T18:13:40.447Z",
+      "text": "📞 Voice Call · 00:31"
+    },
+    {
+      "id": "msg_1787768194427_j5my",
+      "senderId": "user_rahul",
+      "receiverId": "user_pinki",
+      "cipherText": "📞 Voice Call · Missed",
+      "plainText": "📞 Voice Call · Missed",
+      "isEncrypted": true,
+      "type": "text",
+      "timestamp": "2026-08-26T18:16:34.486Z",
+      "text": "📞 Voice Call · Missed"
+    }
+  ]
+}

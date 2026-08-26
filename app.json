@@ -1,0 +1,40 @@
+{
+  "expo": {
+    "name": "SYNKING",
+    "slug": "synking",
+    "version": "1.0.0",
+    "orientation": "portrait",
+    "icon": "./assets/images/icon.png",
+    "scheme": "synking",
+    "userInterfaceStyle": "dark",
+    "newArchEnabled": true,
+    "splash": {
+      "image": "./assets/images/icon.png",
+      "resizeMode": "contain",
+      "backgroundColor": "#08090F"
+    },
+    "ios": {
+      "supportsTablet": false,
+      "bundleIdentifier": "com.synkon.app"
+    },
+    "android": {
+      "package": "com.synkon.app",
+      "adaptiveIcon": {
+        "backgroundColor": "#08090F",
+        "foregroundImage": "./assets/images/icon.png"
+      },
+      "permissions": [
+        "CAMERA",
+        "RECORD_AUDIO",
+        "MODIFY_AUDIO_SETTINGS",
+        "INTERNET",
+        "ACCESS_NETWORK_STATE",
+        "ACCESS_FINE_LOCATION",
+        "ACCESS_COARSE_LOCATION"
+      ]
+    },
+    "plugins": [
+      "expo-router"
+    ]
+  }
+}

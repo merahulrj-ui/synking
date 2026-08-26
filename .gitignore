@@ -1,0 +1,23 @@
+# Node modules
+node_modules/
+.npm
+package-lock.json
+
+# Expo & Next
+.expo/
+dist/
+web-build/
+
+# Android Native Build Outputs
+android/app/build/
+android/.gradle/
+android/build/
+android/local.properties
+*.apk
+*.aab
+
+# OS & Environment
+.DS_Store
+*.log
+.env
+.env.local
