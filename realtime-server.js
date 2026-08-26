@@ -127,6 +127,7 @@ function renderAdminHtml() {
 
   <div class="section-title">
     <span>💖 Live Swipes & Match Requests (${requestList.length})</span>
+    <button onclick="clearAllRequests()" style="background: #EF4444; color: #FFF; border: none; padding: 6px 12px; border-radius: 8px; font-weight: 700; cursor: pointer; font-size: 12px;">🧹 Clear All Requests</button>
   </div>
   <div class="table-box">
     <table>
@@ -137,19 +138,28 @@ function renderAdminHtml() {
           <th>Status</th>
           <th>Pass Plan</th>
           <th>Time</th>
+          <th>Action</th>
         </tr>
       </thead>
       <tbody>
-        ${requestList.length === 0 ? '<tr><td colspan="5" style="color: #94A3B8; text-align: center; padding: 20px;">No match requests yet.</td></tr>' : ''}
-        ${requestList.map(r => `
+        ${requestList.length === 0 ? '<tr><td colspan="6" style="color: #94A3B8; text-align: center; padding: 20px;">No match requests yet.</td></tr>' : ''}
+        ${requestList.map(r => {
+          const timeStr = r.timestamp && !isNaN(new Date(r.timestamp).getTime())
+            ? new Date(r.timestamp).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', second: '2-digit' })
+            : 'Just now';
+          return `
           <tr>
             <td><strong>${r.fromUser?.name || 'Unknown'}</strong></td>
             <td>${r.toUserId}</td>
             <td><span style="color: ${r.status === 'accepted' ? '#22C55E' : '#EAB308'}; font-weight: 700;">${r.status.toUpperCase()}</span></td>
             <td>${r.passType || 'Standard'}</td>
-            <td>${new Date(r.timestamp).toLocaleTimeString()}</td>
+            <td>${timeStr}</td>
+            <td>
+              <button onclick="deleteRequest('${r.id}')" style="background: #EF4444; color: white; border: none; padding: 4px 8px; border-radius: 6px; font-weight: 700; cursor: pointer; font-size: 11px;">🗑️ Delete</button>
+            </td>
           </tr>
-        `).join('')}
+          `;
+        }).join('')}
       </tbody>
     </table>
   </div>
@@ -163,6 +173,34 @@ function renderAdminHtml() {
           location.reload();
         } else {
           alert('Failed to delete user.');
+        }
+      } catch (e) {
+        alert('Error: ' + e);
+      }
+    }
+
+    async function deleteRequest(id) {
+      if (!confirm('Delete this swipe request?')) return;
+      try {
+        const res = await fetch('/api/requests/' + id, { method: 'DELETE' });
+        if (res.ok) {
+          location.reload();
+        } else {
+          alert('Failed to delete request.');
+        }
+      } catch (e) {
+        alert('Error: ' + e);
+      }
+    }
+
+    async function clearAllRequests() {
+      if (!confirm('Are you sure you want to clear ALL swipe requests?')) return;
+      try {
+        const res = await fetch('/api/requests', { method: 'DELETE' });
+        if (res.ok) {
+          location.reload();
+        } else {
+          alert('Failed to clear requests.');
         }
       } catch (e) {
         alert('Error: ' + e);
@@ -311,6 +349,30 @@ const server = http.createServer((req, res) => {
       res.writeHead(400, { 'Content-Type': 'application/json' });
       res.end(JSON.stringify({ success: false }));
     });
+    return;
+  }
+
+  // 5.1 DELETE /api/requests/:id or DELETE /api/requests (Clear All)
+  if (req.method === 'DELETE' && pathname.startsWith('/api/requests')) {
+    if (pathname === '/api/requests') {
+      db.requests = {};
+      saveDb();
+      console.log('[ALL_REQUESTS_CLEARED]');
+      res.writeHead(200, { 'Content-Type': 'application/json' });
+      res.end(JSON.stringify({ success: true }));
+      return;
+    }
+    const id = pathname.replace('/api/requests/', '');
+    if (id && db.requests[id]) {
+      delete db.requests[id];
+      saveDb();
+      console.log(`[REQUEST_DELETED] ${id}`);
+      res.writeHead(200, { 'Content-Type': 'application/json' });
+      res.end(JSON.stringify({ success: true }));
+      return;
+    }
+    res.writeHead(404, { 'Content-Type': 'application/json' });
+    res.end(JSON.stringify({ success: false, error: 'Request not found' }));
     return;
   }
 
