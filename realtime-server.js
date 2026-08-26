@@ -1,5 +1,5 @@
 // SYNKING 100% Free & Unlimited Central Backend & Real-Time Engine
-// Full Profiles, Requests, Chats REST API + WebSocket Signaling
+// Full Profiles, Requests, Chats REST API + WebSocket Signaling + Admin Portal
 // Zero Firestore Dependency • Zero Quota Limits • Zero Cost
 
 const http = require('http');
@@ -20,12 +20,12 @@ let db = {
 // Load DB from Disk
 try {
   if (fs.existsSync(DB_FILE)) {
-    const data = fs.readFileSync(DB_FILE, 'utf8');
-    db = JSON.parse(data);
-    console.log(`[DATABASE_LOADED] Loaded ${Object.keys(db.profiles).length} profiles, ${Object.keys(db.requests).length} requests.`);
+    const raw = fs.readFileSync(DB_FILE, 'utf8');
+    db = JSON.parse(raw);
+    console.log(`[DATABASE_LOADED] Loaded ${Object.keys(db.profiles || {}).length} profiles, ${Object.keys(db.requests || {}).length} requests.`);
   }
 } catch (e) {
-  console.warn('[DATABASE_INIT] Creating fresh local database.');
+  console.warn('[DB_INIT_WARN] Creating fresh in-memory database');
 }
 
 function saveDb() {
@@ -36,10 +36,147 @@ function saveDb() {
 
 const clients = new Set();
 
+// HTML Admin Portal Template
+function renderAdminHtml() {
+  const profileList = Object.values(db.profiles || {});
+  const requestList = Object.values(db.requests || {});
+  const chatList = db.chats || [];
+
+  return `<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>SYNKING Cloud Admin Portal</title>
+  <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;600;700;800&display=swap" rel="stylesheet">
+  <style>
+    * { box-sizing: border-box; margin: 0; padding: 0; font-family: 'Plus Jakarta Sans', sans-serif; }
+    body { background: #08090F; color: #FFFFFF; padding: 24px; min-height: 100vh; }
+    .header { display: flex; justify-content: space-between; align-items: center; border-bottom: 1px solid rgba(255,255,255,0.08); padding-bottom: 16px; margin-bottom: 24px; }
+    .logo { font-size: 24px; font-weight: 800; background: linear-gradient(135deg, #FD3A73, #FF7B00); -webkit-background-clip: text; -webkit-text-fill-color: transparent; }
+    .badge { background: #13141F; padding: 6px 12px; border-radius: 20px; font-size: 12px; border: 1px solid #22C55E; color: #22C55E; font-weight: 700; }
+    .stats-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 16px; margin-bottom: 32px; }
+    .stat-card { background: #13141F; padding: 20px; border-radius: 16px; border: 1px solid rgba(255,255,255,0.06); }
+    .stat-val { font-size: 28px; font-weight: 800; color: #00E5FF; margin-top: 4px; }
+    .stat-lbl { color: #94A3B8; font-size: 12px; font-weight: 600; text-transform: uppercase; }
+    
+    .section-title { font-size: 18px; font-weight: 700; margin-bottom: 16px; display: flex; justify-content: space-between; align-items: center; }
+    .user-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(280px, 1fr)); gap: 16px; margin-bottom: 40px; }
+    .user-card { background: #13141F; border-radius: 16px; border: 1px solid rgba(255,255,255,0.08); overflow: hidden; display: flex; flex-direction: column; }
+    .user-img { width: 100%; height: 180px; object-fit: cover; background: #1E293B; }
+    .user-body { padding: 16px; flex: 1; display: flex; flex-direction: column; gap: 6px; }
+    .user-name { font-size: 18px; font-weight: 800; }
+    .user-meta { color: #00E5FF; font-size: 12px; font-weight: 600; }
+    .user-bio { color: #94A3B8; font-size: 13px; margin-top: 4px; line-height: 1.4; flex: 1; }
+    .del-btn { background: #EF4444; color: white; border: none; padding: 8px 12px; border-radius: 8px; font-weight: 700; cursor: pointer; font-size: 12px; margin-top: 10px; width: 100%; }
+    .del-btn:hover { background: #DC2626; }
+    
+    .table-box { background: #13141F; border-radius: 16px; border: 1px solid rgba(255,255,255,0.08); overflow-x: auto; }
+    table { width: 100%; border-collapse: collapse; text-align: left; }
+    th { padding: 12px 16px; background: rgba(255,255,255,0.03); color: #94A3B8; font-size: 12px; text-transform: uppercase; }
+    td { padding: 12px 16px; border-top: 1px solid rgba(255,255,255,0.04); font-size: 13px; }
+  </style>
+</head>
+<body>
+  <div class="header">
+    <div>
+      <div class="logo">SYNKING ADMIN CONSOLE</div>
+      <div style="color: #94A3B8; font-size: 12px; margin-top: 2px;">Live Cloud Backend • 24/7 Zero Cost Production</div>
+    </div>
+    <div class="badge">● 100% ONLINE (Render Cloud)</div>
+  </div>
+
+  <div class="stats-grid">
+    <div class="stat-card">
+      <div class="stat-lbl">Registered Users</div>
+      <div class="stat-val">${profileList.length}</div>
+    </div>
+    <div class="stat-card">
+      <div class="stat-lbl">Swipes & Requests</div>
+      <div class="stat-val">${requestList.length}</div>
+    </div>
+    <div class="stat-card">
+      <div class="stat-lbl">Total Chats Sent</div>
+      <div class="stat-val">${chatList.length}</div>
+    </div>
+    <div class="stat-card">
+      <div class="stat-lbl">Active WebSockets</div>
+      <div class="stat-val">${clients.size}</div>
+    </div>
+  </div>
+
+  <div class="section-title">
+    <span>👥 User Profiles Directory (${profileList.length})</span>
+    <button onclick="location.reload()" style="background: #1E293B; color: #00E5FF; border: 1px solid #00E5FF; padding: 6px 12px; border-radius: 8px; font-weight: 700; cursor: pointer;">🔄 Refresh</button>
+  </div>
+
+  <div class="user-grid">
+    ${profileList.length === 0 ? '<div style="color: #94A3B8; padding: 20px;">No registered profiles yet. Create a profile in the app!</div>' : ''}
+    ${profileList.map(u => `
+      <div class="user-card">
+        <img class="user-img" src="${u.photo || u.photos?.[0] || 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=500'}" alt="${u.name}" onerror="this.src='https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=500'" />
+        <div class="user-body">
+          <div class="user-name">${u.name}, ${u.age || 21} ${u.verified ? '✅' : ''}</div>
+          <div class="user-meta">📍 ${u.city || 'Roorkee'} • ${u.college || 'IIT Roorkee'}</div>
+          <div class="user-bio">${u.bio || 'Active on Synking'}</div>
+          <button class="del-btn" onclick="deleteUser('${u.id}')">🗑️ Delete Profile</button>
+        </div>
+      </div>
+    `).join('')}
+  </div>
+
+  <div class="section-title">
+    <span>💖 Live Swipes & Match Requests (${requestList.length})</span>
+  </div>
+  <div class="table-box">
+    <table>
+      <thead>
+        <tr>
+          <th>From User</th>
+          <th>To User ID</th>
+          <th>Status</th>
+          <th>Pass Plan</th>
+          <th>Time</th>
+        </tr>
+      </thead>
+      <tbody>
+        ${requestList.length === 0 ? '<tr><td colspan="5" style="color: #94A3B8; text-align: center; padding: 20px;">No match requests yet.</td></tr>' : ''}
+        ${requestList.map(r => `
+          <tr>
+            <td><strong>${r.fromUser?.name || 'Unknown'}</strong></td>
+            <td>${r.toUserId}</td>
+            <td><span style="color: ${r.status === 'accepted' ? '#22C55E' : '#EAB308'}; font-weight: 700;">${r.status.toUpperCase()}</span></td>
+            <td>${r.passType || 'Standard'}</td>
+            <td>${new Date(r.timestamp).toLocaleTimeString()}</td>
+          </tr>
+        `).join('')}
+      </tbody>
+    </table>
+  </div>
+
+  <script>
+    async function deleteUser(id) {
+      if (!confirm('Are you sure you want to delete user ' + id + '?')) return;
+      try {
+        const res = await fetch('/api/profiles/' + id, { method: 'DELETE' });
+        if (res.ok) {
+          location.reload();
+        } else {
+          alert('Failed to delete user.');
+        }
+      } catch (e) {
+        alert('Error: ' + e);
+      }
+    }
+  </script>
+</body>
+</html>`;
+}
+
 const server = http.createServer((req, res) => {
   // CORS Headers
   res.setHeader('Access-Control-Allow-Origin', '*');
-  res.setHeader('Access-Control-Allow-Methods', 'GET, POST, PATCH, OPTIONS');
+  res.setHeader('Access-Control-Allow-Methods', 'GET, POST, PATCH, DELETE, OPTIONS');
   res.setHeader('Access-Control-Allow-Headers', 'Content-Type');
 
   if (req.method === 'OPTIONS') {
@@ -51,6 +188,13 @@ const server = http.createServer((req, res) => {
   const url = new URL(req.url, `http://${req.headers.host || 'localhost'}`);
   const pathname = url.pathname;
 
+  // 0. GET / or /admin (Web Admin Dashboard)
+  if (req.method === 'GET' && (pathname === '/' || pathname === '/admin')) {
+    res.writeHead(200, { 'Content-Type': 'text/html; charset=utf-8' });
+    res.end(renderAdminHtml());
+    return;
+  }
+
   // 1. GET /api/profiles
   if (req.method === 'GET' && pathname === '/api/profiles') {
     const excludeId = url.searchParams.get('excludeId');
@@ -60,7 +204,7 @@ const server = http.createServer((req, res) => {
     return;
   }
 
-  // 2. POST /api/profiles
+  // 2. POST /api/profiles (Save / Update User Profile)
   if (req.method === 'POST' && pathname === '/api/profiles') {
     let body = '';
     req.on('data', chunk => { body += chunk; });
@@ -68,35 +212,45 @@ const server = http.createServer((req, res) => {
       try {
         const profile = JSON.parse(body);
         if (profile && profile.id) {
-          db.profiles[profile.id] = { ...profile, updatedAt: new Date().toISOString() };
+          db.profiles[profile.id] = {
+            ...profile,
+            updatedAt: new Date().toISOString()
+          };
           saveDb();
-          console.log(`[PROFILE_SAVED] User: ${profile.name} (${profile.id}) in ${profile.location}`);
+          console.log(`[PROFILE_SAVED] ${profile.name} (${profile.id})`);
           res.writeHead(200, { 'Content-Type': 'application/json' });
           res.end(JSON.stringify({ success: true, profile: db.profiles[profile.id] }));
           return;
         }
       } catch (e) {}
       res.writeHead(400, { 'Content-Type': 'application/json' });
-      res.end(JSON.stringify({ success: false, error: 'Invalid profile data' }));
+      res.end(JSON.stringify({ success: false, error: 'Invalid profile payload' }));
     });
+    return;
+  }
+
+  // 2.1 DELETE /api/profiles/:id
+  if (req.method === 'DELETE' && pathname.startsWith('/api/profiles/')) {
+    const id = pathname.replace('/api/profiles/', '');
+    if (id && db.profiles[id]) {
+      delete db.profiles[id];
+      saveDb();
+      console.log(`[PROFILE_DELETED] ${id}`);
+      res.writeHead(200, { 'Content-Type': 'application/json' });
+      res.end(JSON.stringify({ success: true }));
+      return;
+    }
+    res.writeHead(404, { 'Content-Type': 'application/json' });
+    res.end(JSON.stringify({ success: false, error: 'Profile not found' }));
     return;
   }
 
   // 3. GET /api/requests
   if (req.method === 'GET' && pathname === '/api/requests') {
     const userId = url.searchParams.get('userId');
-    const type = url.searchParams.get('type') || 'incoming'; // incoming or sent
-
-    const allRequests = Object.values(db.requests);
-    let filtered = [];
-    if (type === 'incoming') {
-      filtered = allRequests.filter(r => r.toUserId === userId && r.status === 'pending');
-    } else {
-      filtered = allRequests.filter(r => r.fromUser?.id === userId || r.fromUserId === userId);
-    }
-
+    const list = Object.values(db.requests).filter(r => !userId || r.toUserId === userId || r.fromUser?.id === userId);
     res.writeHead(200, { 'Content-Type': 'application/json' });
-    res.end(JSON.stringify(filtered));
+    res.end(JSON.stringify(list));
     return;
   }
 
@@ -162,17 +316,19 @@ const server = http.createServer((req, res) => {
 
   // 6. GET /api/chats
   if (req.method === 'GET' && pathname === '/api/chats') {
-    const u1 = url.searchParams.get('user1');
-    const u2 = url.searchParams.get('user2');
-    const thread = db.chats.filter(
-      m => (m.senderId === u1 && m.receiverId === u2) || (m.senderId === u2 && m.receiverId === u1)
+    const u1 = url.searchParams.get('u1');
+    const u2 = url.searchParams.get('u2');
+    const matched = db.chats.filter(c => 
+      (!u1 && !u2) ||
+      (c.senderId === u1 && c.receiverId === u2) ||
+      (c.senderId === u2 && c.receiverId === u1)
     );
     res.writeHead(200, { 'Content-Type': 'application/json' });
-    res.end(JSON.stringify(thread));
+    res.end(JSON.stringify(matched));
     return;
   }
 
-  // 7. POST /api/chats
+  // 7. POST /api/chats (Save Message & Broadcast in 0ms)
   if (req.method === 'POST' && pathname === '/api/chats') {
     let body = '';
     req.on('data', chunk => { body += chunk; });
@@ -182,9 +338,9 @@ const server = http.createServer((req, res) => {
         if (msg && msg.id) {
           db.chats.push(msg);
           saveDb();
-          console.log(`[CHAT_MESSAGE_SAVED] ${msg.senderId} ➔ ${msg.receiverId}: "${msg.text || msg.plainText}"`);
+          console.log(`[CHAT_SAVED] ${msg.senderName} ➔ ${msg.receiverId}: ${msg.content ? msg.content.substring(0, 20) : 'E2EE'}`);
 
-          // Broadcast over WebSocket in 0ms
+          // Instant 0ms WebSocket Broadcast to Recipient Device
           broadcastToWebSockets({ type: 'NEW_MESSAGE', payload: msg });
 
           res.writeHead(200, { 'Content-Type': 'application/json' });
@@ -198,26 +354,23 @@ const server = http.createServer((req, res) => {
     return;
   }
 
-  // 8. POST /api/debug-log (Auto-collect WebRTC Diagnostics)
+  // 8. POST /api/debug-log (In-Call Diagnostics Upload)
   if (req.method === 'POST' && pathname === '/api/debug-log') {
     let body = '';
     req.on('data', chunk => { body += chunk; });
     req.on('end', () => {
-      console.log('\n================== INCOMING CLIENT DEBUG REPORT ==================');
-      console.log(body);
-      console.log('==================================================================\n');
+      console.log('\n📥 [IN-CALL DEBUG REPORT RECEIVED]\n' + body + '\n');
       res.writeHead(200, { 'Content-Type': 'application/json' });
-      res.end(JSON.stringify({ success: true, logged: true }));
+      res.end(JSON.stringify({ success: true }));
     });
     return;
   }
 
-  // Fallback
-  res.writeHead(200, { 'Content-Type': 'application/json' });
-  res.end(JSON.stringify({ status: 'active', service: 'SYNKING Free Backend Engine' }));
+  res.writeHead(404);
+  res.end('Not Found');
 });
 
-// WebSocket Server Implementation
+// WebSocket Protocol Handshake
 server.on('upgrade', (req, socket, head) => {
   const key = req.headers['sec-websocket-key'];
   if (!key) {
@@ -234,19 +387,18 @@ server.on('upgrade', (req, socket, head) => {
     'HTTP/1.1 101 Switching Protocols',
     'Upgrade: websocket',
     'Connection: Upgrade',
-    `Sec-WebSocket-Accept: ${acceptKey}`,
+    `Sec-WebSocket-Accept: ${acceptKey}`
   ];
 
   socket.write(headers.join('\r\n') + '\r\n\r\n');
   clients.add(socket);
-  console.log(`[WEBSOCKET_CLIENT_JOINED] Total connected devices: ${clients.size}`);
+  console.log(`[WS_CONNECTED] Client connected. Total active clients: ${clients.size}`);
 
-  socket.on('data', buffer => {
+  socket.on('data', (buffer) => {
     try {
-      const message = decodeWebSocketFrame(buffer);
-      if (message) {
-        const parsed = JSON.parse(message);
-        // Relay to other connected devices
+      const decoded = decodeWebSocketFrame(buffer);
+      if (decoded) {
+        const parsed = JSON.parse(decoded);
         broadcastToWebSockets(parsed, socket);
       }
     } catch (e) {}
@@ -254,7 +406,7 @@ server.on('upgrade', (req, socket, head) => {
 
   socket.on('close', () => {
     clients.delete(socket);
-    console.log(`[WEBSOCKET_CLIENT_LEFT] Total connected devices: ${clients.size}`);
+    console.log(`[WS_DISCONNECTED] Client disconnected. Active clients: ${clients.size}`);
   });
 
   socket.on('error', () => {
@@ -262,49 +414,11 @@ server.on('upgrade', (req, socket, head) => {
   });
 });
 
-function decodeWebSocketFrame(buffer) {
-  if (buffer.length < 2) return null;
-  const isMasked = (buffer[1] & 0x80) === 0x80;
-  let length = buffer[1] & 0x7f;
-  let maskStart = 2;
-
-  if (length === 126) maskStart = 4;
-  else if (length === 127) maskStart = 10;
-
-  let dataStart = maskStart + (isMasked ? 4 : 0);
-  if (buffer.length < dataStart) return null;
-
-  if (!isMasked) return buffer.slice(dataStart).toString('utf8');
-
-  const mask = buffer.slice(maskStart, maskStart + 4);
-  const data = buffer.slice(dataStart);
-  const decoded = Buffer.alloc(data.length);
-  for (let i = 0; i < data.length; i++) decoded[i] = data[i] ^ mask[i % 4];
-  return decoded.toString('utf8');
-}
-
-function encodeWebSocketFrame(text) {
-  const payload = Buffer.from(text, 'utf8');
-  const length = payload.length;
-  let header;
-  if (length < 126) {
-    header = Buffer.from([0x81, length]);
-  } else if (length < 65536) {
-    header = Buffer.from([0x81, 126, (length >> 8) & 0xff, length & 0xff]);
-  } else {
-    header = Buffer.alloc(10);
-    header[0] = 0x81;
-    header[1] = 127;
-    header.writeBigUInt64BE(BigInt(length), 2);
-  }
-  return Buffer.concat([header, payload]);
-}
-
-function broadcastToWebSockets(obj, senderSocket = null) {
-  const text = typeof obj === 'string' ? obj : JSON.stringify(obj);
-  const frame = encodeWebSocketFrame(text);
+function broadcastToWebSockets(data, senderSocket = null) {
+  const jsonStr = JSON.stringify(data);
+  const frame = encodeWebSocketFrame(jsonStr);
   for (const client of clients) {
-    if (client !== senderSocket && client.writable) {
+    if (client.writable) {
       try {
         client.write(frame);
       } catch (e) {
@@ -314,11 +428,63 @@ function broadcastToWebSockets(obj, senderSocket = null) {
   }
 }
 
+function decodeWebSocketFrame(buffer) {
+  if (buffer.length < 2) return null;
+  const isMasked = (buffer[1] & 0x80) === 0x80;
+  let length = buffer[1] & 0x7f;
+  let offset = 2;
+
+  if (length === 126) {
+    length = buffer.readUInt16BE(2);
+    offset = 4;
+  } else if (length === 127) {
+    return null;
+  }
+
+  let maskingKey = null;
+  if (isMasked) {
+    maskingKey = buffer.slice(offset, offset + 4);
+    offset += 4;
+  }
+
+  const payload = buffer.slice(offset, offset + length);
+  if (isMasked && maskingKey) {
+    for (let i = 0; i < payload.length; i++) {
+      payload[i] ^= maskingKey[i % 4];
+    }
+  }
+
+  return payload.toString('utf8');
+}
+
+function encodeWebSocketFrame(text) {
+  const payload = Buffer.from(text, 'utf8');
+  const length = payload.length;
+  let header;
+
+  if (length <= 125) {
+    header = Buffer.from([0x81, length]);
+  } else if (length <= 65535) {
+    header = Buffer.alloc(4);
+    header[0] = 0x81;
+    header[1] = 126;
+    header.writeUInt16BE(length, 2);
+  } else {
+    header = Buffer.alloc(10);
+    header[0] = 0x81;
+    header[1] = 127;
+    header.writeBigUInt64BE(BigInt(length), 2);
+  }
+
+  return Buffer.concat([header, payload]);
+}
+
 server.listen(PORT, '0.0.0.0', () => {
-  console.log(`\n======================================================`);
+  console.log(`======================================================`);
   console.log(`⚡ SYNKING 100% FREE CENTRAL BACKEND & WEBSOCKET ENGINE`);
+  console.log(`🌐 Admin Portal: http://0.0.0.0:${PORT}/admin`);
   console.log(`🌐 REST API: http://0.0.0.0:${PORT}/api/profiles`);
   console.log(`🌐 WebSocket: ws://0.0.0.0:${PORT}`);
   console.log(`💸 ₹0 Cost • 0 Firestore Dependency • Unlimited Reads/Writes`);
-  console.log(`======================================================\n`);
+  console.log(`======================================================`);
 });
