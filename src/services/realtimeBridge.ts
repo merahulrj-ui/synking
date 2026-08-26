@@ -28,17 +28,13 @@ class RealtimeBridgeManager {
 
   private connectWebSocket() {
     try {
-      let host = '127.0.0.1';
-      if (typeof window !== 'undefined' && window.location && window.location.hostname) {
-        host = window.location.hostname;
-      }
-
-      const wsUrl = `ws://${host}:8082`;
+      // Connect to Live Production Render Cloud WebSocket
+      const wsUrl = 'wss://synking-9my2.onrender.com';
       this.socket = new WebSocket(wsUrl);
 
       this.socket.onopen = () => {
         this.isConnected = true;
-        console.log('[WEBSOCKET_CONNECTED] 100% Free Unlimited Realtime Engine Active');
+        console.log('[WEBSOCKET_CONNECTED] 100% Free Live Cloud Realtime Engine Active (Render.com)');
       };
 
       this.socket.onmessage = (event: any) => {
