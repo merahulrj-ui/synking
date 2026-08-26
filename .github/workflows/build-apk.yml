@@ -33,23 +33,19 @@ jobs:
       - name: 🔄 Generate Fresh Android Prebuild
         run: npx expo prebuild --platform android --clean
 
-      - name: 📦 Enable Standalone Offline JS Bundling
-        run: |
-          sed -i '/bundleCommand = "export:embed"/a \    debuggableVariants = []' android/app/build.gradle
-
       - name: 🔧 Make Gradlew Executable
         run: chmod +x android/gradlew
 
-      - name: 🚀 Compile Standalone APK
+      - name: 🚀 Compile Standalone Release APK
         env:
           GRADLE_OPTS: "-Dorg.gradle.jvmargs=\"-Xmx4096m -XX:MaxMetaspaceSize=1024m\""
         run: |
           cd android
-          ./gradlew assembleDebug --no-daemon
+          ./gradlew assembleRelease --no-daemon
 
       - name: 📲 Upload Synking APK Artifact
         uses: actions/upload-artifact@v4
         with:
-          name: Synking-Live-APK
-          path: android/app/build/outputs/apk/debug/app-debug.apk
+          name: Synking-Release-APK
+          path: android/app/build/outputs/apk/release/app-release.apk
           retention-days: 30
