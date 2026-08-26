@@ -142,6 +142,34 @@ export async function fetchProfilesFromFirestore(currentUserId: string): Promise
 }
 
 /**
+ * Permanently delete a user profile from backend
+ */
+export async function deleteUserProfileFromBackend(userId: string): Promise<boolean> {
+  try {
+    await fetch(`${getLocalBackendUrl()}/api/profiles/${encodeURIComponent(userId)}`, {
+      method: 'DELETE',
+    });
+    return true;
+  } catch (e) {
+    return false;
+  }
+}
+
+/**
+ * Master Reset: Wipe all users, requests, and chats completely
+ */
+export async function wipeAllUsersFromBackend(): Promise<boolean> {
+  try {
+    await fetch(`${getLocalBackendUrl()}/api/reset-all`, {
+      method: 'DELETE',
+    });
+    return true;
+  } catch (e) {
+    return false;
+  }
+}
+
+/**
  * Saves real-time Synk Request to Local Backend & Firestore
  */
 export async function saveSynkRequestToFirestore(req: SynkRequest): Promise<boolean> {

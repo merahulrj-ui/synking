@@ -12,13 +12,15 @@ import { useRouter } from 'expo-router';
 const { width: SCREEN_WIDTH } = Dimensions.get('window');
 
 export default function DiscoverScreen() {
-  const { profiles, swipeProfile, isLoggedIn, isDarkMode, refreshDiscoverFeed } = useApp();
+  const { profiles, currentUser, swipeProfile, isLoggedIn, isDarkMode, refreshDiscoverFeed } = useApp();
   const router = useRouter();
   const [authModalVisible, setAuthModalVisible] = useState(false);
   const [requestSentProfile, setRequestSentProfile] = useState<any>(null);
 
-  const currentProfile = profiles[0];
-  const nextProfile = profiles[1];
+  // Strictly filter out own profile so user never sees themselves
+  const availableProfiles = profiles.filter(p => p && p.id !== currentUser?.id && p.name !== currentUser?.name);
+  const currentProfile = availableProfiles[0];
+  const nextProfile = availableProfiles[1];
 
   const handleSwipe = (action: 'like' | 'pass' | 'supersynk') => {
     if (!isLoggedIn) {

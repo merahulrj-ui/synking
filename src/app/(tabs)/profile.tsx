@@ -9,7 +9,7 @@ import { AuthModal } from '../../components/AuthModal';
 import { useRouter } from 'expo-router';
 
 export default function ProfileScreen() {
-  const { currentUser, isLoggedIn, isDarkMode, toggleTheme, updateCurrentUser } = useApp();
+  const { currentUser, isLoggedIn, isDarkMode, toggleTheme, updateCurrentUser, logoutUser, deleteAccount } = useApp();
   const [authModalVisible, setAuthModalVisible] = useState(false);
   const [editModalVisible, setEditModalVisible] = useState(false);
   const [editName, setEditName] = useState(currentUser?.name || '');
@@ -168,6 +168,61 @@ export default function ProfileScreen() {
                   <Ionicons name="shield-checkmark-outline" size={20} color="#00E5FF" />
                   <Text style={[styles.settingText, { color: textColor }]}>
                     Identity & Live Facial Verification
+                  </Text>
+                </View>
+                <Ionicons name="chevron-forward" size={16} color={subText} />
+              </TouchableOpacity>
+
+              {/* 🚪 LOGOUT BUTTON */}
+              <TouchableOpacity
+                style={[styles.settingRow, { backgroundColor: cardBg, borderColor, marginTop: 12 }]}
+                onPress={() => {
+                  Alert.alert(
+                    'Log Out',
+                    'Are you sure you want to sign out of this account?',
+                    [
+                      { text: 'Cancel', style: 'cancel' },
+                      { text: 'Log Out 🚪', style: 'destructive', onPress: () => logoutUser() }
+                    ]
+                  );
+                }}
+                activeOpacity={0.7}
+              >
+                <View style={{ flexDirection: 'row', alignItems: 'center', gap: 10 }}>
+                  <Ionicons name="log-out-outline" size={20} color="#F59E0B" />
+                  <Text style={[styles.settingText, { color: '#F59E0B' }]}>
+                    Sign Out / Switch User 🚪
+                  </Text>
+                </View>
+                <Ionicons name="chevron-forward" size={16} color={subText} />
+              </TouchableOpacity>
+
+              {/* 🗑️ DELETE PROFILE BUTTON */}
+              <TouchableOpacity
+                style={[styles.settingRow, { backgroundColor: cardBg, borderColor, marginTop: 8 }]}
+                onPress={() => {
+                  Alert.alert(
+                    '⚠️ Delete Profile Permanently?',
+                    'This will permanently remove your profile, match requests, and chat data from the database.',
+                    [
+                      { text: 'Cancel', style: 'cancel' },
+                      {
+                        text: 'Delete Permanently 🗑️',
+                        style: 'destructive',
+                        onPress: async () => {
+                          await deleteAccount();
+                          Alert.alert('Profile Deleted', 'Your account has been deleted from the database.');
+                        }
+                      }
+                    ]
+                  );
+                }}
+                activeOpacity={0.7}
+              >
+                <View style={{ flexDirection: 'row', alignItems: 'center', gap: 10 }}>
+                  <Ionicons name="trash-outline" size={20} color="#EF4444" />
+                  <Text style={[styles.settingText, { color: '#EF4444' }]}>
+                    Delete Account & Wipe Profile 🗑️
                   </Text>
                 </View>
                 <Ionicons name="chevron-forward" size={16} color={subText} />

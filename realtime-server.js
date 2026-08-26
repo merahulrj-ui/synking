@@ -283,6 +283,18 @@ const server = http.createServer((req, res) => {
     return;
   }
 
+  // MASTER DATABASE WIPE (Wipe all users, requests, chats 100%)
+  if (pathname === '/api/reset-all' || pathname === '/api/wipe-database') {
+    db.profiles = {};
+    db.requests = {};
+    db.chats = [];
+    saveDb();
+    console.log('🚨 [MASTER_DATABASE_WIPED] All users, requests, and chats permanently deleted.');
+    res.writeHead(200, { 'Content-Type': 'application/json' });
+    res.end(JSON.stringify({ success: true, message: 'All users, requests, and chats deleted completely. 0 remaining.' }));
+    return;
+  }
+
   // 3. GET /api/requests
   if (req.method === 'GET' && pathname === '/api/requests') {
     const userId = url.searchParams.get('userId');
@@ -300,6 +312,14 @@ const server = http.createServer((req, res) => {
       try {
         const newReq = JSON.parse(body);
         if (newReq && newReq.id) {
+          // STRICT GUARD: Block sending request to yourself!
+          if (newReq.fromUser?.id === newReq.toUserId || (newReq.fromUser?.name && newReq.fromUser.name === newReq.toUserName)) {
+            console.log('⚠️ [SELF_REQUEST_BLOCKED] User cannot send request to self');
+            res.writeHead(400, { 'Content-Type': 'application/json' });
+            res.end(JSON.stringify({ success: false, error: 'Self matching is not allowed' }));
+            return;
+          }
+
           db.requests[newReq.id] = newReq;
           saveDb();
           console.log(`[REQUEST_SAVED] ${newReq.fromUser?.name} ➔ ${newReq.toUserId}`);

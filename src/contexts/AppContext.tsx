@@ -10,6 +10,7 @@ import {
   fetchIncomingRequestsFromFirestore,
   fetchSentRequestsFromFirestore,
   updateRequestStatusInFirestore,
+  deleteUserProfileFromBackend,
 } from '../services/firebase';
 import { encryptE2EEMessage } from '../utils/encryption';
 import { RealtimeBridge } from '../services/realtimeBridge';
@@ -34,6 +35,7 @@ interface AppContextType {
   clearAcceptedMatchAlert: () => void;
   loginUser: (user: UserProfile) => void;
   logoutUser: () => void;
+  deleteAccount: () => Promise<void>;
   updateCurrentUser: (updates: Partial<UserProfile>) => void;
   updateSafetyContact: (contact: SafetyContact) => void;
   swipeProfile: (profileId: string, action: 'like' | 'pass' | 'supersynk') => { success: boolean; requestSent?: boolean; profile?: UserProfile };
@@ -123,7 +125,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
         });
       } else if (type === 'SYNK_REQUEST' && payload) {
         const req = payload as SynkRequest;
-        if (req.toUserId === currentUser?.id) {
+        if (req.toUserId === currentUser?.id && req.fromUser?.id !== currentUser?.id) {
           setIncomingRequests(prev => {
             if (prev.some(r => r.id === req.id)) return prev;
             return [req, ...prev];
@@ -257,6 +259,18 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     AsyncStorage.removeItem('synking_my_user').catch(() => {});
   };
 
+  const deleteAccount = async () => {
+    if (currentUser?.id) {
+      await deleteUserProfileFromBackend(currentUser.id);
+    }
+    logoutUser();
+    setProfiles([]);
+    setMatches([]);
+    setIncomingRequests([]);
+    setSentRequests([]);
+    setMessages({});
+  };
+
   const updateSafetyContact = (contact: SafetyContact) => {
     setSafetyContact(contact);
   };
@@ -267,7 +281,8 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     setProfiles(prev => prev.filter(p => p.id !== profileId));
 
     if (action === 'like' || action === 'supersynk') {
-      if (swipedUser && currentUser) {
+      // NEVER allow matching or sending request to yourself
+      if (swipedUser && currentUser && swipedUser.id !== currentUser.id) {
         const newReq: SynkRequest = {
           id: `req_${Date.now()}_${Math.random().toString(36).substring(2, 6)}`,
           fromUser: currentUser,
@@ -426,6 +441,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
         clearAcceptedMatchAlert: () => setAcceptedMatchAlert(null),
         loginUser,
         logoutUser,
+        deleteAccount,
         updateCurrentUser,
         updateSafetyContact,
         swipeProfile,
