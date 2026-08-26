@@ -53,7 +53,12 @@ export default function ChatScreen() {
     const unsubscribe = RealtimeBridge.subscribe(({ type, payload }) => {
       if (type === 'NEW_MESSAGE' && payload) {
         const msg = payload as ChatMessage;
-        if (msg.senderId === id || msg.receiverId === id) {
+        const myId = currentUser?.id || 'my_user_id';
+        const isForThisThread =
+          (msg.senderId === id && msg.receiverId === myId) ||
+          (msg.senderId === myId && msg.receiverId === id);
+
+        if (isForThisThread) {
           setCloudMessages(prev => {
             if (prev.some(m => m.id === msg.id)) return prev;
             return [...prev, msg];
@@ -62,9 +67,9 @@ export default function ChatScreen() {
       }
     });
     return () => unsubscribe();
-  }, [id]);
+  }, [id, currentUser?.id]);
 
-  // 2. Cloud Firestore Initial Sync & Backup Stream
+  // 2. Cloud Backend Initial Sync & Backup Stream
   useEffect(() => {
     if (!id || !currentUser) return;
     const fetchCloud = async () => {
@@ -74,17 +79,32 @@ export default function ChatScreen() {
       }
     };
     fetchCloud();
-    const interval = setInterval(fetchCloud, 12000);
+    const interval = setInterval(fetchCloud, 10000);
     return () => clearInterval(interval);
   }, [id, currentUser?.id]);
 
-  // Combine and deduplicate cloud + local messages
+  // Combine and strictly bifurcate cloud + local messages for this specific conversation
   const userMessages = React.useMemo(() => {
+    const myId = currentUser?.id || 'my_user_id';
     const map = new Map<string, ChatMessage>();
-    cloudMessages.forEach(m => map.set(m.id, m));
-    localMessages.forEach(m => map.set(m.id, m));
+    cloudMessages.forEach(m => {
+      if (
+        (m.senderId === id && m.receiverId === myId) ||
+        (m.senderId === myId && m.receiverId === id)
+      ) {
+        map.set(m.id, m);
+      }
+    });
+    localMessages.forEach(m => {
+      if (
+        (m.senderId === id && m.receiverId === myId) ||
+        (m.senderId === myId && m.receiverId === id)
+      ) {
+        map.set(m.id, m);
+      }
+    });
     return Array.from(map.values()).sort((a, b) => a.id.localeCompare(b.id));
-  }, [cloudMessages, localMessages]);
+  }, [cloudMessages, localMessages, id, currentUser?.id]);
 
   const activeBooking = activeBookings.find(b => b.user2Id === id || b.user1Id === id);
 

@@ -376,15 +376,21 @@ const server = http.createServer((req, res) => {
     return;
   }
 
-  // 6. GET /api/chats
+  // 6. GET /api/chats (Strictly bifurcate 1-on-1 messages between u1 and u2)
   if (req.method === 'GET' && pathname === '/api/chats') {
-    const u1 = url.searchParams.get('u1');
-    const u2 = url.searchParams.get('u2');
-    const matched = db.chats.filter(c => 
-      (!u1 && !u2) ||
-      (c.senderId === u1 && c.receiverId === u2) ||
-      (c.senderId === u2 && c.receiverId === u1)
-    );
+    const u1 = url.searchParams.get('u1') || url.searchParams.get('user1');
+    const u2 = url.searchParams.get('u2') || url.searchParams.get('user2');
+
+    let matched = db.chats || [];
+    if (u1 && u2) {
+      matched = (db.chats || []).filter(c =>
+        (c.senderId === u1 && c.receiverId === u2) ||
+        (c.senderId === u2 && c.receiverId === u1)
+      );
+    } else if (u1) {
+      matched = (db.chats || []).filter(c => c.senderId === u1 || c.receiverId === u1);
+    }
+
     res.writeHead(200, { 'Content-Type': 'application/json' });
     res.end(JSON.stringify(matched));
     return;
