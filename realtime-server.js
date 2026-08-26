@@ -422,7 +422,21 @@ const server = http.createServer((req, res) => {
     return;
   }
 
-  // 8. POST /api/debug-log (In-Call Diagnostics Upload)
+  // 8. GET /api/version (Zomato-Style Live In-App OTA Update Engine)
+  if (req.method === 'GET' && pathname === '/api/version') {
+    res.writeHead(200, { 'Content-Type': 'application/json' });
+    res.end(JSON.stringify({
+      version: '1.0.2',
+      buildNumber: 102,
+      releaseDate: new Date().toISOString(),
+      title: 'Zomato-Speed Live Update',
+      notes: 'Strict 1-on-1 private chat bifurcation & universal live audio/video streaming!',
+      forceRefresh: true,
+    }));
+    return;
+  }
+
+  // 9. POST /api/debug-log (In-Call Diagnostics Upload)
   if (req.method === 'POST' && pathname === '/api/debug-log') {
     let body = '';
     req.on('data', chunk => { body += chunk; });

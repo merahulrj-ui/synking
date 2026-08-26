@@ -4,11 +4,13 @@ import { Stack } from 'expo-router';
 import { StatusBar } from 'expo-status-bar';
 import { AppProvider } from '../contexts/AppContext';
 import { Colors } from '../constants/theme';
+import { OTAUpdateBanner } from '../components/OTAUpdateBanner';
 
 export default function RootLayout() {
   return (
     <AppProvider>
       <StatusBar style="auto" />
+      <OTAUpdateBanner />
       <View style={styles.outerContainer}>
         <View style={styles.mobileFrame}>
           <Stack

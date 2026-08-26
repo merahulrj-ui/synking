@@ -11,7 +11,7 @@ const FIRESTORE_BASE_URL = `https://firestore.googleapis.com/v1/projects/${PROJE
 
 export const CLOUD_BACKEND_URL = 'https://synking-9my2.onrender.com';
 
-function getLocalBackendUrl(): string {
+export function getLocalBackendUrl(): string {
   // Use Production Live Cloud Server (Render.com)
   return CLOUD_BACKEND_URL;
 }
