@@ -3,6 +3,9 @@
 
 import { CallSession, UserProfile } from '../types';
 import { RealtimeBridge } from './realtimeBridge';
+import { MediaDevices, PeerConnection, SessionDescription, IceCandidate } from './webrtcCore';
+import { Audio } from 'expo-av';
+import { Platform } from 'react-native';
 
 export const ICE_SERVERS: RTCConfiguration = {
   iceServers: [
@@ -59,7 +62,6 @@ class WebRTCManager {
           this.log('📞 CALL_ACCEPTED received from peer. Initiating WebRTC SDP offer handshake...');
           this.notify();
           this.startTimer();
-          this.startFrameBroadcaster();
 
           // Create SDP Offer if I am caller
           if (this.currentSession.id.startsWith('call_')) {
@@ -78,8 +80,7 @@ class WebRTCManager {
       } else if (type === 'WEBRTC_ANSWER' && payload) {
         if (this.peerConnection && this.peerConnection.signalingState === 'have-local-offer') {
           try {
-            // @ts-ignore
-            await this.peerConnection.setRemoteDescription(new RTCSessionDescription(payload.answer));
+            await this.peerConnection.setRemoteDescription(new SessionDescription(payload.answer));
             this.log('✅ WEBRTC_ANSWER applied. P2P Direct Relay Established via STUN/TURN!');
             await this.drainIceCandidates();
           } catch (e) {
@@ -90,8 +91,7 @@ class WebRTCManager {
         if (payload.candidate) {
           if (this.peerConnection && this.peerConnection.remoteDescription && this.peerConnection.remoteDescription.type) {
             try {
-              // @ts-ignore
-              await this.peerConnection.addIceCandidate(new RTCIceCandidate(payload.candidate));
+              await this.peerConnection.addIceCandidate(new IceCandidate(payload.candidate));
               this.log('🌐 ICE Candidate added to active connection.');
             } catch (e) {}
           } else {
@@ -116,7 +116,14 @@ class WebRTCManager {
 
   private getPeerUserId(): string {
     if (!this.currentSession) return '';
-    return this.currentSession.receiverId || this.currentSession.callerId;
+    // If I am the receiver (incoming call), the peer is the caller.
+    // We can identify if I am the receiver by checking if receiverId is the placeholder 'my_user_id' 
+    // or if the session is an incoming session (ringing).
+    if (this.currentSession.receiverId === 'my_user_id' || this.currentSession.status === 'ringing') {
+      return this.currentSession.callerId;
+    }
+    // If I am the caller, the peer is the receiver.
+    return this.currentSession.receiverId;
   }
 
   public onLog(listener: (msg: string) => void): () => void {
@@ -228,7 +235,6 @@ class WebRTCManager {
     this.currentSession.status = 'connected';
     this.notify();
     this.startTimer();
-    this.startFrameBroadcaster();
 
     const peerId = this.getPeerUserId();
     RealtimeBridge.broadcast(
@@ -268,8 +274,16 @@ class WebRTCManager {
 
   private async initLocalStream(includeVideo: boolean) {
     try {
-      if (typeof navigator !== 'undefined' && navigator.mediaDevices && navigator.mediaDevices.getUserMedia) {
-        this.localStream = await navigator.mediaDevices.getUserMedia({
+      if (Platform.OS !== 'web') {
+        await Audio.setAudioModeAsync({
+          allowsRecordingIOS: true,
+          playsInSilentModeIOS: true,
+          playThroughEarpieceAndroid: !includeVideo, // Video calls default to Speaker, Voice calls to Earpiece
+        });
+      }
+
+      if (MediaDevices && MediaDevices.getUserMedia) {
+        this.localStream = await MediaDevices.getUserMedia({
           audio: {
             echoCancellation: true,
             noiseSuppression: true,
@@ -285,56 +299,18 @@ class WebRTCManager {
     }
   }
 
-  // Real Hardware Camera Video Broadcaster (Extracts real video frames from active camera)
-  private startFrameBroadcaster() {
-    this.stopFrameBroadcaster();
-    if (typeof document === 'undefined') return;
-
-    if (!this.offscreenCanvas) {
-      this.offscreenCanvas = document.createElement('canvas');
-      this.offscreenCanvas.width = 360;
-      this.offscreenCanvas.height = 360;
-    }
-
-    this.frameBroadcaster = setInterval(() => {
-      if (this.currentSession && this.currentSession.status === 'connected' && this.currentSession.isVideoEnabled) {
-        try {
-          const ctx = this.offscreenCanvas.getContext('2d');
-          if (ctx) {
-            // Draw real live camera feed if video element is mounted
-            if (this.localVideoElementRef && this.localVideoElementRef.videoWidth > 0) {
-              ctx.drawImage(this.localVideoElementRef, 0, 0, 360, 360);
-              const frame = this.offscreenCanvas.toDataURL('image/jpeg', 0.5);
-              const peerId = this.getPeerUserId();
-              RealtimeBridge.broadcast(
-                'LIVE_VIDEO_FRAME',
-                {
-                  callId: this.currentSession.id,
-                  frame,
-                },
-                peerId
-              );
-            }
-          }
-        } catch (e) {}
-      }
-    }, 200); // 5 FPS low-latency real camera stream
-  }
-
   private stopFrameBroadcaster() {
-    if (this.frameBroadcaster) {
-      clearInterval(this.frameBroadcaster);
-      this.frameBroadcaster = null;
-    }
+    // Removed legacy fake frame broadcaster logic
   }
 
   private setupPeerConnection() {
     try {
-      // @ts-ignore
-      if (typeof RTCPeerConnection === 'undefined') return;
+      if (!PeerConnection) {
+        this.log('❌ WebRTC PeerConnection API not available.');
+        return;
+      }
 
-      // @ts-ignore
-      this.peerConnection = new RTCPeerConnection(ICE_SERVERS);
+      this.peerConnection = new PeerConnection(ICE_SERVERS);
       this.iceStatus = 'connecting';
       this.log('🌐 RTCPeerConnection initialized with Google STUN + OpenRelay TURN.');
 
@@ -398,8 +374,7 @@ class WebRTCManager {
     if (!this.peerConnection) return;
 
     try {
-      // @ts-ignore
-      await this.peerConnection.setRemoteDescription(new RTCSessionDescription(offer));
+      await this.peerConnection.setRemoteDescription(new SessionDescription(offer));
       this.log('📥 Remote SDP Offer set. Creating Targeted SDP Answer...');
       await this.drainIceCandidates();
 
@@ -418,8 +393,7 @@ class WebRTCManager {
     while (this.iceCandidateQueue.length > 0) {
       const candidate = this.iceCandidateQueue.shift();
       try {
-        // @ts-ignore
-        await this.peerConnection.addIceCandidate(new RTCIceCandidate(candidate));
+        await this.peerConnection.addIceCandidate(new IceCandidate(candidate));
         this.log('🌐 Queued ICE Candidate flushed to PeerConnection.');
       } catch (e) {}
     }
@@ -469,10 +443,23 @@ class WebRTCManager {
     return this.currentSession.isVideoEnabled;
   }
 
-  public toggleSpeaker(): boolean {
+  public async toggleSpeaker(): Promise<boolean> {
     if (!this.currentSession) return false;
     this.currentSession.isSpeakerOn = !this.currentSession.isSpeakerOn;
     const isSpeaker = this.currentSession.isSpeakerOn;
+    
+    try {
+      if (Platform.OS !== 'web') {
+        await Audio.setAudioModeAsync({
+          allowsRecordingIOS: true,
+          playsInSilentModeIOS: true,
+          playThroughEarpieceAndroid: !isSpeaker,
+        });
+      }
+    } catch (e) {
+      this.log(`⚠️ Audio routing error: ${e}`);
+    }
+
     this.log(isSpeaker ? '🔊 SPEAKER ON: Loudspeaker active' : '🔈 EARPIECE: Internal receiver active');
     this.notify();
     return this.currentSession.isSpeakerOn;

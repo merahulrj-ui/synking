@@ -6,6 +6,8 @@ import { CallSession } from '../types';
 import { WebRTCService } from '../services/webrtcService';
 import { CameraView } from 'expo-camera';
 
+import { NativeRTCView } from '../services/webrtcCore';
+
 // 1. Live Self Video Component (PiP) - Real Hardware Front Camera
 const LiveSelfVideo: React.FC = () => {
   const videoRef = useRef<any>(null);
@@ -13,7 +15,7 @@ const LiveSelfVideo: React.FC = () => {
   useEffect(() => {
     const attachSelf = () => {
       const stream = WebRTCService.getLocalStream();
-      if (stream && videoRef.current) {
+      if (Platform.OS === 'web' && stream && videoRef.current) {
         if (videoRef.current.srcObject !== stream) {
           videoRef.current.srcObject = stream;
         }
@@ -25,6 +27,8 @@ const LiveSelfVideo: React.FC = () => {
     const interval = setInterval(attachSelf, 400);
     return () => clearInterval(interval);
   }, []);
+
+  const stream = WebRTCService.getLocalStream();
 
   return (
     <View style={styles.selfVideoPlaceholder}>
@@ -45,15 +49,18 @@ const LiveSelfVideo: React.FC = () => {
           }}
         />
       ) : (
-        <CameraView
-          facing="front"
-          style={{
-            width: '100%',
-            height: '100%',
-            borderRadius: 16,
-            overflow: 'hidden',
-          }}
-        />
+        (NativeRTCView && stream) ? (
+          <NativeRTCView
+            streamURL={stream.toURL()}
+            style={{ width: '100%', height: '100%', borderRadius: 16 }}
+            objectFit="cover"
+            mirror={true}
+          />
+        ) : (
+          <View style={{ width: '100%', height: '100%', borderRadius: 16, overflow: 'hidden', backgroundColor: '#1A1A1A', justifyContent: 'center', alignItems: 'center' }}>
+            <Ionicons name="videocam-off" size={24} color="#555" />
+          </View>
+        )
       )}
     </View>
   );
@@ -65,6 +72,7 @@ const LiveAudioReceiver: React.FC = () => {
   const [audioBlocked, setAudioBlocked] = useState(false);
 
   const attemptPlay = () => {
+    if (Platform.OS !== 'web') return; // Native handles audio output automatically via PeerConnection
     const remoteStream = WebRTCService.getRemoteStream();
     if (remoteStream && audioRef.current) {
       if (audioRef.current.srcObject !== remoteStream) {
@@ -81,10 +89,14 @@ const LiveAudioReceiver: React.FC = () => {
   };
 
   useEffect(() => {
-    attemptPlay();
-    const interval = setInterval(attemptPlay, 600);
-    return () => clearInterval(interval);
+    if (Platform.OS === 'web') {
+      attemptPlay();
+      const interval = setInterval(attemptPlay, 600);
+      return () => clearInterval(interval);
+    }
   }, []);
+
+  if (Platform.OS !== 'web') return null;
 
   return (
     <View style={{ position: 'absolute', top: 12, right: 12, zIndex: 999 }}>
@@ -108,27 +120,19 @@ const LiveAudioReceiver: React.FC = () => {
 const LiveRemoteVideo: React.FC<{ photoUrl: string }> = ({ photoUrl }) => {
   const videoRef = useRef<any>(null);
   const [hasRemoteVideo, setHasRemoteVideo] = useState(false);
-  const [remoteFrame, setRemoteFrame] = useState<string | null>(null);
-
-  useEffect(() => {
-    const unsub = WebRTCService.onRemoteFrame((frame) => {
-      if (frame) {
-        setRemoteFrame(frame);
-      }
-    });
-    return () => unsub();
-  }, []);
 
   useEffect(() => {
     const checkStream = () => {
       const remoteStream = WebRTCService.getRemoteStream();
-      if (remoteStream && videoRef.current) {
-        if (videoRef.current.srcObject !== remoteStream) {
-          videoRef.current.srcObject = remoteStream;
-          videoRef.current.play().catch(() => {});
-        }
+      if (remoteStream) {
         if (remoteStream.getVideoTracks().length > 0) {
           setHasRemoteVideo(true);
+        }
+        if (Platform.OS === 'web' && videoRef.current) {
+          if (videoRef.current.srcObject !== remoteStream) {
+            videoRef.current.srcObject = remoteStream;
+            videoRef.current.play().catch(() => {});
+          }
         }
       }
     };
@@ -138,16 +142,11 @@ const LiveRemoteVideo: React.FC<{ photoUrl: string }> = ({ photoUrl }) => {
     return () => clearInterval(interval);
   }, []);
 
+  const remoteStream = WebRTCService.getRemoteStream();
+
   return (
     <View style={{ width: '100%', height: '100%', position: 'relative' }}>
-      {/* Universal Live Video Frame (Works 100% on Mobile + Web) */}
-      <Image
-        source={{ uri: remoteFrame || photoUrl }}
-        style={styles.videoStreamMain}
-        resizeMode="cover"
-      />
-
-      {Platform.OS === 'web' && (
+      {Platform.OS === 'web' ? (
         // @ts-ignore
         <video
           ref={videoRef}
@@ -160,9 +159,26 @@ const LiveRemoteVideo: React.FC<{ photoUrl: string }> = ({ photoUrl }) => {
             width: '100%',
             height: '100%',
             objectFit: 'cover',
-            borderRadius: 24,
-            display: hasRemoteVideo ? 'block' : 'none',
+            opacity: hasRemoteVideo ? 1 : 0,
+            zIndex: hasRemoteVideo ? 10 : 1,
           }}
+        />
+      ) : (
+        (NativeRTCView && remoteStream && hasRemoteVideo) && (
+          <NativeRTCView
+            streamURL={remoteStream.toURL()}
+            style={{ width: '100%', height: '100%', position: 'absolute', top: 0, left: 0, zIndex: 10 }}
+            objectFit="cover"
+          />
+        )
+      )}
+
+      {/* Fallback to Avatar when no video */}
+      {!hasRemoteVideo && (
+        <Image
+          source={{ uri: photoUrl }}
+          style={styles.videoStreamMain}
+          resizeMode="cover"
         />
       )}
     </View>
