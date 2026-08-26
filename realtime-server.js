@@ -298,7 +298,19 @@ const server = http.createServer((req, res) => {
   // 3. GET /api/requests
   if (req.method === 'GET' && pathname === '/api/requests') {
     const userId = url.searchParams.get('userId');
-    const list = Object.values(db.requests).filter(r => !userId || r.toUserId === userId || r.fromUser?.id === userId);
+    const type = url.searchParams.get('type');
+    const status = url.searchParams.get('status');
+
+    let list = Object.values(db.requests || {});
+    if (userId) {
+      if (type === 'incoming') {
+        list = list.filter(r => r.toUserId === userId && (!status || r.status === status));
+      } else if (type === 'sent') {
+        list = list.filter(r => r.fromUser?.id === userId && (!status || r.status === status));
+      } else {
+        list = list.filter(r => r.toUserId === userId || r.fromUser?.id === userId);
+      }
+    }
     res.writeHead(200, { 'Content-Type': 'application/json' });
     res.end(JSON.stringify(list));
     return;
@@ -324,8 +336,8 @@ const server = http.createServer((req, res) => {
           saveDb();
           console.log(`[REQUEST_SAVED] ${newReq.fromUser?.name} ➔ ${newReq.toUserId}`);
           
-          // Broadcast to connected WebSocket clients in 0ms
-          broadcastToWebSockets({ type: 'SYNK_REQUEST', payload: newReq });
+          // Targeted send to recipient only
+          broadcastToWebSockets({ type: 'SYNK_REQUEST', targetUserId: newReq.toUserId, payload: newReq });
 
           res.writeHead(200, { 'Content-Type': 'application/json' });
           res.end(JSON.stringify({ success: true }));
@@ -351,11 +363,13 @@ const server = http.createServer((req, res) => {
           console.log(`[REQUEST_STATUS_UPDATED] ${requestId} ➔ ${status}`);
 
           if (status === 'accepted') {
+            const fromUserId = db.requests[requestId].fromUser?.id;
             broadcastToWebSockets({
               type: 'REQUEST_ACCEPTED',
+              targetUserId: fromUserId,
               payload: {
                 requestId,
-                fromUserId: db.requests[requestId].fromUser?.id,
+                fromUserId,
                 acceptedBy,
               }
             });

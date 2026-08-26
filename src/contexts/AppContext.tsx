@@ -1,4 +1,4 @@
-import React, { createContext, useContext, useState, useEffect } from 'react';
+import React, { createContext, useContext, useState, useEffect, useRef } from 'react';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { UserProfile, SynkRequest, Venue, DateBooking, ChatMessage, SafetyContact } from '../types';
 import { MOCK_VENUES } from '../constants/mockData';
@@ -103,6 +103,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
   const [incomingRequests, setIncomingRequests] = useState<SynkRequest[]>([]);
   const [sentRequests, setSentRequests] = useState<SynkRequest[]>([]);
   const [acceptedMatchAlert, setAcceptedMatchAlert] = useState<UserProfile | null>(null);
+  const seenMatchAlerts = useRef<Set<string>>(new Set());
   const [venues] = useState<Venue[]>(MOCK_VENUES);
   const [activeBookings, setActiveBookings] = useState<DateBooking[]>([]);
   const [messages, setMessages] = useState<Record<string, ChatMessage[]>>({});
@@ -139,7 +140,11 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
               if (prev.some(m => m && m.id === acceptedUser.id)) return prev;
               return [acceptedUser, ...prev.filter(Boolean)];
             });
-            setAcceptedMatchAlert(acceptedUser);
+            // ONLY alert ONCE ever per match (no repeated loops)
+            if (!seenMatchAlerts.current.has(acceptedUser.id)) {
+              seenMatchAlerts.current.add(acceptedUser.id);
+              setAcceptedMatchAlert(acceptedUser);
+            }
           }
         }
       } else if (type === 'INCOMING_CALL' && payload) {
@@ -161,7 +166,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       setProfiles(realUsers.filter(Boolean));
     }
 
-    // Fetch Incoming Synk Requests sent to this user
+    // Fetch Incoming Synk Requests sent to this user (filtered by pending)
     const cloudRequests = await fetchIncomingRequestsFromFirestore(currentUser.id);
     if (Array.isArray(cloudRequests) && cloudRequests.length > 0) {
       setIncomingRequests(prev => {
@@ -183,7 +188,6 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
           if (partner && partner.id) {
             setMatches(prev => {
               if (prev.some(m => m && m.id === partner.id)) return prev;
-              setAcceptedMatchAlert(partner);
               return [partner, ...prev.filter(Boolean)];
             });
           }
@@ -315,11 +319,15 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
 
     // 1. Broadcast instant 0ms Acceptance Notification to sender device
     if (currentUser) {
-      RealtimeBridge.broadcast('REQUEST_ACCEPTED', {
-        requestId,
-        fromUserId: req.fromUser.id,
-        acceptedBy: currentUser,
-      });
+      RealtimeBridge.broadcast(
+        'REQUEST_ACCEPTED',
+        {
+          requestId,
+          fromUserId: req.fromUser.id,
+          acceptedBy: currentUser,
+        },
+        req.fromUser.id
+      );
     }
 
     // 2. Persist update in Cloud Firestore
