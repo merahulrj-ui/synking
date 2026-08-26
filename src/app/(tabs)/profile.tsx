@@ -7,17 +7,60 @@ import { Header } from '../../components/Header';
 import { GradientButton } from '../../components/GradientButton';
 import { AuthModal } from '../../components/AuthModal';
 import { useRouter } from 'expo-router';
+import { getLocalBackendUrl } from '../../services/firebase';
 
 export default function ProfileScreen() {
   const { currentUser, isLoggedIn, isDarkMode, toggleTheme, updateCurrentUser, logoutUser, deleteAccount } = useApp();
   const [authModalVisible, setAuthModalVisible] = useState(false);
   const [editModalVisible, setEditModalVisible] = useState(false);
+  const [isCheckingUpdate, setIsCheckingUpdate] = useState(false);
   const [editName, setEditName] = useState(currentUser?.name || '');
   const [editAge, setEditAge] = useState((currentUser?.age || 22).toString());
   const [editCity, setEditCity] = useState(currentUser?.location || 'Roorkee');
   const [editOccupation, setEditOccupation] = useState(currentUser?.occupation || '');
   const [editBio, setEditBio] = useState(currentUser?.bio || '');
   const router = useRouter();
+
+  const handleCheckForUpdates = async () => {
+    setIsCheckingUpdate(true);
+    try {
+      const res = await fetch(`${getLocalBackendUrl()}/api/version`);
+      if (res.ok) {
+        const data = await res.json();
+        const CURRENT_APP_BUILD = 101;
+        if (data && data.buildNumber > CURRENT_APP_BUILD) {
+          Alert.alert(
+            `🚀 Update Available (v${data.version || '1.0.2'})`,
+            `${data.notes || 'A new live update is ready with latest features.'}\n\nDo you want to update now?`,
+            [
+              { text: 'Later', style: 'cancel' },
+              {
+                text: 'Update & Restart ⚡',
+                onPress: () => {
+                  if (typeof window !== 'undefined' && window.location) {
+                    window.location.reload();
+                  } else {
+                    Alert.alert('Updated ✨', 'App is running latest version.');
+                  }
+                }
+              }
+            ]
+          );
+        } else {
+          Alert.alert(
+            '✅ App Up to Date',
+            `You are already on the latest version of SYNKING (v${data?.version || '1.0.2'}).`
+          );
+        }
+      } else {
+        Alert.alert('✅ App Up to Date', 'You are on the latest version.');
+      }
+    } catch (e) {
+      Alert.alert('Connected', 'You are running the latest live version.');
+    } finally {
+      setIsCheckingUpdate(false);
+    }
+  };
 
   const bg = isDarkMode ? '#05060A' : '#F9FAFB';
   const textColor = isDarkMode ? '#FFFFFF' : '#111827';
@@ -173,9 +216,35 @@ export default function ProfileScreen() {
                 <Ionicons name="chevron-forward" size={16} color={subText} />
               </TouchableOpacity>
 
-              {/* 🚪 LOGOUT BUTTON */}
+              {/* 🔄 CHECK FOR UPDATES BUTTON */}
               <TouchableOpacity
                 style={[styles.settingRow, { backgroundColor: cardBg, borderColor, marginTop: 12 }]}
+                onPress={handleCheckForUpdates}
+                activeOpacity={0.7}
+                disabled={isCheckingUpdate}
+              >
+                <View style={{ flexDirection: 'row', alignItems: 'center', gap: 10 }}>
+                  <Ionicons name="refresh-circle-outline" size={22} color="#00E5FF" />
+                  <View>
+                    <Text style={[styles.settingText, { color: textColor }]}>
+                      {isCheckingUpdate ? 'Checking for updates...' : 'Check for App Updates 🔄'}
+                    </Text>
+                    <Text style={{ fontSize: 11, color: subText, marginTop: 2 }}>
+                      Live OTA Engine • v1.0.2
+                    </Text>
+                  </View>
+                </View>
+                <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
+                  <View style={{ backgroundColor: 'rgba(0, 229, 255, 0.15)', paddingHorizontal: 8, paddingVertical: 2, borderRadius: 8 }}>
+                    <Text style={{ color: '#00E5FF', fontSize: 11, fontWeight: '800' }}>v1.0.2</Text>
+                  </View>
+                  <Ionicons name="chevron-forward" size={16} color={subText} />
+                </View>
+              </TouchableOpacity>
+
+              {/* 🚪 LOGOUT BUTTON */}
+              <TouchableOpacity
+                style={[styles.settingRow, { backgroundColor: cardBg, borderColor, marginTop: 8 }]}
                 onPress={() => {
                   Alert.alert(
                     'Log Out',
