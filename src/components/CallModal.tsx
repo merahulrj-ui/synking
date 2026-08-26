@@ -17,6 +17,7 @@ const LiveSelfVideo: React.FC = () => {
         if (videoRef.current.srcObject !== stream) {
           videoRef.current.srcObject = stream;
         }
+        WebRTCService.localVideoElementRef = videoRef.current;
         videoRef.current.play().catch(() => {});
       }
     };

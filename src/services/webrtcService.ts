@@ -1,5 +1,5 @@
-// Native WebRTC & Universal WebSocket Live Streaming Engine for Synking
-// P2P Direct Tunnel + WebSocket Live Audio/Video Fallback (100% Cross-Platform)
+// Native WebRTC & Targeted Real-Time Streaming Engine for Synking
+// STUN + OpenRelay TURN Pool • 1-on-1 Targeted Signaling • Real Hardware Camera Capture
 
 import { CallSession, UserProfile } from '../types';
 import { RealtimeBridge } from './realtimeBridge';
@@ -9,8 +9,15 @@ export const ICE_SERVERS: RTCConfiguration = {
     { urls: 'stun:stun.l.google.com:19302' },
     { urls: 'stun:stun1.l.google.com:19302' },
     { urls: 'stun:stun2.l.google.com:19302' },
-    { urls: 'stun:stun3.l.google.com:19302' },
-    { urls: 'stun:stun4.l.google.com:19302' },
+    {
+      urls: [
+        'turn:openrelay.metered.ca:80',
+        'turn:openrelay.metered.ca:443',
+        'turn:openrelay.metered.ca:443?transport=tcp'
+      ],
+      username: 'openrelayproject',
+      credential: 'openrelayproject'
+    }
   ],
   iceCandidatePoolSize: 10,
 };
@@ -32,15 +39,24 @@ class WebRTCManager {
   private pendingOffer: any = null;
   private iceCandidateQueue: any[] = [];
   private offscreenCanvas: any = null;
+  public localVideoElementRef: any = null;
   public iceStatus: string = 'disconnected';
 
   constructor() {
-    // Listen for Real-Time Call Signaling from other device
-    RealtimeBridge.subscribe(async ({ type, payload }) => {
+    // Listen for Targeted Real-Time Call Signaling from peer
+    RealtimeBridge.subscribe(async ({ type, payload, targetUserId }) => {
+      // Ignore signals meant for other users
+      if (targetUserId && this.currentSession) {
+        const myId = this.currentSession.callerId;
+        if (targetUserId !== myId && targetUserId !== 'my_user_id' && targetUserId !== this.currentSession.receiverId) {
+          return;
+        }
+      }
+
       if (type === 'CALL_ACCEPTED' && payload) {
         if (this.currentSession && (this.currentSession.status === 'calling' || this.currentSession.status === 'ringing')) {
           this.currentSession.status = 'connected';
-          this.log('📞 CALL_ACCEPTED received. Starting P2P & WebSocket Live Stream...');
+          this.log('📞 CALL_ACCEPTED received from peer. Initiating WebRTC SDP offer handshake...');
           this.notify();
           this.startTimer();
           this.startFrameBroadcaster();
@@ -54,7 +70,7 @@ class WebRTCManager {
         if (this.peerConnection && this.peerConnection.signalingState !== 'stable') {
           return;
         }
-        this.log('⚡ WEBRTC_OFFER received from caller. Preparing SDP Answer...');
+        this.log('⚡ WEBRTC_OFFER received from peer. Generating SDP Answer...');
         this.pendingOffer = payload.offer;
         if (this.currentSession && this.currentSession.status === 'connected') {
           this.handleIncomingOffer(payload.offer);
@@ -64,7 +80,7 @@ class WebRTCManager {
           try {
             // @ts-ignore
             await this.peerConnection.setRemoteDescription(new RTCSessionDescription(payload.answer));
-            this.log('✅ WEBRTC_ANSWER applied. P2P Direct Tunnel established!');
+            this.log('✅ WEBRTC_ANSWER applied. P2P Direct Relay Established via STUN/TURN!');
             await this.drainIceCandidates();
           } catch (e) {
             this.log(`❌ WEBRTC_ANSWER error: ${e}`);
@@ -76,7 +92,7 @@ class WebRTCManager {
             try {
               // @ts-ignore
               await this.peerConnection.addIceCandidate(new RTCIceCandidate(payload.candidate));
-              this.log('🌐 ICE Candidate added to active peer connection.');
+              this.log('🌐 ICE Candidate added to active connection.');
             } catch (e) {}
           } else {
             this.iceCandidateQueue.push(payload.candidate);
@@ -96,6 +112,11 @@ class WebRTCManager {
         }
       }
     });
+  }
+
+  private getPeerUserId(): string {
+    if (!this.currentSession) return '';
+    return this.currentSession.receiverId || this.currentSession.callerId;
   }
 
   public onLog(listener: (msg: string) => void): () => void {
@@ -157,13 +178,17 @@ class WebRTCManager {
     // Capture Local Hardware Microphone & Camera
     await this.initLocalStream(params.type === 'video');
 
-    // Broadcast INCOMING_CALL to recipient device
-    RealtimeBridge.broadcast('INCOMING_CALL', {
-      callId: newSession.id,
-      callerUser: params.callerUser,
-      receiverId: params.targetUser.id,
-      type: params.type,
-    });
+    // Send Targeted INCOMING_CALL to recipient device
+    RealtimeBridge.broadcast(
+      'INCOMING_CALL',
+      {
+        callId: newSession.id,
+        callerUser: params.callerUser,
+        receiverId: params.targetUser.id,
+        type: params.type,
+      },
+      params.targetUser.id
+    );
 
     return newSession;
   }
@@ -205,9 +230,14 @@ class WebRTCManager {
     this.startTimer();
     this.startFrameBroadcaster();
 
-    RealtimeBridge.broadcast('CALL_ACCEPTED', {
-      callId: this.currentSession.id,
-    });
+    const peerId = this.getPeerUserId();
+    RealtimeBridge.broadcast(
+      'CALL_ACCEPTED',
+      {
+        callId: this.currentSession.id,
+      },
+      peerId
+    );
 
     if (this.pendingOffer) {
       await this.handleIncomingOffer(this.pendingOffer);
@@ -217,9 +247,10 @@ class WebRTCManager {
   // 4. Reject Incoming Call
   public rejectCall() {
     const callId = this.currentSession?.id;
+    const peerId = this.getPeerUserId();
     this.log('❌ Rejecting incoming call.');
     this.cleanup();
-    RealtimeBridge.broadcast('CALL_REJECTED', { callId });
+    RealtimeBridge.broadcast('CALL_REJECTED', { callId }, peerId);
   }
 
   // 5. End Ongoing Call
@@ -228,9 +259,10 @@ class WebRTCManager {
     const sessionCopy = { ...this.currentSession };
     const durationFormatted = this.formatDuration(sessionCopy.durationSeconds);
     const callId = sessionCopy.id;
+    const peerId = this.getPeerUserId();
     this.log(`🛑 Ending ongoing call (${durationFormatted}).`);
     this.cleanup();
-    RealtimeBridge.broadcast('CALL_ENDED', { callId });
+    RealtimeBridge.broadcast('CALL_ENDED', { callId }, peerId);
     return { session: sessionCopy, durationFormatted };
   }
 
@@ -238,91 +270,30 @@ class WebRTCManager {
     try {
       if (typeof navigator !== 'undefined' && navigator.mediaDevices && navigator.mediaDevices.getUserMedia) {
         this.localStream = await navigator.mediaDevices.getUserMedia({
-          audio: true,
-          video: includeVideo ? true : false,
+          audio: {
+            echoCancellation: true,
+            noiseSuppression: true,
+            autoGainControl: true,
+          },
+          video: includeVideo ? { facingMode: 'user', width: { ideal: 640 }, height: { ideal: 480 } } : false,
         });
         this.log(`🟢 Hardware stream captured: Audio (${this.localStream.getAudioTracks().length}), Video (${this.localStream.getVideoTracks().length})`);
         return;
       }
     } catch (err) {
-      this.log(`⚠️ Hardware stream error (${err}). Initializing universal video/voice channel.`);
-    }
-
-    // Universal Web Audio & Canvas Stream Fallback
-    try {
-      if (typeof window !== 'undefined') {
-        const AudioContext = window.AudioContext || (window as any).webkitAudioContext;
-        let audioTrack: any = null;
-        let videoTrack: any = null;
-
-        if (AudioContext) {
-          const ctx = new AudioContext();
-          const osc = ctx.createOscillator();
-          const dest = ctx.createMediaStreamDestination();
-          const gain = ctx.createGain();
-          osc.type = 'sine';
-          osc.frequency.setValueAtTime(520, ctx.currentTime);
-          gain.gain.setValueAtTime(0.35, ctx.currentTime);
-          osc.connect(gain);
-          gain.connect(dest);
-          osc.start();
-          audioTrack = dest.stream.getAudioTracks()[0];
-        }
-
-        if (includeVideo && typeof document !== 'undefined') {
-          const canvas = document.createElement('canvas');
-          canvas.width = 480;
-          canvas.height = 480;
-          const ctx = canvas.getContext('2d');
-          if (ctx) {
-            let hue = 0;
-            const draw = () => {
-              hue = (hue + 2) % 360;
-              ctx.fillStyle = `hsl(${hue}, 80%, 20%)`;
-              ctx.fillRect(0, 0, 480, 480);
-              ctx.fillStyle = '#FFFFFF';
-              ctx.font = 'bold 24px sans-serif';
-              ctx.textAlign = 'center';
-              ctx.fillText('SYNKING Live Stream 📹', 240, 220);
-              ctx.font = '16px sans-serif';
-              ctx.fillStyle = '#00E5FF';
-              ctx.fillText(new Date().toLocaleTimeString(), 240, 260);
-              requestAnimationFrame(draw);
-            };
-            draw();
-            // @ts-ignore
-            if (canvas.captureStream) {
-              // @ts-ignore
-              const vStream = canvas.captureStream(30);
-              videoTrack = vStream.getVideoTracks()[0];
-            }
-          }
-        }
-
-        // @ts-ignore
-        if (typeof MediaStream !== 'undefined') {
-          // @ts-ignore
-          const fallbackStream = new MediaStream();
-          if (audioTrack) fallbackStream.addTrack(audioTrack);
-          if (videoTrack) fallbackStream.addTrack(videoTrack);
-          this.localStream = fallbackStream;
-          this.log('🟢 Synthetic audio/video streaming tracks generated and active.');
-        }
-      }
-    } catch (e) {
-      this.log(`❌ Stream fallback error: ${e}`);
+      this.log(`⚠️ Hardware stream capture error: ${err}`);
     }
   }
 
-  // Universal Video Frame Broadcaster (Streams 4 FPS frames over WebSocket for 100% Guaranteed Display)
+  // Real Hardware Camera Video Broadcaster (Extracts real video frames from active camera)
   private startFrameBroadcaster() {
     this.stopFrameBroadcaster();
     if (typeof document === 'undefined') return;
 
     if (!this.offscreenCanvas) {
       this.offscreenCanvas = document.createElement('canvas');
-      this.offscreenCanvas.width = 320;
-      this.offscreenCanvas.height = 320;
+      this.offscreenCanvas.width = 360;
+      this.offscreenCanvas.height = 360;
     }
 
     this.frameBroadcaster = setInterval(() => {
@@ -330,38 +301,24 @@ class WebRTCManager {
         try {
           const ctx = this.offscreenCanvas.getContext('2d');
           if (ctx) {
-            const timeStr = new Date().toLocaleTimeString();
-            ctx.fillStyle = '#0F172A';
-            ctx.fillRect(0, 0, 320, 320);
-
-            // Glowing live indicator
-            ctx.fillStyle = '#FD3A73';
-            ctx.beginPath();
-            ctx.arc(160, 140, 60, 0, Math.PI * 2);
-            ctx.fill();
-
-            ctx.fillStyle = '#FFFFFF';
-            ctx.font = 'bold 20px sans-serif';
-            ctx.textAlign = 'center';
-            ctx.fillText(this.currentSession.callerName || 'Live Video', 160, 146);
-
-            ctx.fillStyle = '#22C55E';
-            ctx.font = 'bold 14px sans-serif';
-            ctx.fillText('● LIVE STREAMING', 160, 240);
-
-            ctx.fillStyle = '#94A3B8';
-            ctx.font = '12px sans-serif';
-            ctx.fillText(timeStr, 160, 270);
-
-            const frame = this.offscreenCanvas.toDataURL('image/jpeg', 0.5);
-            RealtimeBridge.broadcast('LIVE_VIDEO_FRAME', {
-              callId: this.currentSession.id,
-              frame,
-            });
+            // Draw real live camera feed if video element is mounted
+            if (this.localVideoElementRef && this.localVideoElementRef.videoWidth > 0) {
+              ctx.drawImage(this.localVideoElementRef, 0, 0, 360, 360);
+              const frame = this.offscreenCanvas.toDataURL('image/jpeg', 0.5);
+              const peerId = this.getPeerUserId();
+              RealtimeBridge.broadcast(
+                'LIVE_VIDEO_FRAME',
+                {
+                  callId: this.currentSession.id,
+                  frame,
+                },
+                peerId
+              );
+            }
           }
         } catch (e) {}
       }
-    }, 250); // 4 FPS low-latency stream
+    }, 200); // 5 FPS low-latency real camera stream
   }
 
   private stopFrameBroadcaster() {
@@ -379,9 +336,9 @@ class WebRTCManager {
       // @ts-ignore
       this.peerConnection = new RTCPeerConnection(ICE_SERVERS);
       this.iceStatus = 'connecting';
-      this.log('🌐 RTCPeerConnection initialized with Google STUN servers.');
+      this.log('🌐 RTCPeerConnection initialized with Google STUN + OpenRelay TURN.');
 
-      // Attach Local Media Tracks to PeerConnection
+      // Attach Local Media Tracks
       if (this.localStream) {
         this.localStream.getTracks().forEach((track: any) => {
           this.peerConnection.addTrack(track, this.localStream);
@@ -389,26 +346,27 @@ class WebRTCManager {
         this.log(`📤 Attached ${this.localStream.getTracks().length} local media tracks to PeerConnection.`);
       }
 
-      // Handle Remote Incoming Media Stream (Audio/Video from Partner)
+      // Handle Remote Incoming Media Stream (Audio/Video from Peer)
       this.peerConnection.ontrack = (event: any) => {
         if (event.streams && event.streams[0]) {
           this.remoteStream = event.streams[0];
-          this.log(`📥 REMOTE STREAM ARRIVED! Tracks: ${this.remoteStream.getTracks().length}`);
+          this.log(`📥 REMOTE MEDIA STREAM ARRIVED! Tracks: Audio (${this.remoteStream.getAudioTracks().length}), Video (${this.remoteStream.getVideoTracks().length})`);
           this.notify();
         }
       };
 
-      // ICE Candidates Relay
+      // ICE Candidate Relay (Strictly targeted to peer)
+      const peerId = this.getPeerUserId();
       this.peerConnection.onicecandidate = (event: any) => {
         if (event.candidate) {
-          RealtimeBridge.broadcast('WEBRTC_ICE', { candidate: event.candidate });
+          RealtimeBridge.broadcast('WEBRTC_ICE', { candidate: event.candidate, callId: this.currentSession?.id }, peerId);
         }
       };
 
       this.peerConnection.oniceconnectionstatechange = () => {
         if (this.peerConnection) {
           this.iceStatus = this.peerConnection.iceConnectionState;
-          this.log(`🌐 ICE STATE: ${this.iceStatus}`);
+          this.log(`🌐 ICE RELAY STATE: ${this.iceStatus}`);
           this.notify();
         }
       };
@@ -422,10 +380,14 @@ class WebRTCManager {
     if (!this.peerConnection) return;
 
     try {
-      const offer = await this.peerConnection.createOffer();
+      const offer = await this.peerConnection.createOffer({
+        offerToReceiveAudio: true,
+        offerToReceiveVideo: this.currentSession?.isVideoEnabled || false,
+      });
       await this.peerConnection.setLocalDescription(offer);
-      RealtimeBridge.broadcast('WEBRTC_OFFER', { offer });
-      this.log('📤 SDP Offer created & broadcasted to peer.');
+      const peerId = this.getPeerUserId();
+      RealtimeBridge.broadcast('WEBRTC_OFFER', { offer, callId: this.currentSession?.id }, peerId);
+      this.log(`📤 Targeted SDP Offer sent strictly to peer (${peerId}).`);
     } catch (e) {
       this.log(`❌ createOffer error: ${e}`);
     }
@@ -438,13 +400,14 @@ class WebRTCManager {
     try {
       // @ts-ignore
       await this.peerConnection.setRemoteDescription(new RTCSessionDescription(offer));
-      this.log('📥 Remote SDP Offer set. Creating SDP Answer...');
+      this.log('📥 Remote SDP Offer set. Creating Targeted SDP Answer...');
       await this.drainIceCandidates();
 
       const answer = await this.peerConnection.createAnswer();
       await this.peerConnection.setLocalDescription(answer);
-      RealtimeBridge.broadcast('WEBRTC_ANSWER', { answer });
-      this.log('📤 SDP Answer sent back to caller.');
+      const peerId = this.getPeerUserId();
+      RealtimeBridge.broadcast('WEBRTC_ANSWER', { answer, callId: this.currentSession?.id }, peerId);
+      this.log(`📤 Targeted SDP Answer sent back strictly to caller (${peerId}).`);
     } catch (e) {
       this.log(`❌ handleIncomingOffer error: ${e}`);
     }
@@ -457,7 +420,7 @@ class WebRTCManager {
       try {
         // @ts-ignore
         await this.peerConnection.addIceCandidate(new RTCIceCandidate(candidate));
-        this.log('🌐 Queued ICE Candidate flushed & added to PeerConnection.');
+        this.log('🌐 Queued ICE Candidate flushed to PeerConnection.');
       } catch (e) {}
     }
   }
@@ -487,7 +450,7 @@ class WebRTCManager {
         track.enabled = !isMuted;
       });
     }
-    this.log(isMuted ? '🔇 MUTE ON: Mic track disabled (audio muted to peer)' : '🎙️ MUTE OFF: Mic track enabled (voice transmitting live)');
+    this.log(isMuted ? '🔇 MUTE ON: Mic track disabled' : '🎙️ MUTE OFF: Mic track active');
     this.notify();
     return this.currentSession.isMuted;
   }
@@ -501,7 +464,7 @@ class WebRTCManager {
         track.enabled = isVideo;
       });
     }
-    this.log(isVideo ? '📹 CAMERA ON: Video track enabled (stream visible)' : '📷 CAMERA OFF: Video track disabled (avatar shown)');
+    this.log(isVideo ? '📹 CAMERA ON: Video track enabled' : '📷 CAMERA OFF: Video track disabled');
     this.notify();
     return this.currentSession.isVideoEnabled;
   }
@@ -510,7 +473,7 @@ class WebRTCManager {
     if (!this.currentSession) return false;
     this.currentSession.isSpeakerOn = !this.currentSession.isSpeakerOn;
     const isSpeaker = this.currentSession.isSpeakerOn;
-    this.log(isSpeaker ? '🔊 SPEAKER ON: Audio routed to main loudspeaker' : '🔈 EARPIECE: Audio routed to internal earpiece');
+    this.log(isSpeaker ? '🔊 SPEAKER ON: Loudspeaker active' : '🔈 EARPIECE: Internal receiver active');
     this.notify();
     return this.currentSession.isSpeakerOn;
   }

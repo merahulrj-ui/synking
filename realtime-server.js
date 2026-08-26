@@ -501,6 +501,44 @@ server.on('upgrade', (req, socket, head) => {
       const decoded = decodeWebSocketFrame(buffer);
       if (decoded) {
         const parsed = JSON.parse(decoded);
+
+        // 1. Socket User Registration
+        if (parsed.type === 'REGISTER_SOCKET' && parsed.userId) {
+          socket.userId = parsed.userId;
+          console.log(`[WS_REGISTERED] Socket bound to userId: ${parsed.userId}`);
+          return;
+        }
+
+        // 2. Targeted 1-on-1 Signaling Relay (WebRTC Offer, Answer, ICE, Call Signals)
+        const targetUserId =
+          parsed.targetUserId ||
+          parsed.payload?.receiverId ||
+          parsed.payload?.targetUserId ||
+          parsed.payload?.toUserId;
+
+        if (targetUserId) {
+          let delivered = false;
+          const jsonStr = JSON.stringify(parsed);
+          const frame = encodeWebSocketFrame(jsonStr);
+
+          for (const client of clients) {
+            if (client !== socket && client.writable && client.userId === targetUserId) {
+              try {
+                client.write(frame);
+                delivered = true;
+              } catch (e) {
+                clients.delete(client);
+              }
+            }
+          }
+
+          if (delivered) {
+            console.log(`[WS_TARGETED_SIGNAL] ${parsed.type} ➔ Delivered strictly to ${targetUserId}`);
+            return;
+          }
+        }
+
+        // 3. Fallback: Broadcast to other clients
         broadcastToWebSockets(parsed, socket);
       }
     } catch (e) {}
@@ -508,7 +546,7 @@ server.on('upgrade', (req, socket, head) => {
 
   socket.on('close', () => {
     clients.delete(socket);
-    console.log(`[WS_DISCONNECTED] Client disconnected. Active clients: ${clients.size}`);
+    console.log(`[WS_DISCONNECTED] Client (${socket.userId || 'anon'}) disconnected. Active clients: ${clients.size}`);
   });
 
   socket.on('error', () => {
@@ -520,7 +558,7 @@ function broadcastToWebSockets(data, senderSocket = null) {
   const jsonStr = JSON.stringify(data);
   const frame = encodeWebSocketFrame(jsonStr);
   for (const client of clients) {
-    if (client.writable) {
+    if (client !== senderSocket && client.writable) {
       try {
         client.write(frame);
       } catch (e) {

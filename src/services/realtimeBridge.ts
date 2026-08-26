@@ -1,13 +1,14 @@
 // Native Zero-Latency Real-Time Signaling Bridge & WebSocket Client
 // Connects to local/network WebSocket server for 100% FREE Unlimited Real-Time Delivery
 
-type RealtimeListener = (event: { type: string; payload: any }) => void;
+type RealtimeListener = (event: { type: string; payload: any; targetUserId?: string }) => void;
 
 class RealtimeBridgeManager {
   private channel: any = null;
   private socket: any = null;
   private listeners: Set<RealtimeListener> = new Set();
   private isConnected = false;
+  private registeredUserId: string | null = null;
 
   constructor() {
     // 1. Local Browser BroadcastChannel (0ms intra-device sync)
@@ -22,8 +23,17 @@ class RealtimeBridgeManager {
       }
     } catch (e) {}
 
-    // 2. Connect to Free Unlimited WebSocket Server on Port 8082
+    // 2. Connect to Free Unlimited WebSocket Server
     this.connectWebSocket();
+  }
+
+  public registerUser(userId: string) {
+    this.registeredUserId = userId;
+    if (this.socket && this.socket.readyState === WebSocket.OPEN && userId) {
+      try {
+        this.socket.send(JSON.stringify({ type: 'REGISTER_SOCKET', userId }));
+      } catch (e) {}
+    }
   }
 
   private connectWebSocket() {
@@ -34,7 +44,10 @@ class RealtimeBridgeManager {
 
       this.socket.onopen = () => {
         this.isConnected = true;
-        console.log('[WEBSOCKET_CONNECTED] 100% Free Live Cloud Realtime Engine Active (Render.com)');
+        console.log('[WEBSOCKET_CONNECTED] Live Cloud Realtime Signaling Engine Active');
+        if (this.registeredUserId) {
+          this.registerUser(this.registeredUserId);
+        }
       };
 
       this.socket.onmessage = (event: any) => {
@@ -63,7 +76,7 @@ class RealtimeBridgeManager {
     return () => this.listeners.delete(listener);
   }
 
-  private notify(data: { type: string; payload: any }) {
+  private notify(data: { type: string; payload: any; targetUserId?: string }) {
     this.listeners.forEach(cb => {
       try { cb(data); } catch (e) {}
     });
@@ -85,9 +98,10 @@ class RealtimeBridgeManager {
       | 'WEBRTC_ICE'
       | 'LIVE_VIDEO_FRAME'
       | 'LIVE_AUDIO_PULSE',
-    payload: any
+    payload: any,
+    targetUserId?: string
   ) {
-    const data = { type, payload };
+    const data = { type, payload, targetUserId };
 
     // 1. Notify local window
     this.notify(data);
@@ -99,7 +113,7 @@ class RealtimeBridgeManager {
       } catch (e) {}
     }
 
-    // 3. Broadcast to other devices (Phone ⇋ Laptop) via Free WebSocket Server
+    // 3. Broadcast or Send Directly to Targeted Device
     if (this.socket && this.socket.readyState === WebSocket.OPEN) {
       try {
         this.socket.send(JSON.stringify(data));
