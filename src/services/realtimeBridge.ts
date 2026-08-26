@@ -82,7 +82,9 @@ class RealtimeBridgeManager {
       | 'REQUEST_ACCEPTED'
       | 'WEBRTC_OFFER'
       | 'WEBRTC_ANSWER'
-      | 'WEBRTC_ICE',
+      | 'WEBRTC_ICE'
+      | 'LIVE_VIDEO_FRAME'
+      | 'LIVE_AUDIO_PULSE',
     payload: any
   ) {
     const data = { type, payload };

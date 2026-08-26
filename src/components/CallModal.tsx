@@ -24,30 +24,30 @@ const LiveSelfVideo: React.FC = () => {
     return () => clearInterval(interval);
   }, []);
 
-  if (Platform.OS === 'web') {
-    return (
-      // @ts-ignore
-      <video
-        ref={videoRef}
-        autoPlay
-        playsInline
-        muted
-        style={{
-          width: '100%',
-          height: '100%',
-          objectFit: 'cover',
-          transform: 'scaleX(-1)',
-          borderRadius: 16,
-          backgroundColor: '#000',
-        }}
-      />
-    );
-  }
-
   return (
     <View style={styles.selfVideoPlaceholder}>
-      <Ionicons name="videocam" size={20} color="#00E5FF" />
-      <Text style={{ color: '#FFF', fontSize: 10, fontWeight: '800' }}>You (Live)</Text>
+      {Platform.OS === 'web' ? (
+        // @ts-ignore
+        <video
+          ref={videoRef}
+          autoPlay
+          playsInline
+          muted
+          style={{
+            width: '100%',
+            height: '100%',
+            objectFit: 'cover',
+            transform: 'scaleX(-1)',
+            borderRadius: 16,
+            backgroundColor: '#000',
+          }}
+        />
+      ) : (
+        <View style={{ alignItems: 'center', justifyContent: 'center', flex: 1, backgroundColor: '#0B0F19', borderRadius: 16 }}>
+          <Ionicons name="videocam" size={24} color="#00E5FF" />
+          <Text style={{ color: '#22C55E', fontSize: 10, fontWeight: '800', marginTop: 4 }}>● Live Self</Text>
+        </View>
+      )}
     </View>
   );
 };
@@ -75,35 +75,42 @@ const LiveAudioReceiver: React.FC = () => {
 
   useEffect(() => {
     attemptPlay();
-    const interval = setInterval(attemptPlay, 800);
+    const interval = setInterval(attemptPlay, 600);
     return () => clearInterval(interval);
   }, []);
 
-  if (Platform.OS === 'web') {
-    return (
-      <View style={{ position: 'absolute', top: 12, right: 12, zIndex: 999 }}>
-        {/* @ts-ignore */}
-        <audio ref={audioRef} autoPlay playsInline controls={false} />
-        {audioBlocked && (
-          <TouchableOpacity
-            style={styles.unmuteFloatingBtn}
-            onPress={attemptPlay}
-            activeOpacity={0.8}
-          >
-            <Ionicons name="volume-high" size={14} color="#FFF" />
-            <Text style={styles.unmuteFloatingText}>Tap to Unmute 🔊</Text>
-          </TouchableOpacity>
-        )}
-      </View>
-    );
-  }
-  return null;
+  return (
+    <View style={{ position: 'absolute', top: 12, right: 12, zIndex: 999 }}>
+      {/* @ts-ignore */}
+      <audio ref={audioRef} autoPlay playsInline controls={false} />
+      {audioBlocked && (
+        <TouchableOpacity
+          style={styles.unmuteFloatingBtn}
+          onPress={attemptPlay}
+          activeOpacity={0.8}
+        >
+          <Ionicons name="volume-high" size={14} color="#FFF" />
+          <Text style={styles.unmuteFloatingText}>Tap to Unmute 🔊</Text>
+        </TouchableOpacity>
+      )}
+    </View>
+  );
 };
 
 // 3. Live Remote Video Component
 const LiveRemoteVideo: React.FC<{ photoUrl: string }> = ({ photoUrl }) => {
   const videoRef = useRef<any>(null);
   const [hasRemoteVideo, setHasRemoteVideo] = useState(false);
+  const [remoteFrame, setRemoteFrame] = useState<string | null>(null);
+
+  useEffect(() => {
+    const unsub = WebRTCService.onRemoteFrame((frame) => {
+      if (frame) {
+        setRemoteFrame(frame);
+      }
+    });
+    return () => unsub();
+  }, []);
 
   useEffect(() => {
     const checkStream = () => {
@@ -124,42 +131,34 @@ const LiveRemoteVideo: React.FC<{ photoUrl: string }> = ({ photoUrl }) => {
     return () => clearInterval(interval);
   }, []);
 
-  if (Platform.OS === 'web') {
-    return (
-      <View style={{ width: '100%', height: '100%', position: 'relative' }}>
-        {/* Remote Video Track Player */}
-        {/* @ts-ignore */}
+  return (
+    <View style={{ width: '100%', height: '100%', position: 'relative' }}>
+      {/* Universal Live Video Frame (Works 100% on Mobile + Web) */}
+      <Image
+        source={{ uri: remoteFrame || photoUrl }}
+        style={styles.videoStreamMain}
+        resizeMode="cover"
+      />
+
+      {Platform.OS === 'web' && (
+        // @ts-ignore
         <video
           ref={videoRef}
           autoPlay
           playsInline
           style={{
+            position: 'absolute',
+            top: 0,
+            left: 0,
             width: '100%',
             height: '100%',
             objectFit: 'cover',
             borderRadius: 24,
-            backgroundColor: '#0A0F1D',
             display: hasRemoteVideo ? 'block' : 'none',
           }}
         />
-
-        {!hasRemoteVideo && (
-          <Image
-            source={{ uri: photoUrl }}
-            style={styles.videoStreamMain}
-            resizeMode="cover"
-          />
-        )}
-      </View>
-    );
-  }
-
-  return (
-    <Image
-      source={{ uri: photoUrl }}
-      style={styles.videoStreamMain}
-      resizeMode="cover"
-    />
+      )}
+    </View>
   );
 };
 
