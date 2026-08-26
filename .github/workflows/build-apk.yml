@@ -24,16 +24,22 @@ jobs:
           distribution: 'temurin'
           java-version: '17'
 
-      - name: 📦 Install NPM Dependencies
+      - name: 📱 Setup Android SDK
+        uses: android-actions/setup-android@v3
+
+      - name: 📦 Install Dependencies
         run: npm install --legacy-peer-deps
+
+      - name: 🔄 Generate Fresh Android Prebuild
+        run: npx expo prebuild --platform android --clean
 
       - name: 🔧 Make Gradlew Executable
         run: chmod +x android/gradlew
 
-      - name: 🚀 Build Standalone Android APK
+      - name: 🚀 Compile Standalone APK
         run: |
           cd android
-          ./gradlew assembleDebug --no-daemon --stacktrace
+          ./gradlew assembleDebug --no-daemon
 
       - name: 📲 Upload Synking APK Artifact
         uses: actions/upload-artifact@v4
