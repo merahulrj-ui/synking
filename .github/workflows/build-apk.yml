@@ -33,6 +33,10 @@ jobs:
       - name: 🔄 Generate Fresh Android Prebuild
         run: npx expo prebuild --platform android --clean
 
+      - name: 📦 Embed Standalone Offline JS Bundle
+        run: |
+          sed -i '/bundleCommand = "export:embed"/a \    bundleInDebug = true' android/app/build.gradle
+
       - name: 🔧 Make Gradlew Executable
         run: chmod +x android/gradlew
 
