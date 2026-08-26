@@ -4,8 +4,9 @@ import { Ionicons } from '@expo/vector-icons';
 import { LinearGradient } from 'expo-linear-gradient';
 import { CallSession } from '../types';
 import { WebRTCService } from '../services/webrtcService';
+import { CameraView } from 'expo-camera';
 
-// 1. Live Self Video Component (PiP)
+// 1. Live Self Video Component (PiP) - Real Hardware Front Camera
 const LiveSelfVideo: React.FC = () => {
   const videoRef = useRef<any>(null);
 
@@ -43,10 +44,15 @@ const LiveSelfVideo: React.FC = () => {
           }}
         />
       ) : (
-        <View style={{ alignItems: 'center', justifyContent: 'center', flex: 1, backgroundColor: '#0B0F19', borderRadius: 16 }}>
-          <Ionicons name="videocam" size={24} color="#00E5FF" />
-          <Text style={{ color: '#22C55E', fontSize: 10, fontWeight: '800', marginTop: 4 }}>● Live Self</Text>
-        </View>
+        <CameraView
+          facing="front"
+          style={{
+            width: '100%',
+            height: '100%',
+            borderRadius: 16,
+            overflow: 'hidden',
+          }}
+        />
       )}
     </View>
   );

@@ -34,7 +34,14 @@
       ]
     },
     "plugins": [
-      "expo-router"
+      "expo-router",
+      [
+        "expo-camera",
+        {
+          "cameraPermission": "Allow SYNKING to access your camera for HD Video Calling.",
+          "microphonePermission": "Allow SYNKING to access your microphone for HD Voice Calling."
+        }
+      ]
     ]
   }
 }
