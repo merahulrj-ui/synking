@@ -38,9 +38,19 @@ class RealtimeBridgeManager {
 
   private connectWebSocket() {
     try {
-      // Connect to Live Cloud Realtime Signaling Engine
-      // Switch to Secure Render WSS for APK to avoid Android Cleartext Traffic blocks
-      const wsUrl = 'wss://synking-9my2.onrender.com';
+      // Smart auto-detect: Web uses local server (fast), Native APK uses Render Cloud (HTTPS required)
+      const isWeb = typeof window !== 'undefined' && typeof document !== 'undefined';
+      let wsUrl: string;
+      if (isWeb && window.location?.hostname) {
+        // Web: connect to local WebSocket via same host
+        const host = window.location.hostname;
+        const wsProtocol = window.location.protocol === 'https:' ? 'wss' : 'ws';
+        wsUrl = `${wsProtocol}://${host}:8082`;
+      } else {
+        // Native APK: use secure Render Cloud
+        wsUrl = 'wss://synking-9my2.onrender.com';
+      }
+      console.log(`[WS_CONNECTING] ${wsUrl}`);
       this.socket = new WebSocket(wsUrl);
 
       this.socket.onopen = () => {

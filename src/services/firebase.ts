@@ -12,7 +12,14 @@ const FIRESTORE_BASE_URL = `https://firestore.googleapis.com/v1/projects/${PROJE
 export const CLOUD_BACKEND_URL = 'https://synking-9my2.onrender.com';
 
 export function getLocalBackendUrl(): string {
-  // Switch to Render Cloud Backend for APK (HTTPS) to avoid Android Cleartext Traffic blocks
+  // Smart auto-detect: Web uses local server (fast), Native APK uses Render Cloud (HTTPS required)
+  const isWeb = typeof window !== 'undefined' && typeof document !== 'undefined';
+  if (isWeb && window.location?.hostname) {
+    const host = window.location.hostname;
+    const protocol = window.location.protocol === 'https:' ? 'https' : 'http';
+    return `${protocol}://${host}:8082`;
+  }
+  // Native APK: use secure Render Cloud
   return CLOUD_BACKEND_URL;
 }
 

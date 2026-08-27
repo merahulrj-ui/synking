@@ -489,7 +489,14 @@ Remote Video Tracks (${remoteVideo.length}): ${JSON.stringify(remoteVideo)}
           <View style={styles.centerSection}>
             {session.type === 'video' && isConnected && session.isVideoEnabled ? (
               <View style={styles.videoFrame}>
-                {/* Remote video is handled by the global LiveRemoteMedia above */}
+                {/* Native APK: Use RTCView to render remote video frames */}
+                {Platform.OS !== 'web' && NativeRTCView && WebRTCService.getRemoteStream() && (
+                  <NativeRTCView
+                    streamURL={WebRTCService.getRemoteStream()?.toURL?.()}
+                    style={{ width: '100%', height: '100%', position: 'absolute', top: 0, left: 0, zIndex: 10 }}
+                    objectFit="cover"
+                  />
+                )}
                 {/* Picture-in-picture Self View */}
                 <View style={styles.pipSelfView}>
                   <LiveSelfVideo />
