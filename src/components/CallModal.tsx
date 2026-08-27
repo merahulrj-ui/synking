@@ -1,5 +1,5 @@
 import React, { useRef, useEffect, useState } from 'react';
-import { View, Text, StyleSheet, Modal, TouchableOpacity, Image, Platform, ScrollView } from 'react-native';
+import { View, Text, StyleSheet, Modal, TouchableOpacity, Image, Platform, ScrollView, Share } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { LinearGradient } from 'expo-linear-gradient';
 import { CallSession } from '../types';
@@ -328,20 +328,20 @@ Remote Video Tracks (${remoteVideo.length}): ${JSON.stringify(remoteVideo)}
 =======================================`;
   };
 
-  const handleCopyDebugReport = () => {
+  const handleCopyDebugReport = async () => {
     const report = generateReport();
     setDebugReportText(report);
 
-    // 1. Try Modern Clipboard API
     let success = false;
+    // 1. Try Modern Clipboard API (Web)
     try {
       if (typeof navigator !== 'undefined' && navigator.clipboard && navigator.clipboard.writeText) {
-        navigator.clipboard.writeText(report);
+        await navigator.clipboard.writeText(report);
         success = true;
       }
     } catch (e) {}
 
-    // 2. Fallback to execCommand (Works on HTTP/Mobile Web)
+    // 2. Fallback to execCommand (Works on Mobile Web / HTTP)
     if (!success && typeof document !== 'undefined') {
       try {
         const textarea = document.createElement('textarea');
@@ -357,7 +357,18 @@ Remote Video Tracks (${remoteVideo.length}): ${JSON.stringify(remoteVideo)}
       } catch (e) {}
     }
 
-    // 3. Auto send report directly to Local Server Logger
+    // 3. React Native Native Share / Copy Sheet (Android APK & iOS)
+    if (Platform.OS !== 'web') {
+      try {
+        await Share.share({
+          message: report,
+          title: 'SYNKING WebRTC Debug Report',
+        });
+        success = true;
+      } catch (e) {}
+    }
+
+    // 4. Auto send report directly to Local Server Logger
     try {
       let host = '127.0.0.1';
       if (typeof window !== 'undefined' && window.location && window.location.hostname) {
