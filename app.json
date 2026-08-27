@@ -48,8 +48,7 @@
           "cameraPermission": "Allow SYNKING to access your camera for HD Video Calling.",
           "microphonePermission": "Allow SYNKING to access your microphone for HD Voice Calling."
         }
-      ],
-      "expo-barcode-scanner"
+      ]
     ]
   }
 }
