@@ -65,24 +65,38 @@ const LiveSelfVideo: React.FC = () => {
   );
 };
 
-// 2. Live Audio Receiver Component (Always plays partner audio in voice & video calls)
-const LiveAudioReceiver: React.FC = () => {
-  const audioRef = useRef<any>(null);
+// 2. Unified Live Media Component (Handles BOTH Audio and Video gracefully)
+const LiveRemoteMedia: React.FC<{ type: 'voice' | 'video'; photoUrl?: string }> = ({ type, photoUrl }) => {
+  const mediaRef = useRef<any>(null);
   const [audioBlocked, setAudioBlocked] = useState(false);
+  const [hasVideo, setHasVideo] = useState(false);
 
   const attemptPlay = () => {
-    if (Platform.OS !== 'web') return; // Native handles audio output automatically via PeerConnection
+    if (Platform.OS !== 'web') return;
     const remoteStream = WebRTCService.getRemoteStream();
-    if (remoteStream && audioRef.current) {
-      if (audioRef.current.srcObject !== remoteStream) {
-        audioRef.current.srcObject = remoteStream;
+    if (remoteStream && mediaRef.current) {
+      if (mediaRef.current.srcObject !== remoteStream) {
+        mediaRef.current.srcObject = remoteStream;
       }
-      audioRef.current.muted = false;
-      audioRef.current.volume = 1.0;
-      audioRef.current.play().then(() => {
-        setAudioBlocked(false);
-      }).catch(() => {
-        setAudioBlocked(true);
+      
+      // NEVER mute the remote stream, otherwise we won't hear them!
+      mediaRef.current.muted = false;
+      mediaRef.current.volume = 1.0;
+      
+      if (remoteStream.getVideoTracks().length > 0) {
+        setHasVideo(true);
+      }
+
+      mediaRef.current.play().then(() => {
+        if (audioBlocked) {
+          WebRTCService.addDebugLog('🔊 AUDIO UNBLOCKED! Sound is playing.');
+          setAudioBlocked(false);
+        }
+      }).catch((e: any) => {
+        if (!audioBlocked) {
+          WebRTCService.addDebugLog('🔇 BROWSER BLOCKED AUDIO. User interaction needed.');
+          setAudioBlocked(true);
+        }
       });
     }
   };
@@ -98,9 +112,27 @@ const LiveAudioReceiver: React.FC = () => {
   if (Platform.OS !== 'web') return null;
 
   return (
-    <View style={{ position: 'absolute', top: 12, right: 12, zIndex: 999 }}>
+    <View style={{ position: 'absolute', top: 0, left: 0, width: '100%', height: '100%', zIndex: 99 }}>
+      {/* HACK: Make the video tag 100% visible and full screen even for Audio calls! 
+          Chrome throttles/mutes <video> and <audio> tags if they are 1x1 pixels or opacity 0. 
+          By making it full screen, we force Chrome to play it! */}
       {/* @ts-ignore */}
-      <audio ref={audioRef} autoPlay playsInline controls={false} />
+      <video
+        ref={mediaRef}
+        autoPlay
+        playsInline
+        style={{
+          position: 'absolute',
+          top: 0,
+          left: 0,
+          width: '100%',
+          height: '100%',
+          objectFit: 'cover',
+          opacity: hasVideo ? 1 : 0,
+          zIndex: type === 'video' ? 10 : -1, // Hidden behind the gradient for Voice calls so the UI is visible!
+        }}
+      />
+
       {audioBlocked && (
         <TouchableOpacity
           style={styles.unmuteFloatingBtn}
@@ -110,75 +142,6 @@ const LiveAudioReceiver: React.FC = () => {
           <Ionicons name="volume-high" size={14} color="#FFF" />
           <Text style={styles.unmuteFloatingText}>Tap to Unmute 🔊</Text>
         </TouchableOpacity>
-      )}
-    </View>
-  );
-};
-
-// 3. Live Remote Video Component
-const LiveRemoteVideo: React.FC<{ photoUrl: string }> = ({ photoUrl }) => {
-  const videoRef = useRef<any>(null);
-  const [hasRemoteVideo, setHasRemoteVideo] = useState(false);
-
-  useEffect(() => {
-    const checkStream = () => {
-      const remoteStream = WebRTCService.getRemoteStream();
-      if (remoteStream) {
-        if (remoteStream.getVideoTracks().length > 0) {
-          setHasRemoteVideo(true);
-        }
-        if (Platform.OS === 'web' && videoRef.current) {
-          if (videoRef.current.srcObject !== remoteStream) {
-            videoRef.current.srcObject = remoteStream;
-            videoRef.current.play().catch(() => {});
-          }
-        }
-      }
-    };
-
-    checkStream();
-    const interval = setInterval(checkStream, 400);
-    return () => clearInterval(interval);
-  }, []);
-
-  const remoteStream = WebRTCService.getRemoteStream();
-
-  return (
-    <View style={{ width: '100%', height: '100%', position: 'relative' }}>
-      {Platform.OS === 'web' ? (
-        // @ts-ignore
-        <video
-          ref={videoRef}
-          autoPlay
-          playsInline
-          style={{
-            position: 'absolute',
-            top: 0,
-            left: 0,
-            width: '100%',
-            height: '100%',
-            objectFit: 'cover',
-            opacity: hasRemoteVideo ? 1 : 0,
-            zIndex: hasRemoteVideo ? 10 : 1,
-          }}
-        />
-      ) : (
-        (NativeRTCView && remoteStream && hasRemoteVideo) && (
-          <NativeRTCView
-            streamURL={remoteStream.toURL()}
-            style={{ width: '100%', height: '100%', position: 'absolute', top: 0, left: 0, zIndex: 10 }}
-            objectFit="cover"
-          />
-        )
-      )}
-
-      {/* Fallback to Avatar when no video */}
-      {!hasRemoteVideo && (
-        <Image
-          source={{ uri: photoUrl }}
-          style={styles.videoStreamMain}
-          resizeMode="cover"
-        />
       )}
     </View>
   );
@@ -241,6 +204,9 @@ export const CallModal: React.FC<Props> = ({ session, onEndCall, onAcceptCall })
 
   // Real-Time Microphone Level Analyzer (0% to 100%)
   useEffect(() => {
+    // [DISABLED] Connecting WebAudio API (AudioContext) to a local MediaStream 
+    // can cause Safari/Chrome to silently mute the outgoing WebRTC audio track!
+    /*
     let animationId: any = null;
     let audioCtx: any = null;
 
@@ -277,6 +243,7 @@ export const CallModal: React.FC<Props> = ({ session, onEndCall, onAcceptCall })
         try { audioCtx.close(); } catch (e) {}
       }
     };
+    */
   }, [localStream]);
 
   // Test Mic Loopback (Hear your own voice live from speaker)
@@ -410,13 +377,13 @@ Remote Video Tracks (${remoteVideo.length}): ${JSON.stringify(remoteVideo)}
   return (
     <Modal visible={!!session} animationType="fade" transparent>
       <View style={styles.modalOverlay}>
-        {/* Global Live Audio Receiver for both voice and video calls */}
-        <LiveAudioReceiver />
-
         <LinearGradient
           colors={['#0F172A', '#05060A', '#020617']}
           style={styles.callingCard}
         >
+          {/* Global Live Audio Receiver for voice calls - Placed here to sit ON TOP of gradient */}
+          {session.type === 'voice' && <LiveRemoteMedia type="voice" />}
+          
           {/* 1. TOP STATUS HEADER */}
           <View style={styles.topHeader}>
             <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
@@ -522,7 +489,7 @@ Remote Video Tracks (${remoteVideo.length}): ${JSON.stringify(remoteVideo)}
           <View style={styles.centerSection}>
             {session.type === 'video' && isConnected && session.isVideoEnabled ? (
               <View style={styles.videoFrame}>
-                <LiveRemoteVideo photoUrl={session.callerPhoto} />
+                <LiveRemoteMedia type="video" photoUrl={session.callerPhoto} />
                 {/* Picture-in-picture Self View */}
                 <View style={styles.pipSelfView}>
                   <LiveSelfVideo />

@@ -1,11 +1,33 @@
-import React from 'react';
-import { View, StyleSheet, Platform } from 'react-native';
+import React, { useEffect } from 'react';
+import { View, StyleSheet, Platform, Alert } from 'react-native';
 import { Stack } from 'expo-router';
 import { StatusBar } from 'expo-status-bar';
+import * as Updates from 'expo-updates';
 import { AppProvider } from '../contexts/AppContext';
 import { Colors } from '../constants/theme';
 
 export default function RootLayout() {
+  useEffect(() => {
+    async function checkOTA() {
+      if (__DEV__) return;
+      try {
+        const update = await Updates.checkForUpdateAsync();
+        if (update.isAvailable) {
+          Alert.alert('OTA Update 🚀', 'Rahul AI sent new code! Downloading...', [
+            { text: 'Wait...' }
+          ]);
+          await Updates.fetchUpdateAsync();
+          Alert.alert('Download Complete ✅', 'Applying new code now!', [
+            { text: 'Restart App', onPress: () => Updates.reloadAsync() }
+          ]);
+        }
+      } catch (e) {
+        // Skip silently if error
+      }
+    }
+    checkOTA();
+  }, []);
+
   return (
     <AppProvider>
       <StatusBar style="auto" />

@@ -509,55 +509,89 @@ server.on('upgrade', (req, socket, head) => {
   socket.write(headers.join('\r\n') + '\r\n\r\n');
   clients.add(socket);
   console.log(`[WS_CONNECTED] Client connected. Total active clients: ${clients.size}`);
+  socket.buffer = Buffer.alloc(0);
 
-  socket.on('data', (buffer) => {
-    try {
-      const decoded = decodeWebSocketFrame(buffer);
-      if (decoded) {
-        const parsed = JSON.parse(decoded);
+  socket.on('data', (chunk) => {
+    socket.buffer = Buffer.concat([socket.buffer, chunk]);
 
-        // 1. Socket User Registration
-        if (parsed.type === 'REGISTER_SOCKET' && parsed.userId) {
-          socket.userId = parsed.userId;
-          console.log(`[WS_REGISTERED] Socket bound to userId: ${parsed.userId}`);
-          return;
-        }
+    while (true) {
+      if (socket.buffer.length < 2) break;
+      
+      let length = socket.buffer[1] & 0x7f;
+      let offset = 2;
+      
+      if (length === 126) {
+        if (socket.buffer.length < 4) break;
+        length = socket.buffer.readUInt16BE(2);
+        offset = 4;
+      } else if (length === 127) {
+        if (socket.buffer.length < 10) break;
+        // Note: readBigUInt64BE requires Node v12+
+        length = Number(socket.buffer.readBigUInt64BE(2));
+        offset = 10;
+      }
 
-        // 2. Targeted 1-on-1 Signaling Relay (WebRTC Offer, Answer, ICE, Call Signals)
-        const targetUserId =
-          parsed.targetUserId ||
-          parsed.payload?.receiverId ||
-          parsed.payload?.targetUserId ||
-          parsed.payload?.toUserId;
+      const isMasked = (socket.buffer[1] & 0x80) === 0x80;
+      const totalFrameSize = offset + (isMasked ? 4 : 0) + length;
 
-        if (targetUserId) {
-          let delivered = false;
-          const jsonStr = JSON.stringify(parsed);
-          const frame = encodeWebSocketFrame(jsonStr);
+      if (socket.buffer.length < totalFrameSize) {
+        // Incomplete frame, wait for more data from TCP stream
+        break;
+      }
 
-          for (const client of clients) {
-            if (client !== socket && client.writable && client.userId === targetUserId) {
-              try {
-                client.write(frame);
-                delivered = true;
-              } catch (e) {
-                clients.delete(client);
+      const frameBuffer = socket.buffer.slice(0, totalFrameSize);
+      socket.buffer = socket.buffer.slice(totalFrameSize);
+
+      try {
+        const decoded = decodeWebSocketFrame(frameBuffer);
+        if (decoded) {
+          const parsed = JSON.parse(decoded);
+
+          // 1. Socket User Registration
+          if (parsed.type === 'REGISTER_SOCKET' && parsed.userId) {
+            socket.userId = parsed.userId;
+            console.log(`[WS_REGISTERED] Socket bound to userId: ${parsed.userId}`);
+            continue; // Use continue since we are in a while loop now
+          }
+
+          // 2. Targeted 1-on-1 Signaling Relay (WebRTC Offer, Answer, ICE, Call Signals)
+          const targetUserId =
+            parsed.targetUserId ||
+            parsed.payload?.receiverId ||
+            parsed.payload?.targetUserId ||
+            parsed.payload?.toUserId;
+
+          if (targetUserId) {
+            let delivered = false;
+            const jsonStr = JSON.stringify(parsed);
+            const frame = encodeWebSocketFrame(jsonStr);
+
+            for (const client of clients) {
+              if (client !== socket && client.writable && client.userId === targetUserId) {
+                try {
+                  client.write(frame);
+                  delivered = true;
+                } catch (e) {
+                  clients.delete(client);
+                }
               }
             }
+
+            if (delivered) {
+              console.log(`[WS_TARGETED_SIGNAL] ${parsed.type} → Delivered strictly to ${targetUserId}`);
+            } else {
+              console.log(`[WS_TARGETED_SIGNAL] ${parsed.type} → Failed to deliver, user ${targetUserId} is offline. Dropping signal.`);
+            }
+            continue;
           }
 
-          if (delivered) {
-            console.log(`[WS_TARGETED_SIGNAL] ${parsed.type} → Delivered strictly to ${targetUserId}`);
-          } else {
-            console.log(`[WS_TARGETED_SIGNAL] ${parsed.type} → Failed to deliver, user ${targetUserId} is offline. Dropping signal.`);
-          }
-          return;
+          // 3. True Broadcast (Only if no target specified)
+          broadcastToWebSockets(parsed, socket);
         }
-
-        // 3. True Broadcast (Only if no target specified)
-        broadcastToWebSockets(parsed, socket);
+      } catch (e) {
+         console.error("Frame processing error:", e);
       }
-    } catch (e) {}
+    }
   });
 
   socket.on('close', () => {

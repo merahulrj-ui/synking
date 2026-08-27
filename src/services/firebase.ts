@@ -2,7 +2,7 @@
 // Primary: 100% Free Unlimited Local Network REST & WebSocket Backend (Port 8082)
 // Secondary: Google Cloud Firestore REST API
 
-import { UserProfile, SynkRequest, ChatMessage } from '../types';
+import { UserProfile, SynkRequest, ChatMessage, EncryptedChatMessageRecord } from '../types';
 import { decryptE2EEMessage } from '../utils/encryption';
 
 const PROJECT_ID = "synking-apk";
@@ -12,8 +12,8 @@ const FIRESTORE_BASE_URL = `https://firestore.googleapis.com/v1/projects/${PROJE
 export const CLOUD_BACKEND_URL = 'https://synking-9my2.onrender.com';
 
 export function getLocalBackendUrl(): string {
-  // Use Production Live Cloud Server (Render.com)
-  return CLOUD_BACKEND_URL;
+  // Use Local Backend for testing to sync perfectly with local websocket
+  return 'http://10.173.25.217:8082';
 }
 
 export interface UserVerificationRecord {

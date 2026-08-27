@@ -38,8 +38,9 @@ class RealtimeBridgeManager {
 
   private connectWebSocket() {
     try {
-      // Connect to Live Production Render Cloud WebSocket
-      const wsUrl = 'wss://synking-9my2.onrender.com';
+      // Connect to Live Cloud Realtime Signaling Engine
+      // Using Local IP for testing to bypass Render Cloud TCP Fragmentation limits
+      const wsUrl = 'ws://10.173.25.217:8082';
       this.socket = new WebSocket(wsUrl);
 
       this.socket.onopen = () => {
@@ -103,8 +104,10 @@ class RealtimeBridgeManager {
   ) {
     const data = { type, payload, targetUserId };
 
-    // 1. Notify local window
-    this.notify(data);
+    // 1. Notify local window (except for WebRTC signals which cause self-echo loops)
+    if (!type.startsWith('WEBRTC_') && type !== 'LIVE_VIDEO_FRAME' && type !== 'LIVE_AUDIO_PULSE') {
+      this.notify(data);
+    }
 
     // 2. Broadcast to other browser tabs
     if (this.channel) {
