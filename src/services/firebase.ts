@@ -12,8 +12,8 @@ const FIRESTORE_BASE_URL = `https://firestore.googleapis.com/v1/projects/${PROJE
 export const CLOUD_BACKEND_URL = 'https://synking-9my2.onrender.com';
 
 export function getLocalBackendUrl(): string {
-  // Use Local Backend for testing to sync perfectly with local websocket
-  return 'http://10.173.25.217:8082';
+  // Switch to Render Cloud Backend for APK (HTTPS) to avoid Android Cleartext Traffic blocks
+  return CLOUD_BACKEND_URL;
 }
 
 export interface UserVerificationRecord {

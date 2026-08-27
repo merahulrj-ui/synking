@@ -39,8 +39,8 @@ class RealtimeBridgeManager {
   private connectWebSocket() {
     try {
       // Connect to Live Cloud Realtime Signaling Engine
-      // Using Local IP for testing to bypass Render Cloud TCP Fragmentation limits
-      const wsUrl = 'ws://10.173.25.217:8082';
+      // Switch to Secure Render WSS for APK to avoid Android Cleartext Traffic blocks
+      const wsUrl = 'wss://synking-9my2.onrender.com';
       this.socket = new WebSocket(wsUrl);
 
       this.socket.onopen = () => {

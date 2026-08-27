@@ -180,7 +180,7 @@ class WebRTCManager {
       status: 'calling',
       durationSeconds: 0,
       isMuted: false,
-      isSpeakerOn: true,
+      isSpeakerOn: params.type === 'video',
       isVideoEnabled: params.type === 'video',
     };
 
@@ -220,7 +220,7 @@ class WebRTCManager {
       status: 'ringing',
       durationSeconds: 0,
       isMuted: false,
-      isSpeakerOn: true,
+      isSpeakerOn: type === 'video',
       isVideoEnabled: type === 'video',
     };
 

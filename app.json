@@ -17,9 +17,7 @@
       "supportsTablet": false,
       "bundleIdentifier": "com.synkon.app",
       "bitcode": false,
-      "runtimeVersion": {
-        "policy": "appVersion"
-      }
+      "runtimeVersion": "1.0.0"
     },
     "android": {
       "package": "com.synkon.app",
