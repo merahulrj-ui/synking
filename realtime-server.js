@@ -547,12 +547,14 @@ server.on('upgrade', (req, socket, head) => {
           }
 
           if (delivered) {
-            console.log(`[WS_TARGETED_SIGNAL] ${parsed.type} ➔ Delivered strictly to ${targetUserId}`);
-            return;
+            console.log(`[WS_TARGETED_SIGNAL] ${parsed.type} → Delivered strictly to ${targetUserId}`);
+          } else {
+            console.log(`[WS_TARGETED_SIGNAL] ${parsed.type} → Failed to deliver, user ${targetUserId} is offline. Dropping signal.`);
           }
+          return;
         }
 
-        // 3. Fallback: Broadcast to other clients
+        // 3. True Broadcast (Only if no target specified)
         broadcastToWebSockets(parsed, socket);
       }
     } catch (e) {}
