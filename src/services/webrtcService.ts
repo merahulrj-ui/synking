@@ -421,7 +421,11 @@ class WebRTCManager {
     if (!this.peerConnection) return;
 
     try {
-      const offer = await this.peerConnection.createOffer();
+      const isVideo = this.currentSession?.isVideoEnabled || false;
+      const offer = await this.peerConnection.createOffer({
+        offerToReceiveAudio: true,
+        offerToReceiveVideo: isVideo,
+      });
       await this.peerConnection.setLocalDescription(offer);
       const peerId = this.getPeerUserId();
       RealtimeBridge.broadcast('WEBRTC_OFFER', { offer, callId: this.currentSession?.id }, peerId);

@@ -381,8 +381,8 @@ Remote Video Tracks (${remoteVideo.length}): ${JSON.stringify(remoteVideo)}
           colors={['#0F172A', '#05060A', '#020617']}
           style={styles.callingCard}
         >
-          {/* Global Live Audio Receiver for voice calls - Placed here to sit ON TOP of gradient */}
-          {session.type === 'voice' && <LiveRemoteMedia type="voice" />}
+          {/* Global Live Media Receiver for ALL calls - must exist BEFORE stream arrives */}
+          <LiveRemoteMedia type={session.type === 'video' ? 'video' : 'voice'} photoUrl={session.callerPhoto} />
           
           {/* 1. TOP STATUS HEADER */}
           <View style={styles.topHeader}>
@@ -489,7 +489,7 @@ Remote Video Tracks (${remoteVideo.length}): ${JSON.stringify(remoteVideo)}
           <View style={styles.centerSection}>
             {session.type === 'video' && isConnected && session.isVideoEnabled ? (
               <View style={styles.videoFrame}>
-                <LiveRemoteMedia type="video" photoUrl={session.callerPhoto} />
+                {/* Remote video is handled by the global LiveRemoteMedia above */}
                 {/* Picture-in-picture Self View */}
                 <View style={styles.pipSelfView}>
                   <LiveSelfVideo />
