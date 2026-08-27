@@ -388,11 +388,21 @@ class WebRTCManager {
       const peerId = this.getPeerUserId();
         
       this.peerConnection.onicegatheringstatechange = () => {
-        this.log(`🧊 ICE gathering: ${this.peerConnection.iceGatheringState}`);
+        const pc = this.peerConnection;
+        if (!pc) {
+          this.log('⚠️ ICE gathering event ignored: PeerConnection already cleaned up.');
+          return;
+        }
+        this.log(`🧊 ICE gathering: ${pc.iceGatheringState}`);
       };
 
       this.peerConnection.onconnectionstatechange = () => {
-        this.log(`🔌 Connection state: ${this.peerConnection.connectionState}`);
+        const pc = this.peerConnection;
+        if (!pc) {
+          this.log('⚠️ Connection state event ignored: PeerConnection already cleaned up.');
+          return;
+        }
+        this.log(`🔌 Connection state: ${pc.connectionState}`);
       };
 
       this.peerConnection.onicecandidate = (event: any) => {
@@ -559,11 +569,13 @@ class WebRTCManager {
       this.localStream = null;
     }
 
-    if (this.peerConnection) {
+    const pc = this.peerConnection;
+    this.peerConnection = null;
+
+    if (pc) {
       try {
-        this.peerConnection.close();
+        pc.close();
       } catch (e) {}
-      this.peerConnection = null;
     }
 
     this.remoteStream = null;

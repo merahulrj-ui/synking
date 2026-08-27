@@ -164,7 +164,36 @@ export const CallModal: React.FC<Props> = ({ session, onEndCall, onAcceptCall })
   const isConnected = session.status === 'connected';
   const durationText = WebRTCService.formatDuration(session.durationSeconds);
   const localStream = WebRTCService.getLocalStream();
-  const remoteStream = WebRTCService.getRemoteStream();
+
+  const [remoteStream, setRemoteStream] = useState<any>(() => WebRTCService.getRemoteStream());
+  const [remoteStreamURL, setRemoteStreamURL] = useState<string>(() => {
+    try {
+      return WebRTCService.getRemoteStream()?.toURL?.() || '';
+    } catch (e) {
+      return '';
+    }
+  });
+
+  useEffect(() => {
+    const updateStreams = () => {
+      const rs = WebRTCService.getRemoteStream();
+      setRemoteStream(rs);
+      if (rs && typeof rs.toURL === 'function') {
+        try {
+          setRemoteStreamURL(rs.toURL());
+        } catch (e) {}
+      }
+    };
+    updateStreams();
+    const unsub = WebRTCService.subscribe(() => {
+      updateStreams();
+    });
+    const interval = setInterval(updateStreams, 500);
+    return () => {
+      unsub();
+      clearInterval(interval);
+    };
+  }, []);
 
   const [actionLogs, setActionLogs] = useState<string[]>([
     `[${new Date().toLocaleTimeString()}] 🚀 Call session initialized: ${session.type.toUpperCase()} call.`
@@ -498,16 +527,17 @@ Remote Video Tracks (${remoteVideo.length}): ${JSON.stringify(remoteVideo)}
 
           {/* 2. CENTER AVATAR / VIDEO DISPLAY */}
           <View style={styles.centerSection}>
-            {session.type === 'video' && isConnected && session.isVideoEnabled ? (
+            {session.type === 'video' ? (
               <View style={styles.videoFrame}>
-                {/* Native APK: Use RTCView to render remote video frames */}
-                {Platform.OS !== 'web' && NativeRTCView && WebRTCService.getRemoteStream() && (
+                {/* Remote video — mounted continuously without unmounting on connect */}
+                {Platform.OS !== 'web' && NativeRTCView && (
                   <NativeRTCView
-                    streamURL={WebRTCService.getRemoteStream()?.toURL?.()}
-                    style={{ width: '100%', height: '100%', position: 'absolute', top: 0, left: 0, zIndex: 10 }}
+                    streamURL={remoteStreamURL || remoteStream?.toURL?.() || ''}
+                    style={StyleSheet.absoluteFillObject}
                     objectFit="cover"
                   />
                 )}
+
                 {/* Picture-in-picture Self View */}
                 <View style={styles.pipSelfView}>
                   <LiveSelfVideo />
