@@ -4,7 +4,6 @@ import { Ionicons } from '@expo/vector-icons';
 import { LinearGradient } from 'expo-linear-gradient';
 import { CallSession } from '../types';
 import { WebRTCService } from '../services/webrtcService';
-import { CameraView } from 'expo-camera';
 
 import { NativeRTCView } from '../services/webrtcCore';
 
