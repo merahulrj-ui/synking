@@ -5,7 +5,7 @@ import { CallSession, UserProfile } from '../types';
 import { RealtimeBridge } from './realtimeBridge';
 import { MediaDevices, PeerConnection, SessionDescription, IceCandidate } from './webrtcCore';
 import { Audio } from 'expo-av';
-import { Platform } from 'react-native';
+import { Platform, PermissionsAndroid } from 'react-native';
 
 export const ICE_SERVERS: RTCConfiguration = {
   iceServers: [
@@ -274,6 +274,20 @@ class WebRTCManager {
 
   private async initLocalStream(includeVideo: boolean) {
     try {
+      if (Platform.OS === 'android') {
+        const granted = await PermissionsAndroid.requestMultiple([
+          PermissionsAndroid.PERMISSIONS.CAMERA,
+          PermissionsAndroid.PERMISSIONS.RECORD_AUDIO,
+        ]);
+        if (
+          granted[PermissionsAndroid.PERMISSIONS.CAMERA] !== PermissionsAndroid.RESULTS.GRANTED ||
+          granted[PermissionsAndroid.PERMISSIONS.RECORD_AUDIO] !== PermissionsAndroid.RESULTS.GRANTED
+        ) {
+          this.log('❌ Camera or Microphone permission denied by user.');
+          return;
+        }
+      }
+
       if (Platform.OS !== 'web') {
         await Audio.setAudioModeAsync({
           allowsRecordingIOS: true,
