@@ -34,14 +34,12 @@ class WebRTCManager {
   private logListeners: Set<(msg: string) => void> = new Set();
   private frameListeners: Set<FrameListener> = new Set();
   private durationTimer: any = null;
-  private frameBroadcaster: any = null;
   private localStream: any = null;
   private remoteStream: any = null;
   private remoteVideoFrame: string | null = null;
   private peerConnection: any = null;
   private pendingOffer: any = null;
   private iceCandidateQueue: any[] = [];
-  private offscreenCanvas: any = null;
   public localVideoElementRef: any = null;
   public iceStatus: string = 'disconnected';
 
@@ -313,10 +311,6 @@ class WebRTCManager {
     }
   }
 
-  private stopFrameBroadcaster() {
-    // Removed legacy fake frame broadcaster logic
-  }
-
   private setupPeerConnection() {
     try {
       if (!PeerConnection) {
@@ -504,7 +498,6 @@ class WebRTCManager {
 
   private cleanup() {
     this.cleanupTimers();
-    this.stopFrameBroadcaster();
     this.iceStatus = 'disconnected';
     this.pendingOffer = null;
     this.iceCandidateQueue = [];
