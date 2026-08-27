@@ -44,6 +44,11 @@ export default function DiscoverScreen() {
     <SafeAreaView style={[styles.safeArea, { backgroundColor: bgTheme }]}>
       <Header />
 
+        {/* Version Indicator */}
+        <Text style={{ position: 'absolute', bottom: 10, alignSelf: 'center', fontSize: 10, color: '#9CA3AF', opacity: 0.5, zIndex: 100 }}>
+          v1.0.2 (TURN Relay Mode Active)
+        </Text>
+
       <View style={styles.container}>
         {currentProfile ? (
           <View style={styles.cardStack}>

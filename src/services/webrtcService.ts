@@ -11,6 +11,7 @@ export const ICE_SERVERS: RTCConfiguration = {
     { urls: 'stun:stun.l.google.com:19302' },
     { urls: 'stun:stun1.l.google.com:19302' },
     { urls: 'stun:stun2.l.google.com:19302' },
+    { urls: 'stun:stun.relay.metered.ca:80' },
     {
       urls: [
         'turn:openrelay.metered.ca:80',
@@ -19,6 +20,14 @@ export const ICE_SERVERS: RTCConfiguration = {
       ],
       username: 'openrelayproject',
       credential: 'openrelayproject'
+    },
+    {
+      urls: [
+        'turn:freestun.net:3478',
+        'turn:freestun.net:5349'
+      ],
+      username: 'free',
+      credential: 'free'
     }
   ],
   iceCandidatePoolSize: 10,

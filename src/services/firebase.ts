@@ -96,49 +96,17 @@ export async function saveUserProfileToFirestore(user: UserProfile): Promise<boo
  * Fetches all real user profiles from Local Free Backend & Firestore
  */
 export async function fetchProfilesFromFirestore(currentUserId: string): Promise<UserProfile[]> {
-  // 1. Try Local Free Backend First (Zero Quota)
   try {
     const localRes = await fetch(`${getLocalBackendUrl()}/api/profiles?excludeId=${encodeURIComponent(currentUserId)}`);
     if (localRes.ok) {
       const data = await localRes.json();
-      if (Array.isArray(data) && data.length > 0) {
-        return data;
+      if (Array.isArray(data)) {
+        return data; // Return exactly what Render gives, even if it's empty []
       }
     }
   } catch (e) {}
 
-  // 2. Fallback to Cloud Firestore
-  try {
-    const url = `${FIRESTORE_BASE_URL}/profiles?key=${API_KEY}`;
-    const res = await fetch(url);
-    if (!res.ok) return [];
-    const data = await res.json();
-    if (!data.documents) return [];
-
-    const fetchedProfiles: UserProfile[] = data.documents.map((doc: any) => {
-      const f = doc.fields;
-      return {
-        id: f?.id?.stringValue || doc.name.split('/').pop(),
-        name: f?.name?.stringValue || 'Member',
-        age: parseInt(f?.age?.integerValue || '22', 10),
-        gender: (f?.gender?.stringValue as any) || 'other',
-        occupation: f?.occupation?.stringValue || 'Member',
-        location: f?.location?.stringValue || 'Roorkee',
-        distance: f?.distance?.stringValue || '0 km',
-        bio: f?.bio?.stringValue || '',
-        photo: f?.photo?.stringValue || 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=800',
-        photos: [f?.photo?.stringValue || 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=800'],
-        interests: ['Coffee', 'Music'],
-        compatibility: parseInt(f?.compatibility?.integerValue || '95', 10),
-        isVerified: !!f?.isVerified?.booleanValue,
-        isVip: !!f?.isVip?.booleanValue,
-      };
-    });
-
-    return fetchedProfiles.filter(p => p.id !== currentUserId);
-  } catch (e) {
-    return [];
-  }
+  return [];
 }
 
 /**
@@ -173,40 +141,11 @@ export async function wipeAllUsersFromBackend(): Promise<boolean> {
  * Saves real-time Synk Request to Local Backend & Firestore
  */
 export async function saveSynkRequestToFirestore(req: SynkRequest): Promise<boolean> {
-  // 1. Save to Local Free Backend
   try {
     await fetch(`${getLocalBackendUrl()}/api/requests`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify(req),
-    });
-  } catch (e) {}
-
-  // 2. Backup to Firestore
-  try {
-    const url = `${FIRESTORE_BASE_URL}/requests/${encodeURIComponent(req.id)}?key=${API_KEY}`;
-    const body = {
-      fields: {
-        id: { stringValue: req.id },
-        fromUserId: { stringValue: req.fromUser.id },
-        fromUserName: { stringValue: req.fromUser.name },
-        fromUserPhoto: { stringValue: req.fromUser.photo || '' },
-        fromUserAge: { integerValue: (req.fromUser.age || 22).toString() },
-        fromUserOccupation: { stringValue: req.fromUser.occupation || 'Member' },
-        fromUserLocation: { stringValue: req.fromUser.location || 'Roorkee' },
-        fromUserBio: { stringValue: req.fromUser.bio || '' },
-        fromUserCompatibility: { integerValue: (req.fromUser.compatibility || 98).toString() },
-        fromUserVerified: { booleanValue: !!req.fromUser.isVerified },
-        toUserId: { stringValue: req.toUserId },
-        type: { stringValue: req.type || 'like' },
-        status: { stringValue: req.status || 'pending' },
-        timestamp: { stringValue: new Date().toISOString() },
-      }
-    };
-    await fetch(url, {
-      method: 'PATCH',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify(body),
     });
   } catch (e) {}
 
@@ -217,58 +156,17 @@ export async function saveSynkRequestToFirestore(req: SynkRequest): Promise<bool
  * Fetches Incoming Synk Requests
  */
 export async function fetchIncomingRequestsFromFirestore(currentUserId: string): Promise<SynkRequest[]> {
-  // 1. Local Free Backend First
   try {
     const localRes = await fetch(`${getLocalBackendUrl()}/api/requests?userId=${encodeURIComponent(currentUserId)}&type=incoming`);
     if (localRes.ok) {
       const data = await localRes.json();
-      if (Array.isArray(data) && data.length > 0) {
+      if (Array.isArray(data)) {
         return data;
       }
     }
   } catch (e) {}
 
-  // 2. Firestore fallback
-  try {
-    const url = `${FIRESTORE_BASE_URL}/requests?key=${API_KEY}`;
-    const res = await fetch(url);
-    if (!res.ok) return [];
-    const data = await res.json();
-    if (!data.documents) return [];
-
-    const incoming: SynkRequest[] = [];
-    data.documents.forEach((doc: any) => {
-      const f = doc.fields;
-      if (f?.toUserId?.stringValue === currentUserId && f?.status?.stringValue === 'pending') {
-        incoming.push({
-          id: f?.id?.stringValue || doc.name.split('/').pop(),
-          toUserId: f?.toUserId?.stringValue,
-          type: (f?.type?.stringValue as any) || 'like',
-          status: (f?.status?.stringValue as any) || 'pending',
-          timestamp: 'Just now',
-          fromUser: {
-            id: f?.fromUserId?.stringValue || 'user_anon',
-            name: f?.fromUserName?.stringValue || 'Member',
-            photo: f?.fromUserPhoto?.stringValue || 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=800',
-            photos: [f?.fromUserPhoto?.stringValue || 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=800'],
-            age: parseInt(f?.fromUserAge?.integerValue || '22', 10),
-            gender: 'other',
-            occupation: f?.fromUserOccupation?.stringValue || 'Member',
-            location: f?.fromUserLocation?.stringValue || 'Roorkee',
-            distance: '0 km',
-            bio: f?.fromUserBio?.stringValue || '',
-            compatibility: parseInt(f?.fromUserCompatibility?.integerValue || '98', 10),
-            isVerified: !!f?.fromUserVerified?.booleanValue,
-            isVip: true,
-            interests: ['Coffee', 'Music'],
-          }
-        });
-      }
-    });
-    return incoming;
-  } catch (e) {
-    return [];
-  }
+  return [];
 }
 
 /**
