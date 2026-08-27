@@ -4,7 +4,6 @@
 import { CallSession, UserProfile } from '../types';
 import { RealtimeBridge } from './realtimeBridge';
 import { MediaDevices, PeerConnection, SessionDescription, IceCandidate } from './webrtcCore';
-import { Audio } from 'expo-av';
 import { Platform, PermissionsAndroid } from 'react-native';
 
 export const ICE_SERVERS: RTCConfiguration = {
@@ -286,14 +285,6 @@ class WebRTCManager {
         }
       }
 
-      if (Platform.OS !== 'web') {
-        await Audio.setAudioModeAsync({
-          allowsRecordingIOS: true,
-          playsInSilentModeIOS: true,
-          playThroughEarpieceAndroid: !includeVideo, // Video calls default to Speaker, Voice calls to Earpiece
-        });
-      }
-
       if (MediaDevices && MediaDevices.getUserMedia) {
         this.localStream = await MediaDevices.getUserMedia({
           audio: {
@@ -456,17 +447,8 @@ class WebRTCManager {
     this.currentSession.isSpeakerOn = !this.currentSession.isSpeakerOn;
     const isSpeaker = this.currentSession.isSpeakerOn;
     
-    try {
-      if (Platform.OS !== 'web') {
-        await Audio.setAudioModeAsync({
-          allowsRecordingIOS: true,
-          playsInSilentModeIOS: true,
-          playThroughEarpieceAndroid: !isSpeaker,
-        });
-      }
-    } catch (e) {
-      this.log(`⚠️ Audio routing error: ${e}`);
-    }
+    // Note: react-native-webrtc routes audio directly on Android. We removed expo-av due to JSI crashes.
+    // In a real app we'd use react-native-incall-manager or equivalent native module built for RN 0.86.
 
     this.log(isSpeaker ? '🔊 SPEAKER ON: Loudspeaker active' : '🔈 EARPIECE: Internal receiver active');
     this.notify();
