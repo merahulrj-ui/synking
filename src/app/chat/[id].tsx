@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import {
   View,
   Text,
@@ -88,6 +88,21 @@ export default function ChatScreen() {
   const [isSuspended, setIsSuspended] = useState(false);
   const [suspendedUntil, setSuspendedUntil] = useState<number | null>(null);
 
+  // 🛠️ Audio Diagnostic Debugger States
+  const [showAudioDebugger, setShowAudioDebugger] = useState(false);
+  const [audioDebugLogs, setAudioDebugLogs] = useState<string[]>([
+    `[${new Date().toLocaleTimeString()}] 🎙️ Audio Engine Initialized. Ready for diagnostics.`
+  ]);
+  const [liveMicLevel, setLiveMicLevel] = useState<number>(0);
+  const [lastAudioSize, setLastAudioSize] = useState<string>('0 KB');
+  const [supportedMimes, setSupportedMimes] = useState<string>('');
+
+  const addAudioLog = (msg: string) => {
+    const entry = `[${new Date().toLocaleTimeString()}] ${msg}`;
+    console.log(`[AUDIO_DEBUG] ${entry}`);
+    setAudioDebugLogs(prev => [entry, ...prev].slice(0, 25));
+  };
+
   // Load persistent 2-Strike & 3-Day Suspension Status
   useEffect(() => {
     const loadSuspension = async () => {
@@ -113,6 +128,50 @@ export default function ChatScreen() {
     loadSuspension();
   }, []);
 
+  const mediaRecorderRef = useRef<any>(null);
+  const mediaStreamRef = useRef<any>(null);
+  const audioChunksRef = useRef<any[]>([]);
+  const activeAudioRef = useRef<any>(null);
+  const audioContextRef = useRef<any>(null);
+  const analyserRef = useRef<any>(null);
+  const animFrameRef = useRef<any>(null);
+
+  // Test Device Speaker with Synthetic Beep
+  const testSpeakerSound = () => {
+    try {
+      addAudioLog('🔊 Testing device speaker with 440Hz test chime...');
+      const AudioCtx = (window as any).AudioContext || (window as any).webkitAudioContext;
+      if (!AudioCtx) {
+        addAudioLog('❌ Web Audio API not supported on this browser.');
+        return;
+      }
+      const ctx = new AudioCtx();
+      if (ctx.state === 'suspended') {
+        ctx.resume();
+      }
+      const now = ctx.currentTime;
+      const osc = ctx.createOscillator();
+      const gain = ctx.createGain();
+
+      osc.type = 'sine';
+      osc.frequency.setValueAtTime(587.33, now); // D5 chime
+      osc.frequency.exponentialRampToValueAtTime(880, now + 0.3); // A5
+
+      gain.gain.setValueAtTime(0, now);
+      gain.gain.linearRampToValueAtTime(0.3, now + 0.05);
+      gain.gain.exponentialRampToValueAtTime(0.001, now + 0.6);
+
+      osc.connect(gain);
+      gain.connect(ctx.destination);
+
+      osc.start(now);
+      osc.stop(now + 0.6);
+      addAudioLog('✅ Speaker test tone triggered successfully. Did you hear the chime?');
+    } catch (e: any) {
+      addAudioLog(`❌ Speaker test failed: ${e.message || e}`);
+    }
+  };
+
   useEffect(() => {
     let timer: any;
     if (isRecording) {
@@ -125,35 +184,245 @@ export default function ChatScreen() {
     return () => clearInterval(timer);
   }, [isRecording]);
 
-  const startRecording = () => {
-    setIsRecording(true);
-    setRecordingSeconds(0);
+  const startRecording = async () => {
+    try {
+      addAudioLog('🎙️ Requesting microphone access (getUserMedia)...');
+      if (typeof navigator !== 'undefined' && navigator.mediaDevices && navigator.mediaDevices.getUserMedia) {
+        const stream = await navigator.mediaDevices.getUserMedia({
+          audio: {
+            echoCancellation: true,
+            noiseSuppression: true,
+            autoGainControl: true,
+          }
+        });
+        mediaStreamRef.current = stream;
+        audioChunksRef.current = [];
+
+        // Check Audio Tracks
+        const audioTracks = stream.getAudioTracks();
+        addAudioLog(`🟢 Mic granted: ${audioTracks.length} track(s), label: "${audioTracks[0]?.label || 'Default Mic'}"`);
+
+        // Setup Web Audio VU Meter to detect speaking volume
+        try {
+          const AudioCtx = (window as any).AudioContext || (window as any).webkitAudioContext;
+          if (AudioCtx) {
+            const ctx = new AudioCtx();
+            if (ctx.state === 'suspended') ctx.resume();
+            audioContextRef.current = ctx;
+            const source = ctx.createMediaStreamSource(stream);
+            const analyser = ctx.createAnalyser();
+            analyser.fftSize = 256;
+            source.connect(analyser);
+            analyserRef.current = analyser;
+
+            const bufferLength = analyser.frequencyBinCount;
+            const dataArray = new Uint8Array(bufferLength);
+
+            const updateMeter = () => {
+              if (!analyserRef.current) return;
+              analyserRef.current.getByteFrequencyData(dataArray);
+              let sum = 0;
+              for (let i = 0; i < bufferLength; i++) {
+                sum += dataArray[i];
+              }
+              const avg = sum / bufferLength;
+              const normalized = Math.min(100, Math.round((avg / 128) * 100));
+              setLiveMicLevel(normalized);
+              animFrameRef.current = requestAnimationFrame(updateMeter);
+            };
+            updateMeter();
+          }
+        } catch (e) {}
+
+        // Pick best supported MIME type
+        let mimeType = '';
+        if (typeof MediaRecorder !== 'undefined') {
+          if (MediaRecorder.isTypeSupported('audio/webm;codecs=opus')) {
+            mimeType = 'audio/webm;codecs=opus';
+          } else if (MediaRecorder.isTypeSupported('audio/webm')) {
+            mimeType = 'audio/webm';
+          } else if (MediaRecorder.isTypeSupported('audio/ogg;codecs=opus')) {
+            mimeType = 'audio/ogg;codecs=opus';
+          } else if (MediaRecorder.isTypeSupported('audio/mp4')) {
+            mimeType = 'audio/mp4';
+          } else if (MediaRecorder.isTypeSupported('audio/aac')) {
+            mimeType = 'audio/aac';
+          }
+        }
+
+        addAudioLog(`📦 MediaRecorder selected MIME: "${mimeType || 'default'}"`);
+        setSupportedMimes(mimeType || 'default');
+
+        const recorderOptions = mimeType ? { mimeType } : undefined;
+        const recorder = new MediaRecorder(stream, recorderOptions);
+        
+        recorder.ondataavailable = (e: any) => {
+          if (e.data && e.data.size > 0) {
+            audioChunksRef.current.push(e.data);
+            addAudioLog(`📥 Audio chunk captured: ${e.data.size} bytes`);
+          }
+        };
+
+        recorder.start(250);
+        mediaRecorderRef.current = recorder;
+        setIsRecording(true);
+        setRecordingSeconds(0);
+        addAudioLog('🔴 Recording active! Speak into your microphone.');
+      } else {
+        addAudioLog('⚠️ Navigator mediaDevices not available on this device.');
+        setIsRecording(true);
+        setRecordingSeconds(0);
+      }
+    } catch (err: any) {
+      addAudioLog(`❌ Mic permission failed: ${err.message || err}`);
+      console.warn('[MIC_RECORD_ERROR]', err);
+      if (Platform.OS === 'web') {
+        window.alert('Microphone Access Required 🎙️\n\nPlease allow microphone permissions in your browser to record voice notes.');
+      } else {
+        Alert.alert('Microphone Access Required 🎙️', 'Please allow microphone permissions to record voice notes.');
+      }
+    }
   };
 
   const cancelRecording = () => {
+    addAudioLog('🚫 Recording cancelled by user.');
+    if (animFrameRef.current) cancelAnimationFrame(animFrameRef.current);
+    try {
+      if (mediaRecorderRef.current && mediaRecorderRef.current.state !== 'inactive') {
+        mediaRecorderRef.current.stop();
+      }
+      if (mediaStreamRef.current) {
+        mediaStreamRef.current.getTracks().forEach((track: any) => track.stop());
+        mediaStreamRef.current = null;
+      }
+    } catch (e) {}
+    audioChunksRef.current = [];
+    setLiveMicLevel(0);
     setIsRecording(false);
     setRecordingSeconds(0);
   };
 
-  const sendVoiceNote = () => {
+  const sendVoiceNote = async () => {
+    addAudioLog('🛑 Finishing voice note recording and encoding...');
+    if (animFrameRef.current) cancelAnimationFrame(animFrameRef.current);
+    setLiveMicLevel(0);
+
     const duration = Math.max(1, recordingSeconds);
     const mins = Math.floor(duration / 60);
     const secs = duration % 60;
     const durStr = `${mins}:${secs.toString().padStart(2, '0')}`;
-    handleSend(`🎙️ Voice Note (${durStr})`);
+    const textLabel = `🎙️ Voice Note (${durStr})`;
+
+    let audioDataUri = '';
+
+    if (mediaRecorderRef.current && mediaRecorderRef.current.state !== 'inactive') {
+      await new Promise<void>((resolve) => {
+        mediaRecorderRef.current.onstop = () => resolve();
+        mediaRecorderRef.current.stop();
+      });
+    }
+
+    if (mediaStreamRef.current) {
+      mediaStreamRef.current.getTracks().forEach((track: any) => track.stop());
+      mediaStreamRef.current = null;
+    }
+
+    if (audioChunksRef.current && audioChunksRef.current.length > 0) {
+      try {
+        const mime = supportedMimes || 'audio/webm';
+        const audioBlob = new Blob(audioChunksRef.current, { type: mime });
+        const sizeKb = (audioBlob.size / 1024).toFixed(1) + ' KB';
+        setLastAudioSize(sizeKb);
+        addAudioLog(`📦 Encoded audio blob: ${sizeKb} (${audioBlob.type})`);
+
+        audioDataUri = await new Promise<string>((resolve) => {
+          const reader = new FileReader();
+          reader.onloadend = () => resolve(reader.result as string);
+          reader.onerror = () => resolve('');
+          reader.readAsDataURL(audioBlob);
+        });
+        addAudioLog(`✅ Base64 Data URI generated (length: ${audioDataUri.length})`);
+      } catch (e: any) {
+        addAudioLog(`❌ Audio encoding error: ${e.message || e}`);
+      }
+    } else {
+      addAudioLog('⚠️ Warning: 0 audio chunks were captured during recording.');
+    }
+
+    audioChunksRef.current = [];
     setIsRecording(false);
     setRecordingSeconds(0);
+
+    if (id) {
+      sendMessage(id, textLabel, 'voice', {
+        audioUrl: audioDataUri,
+        audioDuration: duration,
+      });
+      addAudioLog('🚀 Voice note broadcast to match!');
+    }
   };
 
-  const togglePlayVoiceNote = (messageId: string) => {
+  const togglePlayVoiceNote = (messageId: string, audioUrl?: string) => {
+    addAudioLog(`▶️ Toggle playback tapped for message: ${messageId}`);
     if (playingMessageId === messageId) {
+      addAudioLog('⏸️ Paused current voice note.');
+      if (activeAudioRef.current) {
+        activeAudioRef.current.pause();
+        activeAudioRef.current = null;
+      }
       setPlayingMessageId(null);
-    } else {
-      setPlayingMessageId(messageId);
-      setTimeout(() => {
-        setPlayingMessageId(null);
-      }, 3500);
+      return;
     }
+
+    if (activeAudioRef.current) {
+      activeAudioRef.current.pause();
+      activeAudioRef.current = null;
+    }
+
+    if (audioUrl && audioUrl.startsWith('data:audio/')) {
+      addAudioLog(`🔊 Creating HTML5 Audio element with Data URI (size: ${audioUrl.length} chars)...`);
+      try {
+        const audio = new Audio(audioUrl);
+        audio.volume = 1.0;
+        activeAudioRef.current = audio;
+        setPlayingMessageId(messageId);
+
+        audio.onplay = () => {
+          addAudioLog('🟢 AUDIO PLAYING: Device speaker is actively streaming audio!');
+        };
+
+        audio.onended = () => {
+          addAudioLog('🏁 Voice note playback finished.');
+          setPlayingMessageId(null);
+          activeAudioRef.current = null;
+        };
+
+        audio.onerror = (e: any) => {
+          addAudioLog(`❌ Audio playback error: ${audio.error ? audio.error.message : 'Unknown audio error'}`);
+          setPlayingMessageId(null);
+          activeAudioRef.current = null;
+        };
+
+        audio.play().then(() => {
+          addAudioLog('✅ audio.play() promise resolved.');
+        }).catch((err: any) => {
+          addAudioLog(`❌ audio.play() blocked by browser policy: ${err.message}`);
+          setPlayingMessageId(null);
+          activeAudioRef.current = null;
+        });
+        return;
+      } catch (e: any) {
+        addAudioLog(`❌ Failed to initialize Audio: ${e.message || e}`);
+      }
+    } else {
+      addAudioLog('ℹ️ No raw audio URL attached to message (fallback tone preview)');
+    }
+
+    setPlayingMessageId(messageId);
+    testSpeakerSound();
+    setTimeout(() => {
+      setPlayingMessageId(null);
+    }, 2500);
   };
 
   // Real target profile resolution (NO fake mock profiles)
@@ -713,7 +982,7 @@ export default function ChatScreen() {
                 >
                   <View style={{ flexDirection: 'row', alignItems: 'center', gap: 10 }}>
                     <TouchableOpacity
-                      onPress={() => togglePlayVoiceNote(item.id)}
+                      onPress={() => togglePlayVoiceNote(item.id, item.extraData?.audioUrl)}
                       style={{
                         width: 38,
                         height: 38,

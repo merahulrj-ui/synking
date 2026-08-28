@@ -44,7 +44,7 @@ interface AppContextType {
   acceptRequest: (requestId: string) => UserProfile | null;
   declineRequest: (requestId: string) => void;
   bookDate: (params: { targetUser: UserProfile; venue: Venue; dateTime: string; splitType: 'split_50_50' | 'i_treat' | 'they_treat' }) => DateBooking;
-  sendMessage: (receiverId: string, text: string) => void;
+  sendMessage: (receiverId: string, text: string, type?: 'text' | 'voice', extraData?: ChatMessage['extraData']) => void;
   submitFeedback: (bookingId: string, feedback: { matched: boolean; respectful: boolean; safe: boolean; notes: string }) => void;
   refreshDiscoverFeed: () => Promise<void>;
   isSuspended: boolean;
@@ -601,7 +601,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
   };
 
   // Send Message: Instant 0ms Broadcast + Fast Firestore Stream
-  const sendMessage = async (receiverId: string, text: string) => {
+  const sendMessage = async (receiverId: string, text: string, type: 'text' | 'voice' = 'text', extraData?: ChatMessage['extraData']) => {
     if (isSuspended && suspendedUntil && Date.now() < suspendedUntil) {
       const unlockStr = new Date(suspendedUntil).toLocaleString();
       const msg = `Your ENTIRE account is temporarily suspended for 3 days.\n\n🔒 Messaging unlocks on: ${unlockStr}`;
@@ -620,7 +620,8 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       receiverId: receiverId,
       text: text,
       timestamp: 'Just now',
-      type: 'text'
+      type: type,
+      extraData: extraData,
     };
 
     setMessages(prev => ({

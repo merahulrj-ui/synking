@@ -109,6 +109,8 @@ export interface ChatMessage {
     callType?: 'audio' | 'video';
     callDuration?: string;
     callStatus?: 'completed' | 'missed' | 'declined';
+    audioUrl?: string;
+    audioDuration?: number;
   };
 }
 
