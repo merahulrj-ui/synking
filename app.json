@@ -48,7 +48,6 @@
     },
     "plugins": [
       "expo-router",
-      "expo-av",
       [
         "@config-plugins/react-native-webrtc",
         {

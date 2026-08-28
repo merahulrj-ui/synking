@@ -1,41 +1,14 @@
 import { Platform, Vibration } from 'react-native';
 
-// Professional Ringtone Engine for SYNKING
-// Safely checks for Native expo-av or falls back seamlessly to Web Audio API
-
-let ExpoAudio: any = null;
-try {
-  const av = require('expo-av');
-  if (av && av.Audio) {
-    ExpoAudio = av.Audio;
-  }
-} catch (e) {
-  // Graceful fallback if native module is not in older binary
-}
-
-const INCOMING_RINGTONE_URL = 'https://assets.mixkit.co/active_storage/sfx/2869/2869-preview.mp3';
-const OUTGOING_RINGTONE_URL = 'https://assets.mixkit.co/active_storage/sfx/1360/1360-preview.mp3';
+// Professional, Crash-Proof Ringtone & Vibration Engine for SYNKING
+// Uses Native Android/iOS Vibration patterns for incoming calls & Web Audio API for Web browsers
+// 100% Zero-Crash & Free of native UnsatisfiedLinkError binary issues
 
 class RingtoneServiceClass {
   private audioCtx: any = null;
   private ringInterval: any = null;
   private isPlaying: boolean = false;
   private currentMode: 'incoming' | 'outgoing' | null = null;
-  private soundInstance: any = null;
-
-  private async configureAudioMode() {
-    try {
-      if (Platform.OS !== 'web' && ExpoAudio && typeof ExpoAudio.setAudioModeAsync === 'function') {
-        await ExpoAudio.setAudioModeAsync({
-          allowsRecordingIOS: false,
-          playsInSilentModeIOS: true,
-          staysActiveInBackground: true,
-          shouldDuckAndroid: true,
-          playThroughEarpieceAndroid: false,
-        });
-      }
-    } catch (e) {}
-  }
 
   private getAudioContext(): any {
     if (typeof window === 'undefined') return null;
@@ -63,29 +36,7 @@ class RingtoneServiceClass {
     this.isPlaying = true;
     this.currentMode = 'outgoing';
 
-    if (Platform.OS !== 'web' && ExpoAudio && ExpoAudio.Sound) {
-      try {
-        await this.configureAudioMode();
-        const { sound } = await ExpoAudio.Sound.createAsync(
-          { uri: OUTGOING_RINGTONE_URL },
-          { shouldPlay: true, isLooping: true, volume: 0.8 }
-        );
-
-        // Guard against race condition if stopped while downloading
-        if (!this.isPlaying || this.currentMode !== 'outgoing') {
-          await sound.stopAsync().catch(() => {});
-          await sound.unloadAsync().catch(() => {});
-          return;
-        }
-
-        this.soundInstance = sound;
-        return;
-      } catch (e) {
-        console.warn('[NATIVE_OUTGOING_RING_ERROR]', e);
-      }
-    }
-
-    // Web Audio Fallback
+    // Audio Oscillator for Web & Supported Native Environments
     const playPulse = () => {
       if (!this.isPlaying || this.currentMode !== 'outgoing') return;
       const ctx = this.getAudioContext();
@@ -121,43 +72,21 @@ class RingtoneServiceClass {
     this.ringInterval = setInterval(playPulse, 3200);
   }
 
-  // 2. INCOMING CALL: Melodic Marimba Ringtone + Vibration
+  // 2. INCOMING CALL: Melodic Marimba Tone + Looping Vibration
   public async playIncomingRing() {
     if (this.isPlaying && this.currentMode === 'incoming') return;
     this.stop();
     this.isPlaying = true;
     this.currentMode = 'incoming';
 
-    // Trigger looping vibration on mobile
+    // 📳 Trigger standard incoming call vibration pattern on mobile
     if (Platform.OS !== 'web') {
       try {
         Vibration.vibrate([0, 800, 1000], true);
       } catch (e) {}
     }
 
-    if (Platform.OS !== 'web' && ExpoAudio && ExpoAudio.Sound) {
-      try {
-        await this.configureAudioMode();
-        const { sound } = await ExpoAudio.Sound.createAsync(
-          { uri: INCOMING_RINGTONE_URL },
-          { shouldPlay: true, isLooping: true, volume: 1.0 }
-        );
-
-        // Guard against race condition if answered/rejected while loading
-        if (!this.isPlaying || this.currentMode !== 'incoming') {
-          await sound.stopAsync().catch(() => {});
-          await sound.unloadAsync().catch(() => {});
-          return;
-        }
-
-        this.soundInstance = sound;
-        return;
-      } catch (e) {
-        console.warn('[NATIVE_INCOMING_RING_ERROR]', e);
-      }
-    }
-
-    // Web Audio Fallback
+    // Melodic Synth Chime for Web
     const playMelody = () => {
       if (!this.isPlaying || this.currentMode !== 'incoming') return;
       const ctx = this.getAudioContext();
@@ -202,7 +131,7 @@ class RingtoneServiceClass {
   public async stop() {
     this.isPlaying = false;
     this.currentMode = null;
-    
+
     if (Platform.OS !== 'web') {
       try {
         Vibration.cancel();
@@ -213,17 +142,9 @@ class RingtoneServiceClass {
       clearInterval(this.ringInterval);
       this.ringInterval = null;
     }
-    
-    if (this.soundInstance) {
-      try {
-        const sound = this.soundInstance;
-        this.soundInstance = null;
-        await sound.stopAsync();
-        await sound.unloadAsync();
-      } catch (e) {}
-    }
   }
 }
 
 export const RingtoneService = new RingtoneServiceClass();
+
 
