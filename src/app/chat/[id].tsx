@@ -410,6 +410,22 @@ export default function ChatScreen() {
     }
   };
 
+  const handleForceSync = () => {
+    if (currentUser?.id && id) {
+      fetchChatMessagesFromFirestore(currentUser.id, id).then(msgs => {
+        if (Array.isArray(msgs)) {
+          setCloudMessages(msgs);
+        }
+      });
+    }
+  };
+
+  const handleSendTestPing = () => {
+    if (id) {
+      sendMessage(id, '⚡ Ping Test ' + new Date().toLocaleTimeString());
+    }
+  };
+
   const handleBack = () => {
     if (router.canGoBack()) {
       router.back();
