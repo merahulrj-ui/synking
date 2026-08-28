@@ -407,8 +407,9 @@ class WebRTCManager {
 
       this.peerConnection.onicecandidate = (event: any) => {
         if (event.candidate) {
+          const currentPeer = this.getPeerUserId();
           this.log(`🧊 ICE candidate generated: ${event.candidate.candidate}`);
-          RealtimeBridge.broadcast('WEBRTC_ICE', { candidate: event.candidate, callId: this.currentSession?.id }, peerId);
+          RealtimeBridge.broadcast('WEBRTC_ICE', { candidate: event.candidate, callId: this.currentSession?.id }, currentPeer);
         } else {
           this.log(`🧊 ICE candidate gathering complete.`);
         }

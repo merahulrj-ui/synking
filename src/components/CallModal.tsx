@@ -54,6 +54,7 @@ const LiveSelfVideo: React.FC = () => {
             style={{ width: '100%', height: '100%', borderRadius: 16 }}
             objectFit="cover"
             mirror={true}
+            zOrder={1}
           />
         ) : (
           <View style={{ width: '100%', height: '100%', borderRadius: 16, overflow: 'hidden', backgroundColor: '#1A1A1A', justifyContent: 'center', alignItems: 'center' }}>
@@ -529,16 +530,35 @@ Remote Video Tracks (${remoteVideo.length}): ${JSON.stringify(remoteVideo)}
           <View style={styles.centerSection}>
             {session.type === 'video' ? (
               <View style={styles.videoFrame}>
-                {/* Remote video — mounted continuously without unmounting on connect */}
-                {Platform.OS !== 'web' && NativeRTCView && (
+                {/* 1. Caller Photo Background while connecting or before remote video arrives */}
+                <Image
+                  source={{ uri: session.callerPhoto }}
+                  style={[StyleSheet.absoluteFillObject, { opacity: (remoteStream && remoteStream.getVideoTracks?.()?.length > 0) ? 0 : 0.85 }]}
+                  blurRadius={12}
+                />
+                {!(remoteStream && remoteStream.getVideoTracks?.()?.length > 0) && (
+                  <View style={[StyleSheet.absoluteFillObject, { alignItems: 'center', justifyContent: 'center', backgroundColor: 'rgba(5, 6, 10, 0.4)' }]}>
+                    <Image
+                      source={{ uri: session.callerPhoto }}
+                      style={{ width: 110, height: 110, borderRadius: 55, borderWidth: 3, borderColor: '#FD3A73', marginBottom: 12 }}
+                    />
+                    <Text style={{ color: '#00E5FF', fontSize: 13, fontWeight: '800', letterSpacing: -0.2 }}>
+                      {isConnected ? 'Connecting Live Video Feed...' : 'Ringing...'}
+                    </Text>
+                  </View>
+                )}
+
+                {/* 2. Remote video — Mounted with zOrder=0 when remote video stream exists */}
+                {Platform.OS !== 'web' && NativeRTCView && remoteStream && remoteStream.getVideoTracks?.()?.length > 0 && (
                   <NativeRTCView
                     streamURL={remoteStreamURL || remoteStream?.toURL?.() || ''}
                     style={StyleSheet.absoluteFillObject}
                     objectFit="cover"
+                    zOrder={0}
                   />
                 )}
 
-                {/* Picture-in-picture Self View */}
+                {/* 3. Picture-in-picture Self View (zOrder=1) */}
                 <View style={styles.pipSelfView}>
                   <LiveSelfVideo />
                 </View>

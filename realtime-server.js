@@ -580,7 +580,8 @@ server.on('upgrade', (req, socket, head) => {
             if (delivered) {
               console.log(`[WS_TARGETED_SIGNAL] ${parsed.type} → Delivered strictly to ${targetUserId}`);
             } else {
-              console.log(`[WS_TARGETED_SIGNAL] ${parsed.type} → Failed to deliver, user ${targetUserId} is offline. Dropping signal.`);
+              console.log(`[WS_TARGETED_SIGNAL] ${parsed.type} → Target ${targetUserId} not bound yet. Broadcasting fallback to all peers.`);
+              broadcastToWebSockets(parsed, socket);
             }
             continue;
           }
