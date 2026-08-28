@@ -167,29 +167,14 @@ export const CallModal: React.FC<Props> = ({ session, onEndCall, onAcceptCall })
   const localStream = WebRTCService.getLocalStream();
 
   const [remoteStream, setRemoteStream] = useState<any>(() => WebRTCService.getRemoteStream());
-  const [remoteStreamURL, setRemoteStreamURL] = useState<string>(() => {
-    try {
-      return WebRTCService.getRemoteStream()?.toURL?.() || '';
-    } catch (e) {
-      return '';
-    }
-  });
 
   useEffect(() => {
-    const updateStreams = () => {
-      const rs = WebRTCService.getRemoteStream();
-      setRemoteStream(rs);
-      if (rs && typeof rs.toURL === 'function') {
-        try {
-          setRemoteStreamURL(rs.toURL());
-        } catch (e) {}
-      }
+    const updateRemoteStream = () => {
+      setRemoteStream(WebRTCService.getRemoteStream());
     };
-    updateStreams();
-    const unsub = WebRTCService.subscribe(() => {
-      updateStreams();
-    });
-    const interval = setInterval(updateStreams, 500);
+    updateRemoteStream();
+    const unsub = WebRTCService.subscribe(updateRemoteStream);
+    const interval = setInterval(updateRemoteStream, 300);
     return () => {
       unsub();
       clearInterval(interval);
@@ -529,15 +514,10 @@ Remote Video Tracks (${remoteVideo.length}): ${JSON.stringify(remoteVideo)}
           {/* 2. CENTER AVATAR / VIDEO DISPLAY */}
           <View style={styles.centerSection}>
             {session.type === 'video' ? (
-              <View style={styles.videoFrame}>
-                {/* 1. Caller Photo Background while connecting or before remote video arrives */}
-                <Image
-                  source={{ uri: session.callerPhoto }}
-                  style={[StyleSheet.absoluteFillObject, { opacity: (remoteStream && remoteStream.getVideoTracks?.()?.length > 0) ? 0 : 0.85 }]}
-                  blurRadius={12}
-                />
+              <View style={styles.videoSurfaceContainer}>
+                {/* 1. Background Placeholder while ringing / connecting */}
                 {!(remoteStream && remoteStream.getVideoTracks?.()?.length > 0) && (
-                  <View style={[StyleSheet.absoluteFillObject, { alignItems: 'center', justifyContent: 'center', backgroundColor: 'rgba(5, 6, 10, 0.4)' }]}>
+                  <View style={[StyleSheet.absoluteFillObject, { alignItems: 'center', justifyContent: 'center', backgroundColor: '#070A14' }]}>
                     <Image
                       source={{ uri: session.callerPhoto }}
                       style={{ width: 110, height: 110, borderRadius: 55, borderWidth: 3, borderColor: '#FD3A73', marginBottom: 12 }}
@@ -548,17 +528,17 @@ Remote Video Tracks (${remoteVideo.length}): ${JSON.stringify(remoteVideo)}
                   </View>
                 )}
 
-                {/* 2. Remote video — Mounted with zOrder=0 when remote video stream exists */}
-                {Platform.OS !== 'web' && NativeRTCView && remoteStream && remoteStream.getVideoTracks?.()?.length > 0 && (
+                {/* 2. Stable Remote NativeRTCView Video Surface */}
+                {Platform.OS !== 'web' && NativeRTCView && remoteStream && (
                   <NativeRTCView
-                    streamURL={remoteStreamURL || remoteStream?.toURL?.() || ''}
-                    style={StyleSheet.absoluteFillObject}
+                    streamURL={typeof remoteStream.toURL === 'function' ? remoteStream.toURL() : remoteStream}
+                    style={styles.nativeRemoteVideo}
                     objectFit="cover"
                     zOrder={0}
                   />
                 )}
 
-                {/* 3. Picture-in-picture Self View (zOrder=1) */}
+                {/* 3. Picture-in-picture Self View */}
                 <View style={styles.pipSelfView}>
                   <LiveSelfVideo />
                 </View>
@@ -821,17 +801,15 @@ const styles = StyleSheet.create({
   pulseRingOuterActive: {
     borderColor: 'rgba(34, 197, 94, 0.25)',
   },
-  videoFrame: {
+  videoSurfaceContainer: {
     width: 320,
     height: 320,
-    borderRadius: 24,
-    overflow: 'hidden',
-    borderWidth: 2,
-    borderColor: 'rgba(253, 58, 115, 0.4)',
     position: 'relative',
     backgroundColor: '#000',
+    borderWidth: 1,
+    borderColor: 'rgba(253, 58, 115, 0.3)',
   },
-  videoStreamMain: {
+  nativeRemoteVideo: {
     width: '100%',
     height: '100%',
   },
@@ -846,6 +824,7 @@ const styles = StyleSheet.create({
     borderWidth: 2,
     borderColor: '#00E5FF',
     backgroundColor: '#1E293B',
+    zIndex: 20,
   },
   selfVideoPlaceholder: {
     flex: 1,
