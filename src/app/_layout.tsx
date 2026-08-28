@@ -42,13 +42,8 @@ export default function RootLayout() {
       try {
         const update = await Updates.checkForUpdateAsync();
         if (update.isAvailable) {
-          Alert.alert('OTA Update 🚀', 'Rahul AI sent new code! Downloading...', [
-            { text: 'Wait...' }
-          ]);
           await Updates.fetchUpdateAsync();
-          Alert.alert('Download Complete ✅', 'Applying new code now!', [
-            { text: 'Restart App', onPress: () => Updates.reloadAsync() }
-          ]);
+          await Updates.reloadAsync();
         }
       } catch (e) {
         // Skip silently if error
