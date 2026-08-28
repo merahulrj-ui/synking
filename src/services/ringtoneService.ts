@@ -1,12 +1,33 @@
+import { Platform } from 'react-native';
+import { Audio } from 'expo-av';
+
 // Professional Ringtone Engine for SYNKING
 // Generates Clean WhatsApp-Style Outgoing Dial Tone & Melodic Modern Incoming Ringtone
-// Works 100% reliably on Web, Mobile Browsers, and Native Devices
+// Works 100% reliably on Native Devices (expo-av) and Web Browsers (Web Audio API)
+
+const INCOMING_RINGTONE_URL = 'https://assets.mixkit.co/active_storage/sfx/2869/2869-preview.mp3';
+const OUTGOING_RINGTONE_URL = 'https://assets.mixkit.co/active_storage/sfx/1360/1360-preview.mp3';
 
 class RingtoneServiceClass {
   private audioCtx: any = null;
   private ringInterval: any = null;
   private isPlaying: boolean = false;
   private currentMode: 'incoming' | 'outgoing' | null = null;
+  private soundInstance: Audio.Sound | null = null;
+
+  private async configureAudioMode() {
+    try {
+      if (Platform.OS !== 'web') {
+        await Audio.setAudioModeAsync({
+          allowsRecordingIOS: false,
+          playsInSilentModeIOS: true,
+          staysActiveInBackground: true,
+          shouldDuckAndroid: true,
+          playThroughEarpieceAndroid: false,
+        });
+      }
+    } catch (e) {}
+  }
 
   private getAudioContext(): any {
     if (typeof window === 'undefined') return null;
@@ -27,13 +48,28 @@ class RingtoneServiceClass {
     return null;
   }
 
-  // 1. OUTGOING CALL: Soft Modern Dual-Tone Pulse ("Tring... Tring...")
-  public playOutgoingRing() {
+  // 1. OUTGOING CALL: Modern Dial Tone ("Tring... Tring...")
+  public async playOutgoingRing() {
     if (this.isPlaying && this.currentMode === 'outgoing') return;
     this.stop();
     this.isPlaying = true;
     this.currentMode = 'outgoing';
 
+    if (Platform.OS !== 'web') {
+      try {
+        await this.configureAudioMode();
+        const { sound } = await Audio.Sound.createAsync(
+          { uri: OUTGOING_RINGTONE_URL },
+          { shouldPlay: true, isLooping: true, volume: 0.8 }
+        );
+        this.soundInstance = sound;
+        return;
+      } catch (e) {
+        console.warn('[NATIVE_OUTGOING_RING_ERROR]', e);
+      }
+    }
+
+    // Web Audio Fallback
     const playPulse = () => {
       if (!this.isPlaying || this.currentMode !== 'outgoing') return;
       const ctx = this.getAudioContext();
@@ -48,7 +84,6 @@ class RingtoneServiceClass {
         gainNode.gain.linearRampToValueAtTime(0.001, now + 1.1);
         gainNode.connect(ctx.destination);
 
-        // Standard European/Cellular Dual Frequency 425Hz & 450Hz
         const osc1 = ctx.createOscillator();
         osc1.type = 'sine';
         osc1.frequency.setValueAtTime(425, now);
@@ -70,13 +105,28 @@ class RingtoneServiceClass {
     this.ringInterval = setInterval(playPulse, 3200);
   }
 
-  // 2. INCOMING CALL: Melodic iPhone / Marimba Synth Ringtone
-  public playIncomingRing() {
+  // 2. INCOMING CALL: Melodic Marimba Ringtone
+  public async playIncomingRing() {
     if (this.isPlaying && this.currentMode === 'incoming') return;
     this.stop();
     this.isPlaying = true;
     this.currentMode = 'incoming';
 
+    if (Platform.OS !== 'web') {
+      try {
+        await this.configureAudioMode();
+        const { sound } = await Audio.Sound.createAsync(
+          { uri: INCOMING_RINGTONE_URL },
+          { shouldPlay: true, isLooping: true, volume: 1.0 }
+        );
+        this.soundInstance = sound;
+        return;
+      } catch (e) {
+        console.warn('[NATIVE_INCOMING_RING_ERROR]', e);
+      }
+    }
+
+    // Web Audio Fallback
     const playMelody = () => {
       if (!this.isPlaying || this.currentMode !== 'incoming') return;
       const ctx = this.getAudioContext();
@@ -84,7 +134,6 @@ class RingtoneServiceClass {
 
       try {
         const now = ctx.currentTime;
-        // Upbeat modern marimba chord sequence: E5 (659Hz), G#5 (830Hz), B5 (987Hz), E6 (1318Hz)
         const notes = [
           { freq: 659.25, time: 0.00, dur: 0.22 },
           { freq: 830.61, time: 0.16, dur: 0.22 },
@@ -97,7 +146,6 @@ class RingtoneServiceClass {
         notes.forEach(({ freq, time, dur }) => {
           const noteStart = now + time;
           const noteEnd = noteStart + dur;
-
           const gain = ctx.createGain();
           gain.gain.setValueAtTime(0, noteStart);
           gain.gain.linearRampToValueAtTime(0.22, noteStart + 0.02);
@@ -105,7 +153,7 @@ class RingtoneServiceClass {
           gain.connect(ctx.destination);
 
           const osc = ctx.createOscillator();
-          osc.type = 'triangle'; // Soft acoustic marimba bell texture
+          osc.type = 'triangle';
           osc.frequency.setValueAtTime(freq, noteStart);
           osc.connect(gain);
 
@@ -119,44 +167,24 @@ class RingtoneServiceClass {
     this.ringInterval = setInterval(playMelody, 2200);
   }
 
-  // 4. MESSAGE RECEIVED: Sweet 2-Tone Pop/Chime (G5 -> C6)
-  public playMessageChime() {
-    const ctx = this.getAudioContext();
-    if (!ctx) return;
-    try {
-      const now = ctx.currentTime;
-      const notes = [
-        { freq: 783.99, time: 0.00, dur: 0.08 }, // G5
-        { freq: 1046.50, time: 0.07, dur: 0.18 }, // C6
-      ];
-      notes.forEach(({ freq, time, dur }) => {
-        const noteStart = now + time;
-        const noteEnd = noteStart + dur;
-        const gain = ctx.createGain();
-        gain.gain.setValueAtTime(0, noteStart);
-        gain.gain.linearRampToValueAtTime(0.18, noteStart + 0.01);
-        gain.gain.exponentialRampToValueAtTime(0.001, noteEnd);
-        gain.connect(ctx.destination);
-
-        const osc = ctx.createOscillator();
-        osc.type = 'sine';
-        osc.frequency.setValueAtTime(freq, noteStart);
-        osc.connect(gain);
-        osc.start(noteStart);
-        osc.stop(noteEnd);
-      });
-    } catch (e) {}
-  }
-
-  // 5. STOP RINGTONE INSTANTLY
-  public stop() {
+  // 3. STOP RINGTONE INSTANTLY
+  public async stop() {
     this.isPlaying = false;
     this.currentMode = null;
     if (this.ringInterval) {
       clearInterval(this.ringInterval);
       this.ringInterval = null;
     }
+    if (this.soundInstance) {
+      try {
+        const sound = this.soundInstance;
+        this.soundInstance = null;
+        await sound.stopAsync();
+        await sound.unloadAsync();
+      } catch (e) {}
+    }
   }
 }
 
 export const RingtoneService = new RingtoneServiceClass();
+

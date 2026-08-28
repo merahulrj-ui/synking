@@ -41,6 +41,7 @@ class WebRTCManager {
   private logListeners: Set<(msg: string) => void> = new Set();
   private frameListeners: Set<FrameListener> = new Set();
   private durationTimer: any = null;
+  private ringingTimeoutTimer: any = null;
   private localStream: any = null;
   private remoteStream: any = null;
   private remoteVideoFrame: string | null = null;
@@ -212,6 +213,9 @@ class WebRTCManager {
       params.targetUser.id
     );
 
+    // ⏱️ Auto-disconnect if unanswered in 35s
+    this.startRingingTimeout(35);
+
     return newSession;
   }
 
@@ -239,6 +243,9 @@ class WebRTCManager {
 
     // Play Melodic Incoming Ringtone
     RingtoneService.playIncomingRing();
+
+    // ⏱️ Auto-disconnect if unanswered in 35s
+    this.startRingingTimeout(35);
 
     return incomingSession;
   }
@@ -577,6 +584,18 @@ class WebRTCManager {
     return `${mins.toString().padStart(2, '0')}:${remainingSecs.toString().padStart(2, '0')}`;
   }
 
+  private startRingingTimeout(seconds: number = 35) {
+    if (this.ringingTimeoutTimer) {
+      clearTimeout(this.ringingTimeoutTimer);
+    }
+    this.ringingTimeoutTimer = setTimeout(() => {
+      if (this.currentSession && (this.currentSession.status === 'calling' || this.currentSession.status === 'ringing')) {
+        this.log(`⏱️ 35s Call Timeout: No answer received within 35 seconds. Automatically ending call.`);
+        this.endCall();
+      }
+    }, seconds * 1000);
+  }
+
   private startTimer() {
     this.cleanupTimers();
     this.durationTimer = setInterval(() => {
@@ -591,6 +610,10 @@ class WebRTCManager {
     if (this.durationTimer) {
       clearInterval(this.durationTimer);
       this.durationTimer = null;
+    }
+    if (this.ringingTimeoutTimer) {
+      clearTimeout(this.ringingTimeoutTimer);
+      this.ringingTimeoutTimer = null;
     }
   }
 

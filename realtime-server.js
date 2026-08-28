@@ -641,7 +641,7 @@ const server = http.createServer((req, res) => {
     return;
   }
 
-  // 1.5 GET /api/check-phone (For Demo OTP Login Check)
+  // 1.5 GET /api/check-phone (For Real Phone Login & Auto Account Detection)
   if (req.method === 'GET' && pathname === '/api/check-phone') {
     const phone = url.searchParams.get('phone');
     if (!phone) {
@@ -650,7 +650,25 @@ const server = http.createServer((req, res) => {
       return;
     }
 
-    queryTurso('SELECT * FROM users WHERE phone_number = ?', [{ type: 'text', value: phone }]).then(resTurso => {
+    const cleanDigits = phone.replace(/\D/g, '').slice(-10);
+
+    // 1. Check in-memory profiles first
+    const memUser = Object.values(db.profiles || {}).find(p => {
+      const pDigits = (p.phoneNumber || '').replace(/\D/g, '').slice(-10);
+      return pDigits && pDigits === cleanDigits;
+    });
+
+    if (memUser) {
+      res.writeHead(200, { 'Content-Type': 'application/json' });
+      res.end(JSON.stringify({ exists: true, user: memUser }));
+      return;
+    }
+
+    // 2. Check Turso Cloud Database with flexible query
+    queryTurso('SELECT * FROM users WHERE phone_number LIKE ? OR phone_number = ?', [
+      { type: 'text', value: `%${cleanDigits}` },
+      { type: 'text', value: phone }
+    ]).then(resTurso => {
       const rows = resTurso?.results?.[0]?.response?.result?.rows;
       const cols = resTurso?.results?.[0]?.response?.result?.cols;
       if (Array.isArray(rows) && rows.length > 0 && Array.isArray(cols)) {
@@ -671,8 +689,8 @@ const server = http.createServer((req, res) => {
           location: item.location || 'Roorkee',
           distance: '0 km',
           bio: item.bio || 'Active on Synking ✨',
-          photo: item.photo || 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=500',
-          photos: [item.photo || 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=500'],
+          photo: item.photo || (item.gender === 'female' ? 'https://images.unsplash.com/photo-1494790108377-be9c29b29330?w=800' : 'https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?w=800'),
+          photos: [item.photo || (item.gender === 'female' ? 'https://images.unsplash.com/photo-1494790108377-be9c29b29330?w=800' : 'https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?w=800')],
           interests: ['Coffee', 'Music', 'Travel'],
           compatibility: 100,
           isVerified: true,
@@ -681,6 +699,9 @@ const server = http.createServer((req, res) => {
         try { existingUser.location = JSON.parse(existingUser.location); } catch(e){}
         try { existingUser.photos = JSON.parse(existingUser.photos) || existingUser.photos; } catch(e){}
         try { existingUser.preferences = JSON.parse(item.preferences); } catch(e){}
+
+        // Cache in memory
+        db.profiles[existingUser.id] = existingUser;
 
         res.writeHead(200, { 'Content-Type': 'application/json' });
         res.end(JSON.stringify({ exists: true, user: existingUser }));
@@ -1152,11 +1173,11 @@ const broadcastToWebSockets = broadcastWs;
   if (req.method === 'GET' && pathname === '/api/version') {
     res.writeHead(200, { 'Content-Type': 'application/json' });
     res.end(JSON.stringify({
-      version: '1.0.3',
-      buildNumber: 103,
+      version: '1.0.4',
+      buildNumber: 104,
       releaseDate: new Date().toISOString(),
-      title: 'Incoming Call Vibration & Real Login',
-      notes: 'Incoming call repeating vibration, unified name/phone login, PiP video swap & camera controls.',
+      title: 'v1.0.4 Native Audio Ringtone & 35s Call Timeout',
+      notes: '35-second auto call timeout, expo-av native dial/ring tones, foreground service permissions, anchored bottom controls.',
       forceRefresh: true,
     }));
     return;

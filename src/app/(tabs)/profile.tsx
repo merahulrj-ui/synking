@@ -925,6 +925,22 @@ export default function ProfileScreen() {
               </TouchableOpacity>
             </View>
 
+            {/* 🏷️ SYNKING App Version & Live Release Status */}
+            <View style={{ alignItems: 'center', justifyContent: 'center', marginTop: 24, marginBottom: 8, gap: 4 }}>
+              <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6, backgroundColor: isDarkMode ? '#131927' : '#F1F5F9', paddingHorizontal: 14, paddingVertical: 6, borderRadius: 14, borderWidth: 1, borderColor: borderColor }}>
+                <View style={{ width: 8, height: 8, borderRadius: 4, backgroundColor: '#22C55E' }} />
+                <Text style={{ color: textColor, fontSize: 12, fontWeight: '800', letterSpacing: 0.5 }}>
+                  SYNKING v1.0.4
+                </Text>
+                <Text style={{ color: '#FD3A73', fontSize: 11, fontWeight: '700' }}>
+                  • Build 104
+                </Text>
+              </View>
+              <Text style={{ color: subText, fontSize: 11, fontWeight: '600' }}>
+                P2P Ultra-Fast HD Calling Engine 🚀
+              </Text>
+            </View>
+
             <View style={{ height: 40 }} />
           </View>
         )}

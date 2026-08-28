@@ -197,7 +197,7 @@ export const CallModal: React.FC<Props> = ({ session, onEndCall, onAcceptCall })
 
   const [showDebugger, setShowDebugger] = useState(false);
   const [isLocalExpanded, setIsLocalExpanded] = useState(false);
-  const isIncomingRinging = session.status === 'ringing';
+  const isIncomingRinging = session.status === 'ringing' && (session.receiverId === 'my_user_id' || !session.callerId);
   const isConnected = session.status === 'connected';
   const durationText = WebRTCService.formatDuration(session.durationSeconds);
   const localStream = WebRTCService.getLocalStream();
@@ -557,21 +557,9 @@ Remote Video Tracks (${remoteVideo.length}): ${JSON.stringify(remoteVideo)}
 
           {/* 1. TOP STATUS HEADER (FLOATING OVERLAY) */}
           <View style={[styles.topHeader, session.type === 'video' && styles.topHeaderFloating]}>
-            <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
-              <View style={styles.e2eeBadge}>
-                <Ionicons name="shield-checkmark" size={12} color="#22C55E" />
-                <Text style={styles.e2eeText}>P2P WebRTC Direct</Text>
-              </View>
-
-              {/* Toggle Live Debugger */}
-              <TouchableOpacity
-                style={styles.debugToggleBtn}
-                onPress={() => setShowDebugger(!showDebugger)}
-                activeOpacity={0.8}
-              >
-                <Ionicons name="bug-outline" size={12} color="#00E5FF" />
-                <Text style={styles.debugToggleText}>DEBUG</Text>
-              </TouchableOpacity>
+            <View style={styles.e2eeBadge}>
+              <Ionicons name="shield-checkmark" size={12} color="#22C55E" />
+              <Text style={styles.e2eeText}>P2P WebRTC Direct</Text>
             </View>
 
             <Text style={styles.callTypeTitle}>
@@ -589,70 +577,6 @@ Remote Video Tracks (${remoteVideo.length}): ${JSON.stringify(remoteVideo)}
               {session.status === 'rejected' && 'Call Declined'}
             </Text>
           </View>
-
-          {/* LIVE CALL DEBUGGER PANEL */}
-          {showDebugger && (
-            <View style={styles.debugPanel}>
-              <ScrollView style={{ maxHeight: 180 }} showsVerticalScrollIndicator={true}>
-                <Text style={styles.debugTitle}>🛠️ LIVE WEBRTC STREAM DEBUGGER</Text>
-                <Text style={styles.debugLine}>• ICE Connection: <Text style={{ color: '#22C55E' }}>{WebRTCService.iceStatus}</Text></Text>
-                <Text style={styles.debugLine}>• Local Mic: {localStream?.getAudioTracks().length ? '🟢 Active' : '🔴 Inactive'} | Local Cam: {localStream?.getVideoTracks().length ? '🟢 Active' : '🔴 Inactive'}</Text>
-                <Text style={styles.debugLine}>• Remote Audio: {remoteStream?.getAudioTracks().length ? '🟢 Connected' : '🟡 Waiting'} | Video: {remoteStream?.getVideoTracks().length ? '🟢 Connected' : '🟡 Waiting'}</Text>
-
-                {/* LIVE MIC LEVEL VISUALIZER */}
-                <View style={styles.micLevelBox}>
-                  <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' }}>
-                    <Text style={styles.micLevelLabel}>🎙️ LIVE MIC LEVEL: {micLevel}%</Text>
-                    <Text style={{ color: micLevel > 15 ? '#22C55E' : '#94A3B8', fontSize: 9.5, fontWeight: '800' }}>
-                      {micLevel > 15 ? '🗣️ Speech Detected' : '🤫 Quiet / Listening'}
-                    </Text>
-                  </View>
-                  <View style={styles.micLevelTrack}>
-                    <View style={[styles.micLevelFill, { width: `${Math.max(4, micLevel)}%` }]} />
-                  </View>
-                </View>
-
-                <View style={{ flexDirection: 'row', gap: 6, marginTop: 6 }}>
-                  <TouchableOpacity
-                    style={[styles.testSoundBtn, { flex: 1, backgroundColor: isLoopbackActive ? '#EF4444' : '#10B981' }]}
-                    onPress={handleTestMicLoopback}
-                    activeOpacity={0.8}
-                  >
-                    <Ionicons name="mic" size={12} color="#FFF" />
-                    <Text style={styles.testSoundText}>{isLoopbackActive ? 'Testing Mic (4s)... 🎙️' : 'Test My Mic 🎙️'}</Text>
-                  </TouchableOpacity>
-
-                  <TouchableOpacity
-                    style={[styles.testSoundBtn, { flex: 1, backgroundColor: '#0284C7' }]}
-                    onPress={handleTestSpeakerBeep}
-                    activeOpacity={0.8}
-                  >
-                    <Ionicons name="volume-high" size={12} color="#FFF" />
-                    <Text style={styles.testSoundText}>Test Speaker 🔊</Text>
-                  </TouchableOpacity>
-                </View>
-
-                <View style={{ marginTop: 4 }}>
-                  <TouchableOpacity
-                    style={[styles.testSoundBtn, { backgroundColor: copied ? '#22C55E' : '#6366F1' }]}
-                    onPress={handleCopyDebugReport}
-                    activeOpacity={0.8}
-                  >
-                    <Ionicons name={copied ? 'checkmark-circle' : 'copy-outline'} size={12} color="#FFF" />
-                    <Text style={styles.testSoundText}>{copied ? 'Copied! ✅' : 'Copy Full Debug Report 📋'}</Text>
-                  </TouchableOpacity>
-                </View>
-
-                {/* LIVE ACTION TRACE CONSOLE */}
-                <View style={styles.terminalBox}>
-                  <Text style={styles.terminalTitle}>⚡ LIVE BUTTON PRESS & EXECUTION TRACE:</Text>
-                  {actionLogs.map((log, idx) => (
-                    <Text key={idx} style={styles.terminalLine}>{log}</Text>
-                  ))}
-                </View>
-              </ScrollView>
-            </View>
-          )}
 
           {/* 2. CENTER AVATAR (ONLY FOR VOICE CALLS) */}
           {session.type !== 'video' && (

@@ -483,14 +483,13 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     await saveUserProfileToFirestore(user); // Await the save to prevent race condition with self-check!
     setCurrentUser(user);
     setIsLoggedIn(true);
-    setMatches([]);
-    setIncomingRequests([]);
-    setSentRequests([]);
-    setMessages({});
     if (typeof window !== 'undefined' && window.localStorage) {
       window.localStorage.setItem('synking_my_user', JSON.stringify(user));
     }
     AsyncStorage.setItem('synking_my_user', JSON.stringify(user)).catch(() => {});
+    setTimeout(() => {
+      syncCloudState();
+    }, 100);
   };
 
   const logoutUser = () => {
