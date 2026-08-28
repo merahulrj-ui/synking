@@ -67,7 +67,7 @@ const LiveSelfVideo: React.FC = () => {
 };
 
 // 2. Unified Live Media Component (Handles BOTH Audio and Video gracefully)
-const LiveRemoteMedia: React.FC<{ type: 'voice' | 'video'; photoUrl?: string }> = ({ type, photoUrl }) => {
+const LiveRemoteMedia: React.FC<{ type: 'voice' | 'video'; photoUrl?: string; isSpeakerOn?: boolean }> = ({ type, photoUrl, isSpeakerOn }) => {
   const mediaRef = useRef<any>(null);
   const [audioBlocked, setAudioBlocked] = useState(false);
   const [hasVideo, setHasVideo] = useState(false);
@@ -87,6 +87,31 @@ const LiveRemoteMedia: React.FC<{ type: 'voice' | 'video'; photoUrl?: string }> 
       const vTracks = remoteStream.getVideoTracks ? remoteStream.getVideoTracks() : [];
       if (vTracks.length > 0) {
         setHasVideo(true);
+      }
+
+      // Audio Hardware Sink Switcher: Earpiece (Voice Call) vs Loudspeaker (Video Call)
+      if (typeof mediaRef.current.setSinkId === 'function' && navigator.mediaDevices?.enumerateDevices) {
+        navigator.mediaDevices.enumerateDevices().then(devices => {
+          const audioOutputs = devices.filter(d => d.kind === 'audiooutput');
+          const earpiece = audioOutputs.find(d => 
+            d.label.toLowerCase().includes('earpiece') || 
+            d.label.toLowerCase().includes('receiver') || 
+            d.label.toLowerCase().includes('internal') ||
+            d.deviceId === 'earpiece' ||
+            d.deviceId === 'communications'
+          );
+          const speaker = audioOutputs.find(d => 
+            d.label.toLowerCase().includes('speaker') || 
+            d.label.toLowerCase().includes('loudspeaker') ||
+            d.deviceId === 'speaker'
+          );
+          
+          if (isSpeakerOn && speaker) {
+            mediaRef.current.setSinkId(speaker.deviceId).catch(() => {});
+          } else if (!isSpeakerOn && earpiece) {
+            mediaRef.current.setSinkId(earpiece.deviceId).catch(() => {});
+          }
+        }).catch(() => {});
       }
 
       mediaRef.current.play().then(() => {
@@ -109,7 +134,7 @@ const LiveRemoteMedia: React.FC<{ type: 'voice' | 'video'; photoUrl?: string }> 
       const interval = setInterval(attemptPlay, 400);
       return () => clearInterval(interval);
     }
-  }, []);
+  }, [isSpeakerOn]);
 
   if (Platform.OS !== 'web') return null;
 
@@ -406,7 +431,7 @@ Remote Video Tracks (${remoteVideo.length}): ${JSON.stringify(remoteVideo)}
           style={styles.callingCard}
         >
           {/* Global Live Media Receiver for ALL calls - must exist BEFORE stream arrives */}
-          <LiveRemoteMedia type={session.type === 'video' ? 'video' : 'voice'} photoUrl={session.callerPhoto} />
+          <LiveRemoteMedia type={session.type === 'video' ? 'video' : 'voice'} photoUrl={session.callerPhoto} isSpeakerOn={session.isSpeakerOn} />
 
           {/* FULLSCREEN REMOTE VIDEO BACKGROUND (WHATSAPP STYLE) */}
           {session.type === 'video' && (
