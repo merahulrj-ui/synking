@@ -23,6 +23,7 @@ import { CallSession, ChatMessage } from '../../types';
 import { fetchChatMessagesFromFirestore } from '../../services/firebase';
 import { RealtimeBridge } from '../../services/realtimeBridge';
 import { ChatDebugger } from '../../components/ChatDebugger';
+import AsyncStorage from '@react-native-async-storage/async-storage';
 
 const ICEBREAKERS = [
   { text: 'Specialty Coffee or Boba Tea? ☕', tag: 'Cafe Vibe' },
@@ -42,6 +43,34 @@ export default function ChatScreen() {
   const [isRecording, setIsRecording] = useState(false);
   const [recordingSeconds, setRecordingSeconds] = useState(0);
   const [playingMessageId, setPlayingMessageId] = useState<string | null>(null);
+  const [strikeCount, setStrikeCount] = useState(0);
+  const [isSuspended, setIsSuspended] = useState(false);
+  const [suspendedUntil, setSuspendedUntil] = useState<number | null>(null);
+
+  // Load persistent 2-Strike & 3-Day Suspension Status
+  useEffect(() => {
+    const loadSuspension = async () => {
+      try {
+        const storedStrikes = await AsyncStorage.getItem('synking_phone_strikes');
+        const storedUntil = await AsyncStorage.getItem('synking_suspended_until');
+        if (storedStrikes) setStrikeCount(parseInt(storedStrikes, 10) || 0);
+        if (storedUntil) {
+          const untilTimestamp = parseInt(storedUntil, 10);
+          if (untilTimestamp && Date.now() < untilTimestamp) {
+            setIsSuspended(true);
+            setSuspendedUntil(untilTimestamp);
+          } else if (untilTimestamp && Date.now() >= untilTimestamp) {
+            setIsSuspended(false);
+            setSuspendedUntil(null);
+            setStrikeCount(0);
+            await AsyncStorage.removeItem('synking_suspended_until');
+            await AsyncStorage.removeItem('synking_phone_strikes');
+          }
+        }
+      } catch (e) {}
+    };
+    loadSuspension();
+  }, []);
 
   useEffect(() => {
     let timer: any;
@@ -178,27 +207,118 @@ export default function ChatScreen() {
     Alert.alert('Cloud Synced 🔄', `Fetched ${msgs.length} messages from Cloud Firestore.`);
   };
 
-  const checkAndBlockPhoneNumber = (text: string): boolean => {
-    // 1. Digits only extraction
-    const digits = text.replace(/\D/g, '');
-    
-    // 2. Check 10+ digits sequence or mobile prefix (6,7,8,9)
-    const has10DigitNumber = digits.length >= 10 && (/([6-9]\d{9})|(91[6-9]\d{9})|(0[6-9]\d{9})/.test(digits) || /\d{10,}/.test(digits));
-    
-    // 3. Spaced / punctuated digits (e.g. 9 8 7 6 5 4 3 2 1 0)
-    const spacedPattern = /\b[6-9](?:[\s\-\._*#]{0,3}\d){9}\b/;
-    
-    // 4. Intent keywords + numbers
-    const intentPattern = /(?:(?:no|number|num|whatsapp|ph|phone|contact)\s*(?:is|:)?\s*[\d\s\-\.]{7,})|(?:call\s*me\s*(?:at|on)\s*[\d\s\-\.]{7,})/i;
+  // Advanced Multi-lingual Word-to-Digit Anti-Evasion Normalizer
+  const normalizeTextToDigits = (input: string): string => {
+    let lower = input.toLowerCase();
 
-    if (has10DigitNumber || spacedPattern.test(text) || intentPattern.test(text)) {
-      const warningTitle = '🛡️ Phone Sharing Blocked for Safety';
-      const warningMsg = 'For your privacy and security, sharing personal phone numbers or direct contact details in chat is restricted.\n\n🔒 Please use SYNKING safe in-app Encrypted Voice & Video calls or Plan a Public Date!';
-      
+    // Word-to-Digit Mapping (English words, Hindi/Hinglish numbers, typo slang)
+    const wordMap: [RegExp, string][] = [
+      [/\b(zero|shunya|sifar|oh)\b/gi, '0'],
+      [/\b(one|ek|ik|wan|won)\b/gi, '1'],
+      [/\b(two|do|too|tu)\b/gi, '2'],
+      [/\b(three|teen|tin|tri|tree)\b/gi, '3'],
+      [/\b(four|chaar|char|for|foor)\b/gi, '4'],
+      [/\b(five|paanch|panch|fine|fiv|faiv)\b/gi, '5'],
+      [/\b(six|chhe|che|chhey|siks)\b/gi, '6'],
+      [/\b(seven|saat|sat|sath|sevn)\b/gi, '7'],
+      [/\b(eight|aath|aat|ath|ate|ait)\b/gi, '8'],
+      [/\b(nine|nau|no|nyn|nin)\b/gi, '9'],
+    ];
+
+    wordMap.forEach(([regex, digit]) => {
+      lower = lower.replace(regex, digit);
+    });
+
+    return lower;
+  };
+
+  const checkAndBlockPhoneNumber = (rawText: string): boolean => {
+    if (!rawText) return false;
+
+    // Check if user is currently suspended for 3 days
+    if (isSuspended && suspendedUntil && Date.now() < suspendedUntil) {
+      const unlockDateStr = new Date(suspendedUntil).toLocaleString();
+      const title = '🚫 Account Blocked for 3 Days';
+      const msg = `You are restricted from messaging due to repeated safety violations.\n\n🔒 Account Unlocks: ${unlockDateStr}`;
       if (Platform.OS === 'web') {
-        window.alert(`${warningTitle}\n\n${warningMsg}`);
+        window.alert(`${title}\n\n${msg}`);
       } else {
-        Alert.alert(warningTitle, warningMsg, [{ text: 'Understood 👍' }]);
+        Alert.alert(title, msg, [{ text: 'OK' }]);
+      }
+      return true;
+    }
+
+    // 1. Normalize words like "nine", "two", "fine", "one", "teen" into digits
+    const normalized = normalizeTextToDigits(rawText);
+
+    // 2. Digits only extraction from normalized text
+    const currentDigits = normalized.replace(/\D/g, '');
+    
+    // 3. Single message check: 10+ digits sequence or Indian mobile pattern (starts with 6,7,8,9)
+    const has10DigitNumber =
+      currentDigits.length >= 10 &&
+      (/(?:[6-9]\d{9})|(?:91[6-9]\d{9})|(?:0[6-9]\d{9})/.test(currentDigits) || /\d{10,}/.test(currentDigits));
+    
+    // 4. Spaced / punctuated digits (e.g. 9 8 7 6 5 4 3 2 1 0 or 9-2-1 3424 5-1-9)
+    const spacedPattern = /\b[6-9](?:[\s\-\._*#@,]{0,3}\d){9}\b/;
+    
+    // 5. Intent keywords + numbers (e.g. "whatsapp me on 921...", "call me on 98...")
+    const intentPattern = /(?:(?:no|number|num|whatsapp|ph|phone|contact|call|watsap|insta|dm)\s*(?:is|:|\s)?\s*[\d\s\-\.]{6,})|(?:call\s*me\s*(?:at|on)\s*[\d\s\-\.]{6,})/i;
+
+    // 6. MULTI-MESSAGE FRAGMENT CHECK (e.g. sends 4 digits, then 3 digits, then 3 digits)
+    let isFragmentedLeak = false;
+    if (currentDigits.length >= 2) {
+      const myId = currentUser?.id || 'my_user_id';
+      const recentMyMessages = userMessages
+        .filter(m => (m.senderId === myId || m.senderId === 'my_user_id') && !m.text.startsWith('📞') && !m.text.startsWith('📹'))
+        .slice(-4);
+      
+      const prevDigits = recentMyMessages
+        .map(m => normalizeTextToDigits(m.text).replace(/\D/g, ''))
+        .join('');
+      
+      const combinedDigits = prevDigits + currentDigits;
+      if (combinedDigits.length >= 10 && (/(?:[6-9]\d{9})|(?:91[6-9]\d{9})|(?:0[6-9]\d{9})/.test(combinedDigits) || /\d{10,}/.test(combinedDigits))) {
+        isFragmentedLeak = true;
+      }
+    }
+
+    if (has10DigitNumber || spacedPattern.test(normalized) || intentPattern.test(normalized) || isFragmentedLeak) {
+      if (strikeCount === 0) {
+        // STRIKE 1: FIRST WARNING
+        setStrikeCount(1);
+        AsyncStorage.setItem('synking_phone_strikes', '1').catch(() => {});
+        
+        const warningTitle = '⚠️ 1st Safety Warning (Strike 1/2)';
+        const warningMsg = isFragmentedLeak
+          ? '⚠️ Splitting phone numbers across multiple messages is detected and prohibited.\n\n⚠️ CAUTION: Doing this a 2nd time will immediately BLOCK YOUR ACCOUNT FOR 3 DAYS (72 Hours)!'
+          : 'Sharing mobile numbers or contact words (e.g. "nine two one...") is strictly prohibited.\n\n⚠️ CAUTION: Doing this a 2nd time will immediately BLOCK YOUR ACCOUNT FOR 3 DAYS (72 Hours)!';
+        
+        if (Platform.OS === 'web') {
+          window.alert(`${warningTitle}\n\n${warningMsg}`);
+        } else {
+          Alert.alert(warningTitle, warningMsg, [{ text: 'Understood 👍' }]);
+        }
+      } else {
+        // STRIKE 2: BLOCKED FOR 3 DAYS (72 HOURS)
+        const threeDaysMs = 3 * 24 * 60 * 60 * 1000;
+        const unlockTimestamp = Date.now() + threeDaysMs;
+        setStrikeCount(2);
+        setIsSuspended(true);
+        setSuspendedUntil(unlockTimestamp);
+        
+        AsyncStorage.setItem('synking_phone_strikes', '2').catch(() => {});
+        AsyncStorage.setItem('synking_suspended_until', unlockTimestamp.toString()).catch(() => {});
+        
+        const unlockDateStr = new Date(unlockTimestamp).toLocaleString();
+        const banTitle = '🚫 Account Blocked for 3 Days (Strike 2/2)';
+        const banMsg = `You repeatedly attempted to share contact numbers.\n\nAs per community safety policy, your account is SUSPENDED FOR 3 DAYS (72 Hours).\n\n🔒 Unlock Time: ${unlockDateStr}`;
+        
+        if (Platform.OS === 'web') {
+          window.alert(`${banTitle}\n\n${banMsg}`);
+        } else {
+          Alert.alert(banTitle, banMsg, [{ text: 'I Understand' }]);
+        }
       }
       return true;
     }
@@ -608,8 +728,20 @@ export default function ChatScreen() {
           </ScrollView>
         </View>
 
-        {/* 6. BOTTOM INPUT BAR (WHATSAPP STYLE RECORDING) */}
-        {isRecording ? (
+        {/* 6. BOTTOM INPUT BAR (WHATSAPP STYLE RECORDING / SUSPENSION LOCK) */}
+        {isSuspended ? (
+          <View style={[styles.inputBar, { backgroundColor: isDarkMode ? '#200D11' : '#FEE2E2', borderTopColor: '#EF4444', paddingVertical: 14, paddingHorizontal: 16, alignItems: 'center', justifyContent: 'center', gap: 4 }]}>
+            <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
+              <Ionicons name="lock-closed" size={18} color="#EF4444" />
+              <Text style={{ color: '#EF4444', fontWeight: '900', fontSize: 13, letterSpacing: 0.3 }}>
+                ACCOUNT BLOCKED FOR 3 DAYS (STRIKE 2/2)
+              </Text>
+            </View>
+            <Text style={{ color: isDarkMode ? '#FCA5A5' : '#991B1B', fontSize: 11, fontWeight: '600', textAlign: 'center' }}>
+              Restricted from messaging due to repeated contact sharing violations. Unlocks on {suspendedUntil ? new Date(suspendedUntil).toLocaleDateString() : '3 days'}.
+            </Text>
+          </View>
+        ) : isRecording ? (
           <View style={[styles.inputBar, { backgroundColor: isDarkMode ? '#1E1218' : '#FFF1F2', borderTopColor: '#FECDD3', paddingHorizontal: 16 }]}>
             {/* Pulsing Recording Indicator */}
             <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8, flex: 1 }}>
