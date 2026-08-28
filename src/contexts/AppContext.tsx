@@ -1,4 +1,5 @@
 import React, { createContext, useContext, useState, useEffect, useRef } from 'react';
+import { Alert, Platform } from 'react-native';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { UserProfile, SynkRequest, Venue, DateBooking, ChatMessage, SafetyContact } from '../types';
 import { MOCK_VENUES } from '../constants/mockData';
@@ -46,6 +47,10 @@ interface AppContextType {
   sendMessage: (receiverId: string, text: string) => void;
   submitFeedback: (bookingId: string, feedback: { matched: boolean; respectful: boolean; safe: boolean; notes: string }) => void;
   refreshDiscoverFeed: () => Promise<void>;
+  isSuspended: boolean;
+  suspendedUntil: number | null;
+  strikeCount: number;
+  triggerSafetyViolation: (customMsg?: string) => boolean;
 }
 
 const AppContext = createContext<AppContextType | undefined>(undefined);
@@ -151,6 +156,81 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     name: 'Emergency Contact',
     phone: '+91 98765 43210'
   });
+
+  const [strikeCount, setStrikeCount] = useState(0);
+  const [isSuspended, setIsSuspended] = useState(false);
+  const [suspendedUntil, setSuspendedUntil] = useState<number | null>(null);
+
+  // Load persistent Global 2-Strike & 3-Day Suspension Status
+  useEffect(() => {
+    const loadSuspension = async () => {
+      try {
+        const storedStrikes = await AsyncStorage.getItem('synking_phone_strikes');
+        const storedUntil = await AsyncStorage.getItem('synking_suspended_until');
+        if (storedStrikes) setStrikeCount(parseInt(storedStrikes, 10) || 0);
+        if (storedUntil) {
+          const untilTimestamp = parseInt(storedUntil, 10);
+          if (untilTimestamp && Date.now() < untilTimestamp) {
+            setIsSuspended(true);
+            setSuspendedUntil(untilTimestamp);
+          } else if (untilTimestamp && Date.now() >= untilTimestamp) {
+            setIsSuspended(false);
+            setSuspendedUntil(null);
+            setStrikeCount(0);
+            await AsyncStorage.removeItem('synking_suspended_until');
+            await AsyncStorage.removeItem('synking_phone_strikes');
+          }
+        }
+      } catch (e) {}
+    };
+    loadSuspension();
+  }, []);
+
+  const triggerSafetyViolation = (customMsg?: string): boolean => {
+    if (isSuspended && suspendedUntil && Date.now() < suspendedUntil) {
+      const unlockDateStr = new Date(suspendedUntil).toLocaleString();
+      const title = '🚫 Entire Account Blocked for 3 Days';
+      const msg = `Your ENTIRE account is temporarily suspended for 72 hours due to repeated contact sharing violations.\n\n🔒 Account Unlocks: ${unlockDateStr}`;
+      if (Platform.OS === 'web') {
+        window.alert(`${title}\n\n${msg}`);
+      } else {
+        Alert.alert(title, msg, [{ text: 'OK' }]);
+      }
+      return true;
+    }
+
+    if (strikeCount === 0) {
+      setStrikeCount(1);
+      AsyncStorage.setItem('synking_phone_strikes', '1').catch(() => {});
+      const warningTitle = '⚠️ 1st Safety Warning (Strike 1/2)';
+      const warningMsg = customMsg || 'Sharing phone numbers, social media handles, or contact info is strictly prohibited.\n\n⚠️ CAUTION: Doing this a 2nd time will immediately BLOCK YOUR WHOLE ACCOUNT (Swipes, Calls, & Chats) FOR 3 DAYS (72 Hours)!';
+      if (Platform.OS === 'web') {
+        window.alert(`${warningTitle}\n\n${warningMsg}`);
+      } else {
+        Alert.alert(warningTitle, warningMsg, [{ text: 'Understood 👍' }]);
+      }
+      return true;
+    } else {
+      const threeDaysMs = 3 * 24 * 60 * 60 * 1000;
+      const unlockTimestamp = Date.now() + threeDaysMs;
+      setStrikeCount(2);
+      setIsSuspended(true);
+      setSuspendedUntil(unlockTimestamp);
+      AsyncStorage.setItem('synking_phone_strikes', '2').catch(() => {});
+      AsyncStorage.setItem('synking_suspended_until', unlockTimestamp.toString()).catch(() => {});
+      
+      const unlockDateStr = new Date(unlockTimestamp).toLocaleString();
+      const banTitle = '🚫 ENTIRE ACCOUNT BLOCKED FOR 3 DAYS (Strike 2/2)';
+      const banMsg = `You repeatedly attempted to share contact details.\n\nAs per community safety policy, your ENTIRE ACCOUNT (Swiping, Calls, Messages, & InSynk) is SUSPENDED FOR 3 DAYS (72 Hours).\n\n🔒 Unlock Time: ${unlockDateStr}`;
+      
+      if (Platform.OS === 'web') {
+        window.alert(`${banTitle}\n\n${banMsg}`);
+      } else {
+        Alert.alert(banTitle, banMsg, [{ text: 'I Understand' }]);
+      }
+      return true;
+    }
+  };
 
   // 1. Zero-Latency Realtime Bridge Subscription (0ms instant cross-device/tab synchronization)
   useEffect(() => {
@@ -321,6 +401,17 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
 
   // Right Swipe: Instant 0ms Broadcast + Firestore Persistence
   const swipeProfile = (profileId: string, action: 'like' | 'pass' | 'supersynk') => {
+    if (isSuspended && suspendedUntil && Date.now() < suspendedUntil) {
+      const unlockStr = new Date(suspendedUntil).toLocaleString();
+      const msg = `Your ENTIRE account is temporarily suspended for 3 days.\n\n🔒 Swiping & Matching unlock on: ${unlockStr}`;
+      if (Platform.OS === 'web') {
+        window.alert(`🚫 Entire Account Suspended\n\n${msg}`);
+      } else {
+        Alert.alert('🚫 Entire Account Suspended', msg, [{ text: 'OK' }]);
+      }
+      return { success: false };
+    }
+
     const swipedUser = profiles.find(p => p.id === profileId);
     setProfiles(prev => prev.filter(p => p.id !== profileId));
 
@@ -348,6 +439,17 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
 
   // Accept Request: Broadcasts instant acceptance alert to sender device & updates cloud
   const acceptRequest = (requestId: string): UserProfile | null => {
+    if (isSuspended && suspendedUntil && Date.now() < suspendedUntil) {
+      const unlockStr = new Date(suspendedUntil).toLocaleString();
+      const msg = `Your ENTIRE account is temporarily suspended for 3 days.\n\n🔒 Accepting matches unlocks on: ${unlockStr}`;
+      if (Platform.OS === 'web') {
+        window.alert(`🚫 Entire Account Suspended\n\n${msg}`);
+      } else {
+        Alert.alert('🚫 Entire Account Suspended', msg, [{ text: 'OK' }]);
+      }
+      return null;
+    }
+
     const req = incomingRequests.find(r => r.id === requestId);
     if (!req) return null;
 
@@ -433,6 +535,17 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
 
   // Send Message: Instant 0ms Broadcast + Fast Firestore Stream
   const sendMessage = async (receiverId: string, text: string) => {
+    if (isSuspended && suspendedUntil && Date.now() < suspendedUntil) {
+      const unlockStr = new Date(suspendedUntil).toLocaleString();
+      const msg = `Your ENTIRE account is temporarily suspended for 3 days.\n\n🔒 Messaging unlocks on: ${unlockStr}`;
+      if (Platform.OS === 'web') {
+        window.alert(`🚫 Entire Account Suspended\n\n${msg}`);
+      } else {
+        Alert.alert('🚫 Entire Account Suspended', msg, [{ text: 'OK' }]);
+      }
+      return;
+    }
+
     const senderId = currentUser?.id || 'my_user_id';
     const newMsg: ChatMessage = {
       id: `msg_${Date.now()}_${Math.random().toString(36).substring(2, 6)}`,
@@ -499,6 +612,10 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
         sendMessage,
         submitFeedback,
         refreshDiscoverFeed: syncCloudState,
+        isSuspended,
+        suspendedUntil,
+        strikeCount,
+        triggerSafetyViolation,
       }}
     >
       {children}

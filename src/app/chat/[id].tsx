@@ -283,16 +283,34 @@ export default function ChatScreen() {
       }
     }
 
-    if (has10DigitNumber || spacedPattern.test(normalized) || intentPattern.test(normalized) || isFragmentedLeak) {
+    // 7. UPI & PAYMENT FRAUD SHIELD
+    const upiPattern = /[a-zA-Z0-9.\-_]{2,}@(okaxis|okhdfcbank|oksbi|okicici|paytm|ybl|ibl|axl|apl|upi|kotak|barodampay|idfcbank|federal|indus|freecharge|pockets|airtel|jupiteraxis|sliceaxis|fbl|waaxis|sbi|hdfcbank|icici|axisbank)\b/i;
+    const paymentIntent = /(?:(?:paytm|gpay|googlepay|phonepe|bhim|upi|scanner|qr\s*code|send\s*(?:money|cash|rs|rupees)|transfer)\s*(?:is|:|\s)?\s*[\w\.\-@]{3,})/i;
+
+    // 8. SOCIAL MEDIA HANDLES & EXTERNAL ID SHIELD (Instagram, Snapchat, Telegram, FB, Links, @handles)
+    const socialHandlePattern = /(?:(?:insta|instagram|ig|snap|snapchat|sc|telegram|tele|tg|facebook|fb|twitter)\s*(?:id|handle|username|pe|par|account)?\s*(?:is|:|\s)?\s*[@a-zA-Z0-9._]{3,})/i;
+    const atHandlePattern = /(?:^|\s)@[a-zA-Z0-9._]{3,30}\b/;
+    const emailPattern = /[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}/;
+    const socialLinkPattern = /(?:t\.me|telegram\.me|instagram\.com|snapchat\.com|wa\.me|facebook\.com)\/[a-zA-Z0-9._-]+/i;
+
+    const isUpiViolation = upiPattern.test(rawText) || paymentIntent.test(rawText);
+    const isSocialViolation = socialHandlePattern.test(rawText) || atHandlePattern.test(rawText) || emailPattern.test(rawText) || socialLinkPattern.test(rawText);
+    const isPhoneViolation = has10DigitNumber || spacedPattern.test(normalized) || intentPattern.test(normalized) || isFragmentedLeak;
+
+    if (isPhoneViolation || isUpiViolation || isSocialViolation) {
+      const violationType = isUpiViolation
+        ? 'UPI / Payment ID sharing'
+        : isSocialViolation
+        ? 'Social Media / Insta / Snap ID sharing'
+        : 'Phone Number sharing';
+
       if (strikeCount === 0) {
         // STRIKE 1: FIRST WARNING
         setStrikeCount(1);
         AsyncStorage.setItem('synking_phone_strikes', '1').catch(() => {});
         
         const warningTitle = '⚠️ 1st Safety Warning (Strike 1/2)';
-        const warningMsg = isFragmentedLeak
-          ? '⚠️ Splitting phone numbers across multiple messages is detected and prohibited.\n\n⚠️ CAUTION: Doing this a 2nd time will immediately BLOCK YOUR ACCOUNT FOR 3 DAYS (72 Hours)!'
-          : 'Sharing mobile numbers or contact words (e.g. "nine two one...") is strictly prohibited.\n\n⚠️ CAUTION: Doing this a 2nd time will immediately BLOCK YOUR ACCOUNT FOR 3 DAYS (72 Hours)!';
+        const warningMsg = `${violationType} is strictly prohibited for user privacy and fraud protection.\n\n⚠️ CAUTION: Attempting this a 2nd time will immediately BLOCK YOUR WHOLE ACCOUNT FOR 3 DAYS (72 Hours)!`;
         
         if (Platform.OS === 'web') {
           window.alert(`${warningTitle}\n\n${warningMsg}`);
@@ -311,8 +329,8 @@ export default function ChatScreen() {
         AsyncStorage.setItem('synking_suspended_until', unlockTimestamp.toString()).catch(() => {});
         
         const unlockDateStr = new Date(unlockTimestamp).toLocaleString();
-        const banTitle = '🚫 Account Blocked for 3 Days (Strike 2/2)';
-        const banMsg = `You repeatedly attempted to share contact numbers.\n\nAs per community safety policy, your account is SUSPENDED FOR 3 DAYS (72 Hours).\n\n🔒 Unlock Time: ${unlockDateStr}`;
+        const banTitle = '🚫 ENTIRE ACCOUNT BLOCKED FOR 3 DAYS (Strike 2/2)';
+        const banMsg = `You repeatedly attempted ${violationType}.\n\nAs per community safety policy, your ENTIRE ACCOUNT (Swiping, Calls, Messages, & InSynk) is SUSPENDED FOR 3 DAYS (72 Hours).\n\n🔒 Unlock Time: ${unlockDateStr}`;
         
         if (Platform.OS === 'web') {
           window.alert(`${banTitle}\n\n${banMsg}`);
@@ -354,6 +372,18 @@ export default function ChatScreen() {
   // Start Native WebRTC Voice or Video Call (Outgoing)
   const handleStartCall = (type: 'audio' | 'video') => {
     if (!currentUser || !targetUser) return;
+
+    if (isSuspended && suspendedUntil && Date.now() < suspendedUntil) {
+      const unlockStr = new Date(suspendedUntil).toLocaleString();
+      const msg = `Your ENTIRE account is temporarily suspended for 3 days.\n\n🔒 Voice & Video calls unlock on: ${unlockStr}`;
+      if (Platform.OS === 'web') {
+        window.alert(`🚫 Calls Disabled\n\n${msg}`);
+      } else {
+        Alert.alert('🚫 Calls Disabled', msg, [{ text: 'OK' }]);
+      }
+      return;
+    }
+
     WebRTCService.startCall({
       callerUser: currentUser,
       targetUser,

@@ -10,8 +10,27 @@ import { WebRTCService } from '../../services/webrtcService';
 import { CallSession } from '../../types';
 
 export default function TabsLayout() {
-  const { isDarkMode, incomingRequests, currentUser, acceptedMatchAlert, clearAcceptedMatchAlert } = useApp();
+  const { isDarkMode, incomingRequests, currentUser, acceptedMatchAlert, clearAcceptedMatchAlert, isSuspended, suspendedUntil } = useApp();
   const [activeCall, setActiveCall] = React.useState<CallSession | null>(null);
+  const [timeLeft, setTimeLeft] = React.useState<string>('');
+
+  React.useEffect(() => {
+    if (!isSuspended || !suspendedUntil) return;
+    const update = () => {
+      const diff = suspendedUntil - Date.now();
+      if (diff <= 0) {
+        setTimeLeft('Unlocking...');
+      } else {
+        const hours = Math.floor(diff / (1000 * 60 * 60));
+        const mins = Math.floor((diff % (1000 * 60 * 60)) / (1000 * 60));
+        const secs = Math.floor((diff % (1000 * 60)) / 1000);
+        setTimeLeft(`${hours}h ${mins}m ${secs}s`);
+      }
+    };
+    update();
+    const interval = setInterval(update, 1000);
+    return () => clearInterval(interval);
+  }, [isSuspended, suspendedUntil]);
 
   React.useEffect(() => {
     const unsubscribe = WebRTCService.subscribe(session => {
@@ -27,6 +46,17 @@ export default function TabsLayout() {
 
   return (
     <>
+      {isSuspended && (
+        <View style={styles.globalSuspensionBanner}>
+          <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
+            <Ionicons name="lock-closed" size={14} color="#FFFFFF" />
+            <Text style={styles.suspensionBannerTitle}>ENTIRE ACCOUNT SUSPENDED (3 DAYS)</Text>
+          </View>
+          <Text style={styles.suspensionBannerSub}>
+            Swipes, InSynk, Calls & Chats locked due to contact sharing violation. ⏳ Unlocks in {timeLeft}
+          </Text>
+        </View>
+      )}
       <Tabs
         initialRouteName="index"
         screenOptions={{
@@ -191,5 +221,28 @@ const styles = StyleSheet.create({
     color: '#FFF',
     fontSize: 8.5,
     fontWeight: '900',
+  },
+  globalSuspensionBanner: {
+    backgroundColor: '#DC2626',
+    paddingVertical: 10,
+    paddingHorizontal: 16,
+    alignItems: 'center',
+    justifyContent: 'center',
+    borderBottomWidth: 1,
+    borderBottomColor: 'rgba(0, 0, 0, 0.2)',
+    zIndex: 9999,
+  },
+  suspensionBannerTitle: {
+    color: '#FFFFFF',
+    fontWeight: '900',
+    fontSize: 12.5,
+    letterSpacing: 0.5,
+  },
+  suspensionBannerSub: {
+    color: '#FEE2E2',
+    fontSize: 11,
+    fontWeight: '600',
+    marginTop: 2,
+    textAlign: 'center',
   },
 });
