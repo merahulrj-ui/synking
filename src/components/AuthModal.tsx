@@ -14,6 +14,7 @@ interface Props {
 
 export const AuthModal: React.FC<Props> = ({ visible, onClose, targetUserName }) => {
   const { loginUser, isDarkMode } = useApp();
+  const [name, setName] = useState('');
   const [phone, setPhone] = useState('');
   const [otpSent, setOtpSent] = useState(false);
   const [otp, setOtp] = useState('');
@@ -26,6 +27,10 @@ export const AuthModal: React.FC<Props> = ({ visible, onClose, targetUserName })
   const inputBg = isDarkMode ? '#1A1B28' : '#F1F5F9';
 
   const handleSendOtp = () => {
+    if (!name || name.trim().length < 2) {
+      Alert.alert('Name Required', 'Please enter your full name to continue.');
+      return;
+    }
     if (!phone || phone.length < 10) {
       Alert.alert('Invalid Number', 'Please enter a valid 10-digit mobile number.');
       return;
@@ -41,6 +46,7 @@ export const AuthModal: React.FC<Props> = ({ visible, onClose, targetUserName })
       return;
     }
     const formattedPhone = phone ? `+91 ${phone}` : '+91 98765 43210';
+    const finalName = name.trim() || 'New Member';
     
     try {
       const res = await fetch(`${getLocalBackendUrl()}/api/check-phone?phone=${encodeURIComponent(formattedPhone)}`);
@@ -50,7 +56,7 @@ export const AuthModal: React.FC<Props> = ({ visible, onClose, targetUserName })
           await loginUser(data.user);
           onClose();
           Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
-          Alert.alert('Welcome Back! 🎉', 'You are now signed in securely to your existing account.');
+          Alert.alert('Welcome Back! 🎉', `You are now signed in securely as ${data.user.name}.`);
           return;
         }
       }
@@ -60,7 +66,7 @@ export const AuthModal: React.FC<Props> = ({ visible, onClose, targetUserName })
 
     await loginUser({
       id: `user_${Date.now().toString(36)}`,
-      name: 'New Member',
+      name: finalName,
       age: 22,
       gender: 'male',
       occupation: 'Member',
@@ -80,9 +86,7 @@ export const AuthModal: React.FC<Props> = ({ visible, onClose, targetUserName })
     Alert.alert('Welcome to SYNKING! 🎉', 'You are now signed in securely. Visit the Profile tab to update your details.');
   };
 
-  const handleQuickDemoLogin = () => {
-    handleVerifyOtp();
-  };
+
 
   return (
     <Modal visible={visible} animationType="slide" transparent onRequestClose={onClose}>
@@ -127,6 +131,15 @@ export const AuthModal: React.FC<Props> = ({ visible, onClose, targetUserName })
 
             {!otpSent ? (
               <View style={styles.formGroup}>
+                <Text style={[styles.inputLabel, { color: subText }]}>Your Name</Text>
+                <TextInput
+                  style={[{ backgroundColor: inputBg, borderColor: borderCol, color: textColor, borderWidth: 1, borderRadius: 12, paddingHorizontal: 16, height: 50, marginBottom: 16 }]}
+                  placeholder="Rahul Kumar"
+                  placeholderTextColor={subText}
+                  value={name}
+                  onChangeText={setName}
+                />
+
                 <Text style={[styles.inputLabel, { color: subText }]}>Enter Mobile Number</Text>
                 <View style={[styles.phoneInputRow, { backgroundColor: inputBg, borderColor: borderCol }]}>
                   <Text style={[styles.countryCode, { color: textColor }]}>🇮🇳 +91</Text>
@@ -147,13 +160,7 @@ export const AuthModal: React.FC<Props> = ({ visible, onClose, targetUserName })
                   style={{ marginTop: 14 }}
                 />
 
-                <TouchableOpacity
-                  style={[styles.quickDemoBtn, { backgroundColor: isDarkMode ? 'rgba(255, 255, 255, 0.05)' : '#F1F5F9', borderColor: borderCol }]}
-                  onPress={handleQuickDemoLogin}
-                  activeOpacity={0.8}
-                >
-                  <Text style={[styles.quickDemoText, { color: textColor }]}>⚡ Fast Demo 1-Tap Sign In</Text>
-                </TouchableOpacity>
+
               </View>
             ) : (
               <View style={styles.formGroup}>
