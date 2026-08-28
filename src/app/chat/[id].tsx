@@ -16,7 +16,6 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
 import { useApp } from '../../contexts/AppContext';
-import { MOCK_PROFILES } from '../../constants/mockData';
 import { WebRTCService } from '../../services/webrtcService';
 import { CallModal } from '../../components/CallModal';
 import { CallSession, ChatMessage } from '../../types';
