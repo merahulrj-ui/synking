@@ -29,13 +29,14 @@ interface AppContextType {
   matches: UserProfile[];
   incomingRequests: SynkRequest[];
   sentRequests: SynkRequest[];
+  passedProfiles: Set<string>;
   venues: Venue[];
   activeBookings: DateBooking[];
   messages: Record<string, ChatMessage[]>;
   safetyContact: SafetyContact;
   acceptedMatchAlert: UserProfile | null;
   clearAcceptedMatchAlert: () => void;
-  loginUser: (user: UserProfile) => void;
+  loginUser: (user: UserProfile) => Promise<void>;
   logoutUser: () => void;
   deleteAccount: () => Promise<void>;
   updateCurrentUser: (updates: Partial<UserProfile>) => void;
@@ -187,6 +188,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
   const [matches, setMatches] = useState<UserProfile[]>([]);
   const [incomingRequests, setIncomingRequests] = useState<SynkRequest[]>([]);
   const [sentRequests, setSentRequests] = useState<SynkRequest[]>([]);
+  const [passedProfiles, setPassedProfiles] = useState<Set<string>>(new Set());
   const [acceptedMatchAlert, setAcceptedMatchAlert] = useState<UserProfile | null>(null);
   const seenMatchAlerts = useRef<Set<string>>(new Set());
   const [venues] = useState<Venue[]>(MOCK_VENUES);
@@ -289,12 +291,16 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     const unsubscribe = RealtimeBridge.subscribe(({ type, payload }) => {
       if (type === 'NEW_MESSAGE' && payload) {
         const msg = payload as ChatMessage;
-        const threadKey = msg.senderId === currentUser?.id ? msg.receiverId : msg.senderId;
-        setMessages(prev => {
-          const list = prev[threadKey] || [];
-          if (list.some(m => m.id === msg.id)) return prev;
-          return { ...prev, [threadKey]: [...list, msg] };
-        });
+        const myId = currentUser?.id;
+        // ⛔ Only accept messages where current user is sender or receiver
+        if (myId && (msg.senderId === myId || msg.receiverId === myId)) {
+          const threadKey = msg.senderId === myId ? msg.receiverId : msg.senderId;
+          setMessages(prev => {
+            const list = prev[threadKey] || [];
+            if (list.some(m => m.id === msg.id)) return prev;
+            return { ...prev, [threadKey]: [...list, msg] };
+          });
+        }
       } else if (type === 'SYNK_REQUEST' && payload) {
         const req = payload as SynkRequest;
         if (req.toUserId === currentUser?.id && req.fromUser?.id !== currentUser?.id) {
@@ -332,6 +338,14 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
           logoutUser();
         } else {
           setProfiles(prev => prev.filter(p => p && p.id !== payload.userId));
+          setMatches(prev => prev.filter(m => m && m.id !== payload.userId));
+          setIncomingRequests(prev => prev.filter(r => r && r.fromUser?.id !== payload.userId && r.toUserId !== payload.userId));
+          setSentRequests(prev => prev.filter(r => r && r.toUserId !== payload.userId && r.fromUser?.id !== payload.userId));
+          setMessages(prev => {
+            const next = { ...prev };
+            delete next[payload.userId];
+            return next;
+          });
         }
       } else if (type === 'DATABASE_WIPED') {
         console.log('🧹 [DATABASE_WIPED_BY_ADMIN] Resetting state and logging out all users');
@@ -340,6 +354,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
         setMatches([]);
         setIncomingRequests([]);
         setSentRequests([]);
+        setMessages({});
       }
     });
     return () => unsubscribe();
@@ -347,19 +362,57 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
 
   // 2. Sync Real User Profiles & Incoming/Sent Requests from Cloud Firestore
   const syncCloudState = async () => {
-    if (!currentUser) return;
-
-    // Fetch real registered profiles for Discover
-    const realUsers = await fetchProfilesFromFirestore(currentUser.id);
+    // 1. Fetch real registered profiles for Discover (even if NOT logged in)
+    const currentId = currentUser?.id || 'guest';
+    const realUsers = await fetchProfilesFromFirestore(currentId);
     if (Array.isArray(realUsers)) {
       setProfiles(realUsers.filter(Boolean));
+      
+      // Verification: If logged in but our profile no longer exists in the cloud, we were deleted!
+      // Wait, fetchProfilesFromFirestore(currentId) actually EXCLUDES our currentId!
+      // So we can't check it from `realUsers`.
+      // We must make a separate call or handle it differently. Let's do a quick fetch to check ourselves.
     }
 
-    // Fetch Incoming Synk Requests sent to this user (filtered by pending)
+    if (!currentUser) return; // Only stop here for requests/matches which require auth
+    
+    try {
+      const selfCheck = await fetch(`${getLocalBackendUrl()}/api/profiles`);
+      if (selfCheck.ok) {
+        const allUsers = await selfCheck.json();
+        if (Array.isArray(allUsers) && !allUsers.some(u => u.id === currentUser.id)) {
+          console.log('🚪 [PROFILE_MISSING_IN_CLOUD] User was deleted elsewhere. Logging out locally to prevent resurrection.');
+          logoutUser();
+          return;
+        }
+      }
+    } catch (e) {}
+
+    // 2. Fetch Incoming Synk Requests sent to this user (filtered by pending)
     const cloudRequests = await fetchIncomingRequestsFromFirestore(currentUser.id);
     if (Array.isArray(cloudRequests)) {
       const pendingOnly = cloudRequests.filter(r => r && r.status === 'pending' && r.fromUser);
-      setIncomingRequests(pendingOnly);
+      
+      // Deduplicate by sender ID just in case
+      const seenSenders = new Set();
+      const deduplicatedPending = pendingOnly.filter(r => {
+        if (!r.fromUser?.id) return false;
+        if (seenSenders.has(r.fromUser.id)) return false;
+        seenSenders.add(r.fromUser.id);
+        return true;
+      });
+      
+      setIncomingRequests(deduplicatedPending);
+      
+      // Add accepted incoming requests to matches
+      cloudRequests.forEach(req => {
+        if (req && req.status === 'accepted' && req.fromUser) {
+          setMatches(prev => {
+            if (prev.some(m => m && m.id === req.fromUser!.id)) return prev;
+            return [req.fromUser!, ...prev.filter(Boolean)];
+          });
+        }
+      });
     }
 
     // Fetch Sent Requests and silently sync matches (NO annoying repeat popups on refresh)
@@ -404,10 +457,6 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
   useEffect(() => {
     if (currentUser) {
       RealtimeBridge.registerUser(currentUser.id);
-      if (typeof window !== 'undefined' && window.localStorage) {
-        window.localStorage.setItem('synking_my_user', JSON.stringify(currentUser));
-      }
-      AsyncStorage.setItem('synking_my_user', JSON.stringify(currentUser)).catch(() => {});
       setIsLoggedIn(true);
       syncCloudState();
     }
@@ -415,7 +464,6 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
 
   // Relaxed Firestore Polling (WebSocket handles 0ms instant updates)
   useEffect(() => {
-    if (!currentUser) return;
     syncCloudState();
     const interval = setInterval(syncCloudState, 10000);
     return () => clearInterval(interval);
@@ -431,10 +479,14 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     });
   };
 
-  const loginUser = (user: UserProfile) => {
+  const loginUser = async (user: UserProfile) => {
+    await saveUserProfileToFirestore(user); // Await the save to prevent race condition with self-check!
     setCurrentUser(user);
     setIsLoggedIn(true);
-    saveUserProfileToFirestore(user);
+    setMatches([]);
+    setIncomingRequests([]);
+    setSentRequests([]);
+    setMessages({});
     if (typeof window !== 'undefined' && window.localStorage) {
       window.localStorage.setItem('synking_my_user', JSON.stringify(user));
     }
@@ -444,6 +496,10 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
   const logoutUser = () => {
     setCurrentUser(null);
     setIsLoggedIn(false);
+    setMatches([]);
+    setIncomingRequests([]);
+    setSentRequests([]);
+    setMessages({});
     if (typeof window !== 'undefined' && window.localStorage) {
       window.localStorage.removeItem('synking_my_user');
     }
@@ -482,9 +538,23 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     const swipedUser = profiles.find(p => p.id === profileId);
     setProfiles(prev => prev.filter(p => p.id !== profileId));
 
+    if (action === 'pass') {
+      setPassedProfiles(prev => {
+        const newSet = new Set(prev);
+        newSet.add(profileId);
+        return newSet;
+      });
+      return { success: true };
+    }
+
     if (action === 'like' || action === 'supersynk') {
       // NEVER allow matching or sending request to yourself
       if (swipedUser && currentUser && swipedUser.id !== currentUser.id) {
+        
+        // Block multi-tap rapid duplicate requests
+        const alreadySent = sentRequests.some(r => r.toUserId === swipedUser.id && r.status === 'pending');
+        if (alreadySent) return { success: false, requestSent: false };
+
         const newReq: SynkRequest = {
           id: `req_${Date.now()}_${Math.random().toString(36).substring(2, 6)}`,
           fromUser: currentUser,
@@ -494,7 +564,11 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
           status: 'pending'
         };
 
-        setSentRequests(prev => [newReq, ...prev]);
+        setSentRequests(prev => {
+          if (prev.some(r => r.toUserId === swipedUser.id)) return prev;
+          return [newReq, ...prev];
+        });
+        
         RealtimeBridge.broadcast('SYNK_REQUEST', newReq);
         saveSynkRequestToFirestore(newReq);
 
@@ -624,10 +698,14 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       extraData: extraData,
     };
 
-    setMessages(prev => ({
-      ...prev,
-      [receiverId]: [...(prev[receiverId] || []), newMsg]
-    }));
+    setMessages(prev => {
+      const existing = prev[receiverId] || [];
+      if (existing.some(m => m.id === newMsg.id)) return prev;
+      return {
+        ...prev,
+        [receiverId]: [...existing, newMsg]
+      };
+    });
 
     RealtimeBridge.broadcast('NEW_MESSAGE', newMsg, receiverId);
 
@@ -662,6 +740,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
         matches,
         incomingRequests,
         sentRequests,
+        passedProfiles,
         venues,
         activeBookings,
         messages,

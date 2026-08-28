@@ -21,7 +21,7 @@ import { CallModal } from '../../components/CallModal';
 import { CallSession, ChatMessage, UserProfile } from '../../types';
 import { fetchChatMessagesFromFirestore } from '../../services/firebase';
 import { RealtimeBridge } from '../../services/realtimeBridge';
-import { ChatDebugger } from '../../components/ChatDebugger';
+
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { decryptE2EEMessage } from '../../utils/encryption';
 
@@ -88,22 +88,11 @@ export default function ChatScreen() {
   const [isSuspended, setIsSuspended] = useState(false);
   const [suspendedUntil, setSuspendedUntil] = useState<number | null>(null);
 
-  // 🛠️ Audio Diagnostic Debugger States
-  const [showAudioDebugger, setShowAudioDebugger] = useState(false);
-  const [audioDebugLogs, setAudioDebugLogs] = useState<string[]>([
-    `[${new Date().toLocaleTimeString()}] 🎙️ Audio Engine Initialized. Ready for diagnostics.`
-  ]);
-  const [liveMicLevel, setLiveMicLevel] = useState<number>(0);
-  const [lastAudioSize, setLastAudioSize] = useState<string>('0 KB');
-  const [supportedMimes, setSupportedMimes] = useState<string>('');
-
+  // Load persistent 2-Strike & 3-Day Suspension Status
   const addAudioLog = (msg: string) => {
     const entry = `[${new Date().toLocaleTimeString()}] ${msg}`;
     console.log(`[AUDIO_DEBUG] ${entry}`);
-    setAudioDebugLogs(prev => [entry, ...prev].slice(0, 25));
   };
-
-  // Load persistent 2-Strike & 3-Day Suspension Status
   useEffect(() => {
     const loadSuspension = async () => {
       try {
@@ -135,6 +124,8 @@ export default function ChatScreen() {
   const audioContextRef = useRef<any>(null);
   const analyserRef = useRef<any>(null);
   const animFrameRef = useRef<any>(null);
+  const isSendingRef = useRef<boolean>(false);
+  const lastSentTimeRef = useRef<number>(0);
 
   // Test Device Speaker with Synthetic Beep
   const testSpeakerSound = () => {
@@ -480,7 +471,11 @@ export default function ChatScreen() {
               },
             };
             setCloudMessages(prev => {
-              if (prev.some(m => m.id === clean.id)) return prev;
+              if (prev.some(m => m.id === clean.id)) {
+                addAudioLog(`🛡️ [WS_DUPLICATE_IGNORED] ID ${clean.id.substring(0, 15)} already exists`);
+                return prev;
+              }
+              addAudioLog(`📥 [WS_MESSAGE_ACCEPTED] "${clean.text.substring(0, 20)}"`);
               return [...prev, clean];
             });
           };
@@ -505,27 +500,28 @@ export default function ChatScreen() {
     return () => clearInterval(interval);
   }, [id, currentUser?.id]);
 
-  // Combine and strictly bifurcate cloud + local messages for this specific conversation
+  // Combine and strictly bifurcate cloud + local messages for this specific conversation (0 duplicates guaranteed)
   const userMessages = React.useMemo(() => {
     const myId = currentUser?.id || 'my_user_id';
-    const map = new Map<string, ChatMessage>();
-    cloudMessages.forEach(m => {
-      if (
+    const seenIds = new Set<string>();
+    const seenKeys = new Set<string>();
+    const result: ChatMessage[] = [];
+
+    const all = [...cloudMessages, ...localMessages];
+    for (const m of all) {
+      if (!m || !m.id) continue;
+      const isForThisThread =
         (m.senderId === id && m.receiverId === myId) ||
-        (m.senderId === myId && m.receiverId === id)
-      ) {
-        map.set(m.id, m);
-      }
-    });
-    localMessages.forEach(m => {
-      if (
-        (m.senderId === id && m.receiverId === myId) ||
-        (m.senderId === myId && m.receiverId === id)
-      ) {
-        map.set(m.id, m);
-      }
-    });
-    return Array.from(map.values()).sort((a, b) => a.id.localeCompare(b.id));
+        (m.senderId === myId && m.receiverId === id);
+      if (!isForThisThread) continue;
+
+      if (seenIds.has(m.id)) continue;
+      seenIds.add(m.id);
+
+      result.push(m);
+    }
+
+    return result;
   }, [cloudMessages, localMessages, id, currentUser?.id]);
 
   const activeBooking = activeBookings.find(b => b.user2Id === id || b.user1Id === id);
@@ -711,16 +707,62 @@ export default function ChatScreen() {
   };
 
   const handleSend = (textToSend?: string) => {
-    const text = textToSend || inputText.trim();
-    if (!text || !id) return;
-
-    // Safety Filter: Block Phone Numbers & Direct Contact Leaks
-    if (checkAndBlockPhoneNumber(text)) {
+    const now = Date.now();
+    if (isSendingRef.current || now - lastSentTimeRef.current < 600) {
+      addAudioLog('🛡️ [DUP_BLOCKED] Debounced duplicate tap within 600ms');
       return;
     }
 
-    sendMessage(id, text);
+    const text = textToSend || inputText.trim();
+    if (!text || !id) return;
+
+    // Basic XSS Sanitization & Script blocking
+    let sanitizedText = text
+      .replace(/</g, '&lt;')
+      .replace(/>/g, '&gt;')
+      .replace(/on\w+=/gi, 'blocked=')
+      .replace(/javascript:/gi, 'blocked:');
+
+    // Anti-Spam: Block Links / URLs
+    const urlPattern = /(https?:\/\/[^\s]+)|(www\.[^\s]+)|([a-zA-Z0-9-]+\.[a-zA-Z]{2,}(\/[^\s]*)?)/i;
+    if (urlPattern.test(sanitizedText)) {
+      if (Platform.OS === 'web') {
+        window.alert('Links are not allowed in messages for security reasons.');
+      } else {
+        Alert.alert('Security Warning', 'Links are not allowed in messages.');
+      }
+      isSendingRef.current = false;
+      return;
+    }
+
+    // 500 Character Limit Enforcement
+    if (sanitizedText.length > 500) {
+      if (Platform.OS === 'web') {
+        window.alert('Message cannot exceed 500 characters.');
+      } else {
+        Alert.alert('Limit Reached', 'Message cannot exceed 500 characters.');
+      }
+      isSendingRef.current = false;
+      return;
+    }
+
+    // Safety Filter: Block Phone Numbers & Direct Contact Leaks
+    if (checkAndBlockPhoneNumber(sanitizedText)) {
+      isSendingRef.current = false;
+      return;
+    }
+
+    isSendingRef.current = true;
+    lastSentTimeRef.current = now;
     setInputText('');
+
+    addAudioLog(`📤 [MSG_SENDING] "${sanitizedText.substring(0, 25)}"`);
+    sendMessage(id, sanitizedText);
+
+    setTimeout(() => {
+      isSendingRef.current = false;
+      addAudioLog('✅ [MSG_SENT] Ready for next message');
+    }, 500);
 
     // Simulate real-time partner typing after user sends a message
     setTimeout(() => {
@@ -866,17 +908,7 @@ export default function ChatScreen() {
         </View>
       </View>
 
-      {/* LIVE IN-APP REAL-TIME DEBUGGER */}
-      <ChatDebugger
-        currentUserId={currentUser?.id || 'unknown'}
-        partnerId={id || 'unknown'}
-        partnerName={targetUser?.name || 'Partner'}
-        localCount={localMessages.length}
-        cloudCount={cloudMessages.length}
-        lastMessage={userMessages[userMessages.length - 1]}
-        onForceSync={handleForceSync}
-        onSendTestPing={handleSendTestPing}
-      />
+
 
       {/* 2. SUBTLE SECURITY NOTICE */}
       <View style={[styles.e2eePillWrapper, { backgroundColor: bg }]}>
@@ -1216,6 +1248,7 @@ export default function ChatScreen() {
               placeholder="Type a message..."
               placeholderTextColor={subText}
               multiline
+              maxLength={500}
             />
 
             {/* Mic or Send Button depending on inputText */}

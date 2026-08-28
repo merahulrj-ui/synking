@@ -237,6 +237,18 @@ function saveDb() {
 
 const clients = new Set();
 
+// Anti-Spam: Rate Limiter (Max 5 messages per 10 seconds per user)
+const userMessageRates = {};
+function isRateLimited(userId) {
+  if (!userId) return false;
+  const now = Date.now();
+  if (!userMessageRates[userId]) userMessageRates[userId] = [];
+  userMessageRates[userId] = userMessageRates[userId].filter(t => now - t < 10000); // 10s window
+  if (userMessageRates[userId].length >= 5) return true;
+  userMessageRates[userId].push(now);
+  return false;
+}
+
 // HTML Admin Portal Template (Direct Live Turso Cloud SQLite Sync)
 async function renderAdminHtml() {
   let profileList = Object.values(db.profiles || {});
@@ -262,6 +274,8 @@ async function renderAdminHtml() {
         const occStr = item.occupation || 'Member';
         const bioStr = item.bio || 'Active on Synking ✨';
         const photoStr = item.photo || 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=500';
+        const phoneStr = item.phone_number || '';
+        const genderStr = item.gender || 'male';
 
         return {
           id: idStr,
@@ -271,6 +285,8 @@ async function renderAdminHtml() {
           location: locStr,
           occupation: occStr,
           bio: bioStr,
+          phoneNumber: phoneStr,
+          gender: genderStr,
           verified: true,
         };
       });
@@ -353,19 +369,34 @@ async function renderAdminHtml() {
     </div>
   </div>
 
-  <div class="user-grid">
-    ${profileList.length === 0 ? '<div style="color: #94A3B8; padding: 20px;">No registered profiles yet. Create a profile in the app!</div>' : ''}
-    ${profileList.map(u => `
-      <div class="user-card" id="card_${u.id}">
-        <img class="user-img" src="${u.photo || 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=500'}" alt="${u.name}" onerror="this.src='https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=500'" />
-        <div class="user-body">
-          <div class="user-name">${u.name}, ${u.age || 21} ${u.verified ? '✅' : ''}</div>
-          <div class="user-meta">📍 ${u.location || 'Roorkee'} • ${u.occupation || 'Member'}</div>
-          <div class="user-bio">${u.bio || 'Active on Synking ✨'}</div>
-          <button class="del-btn" data-id="${u.id}">🗑️ Delete Profile</button>
-        </div>
-      </div>
-    `).join('')}
+  <div class="table-box">
+    <table>
+      <thead>
+        <tr>
+          <th>Identifier (Phone)</th>
+          <th>User UID</th>
+          <th>Name</th>
+          <th>Age / Gender</th>
+          <th>Location</th>
+          <th>Actions</th>
+        </tr>
+      </thead>
+      <tbody>
+        ${profileList.length === 0 ? '<tr><td colspan="6" style="color: #94A3B8; text-align: center; padding: 20px;">No registered profiles yet. Create a profile in the app!</td></tr>' : ''}
+        ${profileList.map(u => `
+          <tr id="card_${u.id}">
+            <td style="font-weight: 700; color: #00E5FF;">${u.phoneNumber || '+91 98765 43210'}</td>
+            <td style="font-family: monospace; color: #94A3B8;">${u.id}</td>
+            <td><strong>${u.name}</strong> ${u.verified ? '✅' : ''}</td>
+            <td>${u.age || 21} / ${u.gender || 'male'}</td>
+            <td>${u.location || 'Roorkee'}</td>
+            <td>
+              <button class="del-btn" data-id="${u.id}" style="background: #EF4444; color: white; border: none; padding: 6px 12px; border-radius: 6px; font-weight: 700; cursor: pointer; font-size: 11px;">🗑️ Delete</button>
+            </td>
+          </tr>
+        `).join('')}
+      </tbody>
+    </table>
   </div>
 
   <div class="section-title">
@@ -600,9 +631,66 @@ const server = http.createServer((req, res) => {
       res.writeHead(200, { 'Content-Type': 'application/json' });
       res.end(JSON.stringify(filtered));
     }).catch(() => {
-      const list = Object.values(db.profiles || {}).filter(p => p && p.id && (!excludeId || p.id !== excludeId));
+      let list = Object.values(db.profiles || {});
+      if (excludeId) {
+        list = list.filter(u => u.id !== excludeId);
+      }
       res.writeHead(200, { 'Content-Type': 'application/json' });
       res.end(JSON.stringify(list));
+    });
+    return;
+  }
+
+  // 1.5 GET /api/check-phone (For Demo OTP Login Check)
+  if (req.method === 'GET' && pathname === '/api/check-phone') {
+    const phone = url.searchParams.get('phone');
+    if (!phone) {
+      res.writeHead(400, { 'Content-Type': 'application/json' });
+      res.end(JSON.stringify({ error: 'Phone number required' }));
+      return;
+    }
+
+    queryTurso('SELECT * FROM users WHERE phone_number = ?', [{ type: 'text', value: phone }]).then(resTurso => {
+      const rows = resTurso?.results?.[0]?.response?.result?.rows;
+      const cols = resTurso?.results?.[0]?.response?.result?.cols;
+      if (Array.isArray(rows) && rows.length > 0 && Array.isArray(cols)) {
+        const item = {};
+        cols.forEach((col, idx) => {
+          const colName = (col && typeof col === 'object' && col.name) ? col.name : String(col);
+          const rawVal = rows[0][idx]?.value !== undefined ? rows[0][idx].value : rows[0][idx];
+          item[colName] = extractPlain(rawVal);
+        });
+        
+        const existingUser = {
+          id: item.id || '',
+          name: item.name || 'Member',
+          age: parseInt(item.age, 10) || 22,
+          gender: item.gender || 'male',
+          phoneNumber: item.phone_number || phone,
+          occupation: item.occupation || 'Member',
+          location: item.location || 'Roorkee',
+          distance: '0 km',
+          bio: item.bio || 'Active on Synking ✨',
+          photo: item.photo || 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=500',
+          photos: [item.photo || 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=500'],
+          interests: ['Coffee', 'Music', 'Travel'],
+          compatibility: 100,
+          isVerified: true,
+          isVip: false,
+        };
+        try { existingUser.location = JSON.parse(existingUser.location); } catch(e){}
+        try { existingUser.photos = JSON.parse(existingUser.photos) || existingUser.photos; } catch(e){}
+        try { existingUser.preferences = JSON.parse(item.preferences); } catch(e){}
+
+        res.writeHead(200, { 'Content-Type': 'application/json' });
+        res.end(JSON.stringify({ exists: true, user: existingUser }));
+      } else {
+        res.writeHead(200, { 'Content-Type': 'application/json' });
+        res.end(JSON.stringify({ exists: false }));
+      }
+    }).catch(err => {
+      res.writeHead(500, { 'Content-Type': 'application/json' });
+      res.end(JSON.stringify({ error: err.message }));
     });
     return;
   }
@@ -655,16 +743,25 @@ const broadcastToWebSockets = broadcastWs;
     if (id) {
       if (db.profiles[id]) {
         delete db.profiles[id];
-        saveDb();
       }
+      // Also delete all synk_requests and chats for this user in memory!
+      Object.keys(db.requests || {}).forEach(k => {
+        const r = db.requests[k];
+        if (r && (r.toUserId === id || r.fromUser?.id === id)) {
+          delete db.requests[k];
+        }
+      });
+      db.chats = (db.chats || []).filter(c => c.senderId !== id && c.receiverId !== id);
+      saveDb();
+
       // Broadcast user deleted to all connected clients so active tabs log out
       broadcastWs({ type: 'USER_DELETED', payload: { userId: id } });
 
       // AWAIT Turso Cloud SQLite Deletion
       Promise.all([
-        queryTurso('DELETE FROM users WHERE id = ?', [id]),
-        queryTurso('DELETE FROM synk_requests WHERE from_user_id = ? OR to_user_id = ?', [id, id]),
-        queryTurso('DELETE FROM messages WHERE sender_id = ? OR receiver_id = ?', [id, id]),
+        queryTurso('DELETE FROM users WHERE id = ?', [{ type: 'text', value: id }]),
+        queryTurso('DELETE FROM synk_requests WHERE from_user_id = ? OR to_user_id = ?', [{ type: 'text', value: id }, { type: 'text', value: id }]),
+        queryTurso('DELETE FROM messages WHERE sender_id = ? OR receiver_id = ?', [{ type: 'text', value: id }, { type: 'text', value: id }]),
       ]).then(() => {
         console.log(`[PROFILE_DELETED_PERMANENTLY] ${id} from memory & Turso Cloud SQLite`);
         res.writeHead(200, { 'Content-Type': 'application/json' });
@@ -743,7 +840,12 @@ const broadcastToWebSockets = broadcastWs;
 
         const map = new Map();
         list.forEach(r => r && r.id && map.set(r.id, r));
-        cloudRequests.forEach(r => r && r.id && map.set(r.id, r));
+        cloudRequests.forEach(r => {
+          if (r && r.id) {
+            map.set(r.id, r);
+            db.requests[r.id] = r; // 🔥 Hydrate server memory cache so Match Gate works!
+          }
+        });
         list = Array.from(map.values());
       }
 
@@ -785,12 +887,25 @@ const broadcastToWebSockets = broadcastWs;
         const newReq = JSON.parse(body);
         if (newReq && newReq.id) {
           // STRICT GUARD: Block sending request to yourself!
-          if (newReq.fromUser?.id === newReq.toUserId || (newReq.fromUser?.name && newReq.fromUser.name === newReq.toUserName)) {
-            console.log('⚠️ [SELF_REQUEST_BLOCKED] User cannot send request to self');
-            res.writeHead(400, { 'Content-Type': 'application/json' });
-            res.end(JSON.stringify({ success: false, error: 'Self matching is not allowed' }));
-            return;
-          }
+            if (newReq.fromUser?.id === newReq.toUserId || (newReq.fromUser?.name && newReq.fromUser.name === newReq.toUserName)) {
+              console.log('⚠️ [SELF_REQUEST_BLOCKED] User cannot send request to self');
+              res.writeHead(400, { 'Content-Type': 'application/json' });
+              res.end(JSON.stringify({ success: false, error: 'Self matching is not allowed' }));
+              return;
+            }
+
+            // STRICT GUARD: Block duplicate pending requests between the same users
+            const existingDuplicate = Object.values(db.requests).find(r => 
+              r.fromUser?.id === newReq.fromUser?.id && 
+              r.toUserId === newReq.toUserId &&
+              r.status === 'pending'
+            );
+            if (existingDuplicate) {
+              console.log(`⚠️ [DUPLICATE_REQUEST_BLOCKED] Request already pending from ${newReq.fromUser?.id} to ${newReq.toUserId}`);
+              res.writeHead(400, { 'Content-Type': 'application/json' });
+              res.end(JSON.stringify({ success: false, error: 'Request already exists' }));
+              return;
+            }
 
           db.requests[newReq.id] = newReq;
           saveDb();
@@ -959,7 +1074,7 @@ const broadcastToWebSockets = broadcastWs;
     return;
   }
 
-  // 7. POST /api/chats (Save Message & Broadcast in 0ms)
+  // 7. POST /api/chats (Save Message & Broadcast in 0ms — with Match Verification)
   if (req.method === 'POST' && pathname === '/api/chats') {
     let body = '';
     req.on('data', chunk => { body += chunk; });
@@ -967,13 +1082,60 @@ const broadcastToWebSockets = broadcastWs;
       try {
         const msg = JSON.parse(body);
         if (msg && msg.id) {
-          db.chats.push(msg);
-          saveDb();
-          syncMessageToTurso(msg);
-          console.log(`[CHAT_SAVED] ${msg.senderName} ➔ ${msg.receiverId}: ${msg.content ? msg.content.substring(0, 20) : 'E2EE'} ➔ Synced to Turso 9GB SQLite`);
+          // ⛔ SERVER-SIDE MATCH GATE: Only allow messages between mutually accepted users
+          const sid = msg.senderId;
+          const rid = msg.receiverId;
+          const hasAcceptedMatch = Object.values(db.requests || {}).some(r => {
+            if (!r || r.status !== 'accepted') return false;
+            const from = r.fromUser?.id;
+            const to = r.toUserId;
+            return (from === sid && to === rid) || (from === rid && to === sid);
+          });
 
-          // Instant 0ms WebSocket Broadcast to Recipient Device
-          broadcastToWebSockets({ type: 'NEW_MESSAGE', payload: msg });
+          if (!hasAcceptedMatch) {
+            console.log(`[CHAT_BLOCKED] ${sid} ➔ ${rid}: No accepted match exists. Message rejected.`);
+            res.writeHead(403, { 'Content-Type': 'application/json' });
+            res.end(JSON.stringify({ success: false, error: 'No accepted match between users' }));
+            return;
+          }
+
+          // Anti-Spam: Rate Limiting
+          if (isRateLimited(sid)) {
+            console.log(`[SPAM_BLOCKED] User ${sid} is sending messages too fast.`);
+            res.writeHead(429, { 'Content-Type': 'application/json' });
+            res.end(JSON.stringify({ success: false, error: 'Too many messages. Please wait 10 seconds.' }));
+            return;
+          }
+
+          // Limit text to 500 chars, block URLs, and basic XSS sanitize
+          if (msg.text && typeof msg.text === 'string') {
+            if (msg.text.length > 500) {
+              res.writeHead(400, { 'Content-Type': 'application/json' });
+              res.end(JSON.stringify({ success: false, error: 'Message exceeded 500 chars limit' }));
+              return;
+            }
+            
+            // Block Links
+            const urlPattern = /(https?:\/\/[^\s]+)|(www\.[^\s]+)|([a-zA-Z0-9-]+\.[a-zA-Z]{2,}(\/[^\s]*)?)/i;
+            if (urlPattern.test(msg.text)) {
+              res.writeHead(403, { 'Content-Type': 'application/json' });
+              res.end(JSON.stringify({ success: false, error: 'Links are not allowed in messages' }));
+              return;
+            }
+
+            msg.text = msg.text
+              .replace(/</g, '&lt;')
+              .replace(/>/g, '&gt;')
+              .replace(/on\w+=/gi, 'blocked=')
+              .replace(/javascript:/gi, 'blocked:');
+          }
+
+          if (!db.chats.some(c => c.id === msg.id)) {
+            db.chats.push(msg);
+            saveDb();
+            syncMessageToTurso(msg);
+            console.log(`[CHAT_SAVED] ${msg.senderName || msg.senderId} ➔ ${msg.receiverId}: Synced to Turso 9GB SQLite`);
+          }
 
           res.writeHead(200, { 'Content-Type': 'application/json' });
           res.end(JSON.stringify({ success: true }));
@@ -1142,6 +1304,50 @@ server.on('upgrade', (req, socket, head) => {
           parsed.payload?.toUserId;
 
         if (targetUserId) {
+          // ⛔ SERVER-SIDE MATCH GATE & VALIDATION for NEW_MESSAGE via WebSocket
+          if (parsed.type === 'NEW_MESSAGE' && parsed.payload) {
+            const sid = parsed.payload.senderId || socket.userId;
+            const rid = parsed.payload.receiverId || targetUserId;
+            
+            // Anti-Spam: Rate Limiting
+            if (isRateLimited(sid)) {
+              console.log(`[WS_SPAM_BLOCKED] User ${sid} is sending messages too fast.`);
+              continue;
+            }
+
+            // Limit text to 500 chars, block URLs, and basic XSS sanitize
+            if (parsed.payload.text && typeof parsed.payload.text === 'string') {
+              if (parsed.payload.text.length > 500) {
+                console.log(`[WS_MSG_BLOCKED] ${sid}: Message exceeded 500 chars limit.`);
+                continue;
+              }
+              
+              // Block Links
+              const urlPattern = /(https?:\/\/[^\s]+)|(www\.[^\s]+)|([a-zA-Z0-9-]+\.[a-zA-Z]{2,}(\/[^\s]*)?)/i;
+              if (urlPattern.test(parsed.payload.text)) {
+                console.log(`[WS_MSG_BLOCKED] ${sid}: Link detected in message.`);
+                continue;
+              }
+
+              parsed.payload.text = parsed.payload.text
+                .replace(/</g, '&lt;')
+                .replace(/>/g, '&gt;')
+                .replace(/on\w+=/gi, 'blocked=')
+                .replace(/javascript:/gi, 'blocked:');
+            }
+
+            const hasAcceptedMatch = Object.values(db.requests || {}).some(r => {
+              if (!r || r.status !== 'accepted') return false;
+              const from = r.fromUser?.id;
+              const to = r.toUserId;
+              return (from === sid && to === rid) || (from === rid && to === sid);
+            });
+            if (!hasAcceptedMatch) {
+              console.log(`[WS_MSG_BLOCKED] ${sid} ➔ ${rid}: No accepted match. WebSocket message rejected.`);
+              continue;
+            }
+          }
+
           let delivered = false;
           const jsonStr = JSON.stringify(parsed);
           const frame = encodeWebSocketFrame(jsonStr);

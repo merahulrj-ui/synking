@@ -6,8 +6,8 @@ import { UserProfile } from '../types';
 import { Colors } from '../constants/theme';
 
 const { width: SCREEN_WIDTH, height: SCREEN_HEIGHT } = Dimensions.get('window');
-const CARD_WIDTH = Math.min(SCREEN_WIDTH - 16, 420);
-const CARD_HEIGHT = Math.min(SCREEN_HEIGHT * 0.68, 620);
+const CARD_WIDTH = Math.min(SCREEN_WIDTH - 8, 440);
+const CARD_HEIGHT = Math.min(SCREEN_HEIGHT * 0.74, 700);
 const SWIPE_THRESHOLD = CARD_WIDTH * 0.28;
 
 interface Props {
@@ -145,17 +145,17 @@ export const SwipeCard: React.FC<Props> = ({ profile, isFirst = true, onSwipe })
         style={styles.gradientOverlay}
       />
 
-      {/* TINDER-STYLE LIKE STAMP */}
+      {/* BRAND-SPECIFIC SYNK STAMP */}
       {isFirst && (
         <Animated.View style={[styles.stamp, styles.likeStamp, { opacity: likeOpacity }]}>
-          <Text style={styles.likeStampText}>LIKE</Text>
+          <Text style={styles.likeStampText}>SYNK!</Text>
         </Animated.View>
       )}
 
-      {/* TINDER-STYLE NOPE STAMP */}
+      {/* BRAND-SPECIFIC PASS STAMP */}
       {isFirst && (
         <Animated.View style={[styles.stamp, styles.nopeStamp, { opacity: nopeOpacity }]}>
-          <Text style={styles.nopeStampText}>NOPE</Text>
+          <Text style={styles.nopeStampText}>PASS</Text>
         </Animated.View>
       )}
 
@@ -202,16 +202,16 @@ const styles = StyleSheet.create({
   card: {
     width: CARD_WIDTH,
     height: CARD_HEIGHT,
-    borderRadius: 22,
+    borderRadius: 28,
     overflow: 'hidden',
     backgroundColor: '#0F1017',
     position: 'relative',
     alignSelf: 'center',
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 8 },
-    shadowOpacity: 0.35,
-    shadowRadius: 16,
-    elevation: 8,
+    shadowColor: '#FD3A73',
+    shadowOffset: { width: 0, height: 10 },
+    shadowOpacity: 0.15,
+    shadowRadius: 20,
+    elevation: 10,
   },
   photo: {
     width: '100%',
@@ -251,70 +251,73 @@ const styles = StyleSheet.create({
     left: 0,
     right: 0,
     bottom: 0,
-    height: '60%',
+    height: '70%',
   },
   stamp: {
     position: 'absolute',
-    borderWidth: 3.5,
-    borderRadius: 8,
-    paddingHorizontal: 12,
-    paddingVertical: 4,
+    borderWidth: 4,
+    borderRadius: 12,
+    paddingHorizontal: 16,
+    paddingVertical: 6,
     zIndex: 100,
   },
   likeStamp: {
-    top: 40,
+    top: 50,
     left: 20,
-    borderColor: '#22C55E',
-    backgroundColor: 'rgba(34, 197, 94, 0.15)',
-    transform: [{ rotate: '-16deg' }],
+    borderColor: '#FD3A73',
+    backgroundColor: 'rgba(253, 58, 115, 0.2)',
+    transform: [{ rotate: '-12deg' }],
   },
   likeStampText: {
-    color: '#22C55E',
-    fontSize: 32,
+    color: '#FD3A73',
+    fontSize: 40,
     fontWeight: '900',
-    letterSpacing: 2,
+    letterSpacing: 4,
   },
   nopeStamp: {
-    top: 40,
+    top: 50,
     right: 20,
     borderColor: '#EF4444',
-    backgroundColor: 'rgba(239, 68, 68, 0.15)',
-    transform: [{ rotate: '16deg' }],
+    backgroundColor: 'rgba(239, 68, 68, 0.2)',
+    transform: [{ rotate: '12deg' }],
   },
   nopeStampText: {
     color: '#EF4444',
-    fontSize: 32,
+    fontSize: 40,
     fontWeight: '900',
-    letterSpacing: 2,
+    letterSpacing: 4,
   },
   infoContainer: {
     position: 'absolute',
     bottom: 0,
     left: 0,
     right: 0,
-    paddingHorizontal: 18,
-    paddingBottom: 16,
-    gap: 4,
+    paddingHorizontal: 22,
+    paddingBottom: 20,
+    gap: 6,
     zIndex: 20,
   },
   nameRow: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: 8,
+    gap: 10,
   },
   nameText: {
     color: '#FFFFFF',
-    fontSize: 28,
-    fontWeight: '800',
+    fontSize: 32,
+    fontWeight: '900',
     letterSpacing: -0.5,
+    textShadowColor: 'rgba(0, 0, 0, 0.75)',
+    textShadowOffset: { width: 0, height: 1 },
+    textShadowRadius: 3,
   },
   ageText: {
     color: '#FFFFFF',
-    fontSize: 26,
+    fontSize: 28,
     fontWeight: '400',
   },
   verifiedBadge: {
-    marginTop: 2,
+    marginTop: 4,
   },
   subtitleText: {
     color: '#D1D5DB',

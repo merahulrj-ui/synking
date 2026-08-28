@@ -12,7 +12,7 @@ import { useRouter } from 'expo-router';
 const { width: SCREEN_WIDTH } = Dimensions.get('window');
 
 export default function DiscoverScreen() {
-  const { profiles, matches, sentRequests, incomingRequests, currentUser, swipeProfile, isLoggedIn, isDarkMode, refreshDiscoverFeed } = useApp();
+  const { profiles, matches, sentRequests, incomingRequests, passedProfiles, currentUser, swipeProfile, isLoggedIn, isDarkMode, refreshDiscoverFeed } = useApp();
   const router = useRouter();
   const [authModalVisible, setAuthModalVisible] = useState(false);
   const [requestSentProfile, setRequestSentProfile] = useState<any>(null);
@@ -22,15 +22,19 @@ export default function DiscoverScreen() {
   // 2. Already matched users (Accepted requests)
   // 3. Users you have already liked / sent requests to
   // 4. Users who have sent incoming requests to you
+  // 5. Users you have already passed / swiped left on
   const availableProfiles = profiles.filter(p => {
     if (!p || p.id === currentUser?.id || p.name === currentUser?.name) return false;
     if (matches.some(m => m && (m.id === p.id || m.name === p.name))) return false;
     if (sentRequests.some(r => r && (r.toUserId === p.id || r.toUserName === p.name || r.fromUser?.id === p.id))) return false;
     if (incomingRequests.some(r => r && (r.fromUser?.id === p.id || r.fromUser?.name === p.name))) return false;
+    if (passedProfiles.has(p.id)) return false;
     return true;
   });
   const currentProfile = availableProfiles[0];
   const nextProfile = availableProfiles[1];
+
+  const isProcessingSwipe = React.useRef(false);
 
   const handleSwipe = (action: 'like' | 'pass' | 'supersynk') => {
     if (!isLoggedIn) {
@@ -38,7 +42,9 @@ export default function DiscoverScreen() {
       return;
     }
 
-    if (!currentProfile) return;
+    if (!currentProfile || isProcessingSwipe.current) return;
+    isProcessingSwipe.current = true;
+
     const res = swipeProfile(currentProfile.id, action);
     if (res.requestSent && res.profile) {
       setRequestSentProfile(res.profile);
@@ -46,6 +52,9 @@ export default function DiscoverScreen() {
         setRequestSentProfile(null);
       }, 2000);
     }
+    
+    // Release lock immediately after sync function completes
+    isProcessingSwipe.current = false;
   };
 
   const handleBoostProfile = () => {
@@ -68,8 +77,9 @@ export default function DiscoverScreen() {
 
       <View style={styles.container}>
         {currentProfile ? (
-          <View style={styles.cardStack}>
-            {/* NEXT CARD UNDERNEATH */}
+          <>
+            <View style={styles.cardStack}>
+              {/* NEXT CARD UNDERNEATH */}
             {nextProfile && (
               <View style={styles.nextCardWrapper}>
                 <SwipeCard profile={nextProfile} isFirst={false} />
@@ -85,6 +95,8 @@ export default function DiscoverScreen() {
               />
             </View>
 
+            </View>
+            
             {/* SLEEK GLASS FLOATING ACTION BUTTONS */}
             <View style={styles.actionControls}>
               {/* 1. Rewind */}
@@ -92,12 +104,12 @@ export default function DiscoverScreen() {
                 style={[
                   styles.actionBtn,
                   styles.smallBtn,
-                  { backgroundColor: isDarkMode ? '#22232B' : '#FFFFFF', borderColor: isDarkMode ? 'rgba(255,255,255,0.08)' : 'rgba(0,0,0,0.08)' }
+                  { backgroundColor: isDarkMode ? '#1E202B' : '#FFFFFF', borderColor: isDarkMode ? 'rgba(255,255,255,0.05)' : 'rgba(0,0,0,0.05)' }
                 ]}
-                activeOpacity={0.7}
+                activeOpacity={0.6}
                 onPress={() => handleSwipe('pass')}
               >
-                <Ionicons name="refresh" size={18} color="#FBBF24" />
+                <Ionicons name="refresh" size={24} color="#FBBF24" />
               </TouchableOpacity>
 
               {/* 2. Pass / Nope */}
@@ -105,12 +117,20 @@ export default function DiscoverScreen() {
                 style={[
                   styles.actionBtn,
                   styles.largeBtn,
-                  { backgroundColor: isDarkMode ? '#22232B' : '#FFFFFF', borderColor: isDarkMode ? 'rgba(255,255,255,0.08)' : 'rgba(0,0,0,0.08)' }
+                  { 
+                    backgroundColor: isDarkMode ? '#1E202B' : '#FFFFFF', 
+                    borderColor: isDarkMode ? 'rgba(255,255,255,0.05)' : 'rgba(0,0,0,0.05)',
+                    shadowColor: '#EF4444',
+                    shadowOffset: { width: 0, height: 8 },
+                    shadowOpacity: 0.3,
+                    shadowRadius: 12,
+                    elevation: 10
+                  }
                 ]}
-                activeOpacity={0.7}
+                activeOpacity={0.6}
                 onPress={() => handleSwipe('pass')}
               >
-                <Ionicons name="close" size={30} color="#EF4444" />
+                <Ionicons name="close" size={36} color="#EF4444" />
               </TouchableOpacity>
 
               {/* 3. Super Synk */}
@@ -118,12 +138,20 @@ export default function DiscoverScreen() {
                 style={[
                   styles.actionBtn,
                   styles.midBtn,
-                  { backgroundColor: isDarkMode ? '#22232B' : '#FFFFFF', borderColor: isDarkMode ? 'rgba(255,255,255,0.08)' : 'rgba(0,0,0,0.08)' }
+                  { 
+                    backgroundColor: isDarkMode ? '#1E202B' : '#FFFFFF', 
+                    borderColor: isDarkMode ? 'rgba(255,255,255,0.05)' : 'rgba(0,0,0,0.05)',
+                    shadowColor: '#00E5FF',
+                    shadowOffset: { width: 0, height: 6 },
+                    shadowOpacity: 0.3,
+                    shadowRadius: 10,
+                    elevation: 8
+                  }
                 ]}
-                activeOpacity={0.7}
+                activeOpacity={0.6}
                 onPress={() => handleSwipe('supersynk')}
               >
-                <Ionicons name="star" size={20} color="#00E5FF" />
+                <Ionicons name="star" size={28} color="#00E5FF" />
               </TouchableOpacity>
 
               {/* 4. Synk / Like */}
@@ -131,12 +159,20 @@ export default function DiscoverScreen() {
                 style={[
                   styles.actionBtn,
                   styles.largeBtn,
-                  { backgroundColor: isDarkMode ? '#22232B' : '#FFFFFF', borderColor: isDarkMode ? 'rgba(255,255,255,0.08)' : 'rgba(0,0,0,0.08)' }
+                  { 
+                    backgroundColor: isDarkMode ? '#1E202B' : '#FFFFFF', 
+                    borderColor: isDarkMode ? 'rgba(255,255,255,0.05)' : 'rgba(0,0,0,0.05)',
+                    shadowColor: '#FD3A73',
+                    shadowOffset: { width: 0, height: 8 },
+                    shadowOpacity: 0.4,
+                    shadowRadius: 16,
+                    elevation: 12
+                  }
                 ]}
-                activeOpacity={0.7}
+                activeOpacity={0.6}
                 onPress={() => handleSwipe('like')}
               >
-                <Ionicons name="heart" size={28} color="#FD3A73" />
+                <Ionicons name="heart" size={36} color="#FD3A73" />
               </TouchableOpacity>
 
               {/* 5. Boost */}
@@ -144,15 +180,15 @@ export default function DiscoverScreen() {
                 style={[
                   styles.actionBtn,
                   styles.smallBtn,
-                  { backgroundColor: isDarkMode ? '#22232B' : '#FFFFFF', borderColor: isDarkMode ? 'rgba(255,255,255,0.08)' : 'rgba(0,0,0,0.08)' }
+                  { backgroundColor: isDarkMode ? '#1E202B' : '#FFFFFF', borderColor: isDarkMode ? 'rgba(255,255,255,0.05)' : 'rgba(0,0,0,0.05)' }
                 ]}
-                activeOpacity={0.7}
+                activeOpacity={0.6}
                 onPress={handleBoostProfile}
               >
-                <Ionicons name="flash" size={18} color="#A855F7" />
+                <Ionicons name="flash" size={24} color="#A855F7" />
               </TouchableOpacity>
             </View>
-          </View>
+          </>
         ) : (
           <View style={styles.emptyState}>
             <Ionicons name="location-sharp" size={54} color="#FD3A73" />
@@ -202,8 +238,8 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
     width: '100%',
-    maxWidth: 440,
     alignSelf: 'center',
+    paddingBottom: 20,
   },
   cardStack: {
     flex: 1,
@@ -211,6 +247,7 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
     position: 'relative',
+    marginTop: 10,
   },
   nextCardWrapper: {
     position: 'absolute',
@@ -223,12 +260,11 @@ const styles = StyleSheet.create({
     zIndex: 2,
   },
   actionControls: {
-    position: 'absolute',
-    bottom: 12,
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'center',
-    gap: 12,
+    gap: 14,
+    paddingTop: 10,
     zIndex: 10,
   },
   actionBtn: {
@@ -239,19 +275,19 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
   },
   smallBtn: {
-    width: 44,
-    height: 44,
-    borderRadius: 22,
-  },
-  midBtn: {
     width: 48,
     height: 48,
     borderRadius: 24,
   },
+  midBtn: {
+    width: 56,
+    height: 56,
+    borderRadius: 28,
+  },
   largeBtn: {
-    width: 58,
-    height: 58,
-    borderRadius: 29,
+    width: 68,
+    height: 68,
+    borderRadius: 34,
   },
   emptyState: {
     padding: 30,

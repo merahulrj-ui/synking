@@ -7,12 +7,33 @@ import { useApp } from '../../contexts/AppContext';
 import { MatchCelebrationModal } from '../../components/MatchCelebrationModal';
 import { CallModal } from '../../components/CallModal';
 import { WebRTCService } from '../../services/webrtcService';
+import { RealtimeBridge } from '../../services/realtimeBridge';
 import { CallSession } from '../../types';
 
 export default function TabsLayout() {
   const { isDarkMode, incomingRequests, currentUser, acceptedMatchAlert, clearAcceptedMatchAlert, isSuspended, suspendedUntil } = useApp();
   const [activeCall, setActiveCall] = React.useState<CallSession | null>(null);
   const [timeLeft, setTimeLeft] = React.useState<string>('');
+  const [unreadChatCount, setUnreadChatCount] = React.useState<number>(0);
+  const seenBadgeIds = React.useRef(new Set<string>());
+
+  React.useEffect(() => {
+    const unsubscribeMsg = RealtimeBridge.subscribe(({ type, payload }) => {
+      if (type === 'NEW_MESSAGE' && payload) {
+        const msg = payload;
+        
+        // ⛔ Deduplicate badge increments
+        if (seenBadgeIds.current.has(msg.id)) return;
+        seenBadgeIds.current.add(msg.id);
+
+        // Only count messages addressed to ME, not all broadcast messages
+        if (msg.senderId && msg.senderId !== currentUser?.id && msg.receiverId === currentUser?.id) {
+          setUnreadChatCount(prev => prev + 1);
+        }
+      }
+    });
+    return () => unsubscribeMsg();
+  }, [currentUser]);
 
   React.useEffect(() => {
     if (!isSuspended || !suspendedUntil) return;
@@ -118,10 +139,22 @@ export default function TabsLayout() {
         {/* 4. Chat */}
         <Tabs.Screen
           name="chats"
+          listeners={{
+            tabPress: () => {
+              setUnreadChatCount(0);
+            },
+          }}
           options={{
             title: 'Chat',
             tabBarIcon: ({ focused, color }) => (
-              <Ionicons name={focused ? 'chatbubbles' : 'chatbubbles-outline'} size={24} color={color} />
+              <View style={{ position: 'relative' }}>
+                <Ionicons name={focused ? 'chatbubbles' : 'chatbubbles-outline'} size={24} color={color} />
+                {unreadChatCount > 0 && (
+                  <View style={styles.tabBadge}>
+                    <Text style={styles.tabBadgeText}>{unreadChatCount}</Text>
+                  </View>
+                )}
+              </View>
             ),
           }}
         />

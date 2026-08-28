@@ -7,6 +7,7 @@ import { AppProvider } from '../contexts/AppContext';
 import { Colors } from '../constants/theme';
 
 import { CallModal } from '../components/CallModal';
+import { InAppNotificationBanner } from '../components/InAppNotificationBanner';
 import { WebRTCService } from '../services/webrtcService';
 import { CallSession } from '../types';
 
@@ -113,6 +114,7 @@ export default function RootLayout() {
             />
           </Stack>
           <GlobalCallOverlay />
+          <InAppNotificationBanner />
         </View>
       </View>
     </AppProvider>

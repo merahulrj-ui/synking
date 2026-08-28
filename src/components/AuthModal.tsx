@@ -3,6 +3,7 @@ import { View, Text, StyleSheet, Modal, TouchableOpacity, TextInput, Alert, Scro
 import { Ionicons } from '@expo/vector-icons';
 import { GradientButton } from './GradientButton';
 import { useApp } from '../contexts/AppContext';
+import { getLocalBackendUrl } from '../services/firebase';
 
 interface Props {
   visible: boolean;
@@ -33,13 +34,29 @@ export const AuthModal: React.FC<Props> = ({ visible, onClose, targetUserName })
     Alert.alert('OTP Sent 📲', 'Testing OTP has been set to: 1234');
   };
 
-  const handleVerifyOtp = () => {
+  const handleVerifyOtp = async () => {
     if (!ageVerified) {
       Alert.alert('Terms & Guidelines', 'Please agree to our community safety guidelines to continue.');
       return;
     }
     const formattedPhone = phone ? `+91 ${phone}` : '+91 98765 43210';
-    loginUser({
+    
+    try {
+      const res = await fetch(`${getLocalBackendUrl()}/api/check-phone?phone=${encodeURIComponent(formattedPhone)}`);
+      if (res.ok) {
+        const data = await res.json();
+        if (data.exists && data.user) {
+          await loginUser(data.user);
+          onClose();
+          Alert.alert('Welcome Back! 🎉', 'You are now signed in securely to your existing account.');
+          return;
+        }
+      }
+    } catch (e) {
+      console.warn('Failed to check phone number', e);
+    }
+
+    await loginUser({
       id: `user_${Date.now().toString(36)}`,
       name: 'New Member',
       age: 22,

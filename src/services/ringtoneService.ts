@@ -119,7 +119,36 @@ class RingtoneServiceClass {
     this.ringInterval = setInterval(playMelody, 2200);
   }
 
-  // 3. STOP RINGTONE INSTANTLY
+  // 4. MESSAGE RECEIVED: Sweet 2-Tone Pop/Chime (G5 -> C6)
+  public playMessageChime() {
+    const ctx = this.getAudioContext();
+    if (!ctx) return;
+    try {
+      const now = ctx.currentTime;
+      const notes = [
+        { freq: 783.99, time: 0.00, dur: 0.08 }, // G5
+        { freq: 1046.50, time: 0.07, dur: 0.18 }, // C6
+      ];
+      notes.forEach(({ freq, time, dur }) => {
+        const noteStart = now + time;
+        const noteEnd = noteStart + dur;
+        const gain = ctx.createGain();
+        gain.gain.setValueAtTime(0, noteStart);
+        gain.gain.linearRampToValueAtTime(0.18, noteStart + 0.01);
+        gain.gain.exponentialRampToValueAtTime(0.001, noteEnd);
+        gain.connect(ctx.destination);
+
+        const osc = ctx.createOscillator();
+        osc.type = 'sine';
+        osc.frequency.setValueAtTime(freq, noteStart);
+        osc.connect(gain);
+        osc.start(noteStart);
+        osc.stop(noteEnd);
+      });
+    } catch (e) {}
+  }
+
+  // 5. STOP RINGTONE INSTANTLY
   public stop() {
     this.isPlaying = false;
     this.currentMode = null;

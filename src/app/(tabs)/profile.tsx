@@ -21,6 +21,7 @@ import * as ImagePicker from 'expo-image-picker';
 import { useApp } from '../../contexts/AppContext';
 import { Header } from '../../components/Header';
 import { GradientButton } from '../../components/GradientButton';
+import { AuthModal } from '../../components/AuthModal';
 import { UserProfile } from '../../types';
 import { useRouter } from 'expo-router';
 
@@ -142,12 +143,8 @@ export default function ProfileScreen() {
   const { currentUser, isLoggedIn, isDarkMode, toggleTheme, updateCurrentUser, loginUser, logoutUser, deleteAccount } = useApp();
   const router = useRouter();
 
-  // Login States
-  const [loginName, setLoginName] = useState('');
-  const [loginGender, setLoginGender] = useState<'female' | 'male'>('female');
-  const [loginPhone, setLoginPhone] = useState('');
-  const [loginOtp, setLoginOtp] = useState('');
-  const [isOtpSent, setIsOtpSent] = useState(false);
+  // Auth Modal State (Unified Login)
+  const [authModalVisible, setAuthModalVisible] = useState(false);
 
   // Edit Modal State
   const [editModalVisible, setEditModalVisible] = useState(false);
@@ -445,7 +442,7 @@ export default function ProfileScreen() {
 
       <ScrollView style={styles.container} showsVerticalScrollIndicator={false}>
         {!isLoggedIn ? (
-          // Direct Phone Login Card
+          // Unified Auth Login Card
           <View style={[styles.guestCard, { backgroundColor: cardBg, borderColor, padding: 24, gap: 14 }]}>
             <View style={{ alignItems: 'center', marginBottom: 4 }}>
               <Image
@@ -456,167 +453,20 @@ export default function ProfileScreen() {
               <Text style={[styles.guestTitle, { color: textColor, fontSize: 22, fontWeight: '900' }]}>
                 Sign In with Phone ⚡
               </Text>
-              <Text style={[styles.guestSub, { color: subText, textAlign: 'center', marginTop: 4 }]}>
-                Enter your mobile number to sign in and personalize your dating profile.
+              <Text style={[styles.guestSub, { color: subText, textAlign: 'center', marginTop: 4, marginBottom: 12 }]}>
+                Sign in to view your profile, edit your photos, and start matching!
               </Text>
             </View>
 
-            <View style={{ backgroundColor: 'rgba(0, 229, 255, 0.1)', borderColor: 'rgba(0, 229, 255, 0.3)', borderWidth: 1, borderRadius: 12, padding: 10, alignItems: 'center' }}>
-              <Text style={{ color: '#00E5FF', fontSize: 12, fontWeight: '800' }}>🧪 TESTING MODE ACTIVE</Text>
-              <Text style={{ color: subText, fontSize: 11, marginTop: 2 }}>Enter any 10-digit number & OTP (Default: 1234)</Text>
-            </View>
+            <GradientButton 
+              title="Login / Create Account 📲" 
+              onPress={() => setAuthModalVisible(true)} 
+            />
 
-            {!isOtpSent ? (
-              <View style={{ gap: 12 }}>
-                {/* 1. Name Input */}
-                <Text style={{ color: subText, fontSize: 12, fontWeight: '700', textTransform: 'uppercase' }}>Your Name</Text>
-                <TextInput
-                  style={{ backgroundColor: innerBg, borderRadius: 14, borderWidth: 1, borderColor, color: textColor, fontSize: 15, fontWeight: '700', height: 46, paddingHorizontal: 14 }}
-                  placeholder="e.g. Priya / Rahul / Tanya / Sumit"
-                  placeholderTextColor={subText}
-                  value={loginName}
-                  onChangeText={setLoginName}
-                />
-
-                {/* 2. Gender Selection */}
-                <Text style={{ color: subText, fontSize: 12, fontWeight: '700', textTransform: 'uppercase' }}>Gender</Text>
-                <View style={{ flexDirection: 'row', gap: 10 }}>
-                  <TouchableOpacity
-                    style={{
-                      flex: 1,
-                      paddingVertical: 10,
-                      borderRadius: 12,
-                      alignItems: 'center',
-                      borderWidth: 1,
-                      backgroundColor: loginGender === 'female' ? '#FD3A73' : innerBg,
-                      borderColor: loginGender === 'female' ? '#FD3A73' : borderColor,
-                    }}
-                    onPress={() => setLoginGender('female')}
-                  >
-                    <Text style={{ color: loginGender === 'female' ? '#FFF' : textColor, fontWeight: '800', fontSize: 13 }}>👩 Female</Text>
-                  </TouchableOpacity>
-
-                  <TouchableOpacity
-                    style={{
-                      flex: 1,
-                      paddingVertical: 10,
-                      borderRadius: 12,
-                      alignItems: 'center',
-                      borderWidth: 1,
-                      backgroundColor: loginGender === 'male' ? '#FD3A73' : innerBg,
-                      borderColor: loginGender === 'male' ? '#FD3A73' : borderColor,
-                    }}
-                    onPress={() => setLoginGender('male')}
-                  >
-                    <Text style={{ color: loginGender === 'male' ? '#FFF' : textColor, fontWeight: '800', fontSize: 13 }}>👨 Male</Text>
-                  </TouchableOpacity>
-                </View>
-
-                {/* 3. Phone Number */}
-                <Text style={{ color: subText, fontSize: 12, fontWeight: '700', textTransform: 'uppercase' }}>Phone Number</Text>
-                <View style={{ flexDirection: 'row', alignItems: 'center', backgroundColor: innerBg, borderRadius: 14, borderWidth: 1, borderColor, paddingHorizontal: 12 }}>
-                  <Text style={{ color: textColor, fontWeight: '800', fontSize: 15, marginRight: 8 }}>🇮🇳 +91</Text>
-                  <TextInput
-                    style={{ flex: 1, height: 48, color: textColor, fontSize: 16, fontWeight: '700' }}
-                    placeholder="98765 43210"
-                    placeholderTextColor={subText}
-                    keyboardType="phone-pad"
-                    maxLength={10}
-                    value={loginPhone}
-                    onChangeText={setLoginPhone}
-                  />
-                </View>
-
-                <GradientButton title="Send Verification OTP 📲" onPress={handleSendLoginOtp} style={{ marginTop: 4 }} />
-
-                {/* 2-Device Quick Test Buttons */}
-                <View style={{ gap: 8, marginTop: 6 }}>
-                  <TouchableOpacity
-                    style={{
-                      backgroundColor: 'rgba(236, 72, 153, 0.12)',
-                      borderColor: '#EC4899',
-                      borderWidth: 1,
-                      borderRadius: 14,
-                      paddingVertical: 11,
-                      alignItems: 'center',
-                    }}
-                    onPress={() => handleVerifyLoginOtp({
-                      id: 'user_priya_test',
-                      name: 'Priya',
-                      age: 23,
-                      gender: 'female',
-                      occupation: 'UI/UX Designer',
-                      phoneNumber: '+91 98111 22233',
-                      bio: 'Design enthusiast, matcha lattes & indie music ☕ Let’s explore art cafes!',
-                      photo: 'https://images.unsplash.com/photo-1494790108377-be9c29b29330?w=800',
-                      photos: ['https://images.unsplash.com/photo-1494790108377-be9c29b29330?w=800'],
-                      interests: ['☕ Specialty Coffee', '🎸 Indie Music', '🎨 Art & Museums'],
-                    })}
-                    activeOpacity={0.8}
-                  >
-                    <Text style={{ color: '#EC4899', fontWeight: '800', fontSize: 13 }}>👩 1-Tap Sign In as Priya (Device 1)</Text>
-                  </TouchableOpacity>
-
-                  <TouchableOpacity
-                    style={{
-                      backgroundColor: 'rgba(0, 229, 255, 0.12)',
-                      borderColor: '#00E5FF',
-                      borderWidth: 1,
-                      borderRadius: 14,
-                      paddingVertical: 11,
-                      alignItems: 'center',
-                    }}
-                    onPress={() => handleVerifyLoginOtp({
-                      id: 'user_rahul_test',
-                      name: 'Rahul',
-                      age: 24,
-                      gender: 'male',
-                      occupation: 'Software Engineer',
-                      phoneNumber: '+91 98222 33344',
-                      bio: 'Tech nerd, gym & road trips 🚗 Let’s connect over specialty coffee!',
-                      photo: 'https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?w=800',
-                      photos: ['https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?w=800'],
-                      interests: ['☕ Specialty Coffee', '🤖 Tech & AI', '🚗 Road Trips'],
-                    })}
-                    activeOpacity={0.8}
-                  >
-                    <Text style={{ color: '#00E5FF', fontWeight: '800', fontSize: 13 }}>👨 1-Tap Sign In as Rahul (Device 2)</Text>
-                  </TouchableOpacity>
-                </View>
-              </View>
-            ) : (
-              <View style={{ gap: 12 }}>
-                <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' }}>
-                  <Text style={{ color: subText, fontSize: 12, fontWeight: '700', textTransform: 'uppercase' }}>Verification OTP</Text>
-                  <TouchableOpacity onPress={() => setIsOtpSent(false)}>
-                    <Text style={{ color: '#FD3A73', fontSize: 12, fontWeight: '800' }}>Change Number</Text>
-                  </TouchableOpacity>
-                </View>
-
-                <TextInput
-                  style={{
-                    backgroundColor: innerBg,
-                    borderRadius: 14,
-                    borderWidth: 1,
-                    borderColor,
-                    color: textColor,
-                    fontSize: 24,
-                    fontWeight: '900',
-                    textAlign: 'center',
-                    letterSpacing: 10,
-                    height: 54,
-                  }}
-                  placeholder="1234"
-                  placeholderTextColor={subText}
-                  keyboardType="number-pad"
-                  maxLength={4}
-                  value={loginOtp}
-                  onChangeText={setLoginOtp}
-                />
-
-                <GradientButton title="Verify OTP & Sign In 🚀" onPress={handleVerifyLoginOtp} style={{ marginTop: 6 }} />
-              </View>
-            )}
+            <AuthModal 
+              visible={authModalVisible}
+              onClose={() => setAuthModalVisible(false)}
+            />
           </View>
         ) : (
           // =========================================================================
