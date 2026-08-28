@@ -1,4 +1,4 @@
-import { Platform } from 'react-native';
+import { Platform, Vibration } from 'react-native';
 
 // Professional Ringtone Engine for SYNKING
 // Safely checks for Native expo-av or falls back seamlessly to Web Audio API
@@ -70,6 +70,14 @@ class RingtoneServiceClass {
           { uri: OUTGOING_RINGTONE_URL },
           { shouldPlay: true, isLooping: true, volume: 0.8 }
         );
+
+        // Guard against race condition if stopped while downloading
+        if (!this.isPlaying || this.currentMode !== 'outgoing') {
+          await sound.stopAsync().catch(() => {});
+          await sound.unloadAsync().catch(() => {});
+          return;
+        }
+
         this.soundInstance = sound;
         return;
       } catch (e) {
@@ -113,12 +121,19 @@ class RingtoneServiceClass {
     this.ringInterval = setInterval(playPulse, 3200);
   }
 
-  // 2. INCOMING CALL: Melodic Marimba Ringtone
+  // 2. INCOMING CALL: Melodic Marimba Ringtone + Vibration
   public async playIncomingRing() {
     if (this.isPlaying && this.currentMode === 'incoming') return;
     this.stop();
     this.isPlaying = true;
     this.currentMode = 'incoming';
+
+    // Trigger looping vibration on mobile
+    if (Platform.OS !== 'web') {
+      try {
+        Vibration.vibrate([0, 800, 1000], true);
+      } catch (e) {}
+    }
 
     if (Platform.OS !== 'web' && ExpoAudio && ExpoAudio.Sound) {
       try {
@@ -127,6 +142,14 @@ class RingtoneServiceClass {
           { uri: INCOMING_RINGTONE_URL },
           { shouldPlay: true, isLooping: true, volume: 1.0 }
         );
+
+        // Guard against race condition if answered/rejected while loading
+        if (!this.isPlaying || this.currentMode !== 'incoming') {
+          await sound.stopAsync().catch(() => {});
+          await sound.unloadAsync().catch(() => {});
+          return;
+        }
+
         this.soundInstance = sound;
         return;
       } catch (e) {
@@ -175,14 +198,22 @@ class RingtoneServiceClass {
     this.ringInterval = setInterval(playMelody, 2200);
   }
 
-  // 3. STOP RINGTONE INSTANTLY
+  // 3. STOP RINGTONE INSTANTLY & CANCEL VIBRATION
   public async stop() {
     this.isPlaying = false;
     this.currentMode = null;
+    
+    if (Platform.OS !== 'web') {
+      try {
+        Vibration.cancel();
+      } catch (e) {}
+    }
+
     if (this.ringInterval) {
       clearInterval(this.ringInterval);
       this.ringInterval = null;
     }
+    
     if (this.soundInstance) {
       try {
         const sound = this.soundInstance;
