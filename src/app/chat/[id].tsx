@@ -69,7 +69,7 @@ function formatWhatsAppTime(timestamp?: string): string {
 
 const ICEBREAKERS = [
   { text: 'Specialty Coffee or Boba Tea? ☕', tag: 'Cafe Vibe' },
-  { text: 'Two truths and one lie — you first! 🎲', tag: 'Fun Game' },
+  { text: 'Movies or late night drives? 🚗✨', tag: 'Fun Vibe' },
   { text: 'Best pizza slice in town? 🍕', tag: 'Foodie' },
   { text: 'What song is on loop for you right now? 🎵', tag: 'Music' },
 ];
@@ -315,16 +315,18 @@ export default function ChatScreen() {
     // 5. Intent keywords + numbers (e.g. "whatsapp me on 921...", "call me on 98...")
     const intentPattern = /(?:(?:no|number|num|whatsapp|ph|phone|contact|call|watsap|insta|dm)\s*(?:is|:|\s)?\s*[\d\s\-\.]{6,})|(?:call\s*me\s*(?:at|on)\s*[\d\s\-\.]{6,})/i;
 
-    // 6. MULTI-MESSAGE FRAGMENT CHECK (e.g. sends 4 digits, then 3 digits, then 3 digits)
+    // 6. MULTI-MESSAGE FRAGMENT CHECK (e.g. user sends raw digits in parts: 9812, 345, 678)
     let isFragmentedLeak = false;
-    if (currentDigits.length >= 2) {
+    const isPureDigitChunk = /^[\d\s\-\.,+]{2,8}$/.test(rawText.trim());
+    if (isPureDigitChunk && currentDigits.length >= 2) {
       const myId = currentUser?.id || 'my_user_id';
       const recentMyMessages = userMessages
         .filter(m => (m.senderId === myId || m.senderId === 'my_user_id') && !m.text.startsWith('📞') && !m.text.startsWith('📹'))
         .slice(-4);
       
       const prevDigits = recentMyMessages
-        .map(m => normalizeTextToDigits(m.text).replace(/\D/g, ''))
+        .filter(m => /^[\d\s\-\.,+]{2,8}$/.test(m.text.trim()))
+        .map(m => m.text.replace(/\D/g, ''))
         .join('');
       
       const combinedDigits = prevDigits + currentDigits;
