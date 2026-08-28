@@ -311,6 +311,20 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
         if (payload.receiverId === currentUser?.id && payload.callerUser) {
           WebRTCService.receiveIncomingCall(payload.callerUser, payload.type, payload.callId);
         }
+      } else if (type === 'USER_DELETED' && payload) {
+        if (payload.userId === currentUser?.id) {
+          console.log('🚪 [USER_DELETED_BY_ADMIN] Logging out deleted user:', currentUser?.id);
+          logoutUser();
+        } else {
+          setProfiles(prev => prev.filter(p => p && p.id !== payload.userId));
+        }
+      } else if (type === 'DATABASE_WIPED') {
+        console.log('🧹 [DATABASE_WIPED_BY_ADMIN] Resetting state and logging out all users');
+        logoutUser();
+        setProfiles([]);
+        setMatches([]);
+        setIncomingRequests([]);
+        setSentRequests([]);
       }
     });
     return () => unsubscribe();

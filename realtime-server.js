@@ -19,11 +19,28 @@ const TURSO_TOKEN = (process.env.TURSO_AUTH_TOKEN && process.env.TURSO_AUTH_TOKE
 async function queryTurso(sql, args = []) {
   if (!TURSO_URL || !TURSO_TOKEN) return null;
   const url = new URL('/v2/pipeline', TURSO_URL);
+
+  const formattedArgs = args.map(arg => {
+    if (arg && typeof arg === 'object' && arg.type !== undefined && arg.value !== undefined) {
+      return arg;
+    }
+    if (typeof arg === 'number') {
+      return Number.isInteger(arg) ? { type: 'integer', value: arg.toString() } : { type: 'float', value: arg };
+    }
+    if (typeof arg === 'boolean') {
+      return { type: 'integer', value: arg ? '1' : '0' };
+    }
+    if (arg === null || arg === undefined) {
+      return { type: 'null' };
+    }
+    return { type: 'text', value: typeof arg === 'object' ? JSON.stringify(arg) : String(arg) };
+  });
+
   const payload = JSON.stringify({
     requests: [
       {
         type: 'execute',
-        stmt: { sql, args }
+        stmt: { sql, args: formattedArgs }
       },
       { type: 'close' }
     ]
@@ -54,6 +71,27 @@ async function queryTurso(sql, args = []) {
     req.write(payload);
     req.end();
   });
+}
+
+function extractPlain(val) {
+  if (val === null || val === undefined) return '';
+  if (typeof val === 'object') {
+    if (val.value !== undefined) return extractPlain(val.value);
+    if (val.city !== undefined) return val.city;
+    return '';
+  }
+  if (typeof val === 'string') {
+    if (val.startsWith('{') || val.startsWith('[')) {
+      try {
+        const parsed = JSON.parse(val);
+        if (parsed && typeof parsed === 'object') {
+          if (parsed.value !== undefined) return extractPlain(parsed.value);
+          if (parsed.city !== undefined) return parsed.city;
+        }
+      } catch (e) {}
+    }
+  }
+  return String(val);
 }
 
 // Background Cloud Sync functions
@@ -225,21 +263,24 @@ async function renderAdminHtml() {
       profileList = rows.map(r => {
         const item = {};
         cols.forEach((col, idx) => {
-          let val = r[idx]?.value;
-          if (typeof val === 'string' && (val.startsWith('{') || val.startsWith('['))) {
-            try { val = JSON.parse(val); } catch (e) {}
-          }
-          item[col.name] = val;
+          let rawVal = r[idx]?.value !== undefined ? r[idx].value : r[idx];
+          item[col] = extractPlain(rawVal);
         });
-        const locStr = typeof item.location === 'object' ? (item.location?.city || 'Roorkee') : (item.location || 'Roorkee');
+        const nameStr = extractPlain(item.name) || 'Member';
+        const ageStr = extractPlain(item.age) || '22';
+        const locStr = extractPlain(item.location) || 'Roorkee';
+        const occStr = extractPlain(item.occupation) || 'Member';
+        const bioStr = extractPlain(item.bio) || 'Active on Synking ✨';
+        const photoStr = extractPlain(item.photo) || 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=500';
+
         return {
-          id: item.id,
-          name: item.name || 'Member',
-          age: item.age || 22,
-          photo: item.photo || 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=500',
+          id: extractPlain(item.id),
+          name: nameStr,
+          age: ageStr,
+          photo: photoStr,
           location: locStr,
-          occupation: item.occupation || 'Member',
-          bio: item.bio || 'Active on Synking ✨',
+          occupation: occStr,
+          bio: bioStr,
           verified: item.is_verified || item.isVerified,
         };
       });
@@ -317,7 +358,7 @@ async function renderAdminHtml() {
   <div class="section-title">
     <span>👥 User Profiles Directory (${profileList.length})</span>
     <div style="display: flex; gap: 8px;">
-      <button onclick="wipeAllUsers()" style="background: #EF4444; color: #FFF; border: none; padding: 6px 12px; border-radius: 8px; font-weight: 700; cursor: pointer; font-size: 12px;">🧹 Wipe All Profiles (0 Users)</button>
+      <button onclick="wipeAllUsers()" style="background: #EF4444; color: #FFF; border: none; padding: 6px 14px; border-radius: 8px; font-weight: 700; cursor: pointer; font-size: 12px;">🧹 Delete All Profiles (Reset Database)</button>
       <button onclick="location.reload()" style="background: #1E293B; color: #00E5FF; border: 1px solid #00E5FF; padding: 6px 12px; border-radius: 8px; font-weight: 700; cursor: pointer; font-size: 12px;">🔄 Refresh</button>
     </div>
   </div>
@@ -325,13 +366,13 @@ async function renderAdminHtml() {
   <div class="user-grid">
     ${profileList.length === 0 ? '<div style="color: #94A3B8; padding: 20px;">No registered profiles yet. Create a profile in the app!</div>' : ''}
     ${profileList.map(u => `
-      <div class="user-card">
+      <div class="user-card" id="card_${u.id}">
         <img class="user-img" src="${u.photo || 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=500'}" alt="${u.name}" onerror="this.src='https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=500'" />
         <div class="user-body">
           <div class="user-name">${u.name}, ${u.age || 21} ${u.verified ? '✅' : ''}</div>
-          <div class="user-meta">📍 ${typeof u.location === 'object' ? (u.location?.city || 'Roorkee') : (u.location || 'Roorkee')} • ${u.occupation || 'Member'}</div>
+          <div class="user-meta">📍 ${u.location || 'Roorkee'} • ${u.occupation || 'Member'}</div>
           <div class="user-bio">${u.bio || 'Active on Synking ✨'}</div>
-          <button class="del-btn" onclick="deleteUser('${u.id}')">🗑️ Delete Profile</button>
+          <button class="del-btn" data-id="${u.id}">🗑️ Delete Profile</button>
         </div>
       </div>
     `).join('')}
@@ -367,7 +408,7 @@ async function renderAdminHtml() {
             <td>${r.passType || 'Standard'}</td>
             <td>${timeStr}</td>
             <td>
-              <button onclick="deleteRequest('${r.id}')" style="background: #EF4444; color: white; border: none; padding: 4px 8px; border-radius: 6px; font-weight: 700; cursor: pointer; font-size: 11px;">🗑️ Delete</button>
+              <button class="del-req-btn" data-id="${r.id}" style="background: #EF4444; color: white; border: none; padding: 4px 8px; border-radius: 6px; font-weight: 700; cursor: pointer; font-size: 11px;">🗑️ Delete</button>
             </td>
           </tr>
           `;
@@ -377,62 +418,83 @@ async function renderAdminHtml() {
   </div>
 
   <script>
-    async function deleteUser(id) {
+    console.log('🚀 [SYNKING ADMIN CONSOLE LOADED]');
+
+    // 1. Delete Single User Profile
+    document.addEventListener('click', async function(e) {
+      const btn = e.target.closest('.del-btn');
+      if (!btn) return;
+      const id = btn.getAttribute('data-id');
+      console.log('🗑️ [DELETE_USER_CLICKED] ID:', id);
+
       if (!confirm('Are you sure you want to permanently delete user ' + id + '?')) return;
+
+      btn.disabled = true;
+      btn.innerText = 'Deleting... ⏳';
+
       try {
         const res = await fetch('/api/profiles/' + id, { method: 'DELETE' });
-        if (res.ok) {
+        const data = await res.json();
+        console.log('✅ [DELETE_RESPONSE]', data);
+        if (res.ok && data.success) {
+          const card = document.getElementById('card_' + id);
+          if (card) card.remove();
           location.reload();
         } else {
-          alert('Failed to delete user.');
+          alert('Delete failed: ' + (data.error || 'Unknown error'));
+          btn.disabled = false;
+          btn.innerText = '🗑️ Delete Profile';
         }
-      } catch (e) {
-        alert('Error: ' + e);
+      } catch (err) {
+        console.error('❌ [DELETE_ERROR]', err);
+        alert('Network Error: ' + err.message);
+        btn.disabled = false;
+        btn.innerText = '🗑️ Delete Profile';
       }
-    }
+    });
 
-    async function wipeAllUsers() {
-      if (!confirm('⚠️ Are you sure you want to WIPE OUT ALL PROFILES?\n\nThis will permanently delete all users from Turso Cloud SQLite and local database!')) return;
+    // 2. Wipe All Database Profiles
+    window.wipeAllUsers = async function() {
+      console.log('🧹 [WIPE_ALL_CLICKED]');
+      if (!confirm('⚠️ WIPE OUT ALL DATABASE PROFILES?\\n\\nThis will permanently delete all profiles from Turso Cloud SQLite and local storage.')) return;
+
       try {
         const res = await fetch('/api/wipe-database');
-        if (res.ok) {
-          alert('All users and database wiped successfully!');
-          location.reload();
-        } else {
-          alert('Failed to wipe database.');
-        }
-      } catch (e) {
-        alert('Error: ' + e);
+        const data = await res.json();
+        console.log('✅ [WIPE_RESPONSE]', data);
+        alert('Database Wiped Successfully! (0 Users Remaining)');
+        location.reload();
+      } catch (err) {
+        console.error('❌ [WIPE_ERROR]', err);
+        alert('Wipe Error: ' + err.message);
       }
-    }
+    };
 
-    async function deleteRequest(id) {
-      if (!confirm('Delete this swipe request?')) return;
+    // 3. Delete Single Request
+    document.addEventListener('click', async function(e) {
+      const btn = e.target.closest('.del-req-btn');
+      if (!btn) return;
+      const id = btn.getAttribute('data-id');
+      if (!confirm('Delete this request?')) return;
+
       try {
         const res = await fetch('/api/requests/' + id, { method: 'DELETE' });
-        if (res.ok) {
-          location.reload();
-        } else {
-          alert('Failed to delete request.');
-        }
+        location.reload();
       } catch (e) {
         alert('Error: ' + e);
       }
-    }
+    });
 
-    async function clearAllRequests() {
-      if (!confirm('Are you sure you want to clear ALL swipe requests?')) return;
+    // 4. Clear All Requests
+    window.clearAllRequests = async function() {
+      if (!confirm('Clear all swipe requests?')) return;
       try {
         const res = await fetch('/api/requests', { method: 'DELETE' });
-        if (res.ok) {
-          location.reload();
-        } else {
-          alert('Failed to clear requests.');
-        }
+        location.reload();
       } catch (e) {
         alert('Error: ' + e);
       }
-    }
+    };
   </script>
 </body>
 </html>`;
@@ -544,6 +606,20 @@ const server = http.createServer((req, res) => {
     return;
   }
 
+function broadcastWs(data) {
+  const msg = JSON.stringify(data);
+  const frame = encodeWebSocketFrame(msg);
+  for (const client of clients) {
+    try {
+      if (client && client.writable) {
+        client.write(frame);
+      }
+    } catch (e) {
+      clients.delete(client);
+    }
+  }
+}
+
   // 2.1 DELETE /api/profiles/:id (Delete from Local DB + Turso Cloud SQLite)
   if (req.method === 'DELETE' && pathname.startsWith('/api/profiles/')) {
     const id = pathname.replace('/api/profiles/', '').trim();
@@ -552,12 +628,23 @@ const server = http.createServer((req, res) => {
         delete db.profiles[id];
         saveDb();
       }
-      // Delete from Turso Cloud SQLite
-      queryTurso('DELETE FROM users WHERE id = ?', [id]).catch(() => {});
-      queryTurso('DELETE FROM synk_requests WHERE from_user_id = ? OR to_user_id = ?', [id, id]).catch(() => {});
-      console.log(`[PROFILE_DELETED_PERMANENTLY] ${id} from memory & Turso Cloud SQLite`);
-      res.writeHead(200, { 'Content-Type': 'application/json' });
-      res.end(JSON.stringify({ success: true, deletedId: id }));
+      // Broadcast user deleted to all connected clients so active tabs log out
+      broadcastWs({ type: 'USER_DELETED', payload: { userId: id } });
+
+      // AWAIT Turso Cloud SQLite Deletion
+      Promise.all([
+        queryTurso('DELETE FROM users WHERE id = ?', [id]),
+        queryTurso('DELETE FROM synk_requests WHERE from_user_id = ? OR to_user_id = ?', [id, id]),
+        queryTurso('DELETE FROM messages WHERE sender_id = ? OR receiver_id = ?', [id, id]),
+      ]).then(() => {
+        console.log(`[PROFILE_DELETED_PERMANENTLY] ${id} from memory & Turso Cloud SQLite`);
+        res.writeHead(200, { 'Content-Type': 'application/json' });
+        res.end(JSON.stringify({ success: true, deletedId: id }));
+      }).catch((err) => {
+        console.error('[PROFILE_DELETE_ERROR]', err);
+        res.writeHead(200, { 'Content-Type': 'application/json' });
+        res.end(JSON.stringify({ success: true, deletedId: id }));
+      });
       return;
     }
     res.writeHead(400, { 'Content-Type': 'application/json' });
@@ -571,13 +658,23 @@ const server = http.createServer((req, res) => {
     db.requests = {};
     db.chats = [];
     saveDb();
-    // Wipe Turso Cloud SQLite tables
-    queryTurso('DELETE FROM users').catch(() => {});
-    queryTurso('DELETE FROM synk_requests').catch(() => {});
-    queryTurso('DELETE FROM messages').catch(() => {});
-    console.log('🚨 [MASTER_DATABASE_WIPED] All users, requests, and chats permanently deleted from Turso & Local.');
-    res.writeHead(200, { 'Content-Type': 'application/json' });
-    res.end(JSON.stringify({ success: true, message: 'All users, requests, and chats deleted completely. 0 remaining.' }));
+    // Broadcast database wiped to all connected clients so all open tabs log out
+    broadcastWs({ type: 'DATABASE_WIPED' });
+
+    // AWAIT Wipe Turso Cloud SQLite tables
+    Promise.all([
+      queryTurso('DELETE FROM users'),
+      queryTurso('DELETE FROM synk_requests'),
+      queryTurso('DELETE FROM messages'),
+    ]).then(() => {
+      console.log('🚨 [MASTER_DATABASE_WIPED] All users, requests, and chats permanently deleted from Turso & Local.');
+      res.writeHead(200, { 'Content-Type': 'application/json' });
+      res.end(JSON.stringify({ success: true, message: 'All users, requests, and chats deleted completely. 0 remaining.' }));
+    }).catch((err) => {
+      console.error('[MASTER_WIPE_ERROR]', err);
+      res.writeHead(200, { 'Content-Type': 'application/json' });
+      res.end(JSON.stringify({ success: true }));
+    });
     return;
   }
 
