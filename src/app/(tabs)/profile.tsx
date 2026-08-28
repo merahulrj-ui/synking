@@ -71,31 +71,32 @@ export default function ProfileScreen() {
   };
 
   const handleSendLoginOtp = () => {
-    if (!loginPhone || loginPhone.length < 10) {
-      Alert.alert('Mobile Number Required', 'Please enter a valid 10-digit mobile number.');
+    const digits = loginPhone.replace(/\D/g, '');
+    if (!digits || digits.length < 10) {
+      const msg = 'Please enter a valid 10-digit mobile number.';
+      if (Platform.OS === 'web') window.alert(`Mobile Number Required\n\n${msg}`);
+      else Alert.alert('Mobile Number Required', msg);
       return;
     }
     setIsOtpSent(true);
     setLoginOtp('1234');
-    Alert.alert('OTP Sent 📲', 'Testing verification code is: 1234');
+    const msg = 'Testing verification code is: 1234';
+    if (Platform.OS === 'web') window.alert(`OTP Sent 📲\n\n${msg}`);
+    else Alert.alert('OTP Sent 📲', msg);
   };
 
   const handleVerifyLoginOtp = () => {
-    if (loginOtp.length < 4) {
-      Alert.alert('Enter OTP', 'Please enter the 4-digit verification code.');
-      return;
-    }
-    const cleanPhone = loginPhone ? `+91 ${loginPhone}` : '+91 98765 43210';
-    const newUser = {
+    const cleanPhone = loginPhone ? `+91 ${loginPhone.replace(/\D/g, '')}` : '+91 98765 43210';
+    const newUser: UserProfile = {
       id: `user_${Date.now().toString(36)}`,
-      name: 'New Member',
-      age: 22,
-      gender: 'male' as const,
-      occupation: 'Member',
-      location: editCity || 'Roorkee',
+      name: editName.trim() || 'Rahul Member',
+      age: parseInt(editAge, 10) || 24,
+      gender: 'male',
+      occupation: editOccupation.trim() || 'Software Engineer',
+      location: editCity.trim() || 'Roorkee',
       phoneNumber: cleanPhone,
       distance: '0 km',
-      bio: 'Ready to connect and meet at great venues ✨',
+      bio: editBio.trim() || 'Ready to connect and meet at great venues ✨',
       photo: 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=800&auto=format&fit=crop&q=80',
       photos: ['https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=800&auto=format&fit=crop&q=80'],
       interests: ['Coffee', 'Music', 'Travel'],
@@ -107,8 +108,17 @@ export default function ProfileScreen() {
     setEditName(newUser.name);
     setEditAge(newUser.age.toString());
     setEditBio(newUser.bio);
+    setEditCity(typeof newUser.location === 'object' ? (newUser.location?.city || 'Roorkee') : newUser.location);
     setEditModalVisible(true);
-    Alert.alert('Signed In! 🎉', 'Welcome to SYNKING! Please complete your profile details.');
+    if (Platform.OS === 'web') {
+      window.alert('Signed In! 🎉\n\nWelcome to SYNKING! Please complete your profile details.');
+    } else {
+      Alert.alert('Signed In! 🎉', 'Welcome to SYNKING! Please complete your profile details.');
+    }
+  };
+
+  const handleQuickCreateProfile = () => {
+    handleVerifyLoginOtp();
   };
 
   const bg = isDarkMode ? '#05060A' : '#F9FAFB';
@@ -126,7 +136,11 @@ export default function ProfileScreen() {
       bio: editBio.trim(),
     });
     setEditModalVisible(false);
-    Alert.alert('Profile Saved ✨', `Updated for ${editCity || 'Roorkee'} network.`);
+    if (Platform.OS === 'web') {
+      window.alert(`Profile Saved ✨\n\nUpdated for ${editCity || 'Roorkee'} network.`);
+    } else {
+      Alert.alert('Profile Saved ✨', `Updated for ${editCity || 'Roorkee'} network.`);
+    }
   };
 
   return (
@@ -176,6 +190,23 @@ export default function ProfileScreen() {
                   onPress={handleSendLoginOtp}
                   style={{ marginTop: 6 }}
                 />
+
+                {/* 1-Tap Instant Guest Login Button */}
+                <TouchableOpacity
+                  style={{
+                    backgroundColor: 'rgba(253, 58, 115, 0.12)',
+                    borderColor: '#FD3A73',
+                    borderWidth: 1,
+                    borderRadius: 14,
+                    paddingVertical: 12,
+                    alignItems: 'center',
+                    marginTop: 4,
+                  }}
+                  onPress={handleQuickCreateProfile}
+                  activeOpacity={0.8}
+                >
+                  <Text style={{ color: '#FD3A73', fontWeight: '800', fontSize: 14 }}>⚡ 1-Tap Quick Setup Profile</Text>
+                </TouchableOpacity>
               </View>
             ) : (
               <View style={{ gap: 12 }}>

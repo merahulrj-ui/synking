@@ -12,8 +12,9 @@ const PORT = process.env.PORT || 8082;
 const DB_FILE = path.join(__dirname, 'synking_local_db.json');
 
 // 9 GB Turso Cloud SQLite Configuration (AWS Mumbai - 0ms Latency)
-const TURSO_URL = process.env.TURSO_DATABASE_URL || 'https://synking-db-pikirahulkumar-eng.aws-ap-south-1.turso.io';
-const TURSO_TOKEN = process.env.TURSO_AUTH_TOKEN || 'eyJhbGciOiJFZERTQSIsInR5cCI6IkpXVCJ9.eyJhIjoicnciLCJpYXQiOjE3ODc4OTI0MzYsImlkIjoiMDFhMDQ2YWUtNzgwMS03MzdlLTg3MzAtZWI1NTY5Yjk0NmUxIiwia2lkIjoiMmROU0NaSHpYX2FfcVVsLVhFWmFOSm1tYkRJeUo1VmJsZ3BjSXJnNmc5cyIsInJpZCI6IjRhNWIxNDE3LTkzYWYtNGZiYi1hOTNmLTNiYjU3NGFhOTA3NyJ9.3qHyMOLW_iLlaL0j6c5krGBrR6BrU9nwkzAExC0uH8hYuWXGj1ph79X4YNJuo_Xw3CKaqiUCW0ALaTLGHoeHAw';
+const FALLBACK_TURSO_TOKEN = 'eyJhbGciOiJFZERTQSIsInR5cCI6IkpXVCJ9.eyJhIjoicnciLCJpYXQiOjE3ODc4OTI0MzYsImlkIjoiMDFhMDQ2YWUtNzgwMS03MzdlLTg3MzAtZWI1NTY5Yjk0NmUxIiwia2lkIjoiMmROU0NaSHpYX2FfcVVsLVhFWmFOSm1tYkRJeUo1VmJsZ3BjSXJnNmc5cyIsInJpZCI6IjRhNWIxNDE3LTkzYWYtNGZiYi1hOTNmLTNiYjU3NGFhOTA3NyJ9.3qHyMOLW_iLlaL0j6c5krGBrR6BrU9nwkzAExC0uH8hYuWXGj1ph79X4YNJuo_Xw3CKaqiUCW0ALaTLGHoeHAw';
+const TURSO_URL = (process.env.TURSO_DATABASE_URL && process.env.TURSO_DATABASE_URL.trim()) ? process.env.TURSO_DATABASE_URL.trim() : 'https://synking-db-pikirahulkumar-eng.aws-ap-south-1.turso.io';
+const TURSO_TOKEN = (process.env.TURSO_AUTH_TOKEN && process.env.TURSO_AUTH_TOKEN.trim().length > 20) ? process.env.TURSO_AUTH_TOKEN.trim() : FALLBACK_TURSO_TOKEN;
 
 async function queryTurso(sql, args = []) {
   if (!TURSO_URL || !TURSO_TOKEN) return null;
@@ -211,9 +212,42 @@ function saveDb() {
 
 const clients = new Set();
 
-// HTML Admin Portal Template
-function renderAdminHtml() {
-  const profileList = Object.values(db.profiles || {});
+// HTML Admin Portal Template (Direct Live Turso Cloud SQLite Sync)
+async function renderAdminHtml() {
+  let profileList = Object.values(db.profiles || {});
+
+  // 1. Live Fetch from Turso 9GB Cloud SQLite
+  try {
+    const tursoUsers = await queryTurso('SELECT * FROM users ORDER BY created_at DESC');
+    const rows = tursoUsers?.results?.[0]?.response?.result?.rows;
+    const cols = tursoUsers?.results?.[0]?.response?.result?.cols;
+    if (Array.isArray(rows) && rows.length > 0 && Array.isArray(cols)) {
+      profileList = rows.map(r => {
+        const item = {};
+        cols.forEach((col, idx) => {
+          let val = r[idx]?.value;
+          if (typeof val === 'string' && (val.startsWith('{') || val.startsWith('['))) {
+            try { val = JSON.parse(val); } catch (e) {}
+          }
+          item[col.name] = val;
+        });
+        const locStr = typeof item.location === 'object' ? (item.location?.city || 'Roorkee') : (item.location || 'Roorkee');
+        return {
+          id: item.id,
+          name: item.name || 'Member',
+          age: item.age || 22,
+          photo: item.photo || 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=500',
+          location: locStr,
+          occupation: item.occupation || 'Member',
+          bio: item.bio || 'Active on Synking ✨',
+          verified: item.is_verified || item.isVerified,
+        };
+      });
+    }
+  } catch (e) {
+    console.warn('[TURSO_ADMIN_FETCH_ERR]', e);
+  }
+
   const requestList = Object.values(db.requests || {});
   const chatList = db.chats || [];
 
@@ -258,7 +292,7 @@ function renderAdminHtml() {
       <div class="logo">SYNKING ADMIN CONSOLE</div>
       <div style="color: #94A3B8; font-size: 12px; margin-top: 2px;">Live Cloud Backend • 24/7 Zero Cost Production</div>
     </div>
-    <div class="badge">● 100% ONLINE (Render Cloud)</div>
+    <div class="badge">● 100% ONLINE (Turso 9GB SQLite)</div>
   </div>
 
   <div class="stats-grid">
@@ -289,11 +323,11 @@ function renderAdminHtml() {
     ${profileList.length === 0 ? '<div style="color: #94A3B8; padding: 20px;">No registered profiles yet. Create a profile in the app!</div>' : ''}
     ${profileList.map(u => `
       <div class="user-card">
-        <img class="user-img" src="${u.photo || u.photos?.[0] || 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=500'}" alt="${u.name}" onerror="this.src='https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=500'" />
+        <img class="user-img" src="${u.photo || 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=500'}" alt="${u.name}" onerror="this.src='https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=500'" />
         <div class="user-body">
           <div class="user-name">${u.name}, ${u.age || 21} ${u.verified ? '✅' : ''}</div>
-          <div class="user-meta">📍 ${u.city || 'Roorkee'} • ${u.college || 'IIT Roorkee'}</div>
-          <div class="user-bio">${u.bio || 'Active on Synking'}</div>
+          <div class="user-meta">📍 ${typeof u.location === 'object' ? (u.location?.city || 'Roorkee') : (u.location || 'Roorkee')} • ${u.occupation || 'Member'}</div>
+          <div class="user-bio">${u.bio || 'Active on Synking ✨'}</div>
           <button class="del-btn" onclick="deleteUser('${u.id}')">🗑️ Delete Profile</button>
         </div>
       </div>
@@ -447,8 +481,13 @@ const server = http.createServer((req, res) => {
       return;
     }
 
-    res.writeHead(200, { 'Content-Type': 'text/html; charset=utf-8' });
-    res.end(renderAdminHtml());
+    renderAdminHtml().then(html => {
+      res.writeHead(200, { 'Content-Type': 'text/html; charset=utf-8' });
+      res.end(html);
+    }).catch(err => {
+      res.writeHead(500);
+      res.end('Error loading admin dashboard: ' + err);
+    });
     return;
   }
 

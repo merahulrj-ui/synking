@@ -106,34 +106,75 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
 
   const refreshLocation = async () => {
     try {
+      let lat: number | null = null;
+      let lon: number | null = null;
+      let detectedCity = 'Current Location';
+
+      // 1. Try Browser / Device GPS
       const { status } = await Location.requestForegroundPermissionsAsync();
-      if (status !== 'granted') {
-        console.log('[LOCATION] Permission not granted');
-        return;
+      if (status === 'granted') {
+        const loc = await Location.getCurrentPositionAsync({
+          accuracy: Location.Accuracy.Balanced,
+        });
+        if (loc && loc.coords) {
+          lat = loc.coords.latitude;
+          lon = loc.coords.longitude;
+
+          // Try native reverse geocode
+          try {
+            const [geo] = await Location.reverseGeocodeAsync({ latitude: lat, longitude: lon });
+            if (geo?.city || geo?.subregion || geo?.region) {
+              detectedCity = geo.city || geo.subregion || geo.region || '';
+            }
+          } catch (e) {}
+
+          // If city not resolved (common on Web), use high-accuracy OpenStreetMap reverse geocoding
+          if (!detectedCity || detectedCity === 'Current Location') {
+            try {
+              const res = await fetch(`https://nominatim.openstreetmap.org/reverse?format=json&lat=${lat}&lon=${lon}`);
+              if (res.ok) {
+                const osm = await res.json();
+                const c = osm?.address?.city || osm?.address?.town || osm?.address?.village || osm?.address?.county || osm?.address?.state_district;
+                if (c) detectedCity = c;
+              }
+            } catch (e) {}
+          }
+        }
       }
 
-      const loc = await Location.getCurrentPositionAsync({
-        accuracy: Location.Accuracy.Balanced,
-      });
-
-      if (loc && loc.coords) {
-        const { latitude, longitude } = loc.coords;
-        const [geo] = await Location.reverseGeocodeAsync({ latitude, longitude });
-        const city = geo?.city || geo?.subregion || geo?.region || 'Current Location';
-        setCurrentLocation(city);
-
-        if (currentUser) {
-          updateCurrentUser({
-            location: {
-              city,
-              coordinates: [latitude, longitude],
-              distance: 0,
+      // 2. Fallback to IP Geolocation if GPS is not available or blocked
+      if (!detectedCity || detectedCity === 'Current Location') {
+        try {
+          const ipRes = await fetch('https://ipapi.co/json/');
+          if (ipRes.ok) {
+            const ipData = await ipRes.json();
+            if (ipData?.city) {
+              detectedCity = ipData.city;
+              if (lat === null) lat = ipData.latitude;
+              if (lon === null) lon = ipData.longitude;
             }
-          });
-        }
+          }
+        } catch (e) {}
+      }
+
+      if (!detectedCity || detectedCity === 'Current Location') {
+        detectedCity = 'Roorkee';
+      }
+
+      setCurrentLocation(detectedCity);
+
+      if (currentUser) {
+        updateCurrentUser({
+          location: {
+            city: detectedCity,
+            coordinates: [lat || 29.86, lon || 77.87],
+            distance: 0,
+          }
+        });
       }
     } catch (e) {
       console.warn('[LOCATION_ERROR]', e);
+      setCurrentLocation('Roorkee');
     }
   };
 
