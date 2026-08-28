@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { View, Text, StyleSheet, Image, TouchableOpacity, ScrollView, Switch, TextInput, Alert, Modal } from 'react-native';
+import { View, Text, StyleSheet, Image, TouchableOpacity, ScrollView, Switch, TextInput, Alert, Modal, Platform } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
 import { useApp } from '../../contexts/AppContext';
@@ -7,59 +7,108 @@ import { Header } from '../../components/Header';
 import { GradientButton } from '../../components/GradientButton';
 import { AuthModal } from '../../components/AuthModal';
 import { useRouter } from 'expo-router';
-import { getLocalBackendUrl } from '../../services/firebase';
 
 export default function ProfileScreen() {
   const { currentUser, isLoggedIn, isDarkMode, toggleTheme, updateCurrentUser, logoutUser, deleteAccount } = useApp();
   const [authModalVisible, setAuthModalVisible] = useState(false);
   const [editModalVisible, setEditModalVisible] = useState(false);
-  const [isCheckingUpdate, setIsCheckingUpdate] = useState(false);
   const [editName, setEditName] = useState(currentUser?.name || '');
   const [editAge, setEditAge] = useState((currentUser?.age || 22).toString());
-  const [editCity, setEditCity] = useState(currentUser?.location || 'Roorkee');
+  const [editCity, setEditCity] = useState(
+    typeof currentUser?.location === 'object' ? (currentUser?.location?.city || 'Roorkee') : (currentUser?.location || 'Roorkee')
+  );
   const [editOccupation, setEditOccupation] = useState(currentUser?.occupation || '');
   const [editBio, setEditBio] = useState(currentUser?.bio || '');
+  const [loginPhone, setLoginPhone] = useState('');
+  const [loginOtp, setLoginOtp] = useState('');
+  const [isOtpSent, setIsOtpSent] = useState(false);
   const router = useRouter();
 
-  const handleCheckForUpdates = async () => {
-    setIsCheckingUpdate(true);
-    try {
-      const res = await fetch(`${getLocalBackendUrl()}/api/version`);
-      if (res.ok) {
-        const data = await res.json();
-        const CURRENT_APP_BUILD = 101;
-        if (data && data.buildNumber > CURRENT_APP_BUILD) {
-          Alert.alert(
-            `🚀 Update Available (v${data.version || '1.0.2'})`,
-            `${data.notes || 'A new live update is ready with latest features.'}\n\nDo you want to update now?`,
-            [
-              { text: 'Later', style: 'cancel' },
-              {
-                text: 'Update & Restart ⚡',
-                onPress: () => {
-                  if (typeof window !== 'undefined' && window.location) {
-                    window.location.reload();
-                  } else {
-                    Alert.alert('Updated ✨', 'App is running latest version.');
-                  }
-                }
-              }
-            ]
-          );
-        } else {
-          Alert.alert(
-            '✅ App Up to Date',
-            `You are already on the latest version of SYNKING (v${data?.version || '1.0.2'}).`
-          );
-        }
-      } else {
-        Alert.alert('✅ App Up to Date', 'You are on the latest version.');
+  const handleDeleteAccount = async () => {
+    if (Platform.OS === 'web') {
+      const confirmed = window.confirm(
+        '⚠️ Delete Profile Permanently?\n\nThis will permanently remove your profile, match requests, and chat data from the database.'
+      );
+      if (confirmed) {
+        await deleteAccount();
+        window.alert('Profile Deleted: Your account has been deleted from the database.');
       }
-    } catch (e) {
-      Alert.alert('Connected', 'You are running the latest live version.');
-    } finally {
-      setIsCheckingUpdate(false);
+    } else {
+      Alert.alert(
+        '⚠️ Delete Profile Permanently?',
+        'This will permanently remove your profile, match requests, and chat data from the database.',
+        [
+          { text: 'Cancel', style: 'cancel' },
+          {
+            text: 'Delete Permanently 🗑️',
+            style: 'destructive',
+            onPress: async () => {
+              await deleteAccount();
+              Alert.alert('Profile Deleted', 'Your account has been deleted from the database.');
+            }
+          }
+        ]
+      );
     }
+  };
+
+  const handleLogout = () => {
+    if (Platform.OS === 'web') {
+      const confirmed = window.confirm('Are you sure you want to log out of your account?');
+      if (confirmed) {
+        logoutUser();
+      }
+    } else {
+      Alert.alert(
+        'Log Out',
+        'Are you sure you want to log out of your account?',
+        [
+          { text: 'Cancel', style: 'cancel' },
+          { text: 'Log Out 🚪', style: 'destructive', onPress: () => logoutUser() }
+        ]
+      );
+    }
+  };
+
+  const handleSendLoginOtp = () => {
+    if (!loginPhone || loginPhone.length < 10) {
+      Alert.alert('Mobile Number Required', 'Please enter a valid 10-digit mobile number.');
+      return;
+    }
+    setIsOtpSent(true);
+    setLoginOtp('1234');
+    Alert.alert('OTP Sent 📲', 'Testing verification code is: 1234');
+  };
+
+  const handleVerifyLoginOtp = () => {
+    if (loginOtp.length < 4) {
+      Alert.alert('Enter OTP', 'Please enter the 4-digit verification code.');
+      return;
+    }
+    const cleanPhone = loginPhone ? `+91 ${loginPhone}` : '+91 98765 43210';
+    const newUser = {
+      id: `user_${Date.now().toString(36)}`,
+      name: 'New Member',
+      age: 22,
+      gender: 'male' as const,
+      occupation: 'Member',
+      location: editCity || 'Roorkee',
+      phoneNumber: cleanPhone,
+      distance: '0 km',
+      bio: 'Ready to connect and meet at great venues ✨',
+      photo: 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=800&auto=format&fit=crop&q=80',
+      photos: ['https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=800&auto=format&fit=crop&q=80'],
+      interests: ['Coffee', 'Music', 'Travel'],
+      compatibility: 100,
+      isVerified: true,
+      isVip: false,
+    };
+    loginUser(newUser);
+    setEditName(newUser.name);
+    setEditAge(newUser.age.toString());
+    setEditBio(newUser.bio);
+    setEditModalVisible(true);
+    Alert.alert('Signed In! 🎉', 'Welcome to SYNKING! Please complete your profile details.');
   };
 
   const bg = isDarkMode ? '#05060A' : '#F9FAFB';
@@ -86,18 +135,85 @@ export default function ProfileScreen() {
 
       <ScrollView style={styles.container} showsVerticalScrollIndicator={false}>
         {!isLoggedIn ? (
-          // Guest State Card
-          <View style={[styles.guestCard, { backgroundColor: cardBg, borderColor }]}>
-            <Ionicons name="person-circle-outline" size={56} color="#FD3A73" />
-            <Text style={[styles.guestTitle, { color: textColor }]}>Welcome to SYNKING</Text>
-            <Text style={[styles.guestSub, { color: subText }]}>
-              Sign in to verify your identity, send Synk requests, and plan safe dates in Roorkee.
-            </Text>
-            <GradientButton
-              title="Sign In with Phone / OTP ⚡"
-              onPress={() => setAuthModalVisible(true)}
-              style={{ marginTop: 10, width: '100%' }}
-            />
+          // Direct Phone + OTP Login Card
+          <View style={[styles.guestCard, { backgroundColor: cardBg, borderColor, padding: 24, gap: 14 }]}>
+            <View style={{ alignItems: 'center', marginBottom: 4 }}>
+              <Image
+                source={require('../../../assets/images/logo_emblem.png')}
+                style={{ width: 64, height: 64, borderRadius: 18, marginBottom: 12 }}
+                resizeMode="contain"
+              />
+              <Text style={[styles.guestTitle, { color: textColor, fontSize: 22, fontWeight: '900' }]}>Sign In with Phone ⚡</Text>
+              <Text style={[styles.guestSub, { color: subText, textAlign: 'center', marginTop: 4 }]}>
+                Enter your mobile number to sign in, verify your identity, and update your profile.
+              </Text>
+            </View>
+
+            {/* Testing Mode Banner */}
+            <View style={{ backgroundColor: 'rgba(0, 229, 255, 0.1)', borderColor: 'rgba(0, 229, 255, 0.3)', borderWidth: 1, borderRadius: 12, padding: 10, alignItems: 'center' }}>
+              <Text style={{ color: '#00E5FF', fontSize: 12, fontWeight: '800' }}>🧪 TESTING MODE ACTIVE</Text>
+              <Text style={{ color: subText, fontSize: 11, marginTop: 2 }}>Enter any 10-digit number & OTP (Default: 1234)</Text>
+            </View>
+
+            {!isOtpSent ? (
+              <View style={{ gap: 12 }}>
+                <Text style={{ color: subText, fontSize: 12, fontWeight: '700', textTransform: 'uppercase' }}>Phone Number</Text>
+                <View style={{ flexDirection: 'row', alignItems: 'center', backgroundColor: isDarkMode ? '#1A1B28' : '#F1F5F9', borderRadius: 14, borderWidth: 1, borderColor, paddingHorizontal: 12 }}>
+                  <Text style={{ color: textColor, fontWeight: '800', fontSize: 15, marginRight: 8 }}>🇮🇳 +91</Text>
+                  <TextInput
+                    style={{ flex: 1, height: 48, color: textColor, fontSize: 16, fontWeight: '700' }}
+                    placeholder="98765 43210"
+                    placeholderTextColor={subText}
+                    keyboardType="phone-pad"
+                    maxLength={10}
+                    value={loginPhone}
+                    onChangeText={setLoginPhone}
+                  />
+                </View>
+
+                <GradientButton
+                  title="Send Verification OTP 📲"
+                  onPress={handleSendLoginOtp}
+                  style={{ marginTop: 6 }}
+                />
+              </View>
+            ) : (
+              <View style={{ gap: 12 }}>
+                <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' }}>
+                  <Text style={{ color: subText, fontSize: 12, fontWeight: '700', textTransform: 'uppercase' }}>Verification OTP</Text>
+                  <TouchableOpacity onPress={() => setIsOtpSent(false)}>
+                    <Text style={{ color: '#FD3A73', fontSize: 12, fontWeight: '800' }}>Change Number</Text>
+                  </TouchableOpacity>
+                </View>
+
+                <TextInput
+                  style={{
+                    backgroundColor: isDarkMode ? '#1A1B28' : '#F1F5F9',
+                    borderRadius: 14,
+                    borderWidth: 1,
+                    borderColor,
+                    color: textColor,
+                    fontSize: 24,
+                    fontWeight: '900',
+                    textAlign: 'center',
+                    letterSpacing: 10,
+                    height: 54,
+                  }}
+                  placeholder="1234"
+                  placeholderTextColor={subText}
+                  keyboardType="number-pad"
+                  maxLength={4}
+                  value={loginOtp}
+                  onChangeText={setLoginOtp}
+                />
+
+                <GradientButton
+                  title="Verify OTP & Sign In 🚀"
+                  onPress={handleVerifyLoginOtp}
+                  style={{ marginTop: 6 }}
+                />
+              </View>
+            )}
           </View>
         ) : (
           // Real Logged In User Profile
@@ -124,16 +240,17 @@ export default function ProfileScreen() {
               </View>
 
               <Text style={[styles.occupation, { color: subText }]}>
-                💼 {currentUser?.occupation} • 📍 {currentUser?.location || 'Roorkee'}
+                💼 {currentUser?.occupation} • 📍 {typeof currentUser?.location === 'object' ? (currentUser?.location?.city || 'Roorkee') : (currentUser?.location || 'Roorkee')}
               </Text>
 
               {/* Edit Profile Button */}
               <TouchableOpacity
                 style={[styles.editBtn, { backgroundColor: cardBg, borderColor }]}
                 onPress={() => {
+                  const cityStr = typeof currentUser?.location === 'object' ? (currentUser?.location?.city || 'Roorkee') : (currentUser?.location || 'Roorkee');
                   setEditName(currentUser?.name || '');
                   setEditAge((currentUser?.age || 22).toString());
-                  setEditCity(currentUser?.location || 'Roorkee');
+                  setEditCity(cityStr);
                   setEditOccupation(currentUser?.occupation || '');
                   setEditBio(currentUser?.bio || '');
                   setEditModalVisible(true);
@@ -216,82 +333,31 @@ export default function ProfileScreen() {
                 <Ionicons name="chevron-forward" size={16} color={subText} />
               </TouchableOpacity>
 
-              {/* 🔄 CHECK FOR UPDATES BUTTON */}
-              <TouchableOpacity
-                style={[styles.settingRow, { backgroundColor: cardBg, borderColor, marginTop: 12 }]}
-                onPress={handleCheckForUpdates}
-                activeOpacity={0.7}
-                disabled={isCheckingUpdate}
-              >
-                <View style={{ flexDirection: 'row', alignItems: 'center', gap: 10 }}>
-                  <Ionicons name="refresh-circle-outline" size={22} color="#00E5FF" />
-                  <View>
-                    <Text style={[styles.settingText, { color: textColor }]}>
-                      {isCheckingUpdate ? 'Checking for updates...' : 'Check for App Updates 🔄'}
-                    </Text>
-                    <Text style={{ fontSize: 11, color: subText, marginTop: 2 }}>
-                      Live OTA Engine • v1.0.2
-                    </Text>
-                  </View>
-                </View>
-                <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
-                  <View style={{ backgroundColor: 'rgba(0, 229, 255, 0.15)', paddingHorizontal: 8, paddingVertical: 2, borderRadius: 8 }}>
-                    <Text style={{ color: '#00E5FF', fontSize: 11, fontWeight: '800' }}>v1.0.2</Text>
-                  </View>
-                  <Ionicons name="chevron-forward" size={16} color={subText} />
-                </View>
-              </TouchableOpacity>
-
-              {/* 🚪 LOGOUT BUTTON */}
-              <TouchableOpacity
-                style={[styles.settingRow, { backgroundColor: cardBg, borderColor, marginTop: 8 }]}
-                onPress={() => {
-                  Alert.alert(
-                    'Log Out',
-                    'Are you sure you want to sign out of this account?',
-                    [
-                      { text: 'Cancel', style: 'cancel' },
-                      { text: 'Log Out 🚪', style: 'destructive', onPress: () => logoutUser() }
-                    ]
-                  );
-                }}
-                activeOpacity={0.7}
-              >
-                <View style={{ flexDirection: 'row', alignItems: 'center', gap: 10 }}>
-                  <Ionicons name="log-out-outline" size={20} color="#F59E0B" />
-                  <Text style={[styles.settingText, { color: '#F59E0B' }]}>
-                    Sign Out / Switch User 🚪
-                  </Text>
-                </View>
-                <Ionicons name="chevron-forward" size={16} color={subText} />
-              </TouchableOpacity>
-
               {/* 🗑️ DELETE PROFILE BUTTON */}
               <TouchableOpacity
                 style={[styles.settingRow, { backgroundColor: cardBg, borderColor, marginTop: 8 }]}
-                onPress={() => {
-                  Alert.alert(
-                    '⚠️ Delete Profile Permanently?',
-                    'This will permanently remove your profile, match requests, and chat data from the database.',
-                    [
-                      { text: 'Cancel', style: 'cancel' },
-                      {
-                        text: 'Delete Permanently 🗑️',
-                        style: 'destructive',
-                        onPress: async () => {
-                          await deleteAccount();
-                          Alert.alert('Profile Deleted', 'Your account has been deleted from the database.');
-                        }
-                      }
-                    ]
-                  );
-                }}
+                onPress={handleDeleteAccount}
                 activeOpacity={0.7}
               >
                 <View style={{ flexDirection: 'row', alignItems: 'center', gap: 10 }}>
                   <Ionicons name="trash-outline" size={20} color="#EF4444" />
                   <Text style={[styles.settingText, { color: '#EF4444' }]}>
-                    Delete Account & Wipe Profile 🗑️
+                    Delete Account Permanently 🗑️
+                  </Text>
+                </View>
+                <Ionicons name="chevron-forward" size={16} color={subText} />
+              </TouchableOpacity>
+
+              {/* 🚪 LOGOUT BUTTON (AT THE VERY BOTTOM) */}
+              <TouchableOpacity
+                style={[styles.settingRow, { backgroundColor: cardBg, borderColor, marginTop: 8 }]}
+                onPress={handleLogout}
+                activeOpacity={0.7}
+              >
+                <View style={{ flexDirection: 'row', alignItems: 'center', gap: 10 }}>
+                  <Ionicons name="log-out-outline" size={20} color="#94A3B8" />
+                  <Text style={[styles.settingText, { color: textColor }]}>
+                    Log Out
                   </Text>
                 </View>
                 <Ionicons name="chevron-forward" size={16} color={subText} />

@@ -4,7 +4,6 @@ import { View, Text, StyleSheet, Image } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { useApp } from '../../contexts/AppContext';
 
-import { CreateProfileModal } from '../../components/CreateProfileModal';
 import { MatchCelebrationModal } from '../../components/MatchCelebrationModal';
 import { CallModal } from '../../components/CallModal';
 import { WebRTCService } from '../../services/webrtcService';
@@ -108,9 +107,6 @@ export default function TabsLayout() {
           }}
         />
       </Tabs>
-
-      {/* Real User Profile Creation Onboarding (Shows if no profile exists on this device) */}
-      <CreateProfileModal visible={!currentUser} />
 
       {/* Live "Request Accepted" Celebration Alert (Triggers in 0ms when other user accepts) */}
       <MatchCelebrationModal

@@ -113,7 +113,7 @@ const LiveRemoteMedia: React.FC<{ type: 'voice' | 'video'; photoUrl?: string }> 
   if (Platform.OS !== 'web') return null;
 
   return (
-    <View style={{ position: 'absolute', top: 0, left: 0, width: '100%', height: '100%', zIndex: 99 }}>
+    <View style={{ position: 'absolute', top: 0, left: 0, width: '100%', height: '100%', zIndex: 0, pointerEvents: 'none' }}>
       {/* HACK: Make the video tag 100% visible and full screen even for Audio calls! 
           Chrome throttles/mutes <video> and <audio> tags if they are 1x1 pixels or opacity 0. 
           By making it full screen, we force Chrome to play it! */}
@@ -130,7 +130,7 @@ const LiveRemoteMedia: React.FC<{ type: 'voice' | 'video'; photoUrl?: string }> 
           height: '100%',
           objectFit: 'cover',
           opacity: hasVideo ? 1 : 0,
-          zIndex: type === 'video' ? 10 : -1, // Hidden behind the gradient for Voice calls so the UI is visible!
+          zIndex: 0,
         }}
       />
 
@@ -409,13 +409,49 @@ Remote Video Tracks (${remoteVideo.length}): ${JSON.stringify(remoteVideo)}
         >
           {/* Global Live Media Receiver for ALL calls - must exist BEFORE stream arrives */}
           <LiveRemoteMedia type={session.type === 'video' ? 'video' : 'voice'} photoUrl={session.callerPhoto} />
-          
-          {/* 1. TOP STATUS HEADER */}
-          <View style={styles.topHeader}>
+
+          {/* FULLSCREEN REMOTE VIDEO BACKGROUND (WHATSAPP STYLE) */}
+          {session.type === 'video' && (
+            <View style={styles.videoSurfaceContainer}>
+              {/* 1. Background Placeholder while ringing / connecting */}
+              {!(remoteStream && remoteStream.getVideoTracks?.()?.length > 0) && (
+                <View style={[StyleSheet.absoluteFillObject, { alignItems: 'center', justifyContent: 'center', backgroundColor: '#070A14' }]}>
+                  <Image
+                    source={{ uri: session.callerPhoto }}
+                    style={{ width: 120, height: 120, borderRadius: 60, borderWidth: 3, borderColor: '#FD3A73', marginBottom: 14 }}
+                  />
+                  <Text style={{ color: '#FFFFFF', fontSize: 20, fontWeight: '900', marginBottom: 4 }}>
+                    {session.callerName}
+                  </Text>
+                  <Text style={{ color: '#00E5FF', fontSize: 13, fontWeight: '800', letterSpacing: -0.2 }}>
+                    {isConnected ? 'Connecting Live Video Feed...' : 'Ringing...'}
+                  </Text>
+                </View>
+              )}
+
+              {/* 2. Stable Remote NativeRTCView Video Surface (100% Fullscreen) */}
+              {Platform.OS !== 'web' && NativeRTCView && remoteStream && (
+                <NativeRTCView
+                  streamURL={typeof remoteStream.toURL === 'function' ? remoteStream.toURL() : remoteStream}
+                  style={styles.nativeRemoteVideo}
+                  objectFit="cover"
+                  zOrder={0}
+                />
+              )}
+
+              {/* 3. Picture-in-picture Self View Floating on Top Right */}
+              <View style={styles.pipSelfView}>
+                <LiveSelfVideo />
+              </View>
+            </View>
+          )}
+
+          {/* 1. TOP STATUS HEADER (FLOATING OVERLAY) */}
+          <View style={[styles.topHeader, session.type === 'video' && styles.topHeaderFloating]}>
             <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
               <View style={styles.e2eeBadge}>
                 <Ionicons name="shield-checkmark" size={12} color="#22C55E" />
-                <Text style={styles.e2eeText}>P2P WebRTC Direct Stream</Text>
+                <Text style={styles.e2eeText}>P2P WebRTC Direct</Text>
               </View>
 
               {/* Toggle Live Debugger */}
@@ -432,9 +468,7 @@ Remote Video Tracks (${remoteVideo.length}): ${JSON.stringify(remoteVideo)}
             <Text style={styles.callTypeTitle}>
               {isIncomingRinging
                 ? `Incoming ${session.type === 'video' ? 'Video' : 'Voice'} Call 📲`
-                : session.type === 'video'
-                ? 'SYNKING Video Call'
-                : 'SYNKING Voice Call'}
+                : session.callerName}
             </Text>
 
             <Text style={[styles.callStatus, isConnected && styles.callStatusConnected]}>
@@ -511,39 +545,9 @@ Remote Video Tracks (${remoteVideo.length}): ${JSON.stringify(remoteVideo)}
             </View>
           )}
 
-          {/* 2. CENTER AVATAR / VIDEO DISPLAY */}
-          <View style={styles.centerSection}>
-            {session.type === 'video' ? (
-              <View style={styles.videoSurfaceContainer}>
-                {/* 1. Background Placeholder while ringing / connecting */}
-                {!(remoteStream && remoteStream.getVideoTracks?.()?.length > 0) && (
-                  <View style={[StyleSheet.absoluteFillObject, { alignItems: 'center', justifyContent: 'center', backgroundColor: '#070A14' }]}>
-                    <Image
-                      source={{ uri: session.callerPhoto }}
-                      style={{ width: 110, height: 110, borderRadius: 55, borderWidth: 3, borderColor: '#FD3A73', marginBottom: 12 }}
-                    />
-                    <Text style={{ color: '#00E5FF', fontSize: 13, fontWeight: '800', letterSpacing: -0.2 }}>
-                      {isConnected ? 'Connecting Live Video Feed...' : 'Ringing...'}
-                    </Text>
-                  </View>
-                )}
-
-                {/* 2. Stable Remote NativeRTCView Video Surface */}
-                {Platform.OS !== 'web' && NativeRTCView && remoteStream && (
-                  <NativeRTCView
-                    streamURL={typeof remoteStream.toURL === 'function' ? remoteStream.toURL() : remoteStream}
-                    style={styles.nativeRemoteVideo}
-                    objectFit="cover"
-                    zOrder={0}
-                  />
-                )}
-
-                {/* 3. Picture-in-picture Self View */}
-                <View style={styles.pipSelfView}>
-                  <LiveSelfVideo />
-                </View>
-              </View>
-            ) : (
+          {/* 2. CENTER AVATAR (ONLY FOR VOICE CALLS) */}
+          {session.type === 'voice' && (
+            <View style={styles.centerSection}>
               <View style={styles.avatarContainer}>
                 {/* Glowing Wave Rings */}
                 <View style={[styles.pulseRing, isConnected ? styles.pulseRingActive : styles.pulseRingIncoming]} />
@@ -554,17 +558,17 @@ Remote Video Tracks (${remoteVideo.length}): ${JSON.stringify(remoteVideo)}
                   style={styles.avatar}
                 />
               </View>
-            )}
 
-            <Text style={styles.callerName}>{session.callerName}</Text>
-            <Text style={styles.callerSub}>
-              {isIncomingRinging
-                ? 'Tap Green button to answer & connect'
-                : isConnected
-                ? '🔒 Direct Peer-to-Peer Encrypted'
-                : 'Connecting safely on SYNKING'}
-            </Text>
-          </View>
+              <Text style={styles.callerName}>{session.callerName}</Text>
+              <Text style={styles.callerSub}>
+                {isIncomingRinging
+                  ? 'Tap Green button to answer & connect'
+                  : isConnected
+                  ? '🔒 Direct Peer-to-Peer Encrypted'
+                  : 'Connecting safely on SYNKING'}
+              </Text>
+            </View>
+          )}
 
           {/* 3. BOTTOM CONTROL BAR */}
           {isIncomingRinging ? (
@@ -801,13 +805,19 @@ const styles = StyleSheet.create({
   pulseRingOuterActive: {
     borderColor: 'rgba(34, 197, 94, 0.25)',
   },
-  videoSurfaceContainer: {
-    width: 320,
-    height: 320,
-    position: 'relative',
-    backgroundColor: '#000',
+  topHeaderFloating: {
+    backgroundColor: 'rgba(5, 6, 10, 0.65)',
+    paddingHorizontal: 16,
+    paddingVertical: 10,
+    borderRadius: 20,
     borderWidth: 1,
-    borderColor: 'rgba(253, 58, 115, 0.3)',
+    borderColor: 'rgba(255, 255, 255, 0.08)',
+    zIndex: 20,
+  },
+  videoSurfaceContainer: {
+    ...StyleSheet.absoluteFillObject,
+    backgroundColor: '#000',
+    zIndex: 0,
   },
   nativeRemoteVideo: {
     width: '100%',
@@ -815,16 +825,17 @@ const styles = StyleSheet.create({
   },
   pipSelfView: {
     position: 'absolute',
-    bottom: 12,
-    right: 12,
-    width: 86,
-    height: 114,
+    top: 54,
+    right: 16,
+    width: 96,
+    height: 134,
     borderRadius: 16,
     overflow: 'hidden',
     borderWidth: 2,
     borderColor: '#00E5FF',
     backgroundColor: '#1E293B',
-    zIndex: 20,
+    zIndex: 25,
+    elevation: 8,
   },
   selfVideoPlaceholder: {
     flex: 1,

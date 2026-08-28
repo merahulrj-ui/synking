@@ -29,7 +29,8 @@ export const AuthModal: React.FC<Props> = ({ visible, onClose, targetUserName })
       return;
     }
     setOtpSent(true);
-    Alert.alert('OTP Sent 📲', 'Demo OTP is: 1234');
+    setOtp('1234');
+    Alert.alert('OTP Sent 📲', 'Testing OTP has been set to: 1234');
   };
 
   const handleVerifyOtp = () => {
@@ -39,24 +40,24 @@ export const AuthModal: React.FC<Props> = ({ visible, onClose, targetUserName })
     }
     const formattedPhone = phone ? `+91 ${phone}` : '+91 98765 43210';
     loginUser({
-      id: 'my_user_id',
-      name: 'Verified User',
-      age: 24,
+      id: `user_${Date.now().toString(36)}`,
+      name: 'New Member',
+      age: 22,
       gender: 'male',
       occupation: 'Member',
-      location: 'Nearby',
+      location: 'Roorkee',
       phoneNumber: formattedPhone,
       distance: '0 km',
       bio: 'Looking for great conversations at specialty cafes ✨',
-      photo: 'https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?w=800&auto=format&fit=crop&q=80',
-      photos: ['https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?w=800&auto=format&fit=crop&q=80'],
-      interests: ['Coffee', 'Music'],
+      photo: 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=800&auto=format&fit=crop&q=80',
+      photos: ['https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=800&auto=format&fit=crop&q=80'],
+      interests: ['Coffee', 'Music', 'Travel'],
       compatibility: 100,
-      isVerified: false,
+      isVerified: true,
       isVip: false,
     });
     onClose();
-    Alert.alert('Welcome to SYNKING! 🎉', 'You are now signed in securely.');
+    Alert.alert('Welcome to SYNKING! 🎉', 'You are now signed in securely. Visit the Profile tab to update your details.');
   };
 
   const handleQuickDemoLogin = () => {

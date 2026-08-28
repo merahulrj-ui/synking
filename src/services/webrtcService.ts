@@ -4,6 +4,7 @@
 import { CallSession, UserProfile } from '../types';
 import { RealtimeBridge } from './realtimeBridge';
 import { MediaDevices, PeerConnection, SessionDescription, IceCandidate } from './webrtcCore';
+import { AudioRouteService } from './audioRouteService';
 import { Platform, PermissionsAndroid } from 'react-native';
 
 export const ICE_SERVERS: RTCConfiguration = {
@@ -188,6 +189,9 @@ class WebRTCManager {
     this.log(`🚀 Starting outgoing ${params.type} call to ${params.targetUser.name}...`);
     this.notify();
 
+    // Route Audio: Earpiece for voice calls, Loudspeaker for video calls
+    AudioRouteService.setSpeakerOn(params.type === 'video').catch(() => {});
+
     // Capture Local Hardware Microphone & Camera
     await this.initLocalStream(params.type === 'video');
 
@@ -236,7 +240,9 @@ class WebRTCManager {
     this.cleanupTimers();
 
     this.log('📞 Answering call: Capturing local audio/video media stream...');
-    await this.initLocalStream(this.currentSession.type === 'video');
+    const isVideo = this.currentSession.type === 'video';
+    AudioRouteService.setSpeakerOn(isVideo).catch(() => {});
+    await this.initLocalStream(isVideo);
 
     this.currentSession.status = 'connected';
     this.notify();
@@ -524,10 +530,7 @@ class WebRTCManager {
     if (!this.currentSession) return false;
     this.currentSession.isSpeakerOn = !this.currentSession.isSpeakerOn;
     const isSpeaker = this.currentSession.isSpeakerOn;
-    
-    // Note: react-native-webrtc routes audio directly on Android. We removed expo-av due to JSI crashes.
-    // In a real app we'd use react-native-incall-manager or equivalent native module built for RN 0.86.
-
+    AudioRouteService.setSpeakerOn(isSpeaker).catch(() => {});
     this.log(isSpeaker ? '🔊 SPEAKER ON: Loudspeaker active' : '🔈 EARPIECE: Internal receiver active');
     this.notify();
     return this.currentSession.isSpeakerOn;
@@ -558,6 +561,7 @@ class WebRTCManager {
 
   private cleanup() {
     this.cleanupTimers();
+    AudioRouteService.resetAudioRoute().catch(() => {});
     this.iceStatus = 'disconnected';
     this.pendingOffer = null;
     this.iceCandidateQueue = [];

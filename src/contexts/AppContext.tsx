@@ -15,6 +15,7 @@ import {
 import { encryptE2EEMessage } from '../utils/encryption';
 import { RealtimeBridge } from '../services/realtimeBridge';
 import { WebRTCService } from '../services/webrtcService';
+import * as Location from 'expo-location';
 
 interface AppContextType {
   isLoggedIn: boolean;
@@ -96,7 +97,45 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
   });
 
   const [isLoggedIn, setIsLoggedIn] = useState<boolean>(() => !!currentUser);
-  const [currentLocation, setCurrentLocation] = useState<string>('Roorkee');
+  const [currentLocation, setCurrentLocation] = useState<string>('Current Location');
+
+  const refreshLocation = async () => {
+    try {
+      const { status } = await Location.requestForegroundPermissionsAsync();
+      if (status !== 'granted') {
+        console.log('[LOCATION] Permission not granted');
+        return;
+      }
+
+      const loc = await Location.getCurrentPositionAsync({
+        accuracy: Location.Accuracy.Balanced,
+      });
+
+      if (loc && loc.coords) {
+        const { latitude, longitude } = loc.coords;
+        const [geo] = await Location.reverseGeocodeAsync({ latitude, longitude });
+        const city = geo?.city || geo?.subregion || geo?.region || 'Current Location';
+        setCurrentLocation(city);
+
+        if (currentUser) {
+          updateCurrentUser({
+            location: {
+              city,
+              coordinates: [latitude, longitude],
+              distance: 0,
+            }
+          });
+        }
+      }
+    } catch (e) {
+      console.warn('[LOCATION_ERROR]', e);
+    }
+  };
+
+  // Automatically request GPS location on app launch
+  useEffect(() => {
+    refreshLocation();
+  }, []);
 
   const [profiles, setProfiles] = useState<UserProfile[]>([]);
   const [matches, setMatches] = useState<UserProfile[]>([]);
@@ -437,7 +476,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
         toggleTheme,
         currentUser,
         currentLocation,
-        refreshLocation: async () => {},
+        refreshLocation,
         profiles,
         matches,
         incomingRequests,

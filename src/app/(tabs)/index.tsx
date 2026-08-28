@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { View, Text, StyleSheet, TouchableOpacity, Dimensions } from 'react-native';
+import { View, Text, StyleSheet, TouchableOpacity, Dimensions, Alert } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Ionicons, MaterialCommunityIcons, FontAwesome } from '@expo/vector-icons';
 import { useApp } from '../../contexts/AppContext';
@@ -12,13 +12,23 @@ import { useRouter } from 'expo-router';
 const { width: SCREEN_WIDTH } = Dimensions.get('window');
 
 export default function DiscoverScreen() {
-  const { profiles, currentUser, swipeProfile, isLoggedIn, isDarkMode, refreshDiscoverFeed } = useApp();
+  const { profiles, matches, sentRequests, incomingRequests, currentUser, swipeProfile, isLoggedIn, isDarkMode, refreshDiscoverFeed } = useApp();
   const router = useRouter();
   const [authModalVisible, setAuthModalVisible] = useState(false);
   const [requestSentProfile, setRequestSentProfile] = useState<any>(null);
 
-  // Strictly filter out own profile so user never sees themselves
-  const availableProfiles = profiles.filter(p => p && p.id !== currentUser?.id && p.name !== currentUser?.name);
+  // Strictly filter out:
+  // 1. Own profile
+  // 2. Already matched users (Accepted requests)
+  // 3. Users you have already liked / sent requests to
+  // 4. Users who have sent incoming requests to you
+  const availableProfiles = profiles.filter(p => {
+    if (!p || p.id === currentUser?.id || p.name === currentUser?.name) return false;
+    if (matches.some(m => m && (m.id === p.id || m.name === p.name))) return false;
+    if (sentRequests.some(r => r && (r.toUserId === p.id || r.toUserName === p.name || r.fromUser?.id === p.id))) return false;
+    if (incomingRequests.some(r => r && (r.fromUser?.id === p.id || r.fromUser?.name === p.name))) return false;
+    return true;
+  });
   const currentProfile = availableProfiles[0];
   const nextProfile = availableProfiles[1];
 
@@ -36,6 +46,18 @@ export default function DiscoverScreen() {
         setRequestSentProfile(null);
       }, 2000);
     }
+  };
+
+  const handleBoostProfile = () => {
+    if (!isLoggedIn) {
+      setAuthModalVisible(true);
+      return;
+    }
+    Alert.alert(
+      '⚡ Profile Boost Activated!',
+      'Your profile is now boosted to #1 in your city for the next 30 minutes! You will appear first to all nearby singles.',
+      [{ text: 'Awesome 🚀' }]
+    );
   };
 
   const bgTheme = isDarkMode ? '#000000' : '#F3F4F6';
@@ -125,7 +147,7 @@ export default function DiscoverScreen() {
                   { backgroundColor: isDarkMode ? '#22232B' : '#FFFFFF', borderColor: isDarkMode ? 'rgba(255,255,255,0.08)' : 'rgba(0,0,0,0.08)' }
                 ]}
                 activeOpacity={0.7}
-                onPress={() => handleSwipe('supersynk')}
+                onPress={handleBoostProfile}
               >
                 <Ionicons name="flash" size={18} color="#A855F7" />
               </TouchableOpacity>

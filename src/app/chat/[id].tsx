@@ -39,6 +39,52 @@ export default function ChatScreen() {
   const [activeCall, setActiveCall] = useState<CallSession | null>(null);
   const [isPartnerTyping, setIsPartnerTyping] = useState(false);
   const [cloudMessages, setCloudMessages] = useState<ChatMessage[]>([]);
+  const [isRecording, setIsRecording] = useState(false);
+  const [recordingSeconds, setRecordingSeconds] = useState(0);
+  const [playingMessageId, setPlayingMessageId] = useState<string | null>(null);
+
+  useEffect(() => {
+    let timer: any;
+    if (isRecording) {
+      timer = setInterval(() => {
+        setRecordingSeconds(prev => prev + 1);
+      }, 1000);
+    } else {
+      setRecordingSeconds(0);
+    }
+    return () => clearInterval(timer);
+  }, [isRecording]);
+
+  const startRecording = () => {
+    setIsRecording(true);
+    setRecordingSeconds(0);
+  };
+
+  const cancelRecording = () => {
+    setIsRecording(false);
+    setRecordingSeconds(0);
+  };
+
+  const sendVoiceNote = () => {
+    const duration = Math.max(1, recordingSeconds);
+    const mins = Math.floor(duration / 60);
+    const secs = duration % 60;
+    const durStr = `${mins}:${secs.toString().padStart(2, '0')}`;
+    handleSend(`🎙️ Voice Note (${durStr})`);
+    setIsRecording(false);
+    setRecordingSeconds(0);
+  };
+
+  const togglePlayVoiceNote = (messageId: string) => {
+    if (playingMessageId === messageId) {
+      setPlayingMessageId(null);
+    } else {
+      setPlayingMessageId(messageId);
+      setTimeout(() => {
+        setPlayingMessageId(null);
+      }, 3500);
+    }
+  };
 
   // Fallback to match or profile or first mock user
   const targetUser =
@@ -336,7 +382,7 @@ export default function ChatScreen() {
                   You and {targetUser.name} Synked!
                 </Text>
                 <Text style={[styles.heroSubtitle, { color: subText }]}>
-                  {targetUser.occupation} • {targetUser.location || 'Nearby'}
+                  {targetUser.occupation} • {typeof targetUser.location === 'object' ? (targetUser.location?.city || 'Nearby') : (targetUser.location || 'Nearby')}
                 </Text>
 
                 <View style={[styles.matchBadge, { backgroundColor: isDarkMode ? '#13141F' : '#FFFFFF', borderColor: borderCol }]}>
@@ -403,6 +449,76 @@ export default function ChatScreen() {
               );
             }
 
+            // Voice Note Bubble (WhatsApp Style Waveform)
+            if (item.text.startsWith('🎙️') || item.text.includes('Voice Note')) {
+              const isPlaying = playingMessageId === item.id;
+              return (
+                <View
+                  style={[
+                    styles.bubble,
+                    isMine
+                      ? styles.myBubble
+                      : [styles.theirBubble, { backgroundColor: isDarkMode ? '#141522' : '#FFFFFF', borderColor: borderCol }],
+                    { minWidth: 200, paddingVertical: 10 }
+                  ]}
+                >
+                  <View style={{ flexDirection: 'row', alignItems: 'center', gap: 10 }}>
+                    <TouchableOpacity
+                      onPress={() => togglePlayVoiceNote(item.id)}
+                      style={{
+                        width: 38,
+                        height: 38,
+                        borderRadius: 19,
+                        backgroundColor: isMine ? '#FFFFFF' : '#FD3A73',
+                        alignItems: 'center',
+                        justifyContent: 'center',
+                      }}
+                      activeOpacity={0.8}
+                    >
+                      <Ionicons
+                        name={isPlaying ? 'pause' : 'play'}
+                        size={20}
+                        color={isMine ? '#FD3A73' : '#FFFFFF'}
+                        style={{ marginLeft: isPlaying ? 0 : 2 }}
+                      />
+                    </TouchableOpacity>
+
+                    {/* Animated Sound Waves */}
+                    <View style={{ flex: 1, gap: 3 }}>
+                      <View style={{ flexDirection: 'row', alignItems: 'center', gap: 2 }}>
+                        {[8, 16, 24, 12, 20, 14, 28, 18, 10, 22, 15, 8].map((h, i) => (
+                          <View
+                            key={i}
+                            style={{
+                              width: 3,
+                              height: isPlaying ? Math.min(28, h + (i % 2 === 0 ? 6 : -4)) : h,
+                              borderRadius: 2,
+                              backgroundColor: isMine ? (isPlaying ? '#FFFFFF' : 'rgba(255, 255, 255, 0.6)') : (isPlaying ? '#FD3A73' : subText),
+                            }}
+                          />
+                        ))}
+                      </View>
+                      <Text style={{ fontSize: 11, fontWeight: '700', color: isMine ? 'rgba(255, 255, 255, 0.85)' : subText }}>
+                        {item.text.replace('🎙️ ', '')}
+                      </Text>
+                    </View>
+                  </View>
+
+                  <View style={styles.bubbleFooter}>
+                    <Text style={[styles.timestamp, { color: isMine ? 'rgba(255, 255, 255, 0.75)' : subText }]}>
+                      {item.timestamp}
+                    </Text>
+                    <Ionicons
+                      name="checkmark-done"
+                      size={12}
+                      color={isMine ? '#FFFFFF' : '#22C55E'}
+                      style={{ marginLeft: 2 }}
+                    />
+                  </View>
+                </View>
+              );
+            }
+
             return (
               <View
                 style={[
@@ -464,53 +580,90 @@ export default function ChatScreen() {
           </ScrollView>
         </View>
 
-        {/* 6. BOTTOM INPUT BAR */}
-        <View style={[styles.inputBar, { backgroundColor: inputBg, borderTopColor: borderCol }]}>
-          {/* Plan Date Quick Icon */}
-          <TouchableOpacity
-            style={styles.actionIconBtn}
-            onPress={() => router.push(`/plan-date/${id}`)}
-            activeOpacity={0.7}
-          >
-            <Ionicons name="calendar-outline" size={22} color="#FD3A73" />
-          </TouchableOpacity>
+        {/* 6. BOTTOM INPUT BAR (WHATSAPP STYLE RECORDING) */}
+        {isRecording ? (
+          <View style={[styles.inputBar, { backgroundColor: isDarkMode ? '#1E1218' : '#FFF1F2', borderTopColor: '#FECDD3', paddingHorizontal: 16 }]}>
+            {/* Pulsing Recording Indicator */}
+            <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8, flex: 1 }}>
+              <View style={{ width: 10, height: 10, borderRadius: 5, backgroundColor: '#EF4444' }} />
+              <Text style={{ color: '#EF4444', fontWeight: '800', fontSize: 14 }}>
+                Recording... {Math.floor(recordingSeconds / 60)}:{(recordingSeconds % 60).toString().padStart(2, '0')}
+              </Text>
+            </View>
 
-          {/* Voice Note Icon */}
-          <TouchableOpacity
-            style={styles.actionIconBtn}
-            onPress={handleVoiceNote}
-            activeOpacity={0.7}
-          >
-            <Ionicons name="mic-outline" size={22} color="#FD3A73" />
-          </TouchableOpacity>
+            {/* Cancel Button */}
+            <TouchableOpacity
+              onPress={cancelRecording}
+              style={{ paddingHorizontal: 12, paddingVertical: 8, marginRight: 8 }}
+              activeOpacity={0.7}
+            >
+              <Text style={{ color: subText, fontSize: 13, fontWeight: '700' }}>Cancel</Text>
+            </TouchableOpacity>
 
-          {/* Text Input */}
-          <TextInput
-            style={[
-              styles.input,
-              {
-                backgroundColor: inputFieldBg,
-                borderColor: borderCol,
-                color: textColor,
-              },
-            ]}
-            value={inputText}
-            onChangeText={setInputText}
-            placeholder="Type a message..."
-            placeholderTextColor={subText}
-            multiline
-          />
+            {/* Send Voice Note Button */}
+            <TouchableOpacity
+              onPress={sendVoiceNote}
+              style={{
+                width: 44,
+                height: 44,
+                borderRadius: 22,
+                backgroundColor: '#FD3A73',
+                alignItems: 'center',
+                justifyContent: 'center',
+              }}
+              activeOpacity={0.8}
+            >
+              <Ionicons name="send" size={18} color="#FFFFFF" />
+            </TouchableOpacity>
+          </View>
+        ) : (
+          <View style={[styles.inputBar, { backgroundColor: inputBg, borderTopColor: borderCol }]}>
+            {/* Plan Date Quick Icon */}
+            <TouchableOpacity
+              style={styles.actionIconBtn}
+              onPress={() => router.push(`/plan-date/${id}`)}
+              activeOpacity={0.7}
+            >
+              <Ionicons name="calendar-outline" size={22} color="#FD3A73" />
+            </TouchableOpacity>
 
-          {/* Send Button */}
-          <TouchableOpacity
-            style={[styles.sendBtn, !inputText.trim() && styles.sendBtnDisabled]}
-            onPress={() => handleSend()}
-            disabled={!inputText.trim()}
-            activeOpacity={0.8}
-          >
-            <Ionicons name="send" size={16} color="#FFFFFF" />
-          </TouchableOpacity>
-        </View>
+            {/* Text Input */}
+            <TextInput
+              style={[
+                styles.input,
+                {
+                  backgroundColor: inputFieldBg,
+                  borderColor: borderCol,
+                  color: textColor,
+                },
+              ]}
+              value={inputText}
+              onChangeText={setInputText}
+              placeholder="Type a message..."
+              placeholderTextColor={subText}
+              multiline
+            />
+
+            {/* Mic or Send Button depending on inputText */}
+            {inputText.trim() ? (
+              <TouchableOpacity
+                style={styles.sendBtn}
+                onPress={() => handleSend()}
+                activeOpacity={0.8}
+              >
+                <Ionicons name="send" size={16} color="#FFFFFF" />
+              </TouchableOpacity>
+            ) : (
+              <TouchableOpacity
+                style={[styles.sendBtn, { backgroundColor: '#FD3A73' }]}
+                onPress={startRecording}
+                activeOpacity={0.8}
+              >
+                <Ionicons name="mic" size={20} color="#FFFFFF" />
+              </TouchableOpacity>
+            )}
+          </View>
+        )}
       </KeyboardAvoidingView>
 
       {/* 7. FULLSCREEN WEBRTC CALL MODAL (AUDIO & VIDEO) */}

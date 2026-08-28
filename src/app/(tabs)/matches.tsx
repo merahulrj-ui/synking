@@ -88,11 +88,25 @@ export default function MatchesScreen() {
                   {incomingRequests.map((req, idx) => (
                     <View
                       key={`${req.id}_${idx}`}
-                      style={[styles.requestCard, { backgroundColor: cardBg, borderColor: borderCol }]}
+                      style={[
+                        styles.requestCard,
+                        {
+                          backgroundColor: cardBg,
+                          borderColor: req.type === 'supersynk' ? '#00E5FF' : borderCol,
+                          borderWidth: req.type === 'supersynk' ? 1.5 : 1,
+                        }
+                      ]}
                     >
                       <Image source={{ uri: req.fromUser.photo }} style={styles.requestPhoto} />
 
                       <View style={styles.requestBody}>
+                        {req.type === 'supersynk' && (
+                          <View style={{ flexDirection: 'row', alignItems: 'center', gap: 4, backgroundColor: 'rgba(0, 229, 255, 0.15)', borderColor: '#00E5FF', borderWidth: 1, paddingHorizontal: 8, paddingVertical: 2, borderRadius: 8, alignSelf: 'flex-start', marginBottom: 4 }}>
+                            <Ionicons name="star" size={11} color="#00E5FF" />
+                            <Text style={{ color: '#00E5FF', fontSize: 10, fontWeight: '900', letterSpacing: 0.5 }}>SUPER SYNK ⭐</Text>
+                          </View>
+                        )}
+
                         <View style={styles.requestTopRow}>
                           <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
                             <Text style={[styles.requestName, { color: textColor }]}>
@@ -110,7 +124,7 @@ export default function MatchesScreen() {
                         </View>
 
                         <Text style={[styles.requestOccupation, { color: subText }]}>
-                          💼 {req.fromUser.occupation} • 📍 {req.fromUser.location || 'Nearby'}
+                          💼 {req.fromUser.occupation} • 📍 {typeof req.fromUser.location === 'object' ? (req.fromUser.location?.city || 'Nearby') : (req.fromUser.location || 'Nearby')}
                         </Text>
 
                         <Text style={[styles.requestBio, { color: textColor }]} numberOfLines={2}>
