@@ -617,7 +617,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       [receiverId]: [...(prev[receiverId] || []), newMsg]
     }));
 
-    RealtimeBridge.broadcast('NEW_MESSAGE', newMsg);
+    RealtimeBridge.broadcast('NEW_MESSAGE', newMsg, receiverId);
 
     const encryptedPayload = await encryptE2EEMessage(text, senderId, receiverId);
 

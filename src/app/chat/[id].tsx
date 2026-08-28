@@ -26,6 +26,47 @@ import { ChatDebugger } from '../../components/ChatDebugger';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { decryptE2EEMessage } from '../../utils/encryption';
 
+function formatWhatsAppTime(timestamp?: string): string {
+  if (!timestamp) return '';
+  if (timestamp === 'Just now') return 'Just now';
+  try {
+    const d = new Date(timestamp);
+    if (isNaN(d.getTime())) return timestamp;
+
+    const now = new Date();
+    const isToday =
+      d.getDate() === now.getDate() &&
+      d.getMonth() === now.getMonth() &&
+      d.getFullYear() === now.getFullYear();
+
+    const hours = d.getHours();
+    const mins = d.getMinutes().toString().padStart(2, '0');
+    const ampm = hours >= 12 ? 'PM' : 'AM';
+    const formattedHour = hours % 12 || 12;
+    const timeStr = `${formattedHour}:${mins} ${ampm}`;
+
+    if (isToday) {
+      return timeStr;
+    }
+
+    const yesterday = new Date(now);
+    yesterday.setDate(yesterday.getDate() - 1);
+    const isYesterday =
+      d.getDate() === yesterday.getDate() &&
+      d.getMonth() === yesterday.getMonth() &&
+      d.getFullYear() === yesterday.getFullYear();
+
+    if (isYesterday) {
+      return `Yesterday, ${timeStr}`;
+    }
+
+    const dateStr = d.toLocaleDateString(undefined, { month: 'short', day: 'numeric' });
+    return `${dateStr}, ${timeStr}`;
+  } catch (e) {
+    return timestamp;
+  }
+}
+
 const ICEBREAKERS = [
   { text: 'Specialty Coffee or Boba Tea? ☕', tag: 'Cafe Vibe' },
   { text: 'Two truths and one lie — you first! 🎲', tag: 'Fun Game' },
@@ -629,7 +670,7 @@ export default function ChatScreen() {
                   </View>
                   <View style={{ flex: 1 }}>
                     <Text style={[styles.callLogTitle, { color: textColor }]}>{item.text}</Text>
-                    <Text style={[styles.callLogSub, { color: subText }]}>{item.timestamp} · P2P WebRTC</Text>
+                    <Text style={[styles.callLogSub, { color: subText }]}>{formatWhatsAppTime(item.timestamp)} · P2P WebRTC</Text>
                   </View>
                   <TouchableOpacity
                     style={styles.callBackBtn}
@@ -699,7 +740,7 @@ export default function ChatScreen() {
 
                   <View style={styles.bubbleFooter}>
                     <Text style={[styles.timestamp, { color: isMine ? 'rgba(255, 255, 255, 0.75)' : subText }]}>
-                      {item.timestamp}
+                      {formatWhatsAppTime(item.timestamp)}
                     </Text>
                     <Ionicons
                       name="checkmark-done"
@@ -726,7 +767,7 @@ export default function ChatScreen() {
                 </Text>
                 <View style={styles.bubbleFooter}>
                   <Text style={[styles.timestamp, { color: isMine ? 'rgba(255, 255, 255, 0.75)' : subText }]}>
-                    {item.timestamp}
+                    {formatWhatsAppTime(item.timestamp)}
                   </Text>
                   <Ionicons
                     name="checkmark-done"
