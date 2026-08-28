@@ -719,24 +719,72 @@ const broadcastToWebSockets = broadcastWs;
     return;
   }
 
-  // 3. GET /api/requests
+  // 3. GET /api/requests (Direct Live Turso Cloud SQLite Sync)
   if (req.method === 'GET' && pathname === '/api/requests') {
     const userId = url.searchParams.get('userId');
     const type = url.searchParams.get('type');
     const status = url.searchParams.get('status');
 
-    let list = Object.values(db.requests || {});
-    if (userId) {
-      if (type === 'incoming') {
-        list = list.filter(r => r.toUserId === userId && (!status || r.status === status));
-      } else if (type === 'sent') {
-        list = list.filter(r => r.fromUser?.id === userId && (!status || r.status === status));
-      } else {
-        list = list.filter(r => r.toUserId === userId || r.fromUser?.id === userId);
+    queryTurso('SELECT * FROM synk_requests ORDER BY created_at DESC').then(resTurso => {
+      let list = Object.values(db.requests || {});
+      const rows = resTurso?.results?.[0]?.response?.result?.rows;
+      const cols = resTurso?.results?.[0]?.response?.result?.cols;
+      if (Array.isArray(rows) && rows.length > 0 && Array.isArray(cols)) {
+        const cloudRequests = rows.map(r => {
+          const item = {};
+          cols.forEach((col, idx) => {
+            const colName = (col && typeof col === 'object' && col.name) ? col.name : String(col);
+            const rawVal = r[idx]?.value !== undefined ? r[idx].value : r[idx];
+            item[colName] = extractPlain(rawVal);
+          });
+          let fromUserObj = {};
+          try {
+            fromUserObj = JSON.parse(item.from_user_json);
+          } catch (e) {
+            fromUserObj = { id: item.from_user_id, name: 'Member' };
+          }
+          return {
+            id: item.id,
+            fromUser: fromUserObj,
+            toUserId: item.to_user_id,
+            type: item.type || 'like',
+            status: item.status || 'pending',
+            timestamp: item.timestamp || item.created_at || new Date().toISOString()
+          };
+        });
+
+        const map = new Map();
+        list.forEach(r => r && r.id && map.set(r.id, r));
+        cloudRequests.forEach(r => r && r.id && map.set(r.id, r));
+        list = Array.from(map.values());
       }
-    }
-    res.writeHead(200, { 'Content-Type': 'application/json' });
-    res.end(JSON.stringify(list));
+
+      if (userId) {
+        if (type === 'incoming') {
+          list = list.filter(r => r.toUserId === userId && (!status || r.status === status));
+        } else if (type === 'sent') {
+          list = list.filter(r => r.fromUser?.id === userId && (!status || r.status === status));
+        } else {
+          list = list.filter(r => r.toUserId === userId || r.fromUser?.id === userId);
+        }
+      }
+
+      res.writeHead(200, { 'Content-Type': 'application/json' });
+      res.end(JSON.stringify(list));
+    }).catch(() => {
+      let list = Object.values(db.requests || {});
+      if (userId) {
+        if (type === 'incoming') {
+          list = list.filter(r => r.toUserId === userId && (!status || r.status === status));
+        } else if (type === 'sent') {
+          list = list.filter(r => r.fromUser?.id === userId && (!status || r.status === status));
+        } else {
+          list = list.filter(r => r.toUserId === userId || r.fromUser?.id === userId);
+        }
+      }
+      res.writeHead(200, { 'Content-Type': 'application/json' });
+      res.end(JSON.stringify(list));
+    });
     return;
   }
 
@@ -781,14 +829,25 @@ const broadcastToWebSockets = broadcastWs;
     req.on('data', chunk => { body += chunk; });
     req.on('end', () => {
       try {
-        const { requestId, status, acceptedBy } = JSON.parse(body);
-        if (requestId && db.requests[requestId]) {
-          db.requests[requestId].status = status;
-          saveDb();
+        let { requestId, status, acceptedBy } = JSON.parse(body);
+        if (!requestId && pathname.includes('/api/requests/')) {
+          requestId = pathname.replace('/api/requests/', '').trim();
+        }
+        if (requestId && status) {
+          if (db.requests[requestId]) {
+            db.requests[requestId].status = status;
+            saveDb();
+          }
+          // Update in Turso Cloud SQLite
+          queryTurso('UPDATE synk_requests SET status = ? WHERE id = ?', [
+            { type: 'text', value: status },
+            { type: 'text', value: requestId }
+          ]).catch(() => {});
+
           console.log(`[REQUEST_STATUS_UPDATED] ${requestId} ➔ ${status}`);
 
           if (status === 'accepted') {
-            const fromUserId = db.requests[requestId].fromUser?.id;
+            const fromUserId = db.requests[requestId]?.fromUser?.id;
             broadcastToWebSockets({
               type: 'REQUEST_ACCEPTED',
               targetUserId: fromUserId,
@@ -816,15 +875,17 @@ const broadcastToWebSockets = broadcastWs;
     if (pathname === '/api/requests') {
       db.requests = {};
       saveDb();
+      queryTurso('DELETE FROM synk_requests').catch(() => {});
       console.log('[ALL_REQUESTS_CLEARED]');
       res.writeHead(200, { 'Content-Type': 'application/json' });
       res.end(JSON.stringify({ success: true }));
       return;
     }
     const id = pathname.replace('/api/requests/', '');
-    if (id && db.requests[id]) {
+    if (id) {
       delete db.requests[id];
       saveDb();
+      queryTurso('DELETE FROM synk_requests WHERE id = ?', [{ type: 'text', value: id }]).catch(() => {});
       console.log(`[REQUEST_DELETED] ${id}`);
       res.writeHead(200, { 'Content-Type': 'application/json' });
       res.end(JSON.stringify({ success: true }));

@@ -342,13 +342,9 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
 
     // Fetch Incoming Synk Requests sent to this user (filtered by pending)
     const cloudRequests = await fetchIncomingRequestsFromFirestore(currentUser.id);
-    if (Array.isArray(cloudRequests) && cloudRequests.length > 0) {
-      setIncomingRequests(prev => {
-        const map = new Map<string, SynkRequest>();
-        prev.filter(Boolean).forEach(r => map.set(r.id, r));
-        cloudRequests.filter(Boolean).forEach(r => map.set(r.id, r));
-        return Array.from(map.values());
-      });
+    if (Array.isArray(cloudRequests)) {
+      const pendingOnly = cloudRequests.filter(r => r && r.status === 'pending' && r.fromUser);
+      setIncomingRequests(pendingOnly);
     }
 
     // Fetch Sent Requests to see if partner accepted via Cloud Firestore
@@ -358,12 +354,17 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       cloudSent.forEach(sentReq => {
         if (sentReq && sentReq.status === 'accepted') {
           // Find user profile of the person who accepted
-          const partner = realUsers.find(u => u && u.id === sentReq.toUserId);
+          const partner = realUsers.find(u => u && (u.id === sentReq.toUserId || u.name === sentReq.toUserName));
           if (partner && partner.id) {
             setMatches(prev => {
               if (prev.some(m => m && m.id === partner.id)) return prev;
               return [partner, ...prev.filter(Boolean)];
             });
+            // Trigger Match Celebration Popup on Sender Device!
+            if (!seenMatchAlerts.current.has(partner.id)) {
+              seenMatchAlerts.current.add(partner.id);
+              setAcceptedMatchAlert(partner);
+            }
           }
         }
       });

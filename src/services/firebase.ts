@@ -164,7 +164,7 @@ export async function saveSynkRequestToFirestore(req: SynkRequest): Promise<bool
  */
 export async function fetchIncomingRequestsFromFirestore(currentUserId: string): Promise<SynkRequest[]> {
   try {
-    const localRes = await fetch(`${getLocalBackendUrl()}/api/requests?userId=${encodeURIComponent(currentUserId)}&type=incoming`);
+    const localRes = await fetch(`${getLocalBackendUrl()}/api/requests?userId=${encodeURIComponent(currentUserId)}&type=incoming&status=pending`);
     if (localRes.ok) {
       const data = await localRes.json();
       if (Array.isArray(data)) {

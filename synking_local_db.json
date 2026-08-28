@@ -9,8 +9,8 @@
       "location": {
         "city": "Roorkee",
         "coordinates": [
-          29.8600454,
-          77.87113715000001
+          29.860050880657518,
+          77.8711373
         ],
         "distance": 0
       },
@@ -29,7 +29,7 @@
       "compatibility": 100,
       "isVerified": true,
       "isVip": false,
-      "updatedAt": "2026-08-28T08:44:49.206Z"
+      "updatedAt": "2026-08-28T09:00:44.996Z"
     },
     "user_mtcp5y1t": {
       "id": "user_mtcp5y1t",
@@ -45,6 +45,22 @@
       "preferences": {},
       "safety_contact": "{}",
       "created_at": "2026-08-28 08:36:07",
+      "safetyContact": {}
+    },
+    "user_mtcpq2d0": {
+      "id": "user_mtcpq2d0",
+      "name": "Rahul",
+      "age": "22",
+      "bio": "Ready to connect and meet at great venues ✨",
+      "photo": "https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=800&auto=format&fit=crop&q=80",
+      "photos": [
+        "https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=800&auto=format&fit=crop&q=80"
+      ],
+      "location": "Roorkee",
+      "gender": "male",
+      "preferences": {},
+      "safety_contact": "{}",
+      "created_at": "2026-08-28 08:51:42",
       "safetyContact": {}
     }
   },
@@ -86,6 +102,83 @@
       "type": "text",
       "timestamp": "2026-08-28T08:45:42.020Z",
       "text": "📹 Video Call · Missed"
+    },
+    {
+      "id": "msg_1787906826938_8zir",
+      "senderId": "user_mtcp4mg6",
+      "receiverId": "user_mtcp5y1t",
+      "cipherText": "E2EE::d858dccd00120033005100050001000a001600730054000f000f001300d60044007d00590046001100510001",
+      "plainText": "📹 Video Call · Missed",
+      "isEncrypted": true,
+      "type": "text",
+      "timestamp": "2026-08-28T08:47:06.980Z",
+      "text": "📹 Video Call · Missed"
+    },
+    {
+      "id": "msg_1787906838477_6b6e",
+      "senderId": "user_mtcp4mg6",
+      "receiverId": "user_mtcp5y1t",
+      "cipherText": "E2EE::d858dccd00120033005100050001000a001600730054000f000f001300d60044007d00590046001100510001",
+      "plainText": "📹 Video Call · Missed",
+      "isEncrypted": true,
+      "type": "text",
+      "timestamp": "2026-08-28T08:47:18.519Z",
+      "text": "📹 Video Call · Missed"
+    },
+    {
+      "id": "msg_1787907597045_lc9j",
+      "senderId": "user_mtcp4mg6",
+      "receiverId": "user_mtcpq2d0",
+      "cipherText": "E2EE::d80edc9800190062005e005d0051005a0013007b0055000f00580011008100110028000d0011004b00550050",
+      "plainText": "📹 Video Call · Missed",
+      "isEncrypted": true,
+      "type": "text",
+      "timestamp": "2026-08-28T08:59:57.117Z",
+      "text": "📹 Video Call · Missed"
+    },
+    {
+      "id": "msg_1787907598891_iphf",
+      "senderId": "user_mtcp4mg6",
+      "receiverId": "user_mtcpq2d0",
+      "cipherText": "E2EE::00600011005c0057005e005800580041004a00180077000c00520057005300540045000b001000180072005b005a00510011003600560052005900172621",
+      "plainText": "Specialty Coffee or Boba Tea? ☕",
+      "isEncrypted": true,
+      "type": "text",
+      "timestamp": "2026-08-28T08:59:58.934Z",
+      "text": "Specialty Coffee or Boba Tea? ☕"
+    },
+    {
+      "id": "msg_1787907602065_poo9",
+      "senderId": "user_mtcp4mg6",
+      "receiverId": "user_mtcpq2d0",
+      "cipherText": "E2EE::00600011005c0057005e005800580041004a00180077000c00520057005300540045000b001000180072005b005a00510011003600560052005900172621",
+      "plainText": "Specialty Coffee or Boba Tea? ☕",
+      "isEncrypted": true,
+      "type": "text",
+      "timestamp": "2026-08-28T09:00:02.109Z",
+      "text": "Specialty Coffee or Boba Tea? ☕"
+    },
+    {
+      "id": "msg_1787907602885_r46w",
+      "senderId": "user_mtcp4mg6",
+      "receiverId": "user_mtcpq2d0",
+      "cipherText": "E2EE::00670016005600140043004b00410041005b004b00140002005a00550016005e000b00010042005400590051001820240011001b005c004600460051005d00170017004700170010d85fdfd3",
+      "plainText": "Two truths and one lie — you first! 🎲",
+      "isEncrypted": true,
+      "type": "text",
+      "timestamp": "2026-08-28T09:00:02.936Z",
+      "text": "Two truths and one lie — you first! 🎲"
+    },
+    {
+      "id": "msg_1787907603448_lxl8",
+      "senderId": "user_mtcp4mg6",
+      "receiverId": "user_mtcpq2d0",
+      "cipherText": "E2EE::00600011005c0057005e005800580041004a00180077000c00520057005300540045000b001000180072005b005a00510011003600560052005900172621",
+      "plainText": "Specialty Coffee or Boba Tea? ☕",
+      "isEncrypted": true,
+      "type": "text",
+      "timestamp": "2026-08-28T09:00:03.502Z",
+      "text": "Specialty Coffee or Boba Tea? ☕"
     }
   ]
 }
