@@ -511,96 +511,151 @@ server.on('upgrade', (req, socket, head) => {
   console.log(`[WS_CONNECTED] Client connected. Total active clients: ${clients.size}`);
   socket.buffer = Buffer.alloc(0);
 
+  // WebSocket fragmented-message state
+  socket.wsFragments = [];
+  socket.wsFragmentOpcode = null;
+
   socket.on('data', (chunk) => {
     socket.buffer = Buffer.concat([socket.buffer, chunk]);
 
     while (true) {
       if (socket.buffer.length < 2) break;
-      
-      let length = socket.buffer[1] & 0x7f;
-      let offset = 2;
-      
-      if (length === 126) {
-        if (socket.buffer.length < 4) break;
-        length = socket.buffer.readUInt16BE(2);
-        offset = 4;
-      } else if (length === 127) {
-        if (socket.buffer.length < 10) break;
-        // Note: readBigUInt64BE requires Node v12+
-        length = Number(socket.buffer.readBigUInt64BE(2));
-        offset = 10;
+
+      let decoded;
+      try {
+        decoded = decodeWebSocketFrame(socket.buffer, socket);
+      } catch (err) {
+        console.error('[WS_FRAME_ERROR]', err.message);
+        socket.destroy();
+        clients.delete(socket);
+        break;
       }
 
-      const isMasked = (socket.buffer[1] & 0x80) === 0x80;
-      const totalFrameSize = offset + (isMasked ? 4 : 0) + length;
-
-      if (socket.buffer.length < totalFrameSize) {
+      if (!decoded) {
         // Incomplete frame, wait for more data from TCP stream
         break;
       }
 
-      const frameBuffer = socket.buffer.slice(0, totalFrameSize);
-      socket.buffer = socket.buffer.slice(totalFrameSize);
+      // Slice out the consumed bytes from socket.buffer
+      socket.buffer = socket.buffer.slice(decoded.consumed);
 
-      try {
-        const decoded = decodeWebSocketFrame(frameBuffer);
-        if (decoded) {
-          const parsed = JSON.parse(decoded);
-
-          // 1. Socket User Registration
-          if (parsed.type === 'REGISTER_SOCKET' && parsed.userId) {
-            socket.userId = parsed.userId;
-            console.log(`[WS_REGISTERED] Socket bound to userId: ${parsed.userId}`);
-            continue; // Use continue since we are in a while loop now
+      // 1. Control frames
+      if (decoded.type === 'control') {
+        if (decoded.control === 'ping') {
+          const payload = decoded.payload || Buffer.alloc(0);
+          let pongFrame;
+          if (payload.length <= 125) {
+            pongFrame = Buffer.alloc(2 + payload.length);
+            pongFrame[0] = 0x8A;
+            pongFrame[1] = payload.length;
+            payload.copy(pongFrame, 2);
           }
+          if (pongFrame) {
+            try {
+              socket.write(pongFrame);
+            } catch (e) {
+              clients.delete(socket);
+            }
+          }
+          continue;
+        }
 
-          // 2. Targeted 1-on-1 Signaling Relay (WebRTC Offer, Answer, ICE, Call Signals)
-          const targetUserId =
-            parsed.targetUserId ||
-            parsed.payload?.receiverId ||
-            parsed.payload?.targetUserId ||
-            parsed.payload?.toUserId;
+        if (decoded.control === 'pong') {
+          continue;
+        }
 
-          if (targetUserId) {
-            let delivered = false;
-            const jsonStr = JSON.stringify(parsed);
-            const frame = encodeWebSocketFrame(jsonStr);
+        if (decoded.control === 'close') {
+          try {
+            socket.end();
+          } catch (e) {}
+          clients.delete(socket);
+          continue;
+        }
+      }
 
-            for (const client of clients) {
-              if (client !== socket && client.writable && client.userId === targetUserId) {
-                try {
-                  client.write(frame);
-                  delivered = true;
-                } catch (e) {
-                  clients.delete(client);
-                }
+      // 2. Fragment isn't complete yet
+      if (decoded.type === 'fragment') {
+        continue;
+      }
+
+      // 3. Complete WebSocket message
+      if (decoded.type === 'message') {
+        let parsed;
+        try {
+          parsed = JSON.parse(decoded.data);
+        } catch (e) {
+          console.error(
+            '[WS_JSON_ERROR]',
+            e.message,
+            'payloadLength=',
+            Buffer.byteLength(decoded.data, 'utf8')
+          );
+          continue;
+        }
+
+        // --------------------------------------------------
+        // 1. Socket registration
+        // --------------------------------------------------
+        if (parsed.type === 'REGISTER_SOCKET' && parsed.userId) {
+          socket.userId = parsed.userId;
+          console.log(`[WS_REGISTERED] Socket bound to userId: ${parsed.userId}`);
+          continue;
+        }
+
+        // --------------------------------------------------
+        // 2. Targeted signaling (WebRTC Offer, Answer, ICE, Call Signals)
+        // --------------------------------------------------
+        const targetUserId =
+          parsed.targetUserId ||
+          parsed.payload?.receiverId ||
+          parsed.payload?.targetUserId ||
+          parsed.payload?.toUserId;
+
+        if (targetUserId) {
+          let delivered = false;
+          const jsonStr = JSON.stringify(parsed);
+          const frame = encodeWebSocketFrame(jsonStr);
+
+          for (const client of clients) {
+            if (client !== socket && client.writable && client.userId === targetUserId) {
+              try {
+                client.write(frame);
+                delivered = true;
+              } catch (e) {
+                clients.delete(client);
               }
             }
-
-            if (delivered) {
-              console.log(`[WS_TARGETED_SIGNAL] ${parsed.type} → Delivered strictly to ${targetUserId}`);
-            } else {
-              console.log(`[WS_TARGETED_SIGNAL] ${parsed.type} → Target ${targetUserId} not bound yet. Broadcasting fallback to all peers.`);
-              broadcastToWebSockets(parsed, socket);
-            }
-            continue;
           }
 
-          // 3. True Broadcast (Only if no target specified)
-          broadcastToWebSockets(parsed, socket);
+          if (delivered) {
+            console.log(`[WS_TARGETED_SIGNAL] ${parsed.type} → Delivered strictly to ${targetUserId}`);
+          } else {
+            console.log(
+              `[WS_TARGETED_SIGNAL] ${parsed.type} → Target ${targetUserId} not bound yet. Broadcasting fallback to all peers.`
+            );
+            broadcastToWebSockets(parsed, socket);
+          }
+          continue;
         }
-      } catch (e) {
-         console.error("Frame processing error:", e);
+
+        // --------------------------------------------------
+        // 3. Normal broadcast (Only if no target specified)
+        // --------------------------------------------------
+        broadcastToWebSockets(parsed, socket);
       }
     }
   });
 
   socket.on('close', () => {
+    socket.wsFragments = [];
+    socket.wsFragmentOpcode = null;
     clients.delete(socket);
     console.log(`[WS_DISCONNECTED] Client (${socket.userId || 'anon'}) disconnected. Active clients: ${clients.size}`);
   });
 
   socket.on('error', () => {
+    socket.wsFragments = [];
+    socket.wsFragmentOpcode = null;
     clients.delete(socket);
   });
 });
@@ -619,33 +674,194 @@ function broadcastToWebSockets(data, senderSocket = null) {
   }
 }
 
-function decodeWebSocketFrame(buffer) {
-  if (buffer.length < 2) return null;
-  const isMasked = (buffer[1] & 0x80) === 0x80;
-  let length = buffer[1] & 0x7f;
+function parseWebSocketFrame(buffer) {
+  if (!Buffer.isBuffer(buffer) || buffer.length < 2) {
+    return null;
+  }
+
+  const firstByte = buffer[0];
+  const secondByte = buffer[1];
+
+  const fin = (firstByte & 0x80) !== 0;
+  const rsv = (firstByte & 0x70) >> 4;
+  const opcode = firstByte & 0x0f;
+
+  const isMasked = (secondByte & 0x80) !== 0;
+  let length = secondByte & 0x7f;
   let offset = 2;
 
+  // RSV bits are not supported because no WebSocket extensions are negotiated
+  if (rsv !== 0) {
+    throw new Error(`Unsupported WebSocket RSV bits: ${rsv}`);
+  }
+
+  // 16-bit payload length
   if (length === 126) {
-    length = buffer.readUInt16BE(2);
-    offset = 4;
-  } else if (length === 127) {
-    return null;
+    if (buffer.length < offset + 2) {
+      return null;
+    }
+    length = buffer.readUInt16BE(offset);
+    offset += 2;
+  }
+  // 64-bit payload length
+  else if (length === 127) {
+    if (buffer.length < offset + 8) {
+      return null;
+    }
+    const bigLength = buffer.readBigUInt64BE(offset);
+    if (bigLength > BigInt(Number.MAX_SAFE_INTEGER)) {
+      throw new Error('WebSocket payload is too large');
+    }
+    length = Number(bigLength);
+    offset += 8;
+  }
+
+  // Control frames must never be fragmented and must be <=125 bytes
+  const isControlFrame = opcode >= 0x08;
+  if (isControlFrame) {
+    if (!fin) {
+      throw new Error('Fragmented WebSocket control frame');
+    }
+    if (length > 125) {
+      throw new Error('WebSocket control frame exceeds 125 bytes');
+    }
   }
 
   let maskingKey = null;
   if (isMasked) {
-    maskingKey = buffer.slice(offset, offset + 4);
+    if (buffer.length < offset + 4) {
+      return null;
+    }
+    maskingKey = buffer.subarray(offset, offset + 4);
     offset += 4;
   }
 
-  const payload = buffer.slice(offset, offset + length);
+  const totalFrameSize = offset + length;
+  if (buffer.length < totalFrameSize) {
+    return null;
+  }
+
+  const payload = Buffer.from(buffer.subarray(offset, totalFrameSize));
   if (isMasked && maskingKey) {
     for (let i = 0; i < payload.length; i++) {
-      payload[i] ^= maskingKey[i % 4];
+      payload[i] ^= maskingKey[i & 3];
     }
   }
 
-  return payload.toString('utf8');
+  return {
+    fin,
+    opcode,
+    payload,
+    consumed: totalFrameSize,
+  };
+}
+
+function decodeWebSocketFrame(buffer, socket) {
+  const frame = parseWebSocketFrame(buffer);
+  if (!frame) {
+    return null;
+  }
+
+  const { fin, opcode, payload } = frame;
+
+  // CLOSE
+  if (opcode === 0x08) {
+    return {
+      type: 'control',
+      control: 'close',
+      consumed: frame.consumed,
+    };
+  }
+
+  // PING
+  if (opcode === 0x09) {
+    return {
+      type: 'control',
+      control: 'ping',
+      payload,
+      consumed: frame.consumed,
+    };
+  }
+
+  // PONG
+  if (opcode === 0x0A) {
+    return {
+      type: 'control',
+      control: 'pong',
+      payload,
+      consumed: frame.consumed,
+    };
+  }
+
+  // TEXT frame
+  if (opcode === 0x01) {
+    if (!fin) {
+      socket.wsFragments = [payload];
+      socket.wsFragmentOpcode = opcode;
+      return {
+        type: 'fragment',
+        complete: false,
+        consumed: frame.consumed,
+      };
+    }
+
+    return {
+      type: 'message',
+      opcode,
+      data: payload.toString('utf8'),
+      consumed: frame.consumed,
+    };
+  }
+
+  // CONTINUATION frame
+  if (opcode === 0x00) {
+    if (!socket.wsFragments || socket.wsFragmentOpcode === null) {
+      throw new Error('Unexpected WebSocket continuation frame');
+    }
+
+    socket.wsFragments.push(payload);
+
+    if (!fin) {
+      return {
+        type: 'fragment',
+        complete: false,
+        consumed: frame.consumed,
+      };
+    }
+
+    const completePayload = Buffer.concat(socket.wsFragments);
+    socket.wsFragments = [];
+    socket.wsFragmentOpcode = null;
+
+    return {
+      type: 'message',
+      opcode: 0x01,
+      data: completePayload.toString('utf8'),
+      consumed: frame.consumed,
+    };
+  }
+
+  // Binary frame
+  if (opcode === 0x02) {
+    if (!fin) {
+      socket.wsFragments = [payload];
+      socket.wsFragmentOpcode = opcode;
+      return {
+        type: 'fragment',
+        complete: false,
+        consumed: frame.consumed,
+      };
+    }
+
+    return {
+      type: 'message',
+      opcode,
+      data: payload.toString('utf8'),
+      consumed: frame.consumed,
+    };
+  }
+
+  throw new Error(`Unsupported WebSocket opcode: 0x${opcode.toString(16)}`);
 }
 
 function encodeWebSocketFrame(text) {
