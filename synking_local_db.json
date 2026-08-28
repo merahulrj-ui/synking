@@ -9,8 +9,8 @@
       "location": {
         "city": "Roorkee",
         "coordinates": [
-          29.860050880657518,
-          77.8711373
+          29.8600454,
+          77.87113715000001
         ],
         "distance": 0
       },
@@ -29,7 +29,7 @@
       "compatibility": 100,
       "isVerified": true,
       "isVip": false,
-      "updatedAt": "2026-08-28T08:43:54.686Z"
+      "updatedAt": "2026-08-28T08:44:49.206Z"
     },
     "user_mtcp5y1t": {
       "id": "user_mtcp5y1t",
@@ -64,5 +64,28 @@
       "timestamp": "2026-08-28T08:41:30.630Z"
     }
   },
-  "chats": []
+  "chats": [
+    {
+      "id": "msg_1787906727646_0hma",
+      "senderId": "user_mtcp4mg6",
+      "receiverId": "user_mtcp5y1t",
+      "cipherText": "E2EE::d858dccd00120033005100050001000a001600730054000f000f001300d60044007d00590046001100510001",
+      "plainText": "📹 Video Call · Missed",
+      "isEncrypted": true,
+      "type": "text",
+      "timestamp": "2026-08-28T08:45:27.751Z",
+      "text": "📹 Video Call · Missed"
+    },
+    {
+      "id": "msg_1787906741941_wvr5",
+      "senderId": "user_mtcp4mg6",
+      "receiverId": "user_mtcp5y1t",
+      "cipherText": "E2EE::d858dccd00120033005100050001000a001600730054000f000f001300d60044007d00590046001100510001",
+      "plainText": "📹 Video Call · Missed",
+      "isEncrypted": true,
+      "type": "text",
+      "timestamp": "2026-08-28T08:45:42.020Z",
+      "text": "📹 Video Call · Missed"
+    }
+  ]
 }
