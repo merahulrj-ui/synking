@@ -9,7 +9,7 @@ import { AuthModal } from '../../components/AuthModal';
 import { useRouter } from 'expo-router';
 
 export default function ProfileScreen() {
-  const { currentUser, isLoggedIn, isDarkMode, toggleTheme, updateCurrentUser, logoutUser, deleteAccount } = useApp();
+  const { currentUser, isLoggedIn, isDarkMode, toggleTheme, updateCurrentUser, loginUser, logoutUser, deleteAccount } = useApp();
   const [authModalVisible, setAuthModalVisible] = useState(false);
   const [editModalVisible, setEditModalVisible] = useState(false);
   const [editName, setEditName] = useState(currentUser?.name || '');

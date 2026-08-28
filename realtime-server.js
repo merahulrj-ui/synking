@@ -401,8 +401,52 @@ const server = http.createServer((req, res) => {
   const url = new URL(req.url, `http://${req.headers.host || 'localhost'}`);
   const pathname = url.pathname;
 
-  // 0. GET / or /admin (Web Admin Dashboard)
-  if (req.method === 'GET' && (pathname === '/' || pathname === '/admin')) {
+  // 0. GET / (Public Health Check - Zero User Data Exposed)
+  if (req.method === 'GET' && pathname === '/') {
+    res.writeHead(200, { 'Content-Type': 'application/json' });
+    res.end(JSON.stringify({
+      service: 'SYNKING Realtime Engine & Cloud Gateway',
+      status: 'online',
+      database: 'Turso 9GB Cloud SQLite (AWS Mumbai)',
+      uptimeSeconds: Math.floor(process.uptime()),
+    }));
+    return;
+  }
+
+  // 0.1 GET /admin (Password Protected Private Admin Console)
+  if (req.method === 'GET' && pathname === '/admin') {
+    const adminKey = url.searchParams.get('key');
+    const validKey = process.env.ADMIN_SECRET_KEY || 'synking_secret_admin_2026';
+
+    if (adminKey !== validKey) {
+      res.writeHead(401, { 'Content-Type': 'text/html; charset=utf-8' });
+      res.end(`<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="utf-8">
+  <title>SYNKING • Access Restricted</title>
+  <style>
+    body { background: #05060A; color: #FFF; font-family: -apple-system, sans-serif; display: flex; align-items: center; justify-content: center; height: 100vh; margin: 0; }
+    .box { background: #12131F; border: 1px solid rgba(255,255,255,0.1); border-radius: 16px; padding: 32px; text-align: center; max-width: 360px; width: 100%; }
+    input { width: 100%; padding: 12px; border-radius: 8px; border: 1px solid rgba(255,255,255,0.2); background: #08090F; color: #FFF; margin: 16px 0; box-sizing: border-box; }
+    button { width: 100%; padding: 12px; border-radius: 8px; border: none; background: #FD3A73; color: #FFF; font-weight: bold; cursor: pointer; }
+  </style>
+</head>
+<body>
+  <div class="box">
+    <div style="font-size: 32px; margin-bottom: 12px;">🔒</div>
+    <h2 style="margin: 0 0 8px;">Private Admin Console</h2>
+    <p style="color: #94A3B8; font-size: 13px; margin: 0;">Enter Secret Master Key to access dashboard.</p>
+    <form method="GET" action="/admin">
+      <input type="password" name="key" placeholder="Enter Admin Secret Key" required />
+      <button type="submit">Unlock Dashboard</button>
+    </form>
+  </div>
+</body>
+</html>`);
+      return;
+    }
+
     res.writeHead(200, { 'Content-Type': 'text/html; charset=utf-8' });
     res.end(renderAdminHtml());
     return;
