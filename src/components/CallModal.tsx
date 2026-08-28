@@ -924,10 +924,10 @@ const styles = StyleSheet.create({
   },
   pipSelfView: {
     position: 'absolute',
-    top: 60,
+    top: 70,
     right: 16,
-    width: 114,
-    height: 160,
+    width: 135,
+    height: 190,
     borderRadius: 16,
     overflow: 'hidden',
     borderWidth: 2,
