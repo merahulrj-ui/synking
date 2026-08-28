@@ -14,6 +14,22 @@ export interface UserProfile {
   compatibility: number;
   isVerified: boolean;
   isVip: boolean;
+
+  // Rich Dating Profile Attributes (Tinder / Bumble style)
+  company?: string;
+  school?: string;
+  height?: string;
+  lookingFor?: string;
+  zodiac?: string;
+  drinking?: string;
+  smoking?: string;
+  workout?: string;
+  dietary?: string;
+  pets?: string;
+  hometown?: string;
+  languages?: string[];
+  prompts?: { question: string; answer: string }[];
+  completionPercentage?: number;
 }
 
 export interface SynkRequest {
