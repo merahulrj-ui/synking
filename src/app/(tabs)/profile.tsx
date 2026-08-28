@@ -143,6 +143,8 @@ export default function ProfileScreen() {
   const router = useRouter();
 
   // Login States
+  const [loginName, setLoginName] = useState('');
+  const [loginGender, setLoginGender] = useState<'female' | 'male'>('female');
   const [loginPhone, setLoginPhone] = useState('');
   const [loginOtp, setLoginOtp] = useState('');
   const [isOtpSent, setIsOtpSent] = useState(false);
@@ -312,32 +314,74 @@ export default function ProfileScreen() {
     else Alert.alert('OTP Sent 📲', msg);
   };
 
-  const handleVerifyLoginOtp = () => {
+  const handleVerifyLoginOtp = (preset?: Partial<UserProfile>) => {
+    if (preset && preset.name) {
+      const pUser: UserProfile = {
+        id: preset.id || 'user_' + Date.now().toString(36),
+        name: preset.name,
+        age: preset.age || 23,
+        gender: preset.gender || 'female',
+        occupation: preset.occupation || 'Member',
+        location: preset.location || 'Roorkee',
+        phoneNumber: preset.phoneNumber || '+91 98765 43210',
+        distance: '0 km',
+        bio: preset.bio || 'Coffee, deep conversations & indie vibes ✨',
+        photo: preset.photo || 'https://images.unsplash.com/photo-1494790108377-be9c29b29330?w=800',
+        photos: preset.photos || [preset.photo || 'https://images.unsplash.com/photo-1494790108377-be9c29b29330?w=800'],
+        interests: preset.interests || ['☕ Specialty Coffee', 'Indie Music'],
+        lookingFor: preset.lookingFor || '💘 Long-term partner',
+        zodiac: preset.zodiac || 'Leo ♌',
+        workout: preset.workout || 'Often (3-4x/wk) 🏃',
+        drinking: preset.drinking || 'Socially 🥂',
+        smoking: preset.smoking || 'Non-smoker 🚭',
+        dietary: preset.dietary || 'Vegetarian 🥦',
+        pets: preset.pets || 'Dog Lover 🐶',
+        height: preset.height || '5 ft 6 in',
+        hometown: preset.hometown || 'Roorkee, UK',
+        compatibility: 100,
+        isVerified: true,
+        isVip: false,
+      };
+      loginUser(pUser);
+      populateEditState(pUser);
+      if (Platform.OS === 'web') {
+        window.alert(`Signed In as ${pUser.name}! 🎉\n\nWelcome to SYNKING!`);
+      } else {
+        Alert.alert(`Signed In as ${pUser.name}! 🎉`, 'Welcome to SYNKING!');
+      }
+      return;
+    }
+
+    const digits = loginPhone.replace(/\D/g, '') || Date.now().toString().slice(-6);
     const cleanPhone = loginPhone ? '+91 ' + loginPhone.replace(/\D/g, '') : '+91 98765 43210';
+    const finalName = loginName.trim() || (loginGender === 'female' ? 'Priya' : 'Rahul');
+    const isFem = loginGender === 'female';
+
+    const defaultPhoto = isFem
+      ? 'https://images.unsplash.com/photo-1494790108377-be9c29b29330?w=800'
+      : 'https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?w=800';
+
     const newUser: UserProfile = {
-      id: 'user_' + Date.now().toString(36),
-      name: editName.trim() || 'Rahul',
-      age: parseInt(editAge, 10) || 24,
-      gender: 'male',
-      occupation: editOccupation.trim() || 'Software Engineer',
-      location: editCity.trim() || 'Roorkee',
+      id: 'user_' + digits,
+      name: finalName,
+      age: 23,
+      gender: loginGender,
+      occupation: isFem ? 'UI Designer' : 'Software Engineer',
+      location: 'Roorkee',
       phoneNumber: cleanPhone,
       distance: '0 km',
-      bio: editBio.trim() || 'Specialty coffee lover & indie music enthusiast ☕ Let’s explore artisan cafes in town!',
-      photo: 'https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?w=800',
-      photos: [
-        'https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?w=800',
-        'https://images.unsplash.com/photo-1500648767791-00dcc994a43e?w=800'
-      ],
-      interests: ['☕ Specialty Coffee', '🎸 Indie Music', '🤖 Tech & AI', '🚗 Road Trips'],
+      bio: 'Coffee lover & tech enthusiast ☕ Looking to meet genuine people in Roorkee!',
+      photo: defaultPhoto,
+      photos: [defaultPhoto],
+      interests: ['☕ Specialty Coffee', '🎸 Indie Music', '🚗 Road Trips', '🤖 Tech & AI'],
       lookingFor: '💘 Long-term partner',
-      zodiac: 'Leo ♌',
+      zodiac: isFem ? 'Virgo ♍' : 'Leo ♌',
       workout: 'Often (3-4x/wk) 🏃',
       drinking: 'Socially 🥂',
       smoking: 'Non-smoker 🚭',
       dietary: 'Vegetarian 🥦',
-      pets: 'Dog Lover 🐶',
-      height: '5 ft 10 in',
+      pets: isFem ? 'Cat Person 🐱' : 'Dog Lover 🐶',
+      height: isFem ? '5 ft 5 in' : '5 ft 10 in',
       hometown: 'Roorkee, UK',
       compatibility: 100,
       isVerified: true,
@@ -346,9 +390,9 @@ export default function ProfileScreen() {
     loginUser(newUser);
     populateEditState(newUser);
     if (Platform.OS === 'web') {
-      window.alert('Signed In! 🎉\n\nWelcome to SYNKING!');
+      window.alert(`Signed In as ${finalName}! 🎉\n\nWelcome to SYNKING!`);
     } else {
-      Alert.alert('Signed In! 🎉', 'Welcome to SYNKING!');
+      Alert.alert(`Signed In as ${finalName}! 🎉`, 'Welcome to SYNKING!');
     }
   };
 
@@ -424,6 +468,51 @@ export default function ProfileScreen() {
 
             {!isOtpSent ? (
               <View style={{ gap: 12 }}>
+                {/* 1. Name Input */}
+                <Text style={{ color: subText, fontSize: 12, fontWeight: '700', textTransform: 'uppercase' }}>Your Name</Text>
+                <TextInput
+                  style={{ backgroundColor: innerBg, borderRadius: 14, borderWidth: 1, borderColor, color: textColor, fontSize: 15, fontWeight: '700', height: 46, paddingHorizontal: 14 }}
+                  placeholder="e.g. Priya / Rahul / Tanya / Sumit"
+                  placeholderTextColor={subText}
+                  value={loginName}
+                  onChangeText={setLoginName}
+                />
+
+                {/* 2. Gender Selection */}
+                <Text style={{ color: subText, fontSize: 12, fontWeight: '700', textTransform: 'uppercase' }}>Gender</Text>
+                <View style={{ flexDirection: 'row', gap: 10 }}>
+                  <TouchableOpacity
+                    style={{
+                      flex: 1,
+                      paddingVertical: 10,
+                      borderRadius: 12,
+                      alignItems: 'center',
+                      borderWidth: 1,
+                      backgroundColor: loginGender === 'female' ? '#FD3A73' : innerBg,
+                      borderColor: loginGender === 'female' ? '#FD3A73' : borderColor,
+                    }}
+                    onPress={() => setLoginGender('female')}
+                  >
+                    <Text style={{ color: loginGender === 'female' ? '#FFF' : textColor, fontWeight: '800', fontSize: 13 }}>👩 Female</Text>
+                  </TouchableOpacity>
+
+                  <TouchableOpacity
+                    style={{
+                      flex: 1,
+                      paddingVertical: 10,
+                      borderRadius: 12,
+                      alignItems: 'center',
+                      borderWidth: 1,
+                      backgroundColor: loginGender === 'male' ? '#FD3A73' : innerBg,
+                      borderColor: loginGender === 'male' ? '#FD3A73' : borderColor,
+                    }}
+                    onPress={() => setLoginGender('male')}
+                  >
+                    <Text style={{ color: loginGender === 'male' ? '#FFF' : textColor, fontWeight: '800', fontSize: 13 }}>👨 Male</Text>
+                  </TouchableOpacity>
+                </View>
+
+                {/* 3. Phone Number */}
                 <Text style={{ color: subText, fontSize: 12, fontWeight: '700', textTransform: 'uppercase' }}>Phone Number</Text>
                 <View style={{ flexDirection: 'row', alignItems: 'center', backgroundColor: innerBg, borderRadius: 14, borderWidth: 1, borderColor, paddingHorizontal: 12 }}>
                   <Text style={{ color: textColor, fontWeight: '800', fontSize: 15, marginRight: 8 }}>🇮🇳 +91</Text>
@@ -438,23 +527,62 @@ export default function ProfileScreen() {
                   />
                 </View>
 
-                <GradientButton title="Send Verification OTP 📲" onPress={handleSendLoginOtp} style={{ marginTop: 6 }} />
+                <GradientButton title="Send Verification OTP 📲" onPress={handleSendLoginOtp} style={{ marginTop: 4 }} />
 
-                <TouchableOpacity
-                  style={{
-                    backgroundColor: 'rgba(253, 58, 115, 0.12)',
-                    borderColor: '#FD3A73',
-                    borderWidth: 1,
-                    borderRadius: 14,
-                    paddingVertical: 12,
-                    alignItems: 'center',
-                    marginTop: 4,
-                  }}
-                  onPress={handleVerifyLoginOtp}
-                  activeOpacity={0.8}
-                >
-                  <Text style={{ color: '#FD3A73', fontWeight: '800', fontSize: 14 }}>⚡ 1-Tap Instant Sign In (Rahul)</Text>
-                </TouchableOpacity>
+                {/* 2-Device Quick Test Buttons */}
+                <View style={{ gap: 8, marginTop: 6 }}>
+                  <TouchableOpacity
+                    style={{
+                      backgroundColor: 'rgba(236, 72, 153, 0.12)',
+                      borderColor: '#EC4899',
+                      borderWidth: 1,
+                      borderRadius: 14,
+                      paddingVertical: 11,
+                      alignItems: 'center',
+                    }}
+                    onPress={() => handleVerifyLoginOtp({
+                      id: 'user_priya_test',
+                      name: 'Priya',
+                      age: 23,
+                      gender: 'female',
+                      occupation: 'UI/UX Designer',
+                      phoneNumber: '+91 98111 22233',
+                      bio: 'Design enthusiast, matcha lattes & indie music ☕ Let’s explore art cafes!',
+                      photo: 'https://images.unsplash.com/photo-1494790108377-be9c29b29330?w=800',
+                      photos: ['https://images.unsplash.com/photo-1494790108377-be9c29b29330?w=800'],
+                      interests: ['☕ Specialty Coffee', '🎸 Indie Music', '🎨 Art & Museums'],
+                    })}
+                    activeOpacity={0.8}
+                  >
+                    <Text style={{ color: '#EC4899', fontWeight: '800', fontSize: 13 }}>👩 1-Tap Sign In as Priya (Device 1)</Text>
+                  </TouchableOpacity>
+
+                  <TouchableOpacity
+                    style={{
+                      backgroundColor: 'rgba(0, 229, 255, 0.12)',
+                      borderColor: '#00E5FF',
+                      borderWidth: 1,
+                      borderRadius: 14,
+                      paddingVertical: 11,
+                      alignItems: 'center',
+                    }}
+                    onPress={() => handleVerifyLoginOtp({
+                      id: 'user_rahul_test',
+                      name: 'Rahul',
+                      age: 24,
+                      gender: 'male',
+                      occupation: 'Software Engineer',
+                      phoneNumber: '+91 98222 33344',
+                      bio: 'Tech nerd, gym & road trips 🚗 Let’s connect over specialty coffee!',
+                      photo: 'https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?w=800',
+                      photos: ['https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?w=800'],
+                      interests: ['☕ Specialty Coffee', '🤖 Tech & AI', '🚗 Road Trips'],
+                    })}
+                    activeOpacity={0.8}
+                  >
+                    <Text style={{ color: '#00E5FF', fontWeight: '800', fontSize: 13 }}>👨 1-Tap Sign In as Rahul (Device 2)</Text>
+                  </TouchableOpacity>
+                </View>
               </View>
             ) : (
               <View style={{ gap: 12 }}>
@@ -853,10 +981,10 @@ export default function ProfileScreen() {
                     <Text style={styles.vipBannerTagText}>UPGRADE</Text>
                   </View>
                 </View>
-                <Text style={styles.vipBannerSub}>
-                  • See who liked your profile & unlimited SuperSynks\n
-                  • 5x Discovery Boost in Roorkee • Free reserved tables
-                </Text>
+                <View style={{ gap: 3 }}>
+                  <Text style={styles.vipBannerSub}>• See who liked your profile & unlimited SuperSynks</Text>
+                  <Text style={styles.vipBannerSub}>• 5x Discovery Boost in Roorkee & free reserved tables</Text>
+                </View>
               </LinearGradient>
             </TouchableOpacity>
 

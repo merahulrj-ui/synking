@@ -9,7 +9,7 @@ const path = require('path');
 const crypto = require('crypto');
 
 const PORT = process.env.PORT || 8082;
-const DB_FILE = path.join(__dirname, 'synking_local_db.json');
+// Turso 9GB Cloud SQLite is 100% Single Source of Truth (No Local JSON)
 
 // 9 GB Turso Cloud SQLite Configuration (AWS Mumbai - 0ms Latency)
 const FALLBACK_TURSO_TOKEN = 'eyJhbGciOiJFZERTQSIsInR5cCI6IkpXVCJ9.eyJhIjoicnciLCJpYXQiOjE3ODc4OTI0MzYsImlkIjoiMDFhMDQ2YWUtNzgwMS03MzdlLTg3MzAtZWI1NTY5Yjk0NmUxIiwia2lkIjoiMmROU0NaSHpYX2FfcVVsLVhFWmFOSm1tYkRJeUo1VmJsZ3BjSXJnNmc5cyIsInJpZCI6IjRhNWIxNDE3LTkzYWYtNGZiYi1hOTNmLTNiYjU3NGFhOTA3NyJ9.3qHyMOLW_iLlaL0j6c5krGBrR6BrU9nwkzAExC0uH8hYuWXGj1ph79X4YNJuo_Xw3CKaqiUCW0ALaTLGHoeHAw';
@@ -224,28 +224,15 @@ function syncMessageToTurso(msg) {
   queryTurso(sql, args).catch(() => {});
 }
 
-// Initialize Local Database Cache
+// In-Memory Realtime Cache (Backed 100% by Turso Cloud SQLite)
 let db = {
   profiles: {},
   requests: {},
   chats: []
 };
 
-// Load DB from Disk
-try {
-  if (fs.existsSync(DB_FILE)) {
-    const raw = fs.readFileSync(DB_FILE, 'utf8');
-    db = JSON.parse(raw);
-    console.log(`[DATABASE_LOADED] Loaded ${Object.keys(db.profiles || {}).length} profiles, ${Object.keys(db.requests || {}).length} requests.`);
-  }
-} catch (e) {
-  console.warn('[DB_INIT_WARN] Creating fresh in-memory database');
-}
-
 function saveDb() {
-  try {
-    fs.writeFileSync(DB_FILE, JSON.stringify(db, null, 2), 'utf8');
-  } catch (e) {}
+  // Pure in-memory cache synchronized with Turso Cloud SQLite (No local JSON disk file)
 }
 
 const clients = new Set();

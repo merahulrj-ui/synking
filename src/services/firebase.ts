@@ -50,7 +50,7 @@ export interface EncryptedChatMessageRecord {
  * Saves User Profile to Local Backend & Firestore
  */
 export async function saveUserProfileToFirestore(user: UserProfile): Promise<boolean> {
-  // 1. Save to Local Free Backend (Port 8082)
+  // Save to Central Turso Cloud Backend
   try {
     const localRes = await fetch(`${getLocalBackendUrl()}/api/profiles`, {
       method: 'POST',
@@ -58,38 +58,14 @@ export async function saveUserProfileToFirestore(user: UserProfile): Promise<boo
       body: JSON.stringify(user),
     });
     if (localRes.ok) {
-      console.log('[LOCAL_BACKEND_SUCCESS] Profile saved locally for:', user.name);
+      console.log('[TURSO_BACKEND_SUCCESS] Profile saved for:', user.name);
+      return true;
     }
-  } catch (e) {}
+  } catch (e) {
+    console.warn('[BACKEND_SAVE_ERROR]', e);
+  }
 
-  // 2. Backup to Firestore (if quota available)
-  try {
-    const url = `${FIRESTORE_BASE_URL}/profiles/${encodeURIComponent(user.id)}?key=${API_KEY}`;
-    const body = {
-      fields: {
-        id: { stringValue: user.id },
-        name: { stringValue: user.name },
-        age: { integerValue: (user.age || 22).toString() },
-        gender: { stringValue: user.gender || 'other' },
-        occupation: { stringValue: user.occupation || 'Member' },
-        location: { stringValue: user.location || 'Roorkee' },
-        distance: { stringValue: user.distance || '0 km' },
-        bio: { stringValue: user.bio || '' },
-        photo: { stringValue: user.photo || '' },
-        isVerified: { booleanValue: !!user.isVerified },
-        isVip: { booleanValue: !!user.isVip },
-        compatibility: { integerValue: (user.compatibility || 95).toString() },
-        updatedAt: { stringValue: new Date().toISOString() },
-      }
-    };
-    await fetch(url, {
-      method: 'PATCH',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify(body),
-    });
-  } catch (e) {}
-
-  return true;
+  return false;
 }
 
 /**

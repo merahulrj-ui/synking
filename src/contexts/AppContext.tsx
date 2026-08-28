@@ -400,11 +400,10 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     loadNativeUser();
   }, []);
 
-  // Sync user profile to Firestore on startup and changes
+  // Sync user profile state and WebSocket registration
   useEffect(() => {
     if (currentUser) {
       RealtimeBridge.registerUser(currentUser.id);
-      saveUserProfileToFirestore(currentUser);
       if (typeof window !== 'undefined' && window.localStorage) {
         window.localStorage.setItem('synking_my_user', JSON.stringify(currentUser));
       }
@@ -412,7 +411,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       setIsLoggedIn(true);
       syncCloudState();
     }
-  }, [currentUser?.id, currentUser?.name, currentUser?.photo, currentUser?.location]);
+  }, [currentUser?.id]);
 
   // Relaxed Firestore Polling (WebSocket handles 0ms instant updates)
   useEffect(() => {

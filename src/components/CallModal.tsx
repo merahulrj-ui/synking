@@ -4,7 +4,7 @@ import { Ionicons } from '@expo/vector-icons';
 import { LinearGradient } from 'expo-linear-gradient';
 import { CallSession } from '../types';
 import { WebRTCService } from '../services/webrtcService';
-
+import { RingtoneService } from '../services/ringtoneService';
 import { NativeRTCView } from '../services/webrtcCore';
 
 // 1. Live Self Video Component (PiP) - Real Hardware Front Camera
@@ -215,7 +215,23 @@ export const CallModal: React.FC<Props> = ({ session, onEndCall, onAcceptCall })
     return () => unsubscribe();
   }, []);
 
+  // Ringtone Audio Manager
+  useEffect(() => {
+    if (session.status === 'ringing') {
+      RingtoneService.playIncomingRing();
+    } else if (session.status === 'calling') {
+      RingtoneService.playOutgoingRing();
+    } else {
+      RingtoneService.stop();
+    }
+
+    return () => {
+      RingtoneService.stop();
+    };
+  }, [session.status]);
+
   const handleAccept = () => {
+    RingtoneService.stop();
     WebRTCService.log(`📞 ACCEPT TAPPED: User accepted incoming ${session.type} call. Connecting WebRTC P2P stream...`);
     if (onAcceptCall) {
       onAcceptCall();
@@ -225,12 +241,14 @@ export const CallModal: React.FC<Props> = ({ session, onEndCall, onAcceptCall })
   };
 
   const handleDecline = () => {
+    RingtoneService.stop();
     WebRTCService.log('❌ DECLINE TAPPED: User declined incoming call. Sending CALL_REJECTED.');
     WebRTCService.rejectCall();
     onEndCall();
   };
 
   const handleEndCallAction = () => {
+    RingtoneService.stop();
     WebRTCService.log(`🛑 END CALL TAPPED: User ended ${session.type} call. Cleaning up tracks.`);
     onEndCall();
   };

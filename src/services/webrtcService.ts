@@ -5,6 +5,7 @@ import { CallSession, UserProfile } from '../types';
 import { RealtimeBridge } from './realtimeBridge';
 import { MediaDevices, PeerConnection, SessionDescription, IceCandidate } from './webrtcCore';
 import { AudioRouteService } from './audioRouteService';
+import { RingtoneService } from './ringtoneService';
 import { Platform, PermissionsAndroid } from 'react-native';
 
 export const ICE_SERVERS: RTCConfiguration = {
@@ -58,6 +59,7 @@ class WebRTCManager {
       if (type === 'CALL_ACCEPTED' && payload) {
         if (this.currentSession && (this.currentSession.status === 'calling' || this.currentSession.status === 'ringing')) {
           this.currentSession.status = 'connected';
+          RingtoneService.stop();
           this.log('📞 CALL_ACCEPTED received from peer. Initiating WebRTC SDP offer handshake...');
           this.notify();
           this.startTimer();
@@ -189,6 +191,9 @@ class WebRTCManager {
     this.log(`🚀 Starting outgoing ${params.type} call to ${params.targetUser.name}...`);
     this.notify();
 
+    // Play Outgoing Ringtone (Tring... Tring...)
+    RingtoneService.playOutgoingRing();
+
     // Route Audio: Earpiece for voice calls, Loudspeaker for video calls
     AudioRouteService.setSpeakerOn(params.type === 'video').catch(() => {});
 
@@ -231,6 +236,10 @@ class WebRTCManager {
     this.currentSession = incomingSession;
     this.log(`📲 Incoming ${type} call ringing from ${callerUser.name}...`);
     this.notify();
+
+    // Play Melodic Incoming Ringtone
+    RingtoneService.playIncomingRing();
+
     return incomingSession;
   }
 
@@ -238,6 +247,7 @@ class WebRTCManager {
   public async acceptCall() {
     if (!this.currentSession) return;
     this.cleanupTimers();
+    RingtoneService.stop();
 
     this.log('📞 Answering call: Capturing local audio/video media stream...');
     const isVideo = this.currentSession.type === 'video';
@@ -561,6 +571,7 @@ class WebRTCManager {
 
   private cleanup() {
     this.cleanupTimers();
+    RingtoneService.stop();
     AudioRouteService.resetAudioRoute().catch(() => {});
     this.iceStatus = 'disconnected';
     this.pendingOffer = null;
