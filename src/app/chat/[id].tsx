@@ -178,14 +178,42 @@ export default function ChatScreen() {
     Alert.alert('Cloud Synced 🔄', `Fetched ${msgs.length} messages from Cloud Firestore.`);
   };
 
-  const handleSendTestPing = () => {
-    if (!id) return;
-    handleSend(`🧪 Test Ping at ${new Date().toLocaleTimeString()}`);
+  const checkAndBlockPhoneNumber = (text: string): boolean => {
+    // 1. Digits only extraction
+    const digits = text.replace(/\D/g, '');
+    
+    // 2. Check 10+ digits sequence or mobile prefix (6,7,8,9)
+    const has10DigitNumber = digits.length >= 10 && (/([6-9]\d{9})|(91[6-9]\d{9})|(0[6-9]\d{9})/.test(digits) || /\d{10,}/.test(digits));
+    
+    // 3. Spaced / punctuated digits (e.g. 9 8 7 6 5 4 3 2 1 0)
+    const spacedPattern = /\b[6-9](?:[\s\-\._*#]{0,3}\d){9}\b/;
+    
+    // 4. Intent keywords + numbers
+    const intentPattern = /(?:(?:no|number|num|whatsapp|ph|phone|contact)\s*(?:is|:)?\s*[\d\s\-\.]{7,})|(?:call\s*me\s*(?:at|on)\s*[\d\s\-\.]{7,})/i;
+
+    if (has10DigitNumber || spacedPattern.test(text) || intentPattern.test(text)) {
+      const warningTitle = '🛡️ Phone Sharing Blocked for Safety';
+      const warningMsg = 'For your privacy and security, sharing personal phone numbers or direct contact details in chat is restricted.\n\n🔒 Please use SYNKING safe in-app Encrypted Voice & Video calls or Plan a Public Date!';
+      
+      if (Platform.OS === 'web') {
+        window.alert(`${warningTitle}\n\n${warningMsg}`);
+      } else {
+        Alert.alert(warningTitle, warningMsg, [{ text: 'Understood 👍' }]);
+      }
+      return true;
+    }
+    return false;
   };
 
   const handleSend = (textToSend?: string) => {
     const text = textToSend || inputText.trim();
     if (!text || !id) return;
+
+    // Safety Filter: Block Phone Numbers & Direct Contact Leaks
+    if (checkAndBlockPhoneNumber(text)) {
+      return;
+    }
+
     sendMessage(id, text);
     setInputText('');
 
