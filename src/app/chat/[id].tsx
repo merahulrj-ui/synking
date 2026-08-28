@@ -24,6 +24,7 @@ import { fetchChatMessagesFromFirestore } from '../../services/firebase';
 import { RealtimeBridge } from '../../services/realtimeBridge';
 import { ChatDebugger } from '../../components/ChatDebugger';
 import AsyncStorage from '@react-native-async-storage/async-storage';
+import { decryptE2EEMessage } from '../../utils/encryption';
 
 const ICEBREAKERS = [
   { text: 'Specialty Coffee or Boba Tea? ☕', tag: 'Cafe Vibe' },
@@ -134,10 +135,18 @@ export default function ChatScreen() {
           (msg.senderId === myId && msg.receiverId === id);
 
         if (isForThisThread) {
-          setCloudMessages(prev => {
-            if (prev.some(m => m.id === msg.id)) return prev;
-            return [...prev, msg];
-          });
+          const decryptAndAdd = async () => {
+            let readable = msg.text || (msg as any).plainText || '';
+            if (readable && typeof readable === 'string' && readable.startsWith('E2EE::')) {
+              readable = await decryptE2EEMessage(readable, msg.senderId, msg.receiverId);
+            }
+            const clean = { ...msg, text: readable };
+            setCloudMessages(prev => {
+              if (prev.some(m => m.id === clean.id)) return prev;
+              return [...prev, clean];
+            });
+          };
+          decryptAndAdd();
         }
       }
     });

@@ -227,13 +227,30 @@ export async function saveChatMessageToFirestore(msg: EncryptedChatMessageRecord
  * Fetches all real-time chat messages between two users
  */
 export async function fetchChatMessagesFromFirestore(user1Id: string, user2Id: string): Promise<ChatMessage[]> {
-  // 1. Try Local Free Backend First
   try {
     const localRes = await fetch(`${getLocalBackendUrl()}/api/chats?user1=${encodeURIComponent(user1Id)}&user2=${encodeURIComponent(user2Id)}`);
     if (localRes.ok) {
       const data = await localRes.json();
       if (Array.isArray(data) && data.length > 0) {
-        return data;
+        const decryptedList = await Promise.all(
+          data.map(async (m: any) => {
+            const rawText = m.plainText || m.text || m.cipherText || '';
+            if (rawText && typeof rawText === 'string' && rawText.startsWith('E2EE::')) {
+              const decrypted = await decryptE2EEMessage(rawText, m.senderId, m.receiverId);
+              return {
+                ...m,
+                text: decrypted,
+                plainText: decrypted,
+              };
+            }
+            return {
+              ...m,
+              text: rawText,
+              plainText: rawText,
+            };
+          })
+        );
+        return decryptedList;
       }
     }
   } catch (e) {}
