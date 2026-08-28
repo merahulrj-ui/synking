@@ -115,6 +115,15 @@ class WebRTCManager {
             try { cb(payload.frame); } catch (e) {}
           });
         }
+      } else if (type === 'CALL_UPGRADED_TO_VIDEO' && payload) {
+        if (this.currentSession) {
+          this.currentSession.type = 'video';
+          this.currentSession.isVideoEnabled = true;
+          this.currentSession.isSpeakerOn = true;
+          AudioRouteService.setSpeakerOn(true).catch(() => {});
+          this.log('🎥 Peer switched their camera on! Upgraded call to Video.');
+          this.notify();
+        }
       } else if (type === 'CALL_REJECTED' || type === 'CALL_ENDED') {
         if (this.currentSession) {
           this.log('🛑 Peer ended or rejected the call session.');
@@ -529,15 +538,66 @@ class WebRTCManager {
     return this.currentSession.isMuted;
   }
 
-  public toggleVideo(): boolean {
+  public async toggleVideo(): Promise<boolean> {
     if (!this.currentSession) return false;
+
+    // 1. If in Voice call or video track not present: Acquire Camera Stream!
+    const existingVideoTracks = this.localStream?.getVideoTracks?.() || [];
+    
+    if (existingVideoTracks.length === 0) {
+      try {
+        this.log('📹 Upgrading Audio Call to Video: Capturing camera stream...');
+        if (MediaDevices && MediaDevices.getUserMedia) {
+          const videoStream = await MediaDevices.getUserMedia({
+            video: { facingMode: 'user', width: { ideal: 640 }, height: { ideal: 480 } },
+            audio: false,
+          });
+
+          const newVideoTrack = videoStream.getVideoTracks()[0];
+          if (newVideoTrack) {
+            if (!this.localStream) {
+              this.localStream = videoStream;
+            } else {
+              this.localStream.addTrack(newVideoTrack);
+            }
+
+            if (this.peerConnection) {
+              this.peerConnection.addTrack(newVideoTrack, this.localStream);
+              this.createAndSendOffer();
+            }
+
+            this.currentSession.type = 'video';
+            this.currentSession.isVideoEnabled = true;
+            this.currentSession.isSpeakerOn = true;
+            AudioRouteService.setSpeakerOn(true).catch(() => {});
+            
+            // Inform peer that call is upgraded to video
+            const peerId = this.getPeerUserId();
+            RealtimeBridge.broadcast('CALL_UPGRADED_TO_VIDEO', { callId: this.currentSession.id }, peerId);
+
+            this.log('🎥 Video Camera Enabled! Call upgraded to Live Video.');
+            this.notify();
+            return true;
+          }
+        }
+      } catch (err) {
+        this.log(`❌ Failed to acquire camera track: ${err}`);
+        return false;
+      }
+    }
+
+    // 2. If video track already exists, toggle enabled state
     this.currentSession.isVideoEnabled = !this.currentSession.isVideoEnabled;
     const isVideo = this.currentSession.isVideoEnabled;
-    if (this.localStream) {
-      this.localStream.getVideoTracks().forEach((track: any) => {
-        track.enabled = isVideo;
-      });
+    
+    existingVideoTracks.forEach((track: any) => {
+      track.enabled = isVideo;
+    });
+
+    if (isVideo) {
+      this.currentSession.type = 'video';
     }
+
     this.log(isVideo ? '📹 CAMERA ON: Video track enabled' : '📷 CAMERA OFF: Video track disabled');
     this.notify();
     return this.currentSession.isVideoEnabled;

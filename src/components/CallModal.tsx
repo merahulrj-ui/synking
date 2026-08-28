@@ -499,7 +499,7 @@ Remote Video Tracks (${remoteVideo.length}): ${JSON.stringify(remoteVideo)}
           </Animated.View>
 
           {/* 2. LOCAL VIDEO (PiP or Fullscreen) */}
-          {session.type === 'video' && (
+          {(session.type === 'video' || session.isVideoEnabled) && (
             <Animated.View 
               style={isLocalExpanded ? [styles.videoSurfaceContainer, { zIndex: 0 }] : [styles.pipSelfView, { transform: pipPan.getTranslateTransform(), zIndex: 20 }]}
               {...(!isLocalExpanded ? pipPanResponder.panHandlers : {})}
@@ -540,7 +540,7 @@ Remote Video Tracks (${remoteVideo.length}): ${JSON.stringify(remoteVideo)}
           )}
 
           {/* 3. Background Placeholder only while ringing */}
-          {!isConnected && session.type === 'video' && (
+          {!isConnected && (session.type === 'video' || session.isVideoEnabled) && (
             <View style={[StyleSheet.absoluteFill, { alignItems: 'center', justifyContent: 'center', backgroundColor: '#070A14', zIndex: 5 }]} pointerEvents="none">
               <Image
                 source={{ uri: session.callerPhoto }}
@@ -556,7 +556,7 @@ Remote Video Tracks (${remoteVideo.length}): ${JSON.stringify(remoteVideo)}
           )}
 
           {/* 1. TOP STATUS HEADER (FLOATING OVERLAY) */}
-          <View style={[styles.topHeader, session.type === 'video' && styles.topHeaderFloating]}>
+          <View style={[styles.topHeader, (session.type === 'video' || session.isVideoEnabled) && styles.topHeaderFloating]}>
             <View style={styles.e2eeBadge}>
               <Ionicons name="shield-checkmark" size={12} color="#22C55E" />
               <Text style={styles.e2eeText}>P2P WebRTC Direct</Text>
@@ -578,8 +578,8 @@ Remote Video Tracks (${remoteVideo.length}): ${JSON.stringify(remoteVideo)}
             </Text>
           </View>
 
-          {/* 2. CENTER AVATAR (ONLY FOR VOICE CALLS) */}
-          {session.type !== 'video' && (
+          {/* 2. CENTER AVATAR (ONLY FOR VOICE CALLS WITHOUT VIDEO) */}
+          {session.type !== 'video' && !session.isVideoEnabled && (
             <View style={styles.centerSection}>
               <View style={styles.avatarContainer}>
                 {/* Glowing Wave Rings */}
