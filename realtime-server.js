@@ -574,12 +574,49 @@ const server = http.createServer((req, res) => {
     return;
   }
 
-  // 1. GET /api/profiles
+  // 1. GET /api/profiles (Direct Live Turso Cloud SQLite Sync)
   if (req.method === 'GET' && pathname === '/api/profiles') {
     const excludeId = url.searchParams.get('excludeId');
-    const list = Object.values(db.profiles).filter(p => !excludeId || p.id !== excludeId);
-    res.writeHead(200, { 'Content-Type': 'application/json' });
-    res.end(JSON.stringify(list));
+
+    queryTurso('SELECT * FROM users ORDER BY created_at DESC').then(resTurso => {
+      let list = Object.values(db.profiles || {});
+      const rows = resTurso?.results?.[0]?.response?.result?.rows;
+      const cols = resTurso?.results?.[0]?.response?.result?.cols;
+      if (Array.isArray(rows) && rows.length > 0 && Array.isArray(cols)) {
+        list = rows.map(r => {
+          const item = {};
+          cols.forEach((col, idx) => {
+            const colName = (col && typeof col === 'object' && col.name) ? col.name : String(col);
+            const rawVal = r[idx]?.value !== undefined ? r[idx].value : r[idx];
+            item[colName] = extractPlain(rawVal);
+          });
+          return {
+            id: item.id || '',
+            name: item.name || 'Member',
+            age: parseInt(item.age, 10) || 22,
+            gender: item.gender || 'male',
+            occupation: item.occupation || 'Member',
+            location: item.location || 'Roorkee',
+            distance: '0 km',
+            bio: item.bio || 'Active on Synking ✨',
+            photo: item.photo || 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=500',
+            photos: [item.photo || 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=500'],
+            interests: ['Coffee', 'Music', 'Travel'],
+            compatibility: 100,
+            isVerified: true,
+            isVip: false,
+          };
+        });
+      }
+
+      const filtered = list.filter(p => p && p.id && (!excludeId || p.id !== excludeId));
+      res.writeHead(200, { 'Content-Type': 'application/json' });
+      res.end(JSON.stringify(filtered));
+    }).catch(() => {
+      const list = Object.values(db.profiles || {}).filter(p => p && p.id && (!excludeId || p.id !== excludeId));
+      res.writeHead(200, { 'Content-Type': 'application/json' });
+      res.end(JSON.stringify(list));
+    });
     return;
   }
 
@@ -622,6 +659,7 @@ function broadcastWs(data) {
     }
   }
 }
+const broadcastToWebSockets = broadcastWs;
 
   // 2.1 DELETE /api/profiles/:id (Delete from Local DB + Turso Cloud SQLite)
   if (req.method === 'DELETE' && pathname.startsWith('/api/profiles/')) {
