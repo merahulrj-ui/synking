@@ -1,9 +1,17 @@
 import { Platform } from 'react-native';
-import { Audio } from 'expo-av';
 
 // Professional Ringtone Engine for SYNKING
-// Generates Clean WhatsApp-Style Outgoing Dial Tone & Melodic Modern Incoming Ringtone
-// Works 100% reliably on Native Devices (expo-av) and Web Browsers (Web Audio API)
+// Safely checks for Native expo-av or falls back seamlessly to Web Audio API
+
+let ExpoAudio: any = null;
+try {
+  const av = require('expo-av');
+  if (av && av.Audio) {
+    ExpoAudio = av.Audio;
+  }
+} catch (e) {
+  // Graceful fallback if native module is not in older binary
+}
 
 const INCOMING_RINGTONE_URL = 'https://assets.mixkit.co/active_storage/sfx/2869/2869-preview.mp3';
 const OUTGOING_RINGTONE_URL = 'https://assets.mixkit.co/active_storage/sfx/1360/1360-preview.mp3';
@@ -13,12 +21,12 @@ class RingtoneServiceClass {
   private ringInterval: any = null;
   private isPlaying: boolean = false;
   private currentMode: 'incoming' | 'outgoing' | null = null;
-  private soundInstance: Audio.Sound | null = null;
+  private soundInstance: any = null;
 
   private async configureAudioMode() {
     try {
-      if (Platform.OS !== 'web') {
-        await Audio.setAudioModeAsync({
+      if (Platform.OS !== 'web' && ExpoAudio && typeof ExpoAudio.setAudioModeAsync === 'function') {
+        await ExpoAudio.setAudioModeAsync({
           allowsRecordingIOS: false,
           playsInSilentModeIOS: true,
           staysActiveInBackground: true,
@@ -55,10 +63,10 @@ class RingtoneServiceClass {
     this.isPlaying = true;
     this.currentMode = 'outgoing';
 
-    if (Platform.OS !== 'web') {
+    if (Platform.OS !== 'web' && ExpoAudio && ExpoAudio.Sound) {
       try {
         await this.configureAudioMode();
-        const { sound } = await Audio.Sound.createAsync(
+        const { sound } = await ExpoAudio.Sound.createAsync(
           { uri: OUTGOING_RINGTONE_URL },
           { shouldPlay: true, isLooping: true, volume: 0.8 }
         );
@@ -112,10 +120,10 @@ class RingtoneServiceClass {
     this.isPlaying = true;
     this.currentMode = 'incoming';
 
-    if (Platform.OS !== 'web') {
+    if (Platform.OS !== 'web' && ExpoAudio && ExpoAudio.Sound) {
       try {
         await this.configureAudioMode();
-        const { sound } = await Audio.Sound.createAsync(
+        const { sound } = await ExpoAudio.Sound.createAsync(
           { uri: INCOMING_RINGTONE_URL },
           { shouldPlay: true, isLooping: true, volume: 1.0 }
         );
