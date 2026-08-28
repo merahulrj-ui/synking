@@ -157,11 +157,25 @@ export default function ChatScreen() {
     }
   };
 
-  // Fallback to match or profile or first mock user
-  const targetUser =
-    matches.find(m => m.id === id) ||
-    profiles.find(p => p.id === id) ||
-    MOCK_PROFILES[0];
+  // Real target profile resolution (NO fake mock profiles)
+  const targetUser: UserProfile =
+    matches.find(m => m && m.id === id) ||
+    profiles.find(p => p && p.id === id) || {
+      id: id || 'user',
+      name: (profiles.find(p => p && p.id === id)?.name) || 'Member',
+      age: 22,
+      gender: 'other',
+      occupation: 'Member',
+      location: 'Roorkee',
+      distance: '0 km',
+      bio: 'Ready to connect!',
+      photo: 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=800',
+      photos: [],
+      interests: ['Coffee', 'Music'],
+      compatibility: 100,
+      isVerified: true,
+      isVip: false,
+    };
 
   const localMessages = (id && messages[id]) || [];
 
