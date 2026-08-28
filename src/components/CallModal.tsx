@@ -1,5 +1,5 @@
 import React, { useRef, useEffect, useState } from 'react';
-import { View, Text, StyleSheet, Modal, TouchableOpacity, Image, Platform, ScrollView, Share, Animated, PanResponder } from 'react-native';
+import { View, Text, StyleSheet, Modal, TouchableOpacity, Image, Platform, ScrollView, Share, Animated, PanResponder, Vibration } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { LinearGradient } from 'expo-linear-gradient';
 import { CallSession } from '../types';
@@ -228,23 +228,35 @@ export const CallModal: React.FC<Props> = ({ session, onEndCall, onAcceptCall })
     return () => unsubscribe();
   }, []);
 
-  // Ringtone Audio Manager
+  // Ringtone & Repeating Vibration Manager for Incoming Calls
   useEffect(() => {
     if (session.status === 'ringing') {
       RingtoneService.playIncomingRing();
+      // Repeating Vibration Pattern: wait 0ms, vibrate 1000ms, pause 1000ms (repeating loop)
+      if (Platform.OS !== 'web') {
+        Vibration.vibrate([0, 1000, 1000], true);
+      } else if (typeof navigator !== 'undefined' && 'vibrate' in navigator) {
+        try {
+          navigator.vibrate([1000, 1000]);
+        } catch (e) {}
+      }
     } else if (session.status === 'calling') {
       RingtoneService.playOutgoingRing();
+      Vibration.cancel();
     } else {
       RingtoneService.stop();
+      Vibration.cancel();
     }
 
     return () => {
       RingtoneService.stop();
+      Vibration.cancel();
     };
   }, [session.status]);
 
   const handleAccept = () => {
     RingtoneService.stop();
+    Vibration.cancel();
     WebRTCService.log(`📞 ACCEPT TAPPED: User accepted incoming ${session.type} call. Connecting WebRTC P2P stream...`);
     if (onAcceptCall) {
       onAcceptCall();
@@ -255,6 +267,7 @@ export const CallModal: React.FC<Props> = ({ session, onEndCall, onAcceptCall })
 
   const handleDecline = () => {
     RingtoneService.stop();
+    Vibration.cancel();
     WebRTCService.log('❌ DECLINE TAPPED: User declined incoming call. Sending CALL_REJECTED.');
     WebRTCService.rejectCall();
     onEndCall();
@@ -262,6 +275,7 @@ export const CallModal: React.FC<Props> = ({ session, onEndCall, onAcceptCall })
 
   const handleEndCallAction = () => {
     RingtoneService.stop();
+    Vibration.cancel();
     WebRTCService.log(`🛑 END CALL TAPPED: User ended ${session.type} call. Cleaning up tracks.`);
     onEndCall();
   };
@@ -958,6 +972,8 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
     width: '100%',
+    zIndex: 50,
+    elevation: 50,
   },
   actionCircleBtn: {
     width: 72,
@@ -990,6 +1006,8 @@ const styles = StyleSheet.create({
     borderRadius: 28,
     borderWidth: 1,
     borderColor: 'rgba(255, 255, 255, 0.08)',
+    zIndex: 50,
+    elevation: 50,
   },
   controlBtn: {
     alignItems: 'center',
