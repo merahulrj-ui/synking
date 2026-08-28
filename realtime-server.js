@@ -1152,11 +1152,11 @@ const broadcastToWebSockets = broadcastWs;
   if (req.method === 'GET' && pathname === '/api/version') {
     res.writeHead(200, { 'Content-Type': 'application/json' });
     res.end(JSON.stringify({
-      version: '1.0.2',
-      buildNumber: 102,
+      version: '1.0.3',
+      buildNumber: 103,
       releaseDate: new Date().toISOString(),
-      title: 'Zomato-Speed Live Update',
-      notes: 'Strict 1-on-1 private chat bifurcation & universal live audio/video streaming!',
+      title: 'Incoming Call Vibration & Real Login',
+      notes: 'Incoming call repeating vibration, unified name/phone login, PiP video swap & camera controls.',
       forceRefresh: true,
     }));
     return;
