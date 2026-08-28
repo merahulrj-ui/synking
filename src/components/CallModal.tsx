@@ -116,12 +116,12 @@ const LiveRemoteMedia: React.FC<{ type: 'voice' | 'video'; photoUrl?: string; is
 
       mediaRef.current.play().then(() => {
         if (audioBlocked) {
-          WebRTCService.addDebugLog('🔊 AUDIO UNBLOCKED! Sound is playing.');
+          WebRTCService.log('🔊 AUDIO UNBLOCKED! Sound is playing.');
           setAudioBlocked(false);
         }
       }).catch((e: any) => {
         if (!audioBlocked) {
-          WebRTCService.addDebugLog('🔇 BROWSER BLOCKED AUDIO. User interaction needed.');
+          WebRTCService.log('🔇 BROWSER BLOCKED AUDIO. User interaction needed.');
           setAudioBlocked(true);
         }
       });
@@ -177,7 +177,7 @@ interface Props {
   onAcceptCall?: () => void;
   onToggleMute?: () => boolean;
   onToggleVideo?: () => boolean;
-  onToggleSpeaker?: () => boolean;
+  onToggleSpeaker?: () => boolean | Promise<boolean>;
 }
 
 export const CallModal: React.FC<Props> = ({ session, onEndCall, onAcceptCall }) => {
@@ -438,7 +438,7 @@ Remote Video Tracks (${remoteVideo.length}): ${JSON.stringify(remoteVideo)}
             <View style={[styles.videoSurfaceContainer, { backgroundColor: 'transparent', pointerEvents: 'box-none' }]}>
               {/* 1. Background Placeholder only while ringing */}
               {!isConnected && (
-                <View style={[StyleSheet.absoluteFillObject, { alignItems: 'center', justifyContent: 'center', backgroundColor: '#070A14' }]}>
+                <View style={[StyleSheet.absoluteFill, { alignItems: 'center', justifyContent: 'center', backgroundColor: '#070A14' }]}>
                   <Image
                     source={{ uri: session.callerPhoto }}
                     style={{ width: 120, height: 120, borderRadius: 60, borderWidth: 3, borderColor: '#FD3A73', marginBottom: 14 }}
@@ -569,7 +569,7 @@ Remote Video Tracks (${remoteVideo.length}): ${JSON.stringify(remoteVideo)}
           )}
 
           {/* 2. CENTER AVATAR (ONLY FOR VOICE CALLS) */}
-          {session.type === 'voice' && (
+          {session.type !== 'video' && (
             <View style={styles.centerSection}>
               <View style={styles.avatarContainer}>
                 {/* Glowing Wave Rings */}
@@ -838,7 +838,11 @@ const styles = StyleSheet.create({
     zIndex: 20,
   },
   videoSurfaceContainer: {
-    ...StyleSheet.absoluteFillObject,
+    position: 'absolute',
+    top: 0,
+    left: 0,
+    right: 0,
+    bottom: 0,
     backgroundColor: '#000',
     zIndex: 0,
   },

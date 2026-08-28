@@ -163,7 +163,7 @@ export default function ProfileScreen() {
   const [editAge, setEditAge] = useState((currentUser?.age || 22).toString());
   const [editGender, setEditGender] = useState<'male' | 'female' | 'nonbinary' | 'other'>(currentUser?.gender || 'male');
   const [editCity, setEditCity] = useState(
-    typeof currentUser?.location === 'object' ? (currentUser?.location?.city || 'Roorkee') : (currentUser?.location || 'Roorkee')
+    typeof (currentUser?.location as any) === 'object' ? ((currentUser?.location as any)?.city || 'Roorkee') : (currentUser?.location || 'Roorkee')
   );
   const [editHometown, setEditHometown] = useState(currentUser?.hometown || '');
   const [editHeight, setEditHeight] = useState(currentUser?.height || '');
@@ -198,7 +198,7 @@ export default function ProfileScreen() {
     setEditName(user.name || '');
     setEditAge((user.age || 22).toString());
     setEditGender(user.gender || 'male');
-    setEditCity(typeof user.location === 'object' ? (user.location?.city || 'Roorkee') : (user.location || 'Roorkee'));
+    setEditCity(typeof (user.location as any) === 'object' ? ((user.location as any)?.city || 'Roorkee') : (user.location || 'Roorkee'));
     setEditHometown(user.hometown || '');
     setEditHeight(user.height || '');
     setEditOccupation(user.occupation || '');
@@ -359,7 +359,7 @@ export default function ProfileScreen() {
       smoking: 'Non-smoker 🚭',
       dietary: 'Vegetarian 🥦',
       pets: 'Dog Lover 🐶',
-      height: "5'10"",
+      height: '5 ft 10 in',
       hometown: 'Roorkee, UK',
       compatibility: 100,
       isVerified: true,
@@ -625,7 +625,7 @@ export default function ProfileScreen() {
                 💼 {currentUser?.occupation || 'Member'} {currentUser?.company ? `at ${currentUser.company}` : ''}
               </Text>
               <Text style={[styles.locationText, { color: subText }]}>
-                📍 {typeof currentUser?.location === 'object' ? (currentUser?.location?.city || 'Roorkee') : (currentUser?.location || 'Roorkee')}
+                📍 {typeof (currentUser?.location as any) === 'object' ? ((currentUser?.location as any)?.city || 'Roorkee') : (currentUser?.location || 'Roorkee')}
                 {currentUser?.hometown ? ` • 🏡 From ${currentUser.hometown}` : ''}
               </Text>
 
@@ -1036,7 +1036,7 @@ export default function ProfileScreen() {
                         style={[styles.inputBox, { backgroundColor: innerBg, color: textColor, borderColor }]}
                         value={editHeight}
                         onChangeText={setEditHeight}
-                        placeholder="e.g. 5'10\""
+                        placeholder="e.g. 5ft 10in"
                         placeholderTextColor={subText}
                       />
                     </View>

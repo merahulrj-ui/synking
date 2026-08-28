@@ -124,7 +124,7 @@ export default function MatchesScreen() {
                         </View>
 
                         <Text style={[styles.requestOccupation, { color: subText }]}>
-                          💼 {req.fromUser.occupation} • 📍 {typeof req.fromUser.location === 'object' ? (req.fromUser.location?.city || 'Nearby') : (req.fromUser.location || 'Nearby')}
+                          💼 {req.fromUser.occupation} • 📍 {typeof (req.fromUser.location as any) === 'object' ? ((req.fromUser.location as any)?.city || 'Nearby') : (req.fromUser.location || 'Nearby')}
                         </Text>
 
                         <Text style={[styles.requestBio, { color: textColor }]} numberOfLines={2}>

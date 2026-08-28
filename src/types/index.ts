@@ -4,7 +4,7 @@ export interface UserProfile {
   age: number;
   gender: 'male' | 'female' | 'nonbinary' | 'other';
   occupation: string;
-  location: string;
+  location: string | { city: string; coordinates?: number[]; distance?: number };
   phoneNumber?: string;
   distance: string;
   bio: string;
@@ -36,8 +36,19 @@ export interface SynkRequest {
   id: string;
   fromUser: UserProfile;
   toUserId: string;
+  toUserName?: string;
   type: 'like' | 'supersynk';
   status: 'pending' | 'accepted' | 'declined';
+  timestamp: string;
+}
+
+export interface EncryptedChatMessageRecord {
+  id: string;
+  senderId: string;
+  receiverId: string;
+  cipherText: string;
+  isEncrypted: boolean;
+  type: 'text' | 'date_invite' | 'voice' | 'call' | 'system';
   timestamp: string;
 }
 

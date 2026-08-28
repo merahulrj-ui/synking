@@ -169,7 +169,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
             city: detectedCity,
             coordinates: [lat || 29.86, lon || 77.87],
             distance: 0,
-          }
+          } as any
         });
       }
     } catch (e) {
@@ -202,12 +202,23 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
   const [isSuspended, setIsSuspended] = useState(false);
   const [suspendedUntil, setSuspendedUntil] = useState<number | null>(null);
 
-  // Load persistent Global 2-Strike & 3-Day Suspension Status
+  // Load persistent Global 2-Strike & 3-Day Suspension Status + Seen Match Alerts
   useEffect(() => {
-    const loadSuspension = async () => {
+    const loadStoredState = async () => {
       try {
         const storedStrikes = await AsyncStorage.getItem('synking_phone_strikes');
         const storedUntil = await AsyncStorage.getItem('synking_suspended_until');
+        const storedSeenAlerts = await AsyncStorage.getItem('synking_seen_match_alerts');
+
+        if (storedSeenAlerts) {
+          try {
+            const list = JSON.parse(storedSeenAlerts);
+            if (Array.isArray(list)) {
+              list.forEach((id: string) => seenMatchAlerts.current.add(id));
+            }
+          } catch (e) {}
+        }
+
         if (storedStrikes) setStrikeCount(parseInt(storedStrikes, 10) || 0);
         if (storedUntil) {
           const untilTimestamp = parseInt(storedUntil, 10);
@@ -224,7 +235,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
         }
       } catch (e) {}
     };
-    loadSuspension();
+    loadStoredState();
   }, []);
 
   const triggerSafetyViolation = (customMsg?: string): boolean => {
@@ -300,9 +311,13 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
               if (prev.some(m => m && m.id === acceptedUser.id)) return prev;
               return [acceptedUser, ...prev.filter(Boolean)];
             });
-            // ONLY alert ONCE ever per match (no repeated loops)
+            // ONLY alert ONCE ever per match in real time
             if (!seenMatchAlerts.current.has(acceptedUser.id)) {
               seenMatchAlerts.current.add(acceptedUser.id);
+              AsyncStorage.setItem(
+                'synking_seen_match_alerts',
+                JSON.stringify(Array.from(seenMatchAlerts.current))
+              ).catch(() => {});
               setAcceptedMatchAlert(acceptedUser);
             }
           }
@@ -347,7 +362,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       setIncomingRequests(pendingOnly);
     }
 
-    // Fetch Sent Requests to see if partner accepted via Cloud Firestore
+    // Fetch Sent Requests and silently sync matches (NO annoying repeat popups on refresh)
     const cloudSent = await fetchSentRequestsFromFirestore(currentUser.id);
     if (Array.isArray(cloudSent) && cloudSent.length > 0) {
       setSentRequests(cloudSent.filter(Boolean));
@@ -360,11 +375,8 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
               if (prev.some(m => m && m.id === partner.id)) return prev;
               return [partner, ...prev.filter(Boolean)];
             });
-            // Trigger Match Celebration Popup on Sender Device!
-            if (!seenMatchAlerts.current.has(partner.id)) {
-              seenMatchAlerts.current.add(partner.id);
-              setAcceptedMatchAlert(partner);
-            }
+            // Mark partner as seen so it never re-triggers popups
+            seenMatchAlerts.current.add(partner.id);
           }
         }
       });
@@ -655,7 +667,16 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
         messages,
         safetyContact,
         acceptedMatchAlert,
-        clearAcceptedMatchAlert: () => setAcceptedMatchAlert(null),
+        clearAcceptedMatchAlert: () => {
+          if (acceptedMatchAlert) {
+            seenMatchAlerts.current.add(acceptedMatchAlert.id);
+            AsyncStorage.setItem(
+              'synking_seen_match_alerts',
+              JSON.stringify(Array.from(seenMatchAlerts.current))
+            ).catch(() => {});
+          }
+          setAcceptedMatchAlert(null);
+        },
         loginUser,
         logoutUser,
         deleteAccount,

@@ -2,7 +2,7 @@
 // Primary: 100% Free Unlimited Local Network REST & WebSocket Backend (Port 8082)
 // Secondary: Google Cloud Firestore REST API
 
-import { UserProfile, SynkRequest, ChatMessage, EncryptedChatMessageRecord } from '../types';
+import { UserProfile, SynkRequest, ChatMessage } from '../types';
 import { decryptE2EEMessage } from '../utils/encryption';
 
 const PROJECT_ID = "synking-apk";

@@ -18,7 +18,7 @@ import { Ionicons } from '@expo/vector-icons';
 import { useApp } from '../../contexts/AppContext';
 import { WebRTCService } from '../../services/webrtcService';
 import { CallModal } from '../../components/CallModal';
-import { CallSession, ChatMessage } from '../../types';
+import { CallSession, ChatMessage, UserProfile } from '../../types';
 import { fetchChatMessagesFromFirestore } from '../../services/firebase';
 import { RealtimeBridge } from '../../services/realtimeBridge';
 import { ChatDebugger } from '../../components/ChatDebugger';

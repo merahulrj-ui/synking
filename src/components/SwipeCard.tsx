@@ -178,7 +178,7 @@ export const SwipeCard: React.FC<Props> = ({ profile, isFirst = true, onSwipe })
           <Text style={styles.subtitleText} numberOfLines={1}>
             {[
               profile.occupation,
-              typeof profile.location === 'object' ? (profile.location?.city || 'Nearby') : (profile.location || 'Nearby')
+              typeof (profile.location as any) === 'object' ? ((profile.location as any)?.city || 'Nearby') : (profile.location || 'Nearby')
             ].filter(Boolean).join(' • ')}
           </Text>
         )}

@@ -43,7 +43,7 @@ export const MatchCelebrationModal: React.FC<Props> = ({ matchedUser, onClose })
           </View>
 
           <Text style={styles.userName}>{matchedUser.name}, {matchedUser.age}</Text>
-          <Text style={styles.userLocation}>📍 {typeof matchedUser.location === 'object' ? (matchedUser.location?.city || 'Roorkee') : (matchedUser.location || 'Roorkee')} • {matchedUser.occupation}</Text>
+          <Text style={styles.userLocation}>📍 {typeof (matchedUser.location as any) === 'object' ? ((matchedUser.location as any)?.city || 'Roorkee') : (matchedUser.location || 'Roorkee')} • {matchedUser.occupation}</Text>
 
           <View style={styles.noticeBox}>
             <Ionicons name="lock-closed" size={14} color="#22C55E" />
