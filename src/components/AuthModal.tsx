@@ -4,6 +4,7 @@ import { Ionicons } from '@expo/vector-icons';
 import { GradientButton } from './GradientButton';
 import { useApp } from '../contexts/AppContext';
 import { getLocalBackendUrl } from '../services/firebase';
+import * as Haptics from 'expo-haptics';
 
 interface Props {
   visible: boolean;
@@ -48,6 +49,7 @@ export const AuthModal: React.FC<Props> = ({ visible, onClose, targetUserName })
         if (data.exists && data.user) {
           await loginUser(data.user);
           onClose();
+          Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
           Alert.alert('Welcome Back! 🎉', 'You are now signed in securely to your existing account.');
           return;
         }
@@ -74,6 +76,7 @@ export const AuthModal: React.FC<Props> = ({ visible, onClose, targetUserName })
       isVip: false,
     });
     onClose();
+    Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
     Alert.alert('Welcome to SYNKING! 🎉', 'You are now signed in securely. Visit the Profile tab to update your details.');
   };
 

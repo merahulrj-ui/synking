@@ -15,6 +15,7 @@ import {
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
+import * as Haptics from 'expo-haptics';
 import { useApp } from '../../contexts/AppContext';
 import { WebRTCService } from '../../services/webrtcService';
 import { CallModal } from '../../components/CallModal';
@@ -712,6 +713,8 @@ export default function ChatScreen() {
       addAudioLog('🛡️ [DUP_BLOCKED] Debounced duplicate tap within 600ms');
       return;
     }
+
+    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
 
     const text = textToSend || inputText.trim();
     if (!text || !id) return;

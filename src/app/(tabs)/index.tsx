@@ -2,6 +2,7 @@ import React, { useState } from 'react';
 import { View, Text, StyleSheet, TouchableOpacity, Dimensions, Alert } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Ionicons, MaterialCommunityIcons, FontAwesome } from '@expo/vector-icons';
+import * as Haptics from 'expo-haptics';
 import { useApp } from '../../contexts/AppContext';
 import { Header } from '../../components/Header';
 import { SwipeCard } from '../../components/SwipeCard';
@@ -37,6 +38,15 @@ export default function DiscoverScreen() {
   const isProcessingSwipe = React.useRef(false);
 
   const handleSwipe = (action: 'like' | 'pass' | 'supersynk') => {
+    // Haptic Feedback
+    if (action === 'like') {
+      Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
+    } else if (action === 'supersynk') {
+      Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
+    } else {
+      Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+    }
+
     if (!isLoggedIn) {
       setAuthModalVisible(true);
       return;

@@ -2,6 +2,7 @@ import React, { useState } from 'react';
 import { View, Text, StyleSheet, TouchableOpacity, Image, ScrollView } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
+import * as Haptics from 'expo-haptics';
 import { useApp } from '../../contexts/AppContext';
 import { Header } from '../../components/Header';
 import { DatePassCard } from '../../components/DatePassCard';
@@ -21,6 +22,7 @@ export default function MatchesScreen() {
   const borderCol = isDarkMode ? 'rgba(255, 255, 255, 0.08)' : 'rgba(0, 0, 0, 0.06)';
 
   const handleAccept = (requestId: string) => {
+    Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
     const user = acceptRequest(requestId);
     if (user) {
       setAcceptedCelebration(user);
@@ -28,6 +30,7 @@ export default function MatchesScreen() {
   };
 
   const handleDecline = (requestId: string) => {
+    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
     declineRequest(requestId);
   };
 
