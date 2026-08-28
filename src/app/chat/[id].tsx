@@ -354,11 +354,12 @@ export default function ChatScreen() {
     setRecordingSeconds(0);
 
     if (id) {
-      sendMessage(id, textLabel, 'voice', {
+      const fullText = audioDataUri ? `${textLabel}|||AUDIO_DATA::${audioDataUri}` : textLabel;
+      sendMessage(id, fullText, 'voice', {
         audioUrl: audioDataUri,
         audioDuration: duration,
       });
-      addAudioLog('🚀 Voice note broadcast to match!');
+      addAudioLog(`🚀 Voice note broadcast with ${audioDataUri ? 'Real Encrypted Audio Payload' : 'Text Fallback'}`);
     }
   };
 
@@ -463,7 +464,21 @@ export default function ChatScreen() {
             if (readable && typeof readable === 'string' && readable.startsWith('E2EE::')) {
               readable = await decryptE2EEMessage(readable, msg.senderId, msg.receiverId);
             }
-            const clean = { ...msg, text: readable };
+            let audioUrl = msg.extraData?.audioUrl;
+            let displayText = readable;
+            if (readable && typeof readable === 'string' && readable.includes('|||AUDIO_DATA::')) {
+              const parts = readable.split('|||AUDIO_DATA::');
+              displayText = parts[0];
+              audioUrl = parts[1];
+            }
+            const clean = {
+              ...msg,
+              text: displayText,
+              extraData: {
+                ...msg.extraData,
+                audioUrl: audioUrl || msg.extraData?.audioUrl,
+              },
+            };
             setCloudMessages(prev => {
               if (prev.some(m => m.id === clean.id)) return prev;
               return [...prev, clean];
@@ -535,8 +550,26 @@ export default function ChatScreen() {
   const handleForceSync = async () => {
     if (!id || !currentUser) return;
     const msgs = await fetchChatMessagesFromFirestore(currentUser.id, id);
-    setCloudMessages(msgs);
-    Alert.alert('Cloud Synced 🔄', `Fetched ${msgs.length} messages from Cloud Firestore.`);
+    const parsed = msgs.map(m => {
+      let raw = m.text || '';
+      let audioUrl = m.extraData?.audioUrl;
+      let displayText = raw;
+      if (raw && typeof raw === 'string' && raw.includes('|||AUDIO_DATA::')) {
+        const parts = raw.split('|||AUDIO_DATA::');
+        displayText = parts[0];
+        audioUrl = parts[1];
+      }
+      return {
+        ...m,
+        text: displayText,
+        extraData: {
+          ...m.extraData,
+          audioUrl: audioUrl || m.extraData?.audioUrl,
+        },
+      };
+    });
+    setCloudMessages(parsed);
+    Alert.alert('Cloud Synced 🔄', `Fetched ${parsed.length} messages from Cloud Firestore.`);
   };
 
   // Advanced Multi-lingual Word-to-Digit Anti-Evasion Normalizer
@@ -968,8 +1001,19 @@ export default function ChatScreen() {
             }
 
             // Voice Note Bubble (WhatsApp Style Waveform)
-            if (item.text.startsWith('🎙️') || item.text.includes('Voice Note')) {
+            const rawItemText = item.text || '';
+            const isVoiceMsg = rawItemText.startsWith('🎙️') || rawItemText.includes('Voice Note') || item.type === 'voice';
+
+            if (isVoiceMsg) {
               const isPlaying = playingMessageId === item.id;
+              let displayText = rawItemText;
+              let effectiveAudioUrl = item.extraData?.audioUrl;
+              if (rawItemText.includes('|||AUDIO_DATA::')) {
+                const p = rawItemText.split('|||AUDIO_DATA::');
+                displayText = p[0];
+                if (!effectiveAudioUrl) effectiveAudioUrl = p[1];
+              }
+
               return (
                 <View
                   style={[
@@ -982,7 +1026,7 @@ export default function ChatScreen() {
                 >
                   <View style={{ flexDirection: 'row', alignItems: 'center', gap: 10 }}>
                     <TouchableOpacity
-                      onPress={() => togglePlayVoiceNote(item.id, item.extraData?.audioUrl)}
+                      onPress={() => togglePlayVoiceNote(item.id, effectiveAudioUrl)}
                       style={{
                         width: 38,
                         height: 38,
@@ -1017,7 +1061,7 @@ export default function ChatScreen() {
                         ))}
                       </View>
                       <Text style={{ fontSize: 11, fontWeight: '700', color: isMine ? 'rgba(255, 255, 255, 0.85)' : subText }}>
-                        {item.text.replace('🎙️ ', '')}
+                        {displayText.replace('🎙️ ', '')}
                       </Text>
                     </View>
                   </View>

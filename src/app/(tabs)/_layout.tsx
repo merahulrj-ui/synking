@@ -172,25 +172,23 @@ const styles = StyleSheet.create({
     position: 'relative',
   },
   inSynkCircle: {
-    width: 26,
-    height: 26,
-    borderRadius: 13,
-    overflow: 'hidden',
+    width: 28,
+    height: 28,
+    borderRadius: 8,
     alignItems: 'center',
     justifyContent: 'center',
   },
   inSynkCircleInactive: {
-    opacity: 0.7,
+    opacity: 1,
   },
   inSynkCircleActive: {
     opacity: 1,
-    borderWidth: 2,
-    borderColor: '#FD3A73',
-    transform: [{ scale: 1.05 }],
+    transform: [{ scale: 1.08 }],
   },
   inSynkTabIcon: {
-    width: '100%',
-    height: '100%',
+    width: 28,
+    height: 28,
+    borderRadius: 8,
   },
   tabBadge: {
     position: 'absolute',
