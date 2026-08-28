@@ -870,9 +870,6 @@ export default function ChatScreen() {
           </View>
         )}
       </KeyboardAvoidingView>
-
-      {/* 7. FULLSCREEN WEBRTC CALL MODAL (AUDIO & VIDEO) */}
-      <CallModal session={activeCall} onEndCall={handleEndCall} />
     </SafeAreaView>
   );
 }

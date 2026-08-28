@@ -143,16 +143,6 @@ export default function TabsLayout() {
         matchedUser={acceptedMatchAlert}
         onClose={clearAcceptedMatchAlert}
       />
-
-      {/* Global Real-Time WebRTC Call Modal (Voice & Video Calls across devices) */}
-      <CallModal
-        session={activeCall}
-        onEndCall={() => WebRTCService.endCall()}
-        onAcceptCall={() => WebRTCService.acceptCall()}
-        onToggleMute={() => WebRTCService.toggleMute()}
-        onToggleVideo={() => WebRTCService.toggleVideo()}
-        onToggleSpeaker={() => WebRTCService.toggleSpeaker()}
-      />
     </>
   );
 }

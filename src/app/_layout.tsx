@@ -6,6 +6,34 @@ import * as Updates from 'expo-updates';
 import { AppProvider } from '../contexts/AppContext';
 import { Colors } from '../constants/theme';
 
+import { CallModal } from '../components/CallModal';
+import { WebRTCService } from '../services/webrtcService';
+import { CallSession } from '../types';
+
+function GlobalCallOverlay() {
+  const [activeCall, setActiveCall] = React.useState<CallSession | null>(null);
+
+  React.useEffect(() => {
+    const unsubscribe = WebRTCService.subscribe(session => {
+      setActiveCall(session);
+    });
+    return () => unsubscribe();
+  }, []);
+
+  if (!activeCall) return null;
+
+  return (
+    <CallModal
+      session={activeCall}
+      onEndCall={() => WebRTCService.endCall()}
+      onAcceptCall={() => WebRTCService.acceptCall()}
+      onToggleMute={() => WebRTCService.toggleMute()}
+      onToggleVideo={() => WebRTCService.toggleVideo()}
+      onToggleSpeaker={() => WebRTCService.toggleSpeaker()}
+    />
+  );
+}
+
 export default function RootLayout() {
   useEffect(() => {
     async function checkOTA() {
@@ -84,6 +112,7 @@ export default function RootLayout() {
               }}
             />
           </Stack>
+          <GlobalCallOverlay />
         </View>
       </View>
     </AppProvider>

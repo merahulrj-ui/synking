@@ -646,10 +646,11 @@ const server = http.createServer((req, res) => {
     return;
   }
 
-function broadcastWs(data) {
+function broadcastWs(data, excludeSocket = null) {
   const msg = JSON.stringify(data);
   const frame = encodeWebSocketFrame(msg);
   for (const client of clients) {
+    if (excludeSocket && client === excludeSocket) continue;
     try {
       if (client && client.writable) {
         client.write(frame);
