@@ -263,25 +263,28 @@ async function renderAdminHtml() {
       profileList = rows.map(r => {
         const item = {};
         cols.forEach((col, idx) => {
-          let rawVal = r[idx]?.value !== undefined ? r[idx].value : r[idx];
-          item[col] = extractPlain(rawVal);
+          const colName = (col && typeof col === 'object' && col.name) ? col.name : String(col);
+          const rawVal = r[idx]?.value !== undefined ? r[idx].value : r[idx];
+          item[colName] = extractPlain(rawVal);
         });
-        const nameStr = extractPlain(item.name) || 'Member';
-        const ageStr = extractPlain(item.age) || '22';
-        const locStr = extractPlain(item.location) || 'Roorkee';
-        const occStr = extractPlain(item.occupation) || 'Member';
-        const bioStr = extractPlain(item.bio) || 'Active on Synking ✨';
-        const photoStr = extractPlain(item.photo) || 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=500';
+
+        const idStr = item.id || '';
+        const nameStr = item.name || 'Member';
+        const ageStr = item.age || '22';
+        const locStr = item.location || 'Roorkee';
+        const occStr = item.occupation || 'Member';
+        const bioStr = item.bio || 'Active on Synking ✨';
+        const photoStr = item.photo || 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=500';
 
         return {
-          id: extractPlain(item.id),
+          id: idStr,
           name: nameStr,
           age: ageStr,
           photo: photoStr,
           location: locStr,
           occupation: occStr,
           bio: bioStr,
-          verified: item.is_verified || item.isVerified,
+          verified: true,
         };
       });
     }

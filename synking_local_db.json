@@ -1,5 +1,30 @@
 {
-  "profiles": {},
+  "profiles": {
+    "user_mtcoyjhu": {
+      "id": "user_mtcoyjhu",
+      "name": "sumit",
+      "age": 22,
+      "gender": "male",
+      "occupation": "Member",
+      "location": "Roorkee",
+      "phoneNumber": "+91 6767677877",
+      "distance": "0 km",
+      "bio": "Exploring cafes & dates in Roorkee ✨",
+      "photo": "https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=800&auto=format&fit=crop&q=80",
+      "photos": [
+        "https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=800&auto=format&fit=crop&q=80"
+      ],
+      "interests": [
+        "Coffee",
+        "Music",
+        "Travel"
+      ],
+      "compatibility": 100,
+      "isVerified": true,
+      "isVip": false,
+      "updatedAt": "2026-08-28T08:30:22.363Z"
+    }
+  },
   "requests": {},
   "chats": []
 }
