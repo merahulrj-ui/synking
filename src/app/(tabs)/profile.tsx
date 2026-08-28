@@ -551,10 +551,15 @@ export default function ProfileScreen() {
                   </LinearGradient>
                 )}
                 {currentUser?.isVip && (
-                  <View style={styles.vipCrownBadge}>
-                    <Ionicons name="sparkles" size={10} color="#FFD700" />
-                    <Text style={styles.vipCrownText}>VIP</Text>
-                  </View>
+                  <LinearGradient
+                    colors={['#F59E0B', '#D97706']}
+                    start={{ x: 0, y: 0 }}
+                    end={{ x: 1, y: 1 }}
+                    style={[styles.vipCrownBadge, { borderWidth: 0, paddingHorizontal: 6, paddingVertical: 2, borderRadius: 10 }]}
+                  >
+                    <MaterialCommunityIcons name="crown" size={12} color="#FFF" />
+                    <Text style={[styles.vipCrownText, { color: '#FFF' }]}>VIP</Text>
+                  </LinearGradient>
                 )}
               </View>
 
@@ -585,12 +590,24 @@ export default function ProfileScreen() {
                 </TouchableOpacity>
 
                 <TouchableOpacity
-                  style={[styles.secondaryActionBtn, { backgroundColor: cardBg, borderColor }]}
+                  style={[
+                    styles.secondaryActionBtn, 
+                    { 
+                      backgroundColor: isDarkMode ? 'rgba(245, 158, 11, 0.15)' : '#FEF3C7', 
+                      borderColor: 'rgba(245, 158, 11, 0.5)',
+                      borderWidth: 1.5,
+                      shadowColor: '#F59E0B',
+                      shadowOffset: { width: 0, height: 4 },
+                      shadowOpacity: 0.3,
+                      shadowRadius: 8,
+                      elevation: 5
+                    }
+                  ]}
                   onPress={() => router.push('/vip-membership')}
                   activeOpacity={0.8}
                 >
-                  <Ionicons name="sparkles" size={14} color="#F59E0B" />
-                  <Text style={[styles.secondaryActionText, { color: isDarkMode ? '#FDE047' : '#D97706' }]}>VIP Crown</Text>
+                  <MaterialCommunityIcons name="crown" size={16} color={isDarkMode ? '#FDE047' : '#D97706'} />
+                  <Text style={[styles.secondaryActionText, { color: isDarkMode ? '#FDE047' : '#D97706', fontWeight: '900' }]}>Get VIP</Text>
                 </TouchableOpacity>
 
                 <TouchableOpacity

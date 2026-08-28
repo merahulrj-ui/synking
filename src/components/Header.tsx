@@ -1,6 +1,6 @@
 import React from 'react';
 import { View, Text, StyleSheet, TouchableOpacity, Image } from 'react-native';
-import { Ionicons } from '@expo/vector-icons';
+import { Ionicons, MaterialCommunityIcons } from '@expo/vector-icons';
 import { useRouter } from 'expo-router';
 import { useApp } from '../contexts/AppContext';
 
@@ -30,7 +30,7 @@ export const Header: React.FC = () => {
         activeOpacity={0.7}
         onPress={() => router.push('/vip-membership')}
       >
-        <Ionicons name="sparkles" size={15} color="#FBBF24" />
+        <MaterialCommunityIcons name="crown" size={17} color="#FBBF24" />
       </TouchableOpacity>
     </View>
   );

@@ -1,7 +1,7 @@
 import React, { useState } from 'react';
 import { View, Text, StyleSheet, TouchableOpacity, ScrollView, Alert, Dimensions } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
-import { Ionicons } from '@expo/vector-icons';
+import { Ionicons, MaterialCommunityIcons } from '@expo/vector-icons';
 import { LinearGradient } from 'expo-linear-gradient';
 import { useRouter } from 'expo-router';
 import { useApp } from '../contexts/AppContext';
@@ -88,7 +88,7 @@ export default function VipMembershipScreen() {
           style={styles.bannerCard}
         >
           <View style={styles.crownCircle}>
-            <Ionicons name="sparkles" size={32} color="#FFF" />
+            <MaterialCommunityIcons name="crown" size={38} color="#FFF" />
           </View>
           <Text style={styles.bannerTitle}>SYNKING BLACK VIP</Text>
           <Text style={styles.bannerSub}>
