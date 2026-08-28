@@ -84,7 +84,8 @@ const LiveRemoteMedia: React.FC<{ type: 'voice' | 'video'; photoUrl?: string }> 
       mediaRef.current.muted = false;
       mediaRef.current.volume = 1.0;
       
-      if (remoteStream.getVideoTracks().length > 0) {
+      const vTracks = remoteStream.getVideoTracks ? remoteStream.getVideoTracks() : [];
+      if (vTracks.length > 0) {
         setHasVideo(true);
       }
 
@@ -105,7 +106,7 @@ const LiveRemoteMedia: React.FC<{ type: 'voice' | 'video'; photoUrl?: string }> 
   useEffect(() => {
     if (Platform.OS === 'web') {
       attemptPlay();
-      const interval = setInterval(attemptPlay, 600);
+      const interval = setInterval(attemptPlay, 400);
       return () => clearInterval(interval);
     }
   }, []);
@@ -113,10 +114,8 @@ const LiveRemoteMedia: React.FC<{ type: 'voice' | 'video'; photoUrl?: string }> 
   if (Platform.OS !== 'web') return null;
 
   return (
-    <View style={{ position: 'absolute', top: 0, left: 0, width: '100%', height: '100%', zIndex: 0, pointerEvents: 'none' }}>
-      {/* HACK: Make the video tag 100% visible and full screen even for Audio calls! 
-          Chrome throttles/mutes <video> and <audio> tags if they are 1x1 pixels or opacity 0. 
-          By making it full screen, we force Chrome to play it! */}
+    <View style={{ position: 'absolute', top: 0, left: 0, width: '100%', height: '100%', zIndex: 0 }}>
+      {/* 100% Fullscreen Remote Video Surface */}
       {/* @ts-ignore */}
       <video
         ref={mediaRef}
@@ -129,7 +128,6 @@ const LiveRemoteMedia: React.FC<{ type: 'voice' | 'video'; photoUrl?: string }> 
           width: '100%',
           height: '100%',
           objectFit: 'cover',
-          opacity: hasVideo ? 1 : 0,
           zIndex: 0,
         }}
       />
@@ -412,9 +410,9 @@ Remote Video Tracks (${remoteVideo.length}): ${JSON.stringify(remoteVideo)}
 
           {/* FULLSCREEN REMOTE VIDEO BACKGROUND (WHATSAPP STYLE) */}
           {session.type === 'video' && (
-            <View style={styles.videoSurfaceContainer}>
-              {/* 1. Background Placeholder while ringing / connecting */}
-              {!(remoteStream && remoteStream.getVideoTracks?.()?.length > 0) && (
+            <View style={[styles.videoSurfaceContainer, { backgroundColor: 'transparent', pointerEvents: 'box-none' }]}>
+              {/* 1. Background Placeholder only while ringing */}
+              {!isConnected && (
                 <View style={[StyleSheet.absoluteFillObject, { alignItems: 'center', justifyContent: 'center', backgroundColor: '#070A14' }]}>
                   <Image
                     source={{ uri: session.callerPhoto }}
@@ -424,12 +422,12 @@ Remote Video Tracks (${remoteVideo.length}): ${JSON.stringify(remoteVideo)}
                     {session.callerName}
                   </Text>
                   <Text style={{ color: '#00E5FF', fontSize: 13, fontWeight: '800', letterSpacing: -0.2 }}>
-                    {isConnected ? 'Connecting Live Video Feed...' : 'Ringing...'}
+                    Ringing...
                   </Text>
                 </View>
               )}
 
-              {/* 2. Stable Remote NativeRTCView Video Surface (100% Fullscreen) */}
+              {/* 2. Stable Remote NativeRTCView Video Surface (100% Fullscreen on Native APK) */}
               {Platform.OS !== 'web' && NativeRTCView && remoteStream && (
                 <NativeRTCView
                   streamURL={typeof remoteStream.toURL === 'function' ? remoteStream.toURL() : remoteStream}
