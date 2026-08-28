@@ -93,6 +93,7 @@ export interface CallSession {
   isMuted: boolean;
   isSpeakerOn: boolean;
   isVideoEnabled: boolean;
+  isFrontCamera?: boolean;
 }
 
 export interface ChatMessage {

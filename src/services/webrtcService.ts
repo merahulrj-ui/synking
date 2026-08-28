@@ -536,6 +536,31 @@ class WebRTCManager {
     return this.currentSession.isVideoEnabled;
   }
 
+  public switchCamera(): void {
+    if (!this.currentSession || !this.localStream) return;
+    
+    // Default to front camera initially if undefined
+    if (this.currentSession.isFrontCamera === undefined) {
+      this.currentSession.isFrontCamera = true;
+    }
+    
+    const videoTracks = this.localStream.getVideoTracks();
+    if (videoTracks && videoTracks.length > 0) {
+      const videoTrack = videoTracks[0];
+      
+      // Native react-native-webrtc provides _switchCamera method
+      if (typeof videoTrack._switchCamera === 'function') {
+        videoTrack._switchCamera();
+        this.currentSession.isFrontCamera = !this.currentSession.isFrontCamera;
+        this.log(`🔄 CAMERA SWITCHED: Now using ${this.currentSession.isFrontCamera ? 'Front' : 'Back'} camera.`);
+        this.notify();
+      } else {
+        // Fallback for Web/Browser which doesn't have _switchCamera easily without re-creating stream
+        this.log(`⚠️ switchCamera not directly supported on this platform without stream recreation.`);
+      }
+    }
+  }
+
   public async toggleSpeaker(): Promise<boolean> {
     if (!this.currentSession) return false;
     this.currentSession.isSpeakerOn = !this.currentSession.isSpeakerOn;
