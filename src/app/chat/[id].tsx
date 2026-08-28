@@ -154,7 +154,7 @@ export default function ChatScreen() {
       }
     };
     fetchCloud();
-    const interval = setInterval(fetchCloud, 10000);
+    const interval = setInterval(fetchCloud, 2000);
     return () => clearInterval(interval);
   }, [id, currentUser?.id]);
 

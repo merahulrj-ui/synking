@@ -896,23 +896,78 @@ const broadcastToWebSockets = broadcastWs;
     return;
   }
 
-  // 6. GET /api/chats (Strictly bifurcate 1-on-1 messages between u1 and u2)
+  // 6. GET /api/chats (Direct Live Turso Cloud SQLite Sync - Universal Cross-Device Messaging)
   if (req.method === 'GET' && pathname === '/api/chats') {
     const u1 = url.searchParams.get('u1') || url.searchParams.get('user1');
     const u2 = url.searchParams.get('u2') || url.searchParams.get('user2');
 
-    let matched = db.chats || [];
+    let sql = 'SELECT * FROM messages';
+    const args = [];
     if (u1 && u2) {
-      matched = (db.chats || []).filter(c =>
-        (c.senderId === u1 && c.receiverId === u2) ||
-        (c.senderId === u2 && c.receiverId === u1)
+      sql += ' WHERE (sender_id = ? AND receiver_id = ?) OR (sender_id = ? AND receiver_id = ?) ORDER BY created_at ASC';
+      args.push(
+        { type: 'text', value: u1 },
+        { type: 'text', value: u2 },
+        { type: 'text', value: u2 },
+        { type: 'text', value: u1 }
       );
     } else if (u1) {
-      matched = (db.chats || []).filter(c => c.senderId === u1 || c.receiverId === u1);
+      sql += ' WHERE sender_id = ? OR receiver_id = ? ORDER BY created_at ASC';
+      args.push({ type: 'text', value: u1 }, { type: 'text', value: u1 });
+    } else {
+      sql += ' ORDER BY created_at ASC';
     }
 
-    res.writeHead(200, { 'Content-Type': 'application/json' });
-    res.end(JSON.stringify(matched));
+    queryTurso(sql, args).then(resTurso => {
+      let matched = [];
+      const rows = resTurso?.results?.[0]?.response?.result?.rows;
+      const cols = resTurso?.results?.[0]?.response?.result?.cols;
+      if (Array.isArray(rows) && rows.length > 0 && Array.isArray(cols)) {
+        matched = rows.map(r => {
+          const item = {};
+          cols.forEach((col, idx) => {
+            const colName = (col && typeof col === 'object' && col.name) ? col.name : String(col);
+            const rawVal = r[idx]?.value !== undefined ? r[idx].value : r[idx];
+            item[colName] = extractPlain(rawVal);
+          });
+          return {
+            id: item.id,
+            matchId: item.match_id,
+            senderId: item.sender_id,
+            receiverId: item.receiver_id,
+            text: item.text,
+            plainText: item.text,
+            cipherText: item.text,
+            timestamp: item.timestamp || item.created_at || new Date().toISOString()
+          };
+        });
+      } else {
+        // Fallback to in-memory db.chats
+        if (u1 && u2) {
+          matched = (db.chats || []).filter(c =>
+            (c.senderId === u1 && c.receiverId === u2) ||
+            (c.senderId === u2 && c.receiverId === u1)
+          );
+        } else if (u1) {
+          matched = (db.chats || []).filter(c => c.senderId === u1 || c.receiverId === u1);
+        } else {
+          matched = db.chats || [];
+        }
+      }
+
+      res.writeHead(200, { 'Content-Type': 'application/json' });
+      res.end(JSON.stringify(matched));
+    }).catch(() => {
+      let matched = db.chats || [];
+      if (u1 && u2) {
+        matched = (db.chats || []).filter(c =>
+          (c.senderId === u1 && c.receiverId === u2) ||
+          (c.senderId === u2 && c.receiverId === u1)
+        );
+      }
+      res.writeHead(200, { 'Content-Type': 'application/json' });
+      res.end(JSON.stringify(matched));
+    });
     return;
   }
 
