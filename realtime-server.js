@@ -316,7 +316,10 @@ async function renderAdminHtml() {
 
   <div class="section-title">
     <span>👥 User Profiles Directory (${profileList.length})</span>
-    <button onclick="location.reload()" style="background: #1E293B; color: #00E5FF; border: 1px solid #00E5FF; padding: 6px 12px; border-radius: 8px; font-weight: 700; cursor: pointer;">🔄 Refresh</button>
+    <div style="display: flex; gap: 8px;">
+      <button onclick="wipeAllUsers()" style="background: #EF4444; color: #FFF; border: none; padding: 6px 12px; border-radius: 8px; font-weight: 700; cursor: pointer; font-size: 12px;">🧹 Wipe All Profiles (0 Users)</button>
+      <button onclick="location.reload()" style="background: #1E293B; color: #00E5FF; border: 1px solid #00E5FF; padding: 6px 12px; border-radius: 8px; font-weight: 700; cursor: pointer; font-size: 12px;">🔄 Refresh</button>
+    </div>
   </div>
 
   <div class="user-grid">
@@ -375,13 +378,28 @@ async function renderAdminHtml() {
 
   <script>
     async function deleteUser(id) {
-      if (!confirm('Are you sure you want to delete user ' + id + '?')) return;
+      if (!confirm('Are you sure you want to permanently delete user ' + id + '?')) return;
       try {
         const res = await fetch('/api/profiles/' + id, { method: 'DELETE' });
         if (res.ok) {
           location.reload();
         } else {
           alert('Failed to delete user.');
+        }
+      } catch (e) {
+        alert('Error: ' + e);
+      }
+    }
+
+    async function wipeAllUsers() {
+      if (!confirm('⚠️ Are you sure you want to WIPE OUT ALL PROFILES?\n\nThis will permanently delete all users from Turso Cloud SQLite and local database!')) return;
+      try {
+        const res = await fetch('/api/wipe-database');
+        if (res.ok) {
+          alert('All users and database wiped successfully!');
+          location.reload();
+        } else {
+          alert('Failed to wipe database.');
         }
       } catch (e) {
         alert('Error: ' + e);
@@ -526,29 +544,38 @@ const server = http.createServer((req, res) => {
     return;
   }
 
-  // 2.1 DELETE /api/profiles/:id
+  // 2.1 DELETE /api/profiles/:id (Delete from Local DB + Turso Cloud SQLite)
   if (req.method === 'DELETE' && pathname.startsWith('/api/profiles/')) {
-    const id = pathname.replace('/api/profiles/', '');
-    if (id && db.profiles[id]) {
-      delete db.profiles[id];
-      saveDb();
-      console.log(`[PROFILE_DELETED] ${id}`);
+    const id = pathname.replace('/api/profiles/', '').trim();
+    if (id) {
+      if (db.profiles[id]) {
+        delete db.profiles[id];
+        saveDb();
+      }
+      // Delete from Turso Cloud SQLite
+      queryTurso('DELETE FROM users WHERE id = ?', [id]).catch(() => {});
+      queryTurso('DELETE FROM synk_requests WHERE from_user_id = ? OR to_user_id = ?', [id, id]).catch(() => {});
+      console.log(`[PROFILE_DELETED_PERMANENTLY] ${id} from memory & Turso Cloud SQLite`);
       res.writeHead(200, { 'Content-Type': 'application/json' });
-      res.end(JSON.stringify({ success: true }));
+      res.end(JSON.stringify({ success: true, deletedId: id }));
       return;
     }
-    res.writeHead(404, { 'Content-Type': 'application/json' });
-    res.end(JSON.stringify({ success: false, error: 'Profile not found' }));
+    res.writeHead(400, { 'Content-Type': 'application/json' });
+    res.end(JSON.stringify({ success: false, error: 'User ID missing' }));
     return;
   }
 
-  // MASTER DATABASE WIPE (Wipe all users, requests, chats 100%)
+  // MASTER DATABASE WIPE (Wipe all users, requests, chats from Local + Turso Cloud SQLite 100%)
   if (pathname === '/api/reset-all' || pathname === '/api/wipe-database') {
     db.profiles = {};
     db.requests = {};
     db.chats = [];
     saveDb();
-    console.log('🚨 [MASTER_DATABASE_WIPED] All users, requests, and chats permanently deleted.');
+    // Wipe Turso Cloud SQLite tables
+    queryTurso('DELETE FROM users').catch(() => {});
+    queryTurso('DELETE FROM synk_requests').catch(() => {});
+    queryTurso('DELETE FROM messages').catch(() => {});
+    console.log('🚨 [MASTER_DATABASE_WIPED] All users, requests, and chats permanently deleted from Turso & Local.');
     res.writeHead(200, { 'Content-Type': 'application/json' });
     res.end(JSON.stringify({ success: true, message: 'All users, requests, and chats deleted completely. 0 remaining.' }));
     return;
