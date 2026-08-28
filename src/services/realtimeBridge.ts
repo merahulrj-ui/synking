@@ -38,18 +38,8 @@ class RealtimeBridgeManager {
 
   private connectWebSocket() {
     try {
-      // Smart auto-detect: Web uses local server (fast), Native APK uses Render Cloud (HTTPS required)
-      const isWeb = typeof window !== 'undefined' && typeof document !== 'undefined';
-      let wsUrl: string;
-      if (isWeb && window.location?.hostname) {
-        // Web: connect to local WebSocket via same host
-        const host = window.location.hostname;
-        const wsProtocol = window.location.protocol === 'https:' ? 'wss' : 'ws';
-        wsUrl = `${wsProtocol}://${host}:8082`;
-      } else {
-        // Native APK: use secure Render Cloud
-        wsUrl = 'wss://synking-9my2.onrender.com';
-      }
+      // Connect both Web & Native Mobile to the Central Live Render Cloud WebSocket Engine
+      const wsUrl = 'wss://synking-9my2.onrender.com';
       console.log(`[WS_CONNECTING] ${wsUrl}`);
       this.socket = new WebSocket(wsUrl);
 
