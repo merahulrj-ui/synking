@@ -65,8 +65,31 @@ class NotificationServiceClass {
       Notifications.addNotificationResponseReceivedListener((response: any) => {
         const actionId = response.actionIdentifier;
         const callData = response.notification?.request?.content?.data;
-        if (actionId === 'DECLINE_CALL') {
+        if (actionId === 'ACCEPT_CALL' || actionId === Notifications.DEFAULT_ACTION_IDENTIFIER) {
           this.dismissCallNotification(callData?.callId);
+          try {
+            const { WebRTCService } = require('./webrtcService');
+            WebRTCService.acceptCall().catch(() => {});
+          } catch (e) {}
+        } else if (actionId === 'DECLINE_CALL') {
+          this.dismissCallNotification(callData?.callId);
+          try {
+            const { WebRTCService } = require('./webrtcService');
+            const { RingtoneService } = require('./ringtoneService');
+            RingtoneService.stop();
+            WebRTCService.rejectCall();
+          } catch (e) {}
+        }
+      });
+
+      // 6. Handle background / locked FCM push incoming call wakeup
+      Notifications.addNotificationReceivedListener((notification: any) => {
+        const data = notification.request?.content?.data;
+        if (data && (data.type === 'INCOMING_CALL' || data.callId) && data.callerUser) {
+          try {
+            const { WebRTCService } = require('./webrtcService');
+            WebRTCService.receiveIncomingCall(data.callerUser, data.callType || 'audio', data.callId);
+          } catch (e) {}
         }
       });
 

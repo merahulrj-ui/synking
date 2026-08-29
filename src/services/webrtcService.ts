@@ -401,6 +401,8 @@ class WebRTCManager {
 
           if (this.remoteStream) {
             this.log(`🎥 REMOTE STREAM READY! Audio: ${this.remoteStream.getAudioTracks().length}, Video: ${this.remoteStream.getVideoTracks().length}`);
+            const shouldBeSpeaker = this.currentSession?.isSpeakerOn ?? (this.currentSession?.type === 'video');
+            AudioRouteService.setSpeakerOn(shouldBeSpeaker).catch(() => {});
             this.notify();
           }
         };
@@ -412,6 +414,8 @@ class WebRTCManager {
           if (event.stream) {
             this.remoteStream = event.stream;
             this.log(`🎥 REMOTE STREAM READY (Legacy)! Audio: ${this.remoteStream.getAudioTracks().length}, Video: ${this.remoteStream.getVideoTracks().length}`);
+            const shouldBeSpeaker = this.currentSession?.isSpeakerOn ?? (this.currentSession?.type === 'video');
+            AudioRouteService.setSpeakerOn(shouldBeSpeaker).catch(() => {});
             this.notify();
           }
         };
