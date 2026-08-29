@@ -930,10 +930,10 @@ export default function ProfileScreen() {
               <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6, backgroundColor: isDarkMode ? '#131927' : '#F1F5F9', paddingHorizontal: 14, paddingVertical: 6, borderRadius: 14, borderWidth: 1, borderColor: borderColor }}>
                 <View style={{ width: 8, height: 8, borderRadius: 4, backgroundColor: '#22C55E' }} />
                 <Text style={{ color: textColor, fontSize: 12, fontWeight: '800', letterSpacing: 0.5 }}>
-                  SYNKING v1.0.4
+                  SYNKING v1.0.69
                 </Text>
                 <Text style={{ color: '#FD3A73', fontSize: 11, fontWeight: '700' }}>
-                  • Build 104
+                  • Build #69
                 </Text>
               </View>
               <Text style={{ color: subText, fontSize: 11, fontWeight: '600' }}>

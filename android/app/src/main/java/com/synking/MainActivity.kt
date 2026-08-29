@@ -18,10 +18,36 @@ class MainActivity : ReactActivity() {
     setTheme(R.style.AppTheme);
     super.onCreate(null)
 
+    // 1. Native High-Priority Incoming Calls Notification Channel for Lock Screen & AOD Wakeup
+    try {
+      if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
+        val channelId = "incoming_calls"
+        val channelName = "SYNKING Incoming Calls"
+        val importance = android.app.NotificationManager.IMPORTANCE_HIGH
+        val channel = android.app.NotificationChannel(channelId, channelName, importance).apply {
+          description = "Full screen and lock screen notifications for incoming calls"
+          enableLights(true)
+          lightColor = android.graphics.Color.parseColor("#FD3A73")
+          enableVibration(true)
+          vibrationPattern = longArrayOf(0, 800, 1000)
+          lockscreenVisibility = android.app.Notification.VISIBILITY_PUBLIC
+          setBypassDnd(true)
+        }
+        val notificationManager = getSystemService(android.content.Context.NOTIFICATION_SERVICE) as? android.app.NotificationManager
+        notificationManager?.createNotificationChannel(channel)
+        android.util.Log.d("SYNKING_NATIVE", "MainActivity: Native NotificationChannel 'incoming_calls' created.")
+      }
+    } catch (e: Exception) {
+      android.util.Log.w("SYNKING_NATIVE", "NotificationChannel warning: ${e.message}")
+    }
+
+    // 2. Lock Screen & Turn Screen On Flags
     try {
       if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O_MR1) {
         setShowWhenLocked(true)
         setTurnScreenOn(true)
+        val keyguardManager = getSystemService(android.content.Context.KEYGUARD_SERVICE) as? android.app.KeyguardManager
+        keyguardManager?.requestDismissKeyguard(this, null)
       } else {
         window.addFlags(
           android.view.WindowManager.LayoutParams.FLAG_SHOW_WHEN_LOCKED or

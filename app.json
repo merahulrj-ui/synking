@@ -2,7 +2,7 @@
   "expo": {
     "name": "SYNKING",
     "slug": "synking",
-    "version": "1.0.66",
+    "version": "1.0.69",
     "orientation": "portrait",
     "icon": "./assets/images/icon.png",
     "scheme": "synking",
