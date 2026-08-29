@@ -2,7 +2,7 @@ import React, { createContext, useContext, useState, useEffect, useRef } from 'r
 import { Alert, Platform } from 'react-native';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { UserProfile, SynkRequest, Venue, DateBooking, ChatMessage, SafetyContact } from '../types';
-import { MOCK_VENUES } from '../constants/mockData';
+import { MOCK_VENUES, MOCK_PROFILES } from '../constants/mockData';
 import {
   saveChatMessageToFirestore,
   saveUserProfileToFirestore,
@@ -369,14 +369,19 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     // 1. Fetch real registered profiles for Discover (even if NOT logged in)
     const currentId = currentUser?.id || 'guest';
     const realUsers = await fetchProfilesFromFirestore(currentId);
-    if (Array.isArray(realUsers)) {
-      setProfiles(realUsers.filter(Boolean));
-      
-      // Verification: If logged in but our profile no longer exists in the cloud, we were deleted!
-      // Wait, fetchProfilesFromFirestore(currentId) actually EXCLUDES our currentId!
-      // So we can't check it from `realUsers`.
-      // We must make a separate call or handle it differently. Let's do a quick fetch to check ourselves.
+    let combinedProfiles: UserProfile[] = Array.isArray(realUsers) ? realUsers.filter(Boolean) : [];
+
+    // Always merge 4 rich dummy profiles so Discover feed is full and engaging
+    MOCK_PROFILES.forEach(mock => {
+      if (!combinedProfiles.some(p => p.id === mock.id)) {
+        combinedProfiles.push(mock);
+      }
+    });
+
+    if (currentUser?.id) {
+      combinedProfiles = combinedProfiles.filter(u => u && u.id !== currentUser.id);
     }
+    setProfiles(combinedProfiles);
 
     if (!currentUser) return; // Only stop here for requests/matches which require auth
 
@@ -449,6 +454,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
   useEffect(() => {
     if (currentUser) {
       RealtimeBridge.registerUser(currentUser.id);
+      NotificationService.registerForPushNotificationsAsync(currentUser.id);
       setIsLoggedIn(true);
       syncCloudState();
     }

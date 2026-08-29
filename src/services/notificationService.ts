@@ -42,6 +42,34 @@ class NotificationServiceClass {
         });
       }
 
+      // 4. Interactive Call Actions: Answer (Pick) & Decline (Disconnect) Buttons
+      await Notifications.setNotificationCategoryAsync('CALL', [
+        {
+          identifier: 'ACCEPT_CALL',
+          buttonTitle: '🟢 Answer',
+          options: {
+            opensAppToForeground: true,
+          },
+        },
+        {
+          identifier: 'DECLINE_CALL',
+          buttonTitle: '🔴 Decline',
+          options: {
+            opensAppToForeground: false,
+            isDestructive: true,
+          },
+        },
+      ]);
+
+      // 5. Handle user tapping Answer / Decline directly on notification banner
+      Notifications.addNotificationResponseReceivedListener((response: any) => {
+        const actionId = response.actionIdentifier;
+        const callData = response.notification?.request?.content?.data;
+        if (actionId === 'DECLINE_CALL') {
+          this.dismissCallNotification(callData?.callId);
+        }
+      });
+
       this.isInitialized = true;
     } catch (e) {
       console.warn('[NOTIF_INIT_WARN]', e);
@@ -81,6 +109,27 @@ class NotificationServiceClass {
         await Notifications.dismissAllNotificationsAsync();
       }
     } catch (e) {}
+  }
+
+  // Register device push token to backend for background / closed app call wakeups
+  public async registerForPushNotificationsAsync(userId: string) {
+    if (Platform.OS === 'web' || !Notifications || !userId) return;
+
+    try {
+      await this.initialize();
+      const tokenData = await Notifications.getExpoPushTokenAsync().catch(() => null);
+      const pushToken = tokenData?.data;
+      if (pushToken) {
+        const backendUrl = 'https://synking-9my2.onrender.com';
+        await fetch(`${backendUrl}/api/profiles/push-token`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ userId, pushToken }),
+        }).catch(() => {});
+      }
+    } catch (e) {
+      console.warn('[PUSH_TOKEN_REG_WARN]', e);
+    }
   }
 }
 

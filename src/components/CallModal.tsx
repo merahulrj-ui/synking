@@ -528,7 +528,12 @@ Remote Video Tracks (${remoteVideo.length}): ${JSON.stringify(remoteVideo)}
             </>
           )}
 
-          {/* 2. OUTGOING VIDEO CALL (CALLER PREVIEW): Fullscreen Self Camera */}
+          {/* 2. CONNECTED VOICE CALL (WEB AUDIO SINK): Audio Player */}
+          {isConnected && session.type !== 'video' && !session.isVideoEnabled && Platform.OS === 'web' && (
+            <LiveRemoteMedia type="voice" photoUrl={session.callerPhoto} isSpeakerOn={session.isSpeakerOn} />
+          )}
+
+          {/* 3. OUTGOING VIDEO CALL (CALLER PREVIEW): Fullscreen Self Camera */}
           {!isConnected && !isIncomingRinging && (session.type === 'video' || session.isVideoEnabled) && (
             <View style={styles.videoSurfaceContainer}>
               <LiveSelfVideo isPip={false} />
@@ -715,6 +720,7 @@ const styles = StyleSheet.create({
   e2eeBadge: {
     flexDirection: 'row',
     alignItems: 'center',
+    flexWrap: 'nowrap',
     gap: 6,
     backgroundColor: 'rgba(34, 197, 94, 0.12)',
     paddingHorizontal: 12,
@@ -728,6 +734,7 @@ const styles = StyleSheet.create({
     fontSize: 11,
     fontWeight: '800',
     letterSpacing: 0.5,
+    flexShrink: 0,
   },
   debugToggleBtn: {
     flexDirection: 'row',
@@ -845,13 +852,24 @@ const styles = StyleSheet.create({
     borderColor: 'rgba(34, 197, 94, 0.25)',
   },
   topHeaderFloating: {
-    backgroundColor: 'rgba(5, 6, 10, 0.65)',
-    paddingHorizontal: 16,
-    paddingVertical: 10,
-    borderRadius: 20,
+    position: 'absolute',
+    top: Platform.OS === 'web' ? 18 : 48,
+    alignSelf: 'center',
+    minWidth: 210,
+    backgroundColor: 'rgba(0, 0, 0, 0.75)',
+    paddingHorizontal: 18,
+    paddingVertical: 8,
+    borderRadius: 24,
     borderWidth: 1,
-    borderColor: 'rgba(255, 255, 255, 0.08)',
+    borderColor: 'rgba(255, 255, 255, 0.18)',
     zIndex: 20,
+    alignItems: 'center',
+    gap: 4,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.4,
+    shadowRadius: 8,
+    elevation: 8,
   },
   videoSurfaceContainer: {
     position: 'absolute',
@@ -868,17 +886,21 @@ const styles = StyleSheet.create({
   },
   pipSelfView: {
     position: 'absolute',
-    top: 70,
+    bottom: Platform.OS === 'web' ? 140 : 145,
     right: 16,
-    width: 135,
-    height: 190,
-    borderRadius: 16,
+    width: 96,
+    height: 140,
+    borderRadius: 14,
     overflow: 'hidden',
-    borderWidth: 2,
-    borderColor: '#00E5FF',
+    borderWidth: 1.5,
+    borderColor: 'rgba(255, 255, 255, 0.45)',
     backgroundColor: '#000000',
     zIndex: 25,
-    elevation: 8,
+    elevation: 10,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.5,
+    shadowRadius: 8,
   },
   selfVideoPlaceholder: {
     flex: 1,

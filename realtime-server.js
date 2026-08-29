@@ -742,6 +742,80 @@ const server = http.createServer((req, res) => {
     return;
   }
 
+  // 2.0 POST /api/profiles/push-token (Save Device Push Token for Background Call Wakeup)
+  if (req.method === 'POST' && pathname === '/api/profiles/push-token') {
+    let body = '';
+    req.on('data', chunk => { body += chunk; });
+    req.on('end', () => {
+      try {
+        const { userId, pushToken } = JSON.parse(body);
+        if (userId && pushToken) {
+          if (!db.pushTokens) db.pushTokens = {};
+          db.pushTokens[userId] = pushToken;
+          if (db.profiles[userId]) {
+            db.profiles[userId].pushToken = pushToken;
+          }
+          saveDb();
+          console.log(`[PUSH_TOKEN_BOUND] Bound Push Token for User ${userId}`);
+          res.writeHead(200, { 'Content-Type': 'application/json' });
+          res.end(JSON.stringify({ success: true }));
+          return;
+        }
+      } catch (e) {}
+      res.writeHead(400, { 'Content-Type': 'application/json' });
+      res.end(JSON.stringify({ success: false, error: 'Invalid push token payload' }));
+    });
+    return;
+  }
+
+function sendCallPushNotification(targetUserId, callPayload) {
+  const pushToken = db.pushTokens?.[targetUserId] || db.profiles[targetUserId]?.pushToken;
+  if (!pushToken) {
+    console.log(`[PUSH_SKIP] No push token registered for target ${targetUserId}`);
+    return;
+  }
+
+  const callerName = callPayload.callerUser?.name || 'Someone';
+  const callType = callPayload.type === 'video' ? 'Video' : 'Voice';
+
+  const pushBody = JSON.stringify({
+    to: pushToken,
+    title: `📞 Incoming ${callType} Call`,
+    body: `${callerName} is calling you on SYNKING`,
+    data: {
+      type: 'INCOMING_CALL',
+      callId: callPayload.callId,
+      callerUser: callPayload.callerUser,
+      callType: callPayload.type,
+    },
+    priority: 'high',
+    channelId: 'incoming_calls',
+    categoryIdentifier: 'CALL',
+    sound: 'default',
+  });
+
+  const req = https.request('https://exp.host/--/api/v2/push/send', {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+      'Content-Length': Buffer.byteLength(pushBody),
+    },
+  }, (res) => {
+    let respData = '';
+    res.on('data', chunk => respData += chunk);
+    res.on('end', () => {
+      console.log(`[PUSH_CALL_DISPATCHED] Sent high-priority push call to ${targetUserId}:`, respData);
+    });
+  });
+
+  req.on('error', (err) => {
+    console.error('[PUSH_CALL_ERROR]', err.message);
+  });
+
+  req.write(pushBody);
+  req.end();
+}
+
 function broadcastWs(data, excludeSocket = null) {
   const msg = JSON.stringify(data);
   const frame = encodeWebSocketFrame(msg);
@@ -1391,6 +1465,11 @@ server.on('upgrade', (req, socket, head) => {
               `[WS_TARGETED_SIGNAL] ${parsed.type} → Target ${targetUserId} not bound yet. Broadcasting fallback to all peers.`
             );
             broadcastToWebSockets(parsed, socket);
+          }
+
+          // 📲 High-Priority Push Notification to wake up phone if app is closed or locked!
+          if (parsed.type === 'INCOMING_CALL' && parsed.payload) {
+            sendCallPushNotification(targetUserId, parsed.payload);
           }
           continue;
         }
