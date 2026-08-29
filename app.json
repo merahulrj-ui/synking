@@ -55,6 +55,13 @@
           "cameraPermission": "Allow SYNKING to access your camera for HD Video Calling.",
           "microphonePermission": "Allow SYNKING to access your microphone for HD Voice Calling."
         }
+      ],
+      [
+        "expo-notifications",
+        {
+          "icon": "./assets/images/icon.png",
+          "color": "#FD3A73"
+        }
       ]
     ],
     "extra": {
