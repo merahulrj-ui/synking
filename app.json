@@ -49,8 +49,6 @@
     },
     "plugins": [
       "expo-router",
-      "expo-audio",
-      "expo-notifications",
       [
         "@config-plugins/react-native-webrtc",
         {

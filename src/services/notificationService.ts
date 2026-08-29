@@ -66,7 +66,7 @@ class NotificationServiceClass {
         trigger: null,
       });
     } catch (e) {
-      console.warn('[SHOW_CALL_NOTIF_ERROR'], e);
+      console.warn('[SHOW_CALL_NOTIF_ERROR]', e);
     }
   }
 
