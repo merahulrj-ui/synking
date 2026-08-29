@@ -120,6 +120,44 @@ class WebRTCManager {
     });
   }
 
+  private getPeerUserId(): string {
+    if (!this.currentSession) return '';
+    if (this.currentSession.receiverId === 'my_user_id' || this.currentSession.status === 'ringing') {
+      return this.currentSession.callerId;
+    }
+    return this.currentSession.receiverId;
+  }
+
+  public onLog(listener: (msg: string) => void): () => void {
+    this.logListeners.add(listener);
+    return () => this.logListeners.delete(listener);
+  }
+
+  public onRemoteFrame(listener: FrameListener): () => void {
+    this.frameListeners.add(listener);
+    listener(this.remoteVideoFrame);
+    return () => this.frameListeners.delete(listener);
+  }
+
+  public log(msg: string) {
+    const time = new Date().toLocaleTimeString();
+    const entry = `[${time}] ${msg}`;
+    console.log(`[WEBRTC_DEBUG] ${entry}`);
+    this.logListeners.forEach(cb => {
+      try { cb(entry); } catch (e) {}
+    });
+  }
+
+  public subscribe(listener: CallStateListener): () => void {
+    this.listeners.add(listener);
+    listener(this.currentSession);
+    return () => this.listeners.delete(listener);
+  }
+
+  private notify() {
+    this.listeners.forEach(cb => cb(this.currentSession ? { ...this.currentSession } : null));
+  }
+
   // 1. Initiate Outgoing Call
   public async startCall(params: {
     callerUser: UserProfile;
