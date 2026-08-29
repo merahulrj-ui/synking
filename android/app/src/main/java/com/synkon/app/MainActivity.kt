@@ -1,4 +1,4 @@
-package com.synkon.app
+package com.synking
 
 import android.os.Build
 import android.os.Bundle

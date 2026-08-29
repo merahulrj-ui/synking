@@ -205,10 +205,15 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
   const [isSuspended, setIsSuspended] = useState(false);
   const [suspendedUntil, setSuspendedUntil] = useState<number | null>(null);
 
-  // Load persistent Global 2-Strike & 3-Day Suspension Status + Seen Match Alerts
+  // Load persistent Global Theme + 2-Strike & 3-Day Suspension Status + Seen Match Alerts
   useEffect(() => {
     const loadStoredState = async () => {
       try {
+        const storedTheme = await AsyncStorage.getItem('synking_theme');
+        if (storedTheme !== null) {
+          setIsDarkMode(storedTheme === 'dark');
+        }
+
         const storedStrikes = await AsyncStorage.getItem('synking_phone_strikes');
         const storedUntil = await AsyncStorage.getItem('synking_suspended_until');
         const storedSeenAlerts = await AsyncStorage.getItem('synking_seen_match_alerts');

@@ -15,12 +15,12 @@
     },
     "ios": {
       "supportsTablet": false,
-      "bundleIdentifier": "com.synkon.app",
+      "bundleIdentifier": "com.synking",
       "bitcode": false,
       "runtimeVersion": "1.0.0"
     },
     "android": {
-      "package": "com.synkon.app",
+      "package": "com.synking",
       "googleServicesFile": "./google-services.json",
       "adaptiveIcon": {
         "backgroundColor": "#FD3A73",

@@ -1,4 +1,4 @@
-package com.synkon.app
+package com.synking
 
 import android.content.Context
 import android.media.AudioDeviceInfo

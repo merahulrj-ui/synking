@@ -12,7 +12,7 @@ import {
   ScrollView,
   Alert,
 } from 'react-native';
-import { SafeAreaView } from 'react-native-safe-area-context';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
 import * as Haptics from 'expo-haptics';
@@ -75,6 +75,7 @@ const ICEBREAKERS = [
 ];
 
 export default function ChatScreen() {
+  const insets = useSafeAreaInsets();
   const { id } = useLocalSearchParams<{ id: string }>();
   const router = useRouter();
   const { matches, profiles, messages, sendMessage, activeBookings, currentUser, isDarkMode } = useApp();
@@ -854,7 +855,7 @@ export default function ChatScreen() {
   };
 
   return (
-    <SafeAreaView style={[styles.safeArea, { backgroundColor: bg }]}>
+    <View style={[styles.safeArea, { backgroundColor: bg, paddingTop: insets.top }]}>
       {/* 1. TOP APP BAR WITH WHATSAPP-STYLE CALLING ICONS */}
       <View style={[styles.header, { backgroundColor: headerBg, borderBottomColor: borderCol }]}>
         {/* Back Button */}
@@ -961,13 +962,16 @@ export default function ChatScreen() {
       {/* 4. CHAT THREAD & MATCH HERO */}
       <KeyboardAvoidingView
         style={{ flex: 1 }}
-        behavior={Platform.OS === 'ios' ? 'padding' : undefined}
+        behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
+        keyboardVerticalOffset={Platform.OS === 'ios' ? 0 : 0}
       >
         <FlatList
           data={userMessages}
           keyExtractor={item => item.id}
           contentContainerStyle={styles.messagesList}
           showsVerticalScrollIndicator={false}
+          keyboardShouldPersistTaps="handled"
+          keyboardDismissMode="on-drag"
           ListHeaderComponent={
             userMessages.length === 0 ? (
               <View style={styles.heroMatchCard}>
@@ -1243,7 +1247,7 @@ export default function ChatScreen() {
             </TouchableOpacity>
           </View>
         ) : (
-          <View style={[styles.inputBar, { backgroundColor: inputBg, borderTopColor: borderCol }]}>
+          <View style={[styles.inputBar, { backgroundColor: inputBg, borderTopColor: borderCol, paddingBottom: Math.max(8, insets.bottom) }]}>
             {/* Plan Date Quick Icon */}
             <TouchableOpacity
               style={styles.actionIconBtn}
@@ -1292,7 +1296,7 @@ export default function ChatScreen() {
           </View>
         )}
       </KeyboardAvoidingView>
-    </SafeAreaView>
+    </View>
   );
 }
 
