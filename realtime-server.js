@@ -1209,24 +1209,6 @@ const server = http.createServer((req, res) => {
   res.end('Not Found');
 });
 
-function broadcastWs(data, excludeSocket = null) {
-  try {
-    const msg = JSON.stringify(data);
-    const frame = encodeWebSocketFrame(msg);
-    for (const client of clients) {
-      if (excludeSocket && client === excludeSocket) continue;
-      try {
-        if (client && client.writable) {
-          client.write(frame);
-        }
-      } catch (e) {
-        clients.delete(client);
-      }
-    }
-  } catch (e) {}
-}
-const broadcastToWebSockets = broadcastWs;
-
 function sendCallPushNotification(targetUserId, callPayload) {
   try {
     const pushToken = db.pushTokens?.[targetUserId] || db.profiles[targetUserId]?.pushToken;
