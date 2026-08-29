@@ -20,16 +20,20 @@ class CallDebuggerClass {
 
   private async loadPersistedLogs() {
     try {
-      const saved = await AsyncStorage.getItem(this.STORAGE_KEY);
-      if (saved) {
-        this.logs = JSON.parse(saved);
+      if (AsyncStorage && typeof AsyncStorage.getItem === 'function') {
+        const saved = await AsyncStorage.getItem(this.STORAGE_KEY).catch(() => null);
+        if (saved) {
+          this.logs = JSON.parse(saved);
+        }
       }
     } catch (e) {}
   }
 
   private async persistLogs() {
     try {
-      await AsyncStorage.setItem(this.STORAGE_KEY, JSON.stringify(this.logs.slice(-this.MAX_LOGS)));
+      if (AsyncStorage && typeof AsyncStorage.setItem === 'function') {
+        await AsyncStorage.setItem(this.STORAGE_KEY, JSON.stringify(this.logs.slice(-this.MAX_LOGS))).catch(() => {});
+      }
     } catch (e) {}
   }
 

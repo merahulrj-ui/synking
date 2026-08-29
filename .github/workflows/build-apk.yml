@@ -30,9 +30,6 @@ jobs:
       - name: 📦 Install Dependencies
         run: npm install --legacy-peer-deps
 
-      - name: 🔄 Generate Fresh Android Prebuild
-        run: npx expo prebuild --platform android --clean
-
       - name: 🔧 Make Gradlew Executable
         run: chmod +x android/gradlew
 

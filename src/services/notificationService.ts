@@ -27,14 +27,17 @@ class NotificationServiceClass {
         }),
       });
 
-      const { status: existingStatus } = await Notifications.getPermissionsAsync();
-      let finalStatus = existingStatus;
-      if (existingStatus !== 'granted') {
-        const { status } = await Notifications.requestPermissionsAsync();
-        finalStatus = status;
-      }
+      let finalStatus = 'undetermined';
+      try {
+        const perm = await Notifications.getPermissionsAsync().catch(() => null);
+        finalStatus = perm?.status || 'undetermined';
+        if (finalStatus !== 'granted') {
+          const req = await Notifications.requestPermissionsAsync().catch(() => null);
+          finalStatus = req?.status || finalStatus;
+        }
+      } catch (e) {}
 
-      CallDebugger.logStage('NOTIFICATION PERMISSION', finalStatus === 'granted' ? 'OK' : 'FAIL', { status: finalStatus });
+      CallDebugger.logStage('NOTIFICATION PERMISSION', finalStatus === 'granted' ? 'OK' : 'INFO', { status: finalStatus });
 
       if (Platform.OS === 'android') {
         await Notifications.setNotificationChannelAsync('incoming_calls', {

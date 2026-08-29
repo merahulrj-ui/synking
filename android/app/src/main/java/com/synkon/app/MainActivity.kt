@@ -18,16 +18,20 @@ class MainActivity : ReactActivity() {
     setTheme(R.style.AppTheme);
     super.onCreate(null)
 
-    if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O_MR1) {
-      setShowWhenLocked(true)
-      setTurnScreenOn(true)
-    } else {
-      window.addFlags(
-        android.view.WindowManager.LayoutParams.FLAG_SHOW_WHEN_LOCKED or
-        android.view.WindowManager.LayoutParams.FLAG_TURN_SCREEN_ON or
-        android.view.WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON or
-        android.view.WindowManager.LayoutParams.FLAG_DISMISS_KEYGUARD
-      )
+    try {
+      if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O_MR1) {
+        setShowWhenLocked(true)
+        setTurnScreenOn(true)
+      } else {
+        window.addFlags(
+          android.view.WindowManager.LayoutParams.FLAG_SHOW_WHEN_LOCKED or
+          android.view.WindowManager.LayoutParams.FLAG_TURN_SCREEN_ON or
+          android.view.WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON or
+          android.view.WindowManager.LayoutParams.FLAG_DISMISS_KEYGUARD
+        )
+      }
+    } catch (e: Exception) {
+      android.util.Log.w("SYNKING_NATIVE", "Lockscreen flag warning: ${e.message}")
     }
     android.util.Log.d("SYNKING_NATIVE", "MainActivity: Lockscreen & TurnScreenOn flags applied.")
   }
