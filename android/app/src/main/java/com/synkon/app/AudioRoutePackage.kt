@@ -1,10 +1,8 @@
-﻿package com.synkon.app
+package com.synkon.app
 
-import android.view.View
 import com.facebook.react.ReactPackage
 import com.facebook.react.bridge.NativeModule
 import com.facebook.react.bridge.ReactApplicationContext
-import com.facebook.react.uimanager.ReactShadowNode
 import com.facebook.react.uimanager.ViewManager
 
 class AudioRoutePackage : ReactPackage {
@@ -12,7 +10,7 @@ class AudioRoutePackage : ReactPackage {
         return listOf(AudioRouteModule(reactContext))
     }
 
-    override fun createViewManagers(reactContext: ReactApplicationContext): List<ViewManager<View, ReactShadowNode<*>>> {
+    override fun createViewManagers(reactContext: ReactApplicationContext): List<ViewManager<*, *>> {
         return emptyList()
     }
 }
