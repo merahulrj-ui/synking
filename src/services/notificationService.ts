@@ -1,10 +1,15 @@
 import { Platform } from 'react-native';
+import { CallDebugger } from './callDebugger';
 
 // Safe dynamic require for expo-notifications
 let Notifications: any = null;
-try {
-  Notifications = require('expo-notifications');
-} catch (e) {}
+if (Platform.OS !== 'web') {
+  try {
+    Notifications = require('expo-notifications');
+  } catch (e) {
+    console.warn('[NOTIF_MODULE_WARN]', e);
+  }
+}
 
 class NotificationServiceClass {
   private isInitialized = false;
@@ -29,6 +34,7 @@ class NotificationServiceClass {
         finalStatus = status;
       }
 
+      CallDebugger.logStage('NOTIFICATION PERMISSION', finalStatus === 'granted' ? 'OK' : 'FAIL', { status: finalStatus });
 
       if (Platform.OS === 'android') {
         await Notifications.setNotificationChannelAsync('incoming_calls', {
@@ -65,6 +71,8 @@ class NotificationServiceClass {
       Notifications.addNotificationResponseReceivedListener((response: any) => {
         const actionId = response.actionIdentifier;
         const callData = response.notification?.request?.content?.data;
+        CallDebugger.logStage('NOTIFICATION ACTION', 'OK', { actionId, callId: callData?.callId });
+
         if (actionId === 'ACCEPT_CALL' || actionId === Notifications.DEFAULT_ACTION_IDENTIFIER) {
           this.dismissCallNotification(callData?.callId);
           try {
@@ -85,17 +93,26 @@ class NotificationServiceClass {
       // 6. Handle background / locked FCM push incoming call wakeup
       Notifications.addNotificationReceivedListener((notification: any) => {
         const data = notification.request?.content?.data;
+        CallDebugger.logStage('FCM MESSAGE RECEIVED', 'OK', { 
+          callId: data?.callId, 
+          caller: data?.callerUser?.name,
+          type: data?.type || data?.callType 
+        });
+
         if (data && (data.type === 'INCOMING_CALL' || data.callId) && data.callerUser) {
           try {
+            CallDebugger.logStage('MESSAGE HANDLER', 'OK', { launchingCall: true });
             const { WebRTCService } = require('./webrtcService');
             WebRTCService.receiveIncomingCall(data.callerUser, data.callType || 'audio', data.callId);
-          } catch (e) {}
+          } catch (e: any) {
+            CallDebugger.logStage('MESSAGE HANDLER', 'FAIL', { error: e?.message });
+          }
         }
       });
 
       this.isInitialized = true;
-    } catch (e) {
-      console.warn('[NOTIF_INIT_WARN]', e);
+    } catch (e: any) {
+      CallDebugger.logStage('NOTIFICATION INIT', 'FAIL', { error: e?.message });
     }
   }
 
@@ -116,8 +133,9 @@ class NotificationServiceClass {
         },
         trigger: null,
       });
-    } catch (e) {
-      console.warn('[SHOW_CALL_NOTIF_ERROR]', e);
+      CallDebugger.logStage('FULL SCREEN INTENT', 'OK', { callerName, callType, callId });
+    } catch (e: any) {
+      CallDebugger.logStage('FULL SCREEN INTENT', 'FAIL', { error: e?.message });
     }
   }
 
@@ -140,18 +158,32 @@ class NotificationServiceClass {
 
     try {
       await this.initialize();
-      const tokenData = await Notifications.getExpoPushTokenAsync().catch(() => null);
-      const pushToken = tokenData?.data;
+      let pushToken: string | null = null;
+      try {
+        const tokenData = await Notifications.getExpoPushTokenAsync().catch(() => null);
+        pushToken = tokenData?.data || null;
+      } catch (e) {}
+
+      if (!pushToken) {
+        try {
+          const deviceTokenData = await Notifications.getDevicePushTokenAsync().catch(() => null);
+          pushToken = deviceTokenData?.data || null;
+        } catch (e) {}
+      }
+
       if (pushToken) {
+        CallDebugger.logStage('FCM TOKEN', 'OK', { userId, pushToken: pushToken.substring(0, 20) + '...' });
         const backendUrl = 'https://synking-9my2.onrender.com';
         await fetch(`${backendUrl}/api/profiles/push-token`, {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({ userId, pushToken }),
         }).catch(() => {});
+      } else {
+        CallDebugger.logStage('FCM TOKEN', 'FAIL', { reason: 'No push token returned by device' });
       }
-    } catch (e) {
-      console.warn('[PUSH_TOKEN_REG_WARN]', e);
+    } catch (e: any) {
+      CallDebugger.logStage('FCM TOKEN', 'FAIL', { error: e?.message });
     }
   }
 }

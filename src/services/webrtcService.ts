@@ -1,24 +1,20 @@
 // Native WebRTC & Targeted Real-Time Streaming Engine for Synking
 // STUN + OpenRelay TURN Pool • 1-on-1 Targeted Signaling • Real Hardware Camera Capture
 
-import { CallSession, UserProfile } from '../types';
 import { RealtimeBridge } from './realtimeBridge';
-import { MediaDevices, PeerConnection, SessionDescription, IceCandidate } from './webrtcCore';
-import { AudioRouteService } from './audioRouteService';
 import { RingtoneService } from './ringtoneService';
-import { Platform, PermissionsAndroid } from 'react-native';
+import { AudioRouteService } from './audioRouteService';
+import { UserProfile, CallSession } from '../types';
+import { PermissionsAndroid, Platform } from 'react-native';
+import { MediaDevices, PeerConnection, SessionDescription, IceCandidate } from './webrtcCore';
+import { NotificationService } from './notificationService';
+import { CallDebugger } from './callDebugger';
 
-export const ICE_SERVERS: RTCConfiguration = {
+// High-Speed WebRTC Ice Server Configuration (Google STUN + Free OpenRelay TURN Fallback)
+const ICE_SERVERS: any = {
   iceServers: [
-    {
-      urls: [
-        'stun:stun.l.google.com:19302',
-        'stun:stun1.l.google.com:19302',
-        'stun:stun2.l.google.com:19302',
-        'stun:stun3.l.google.com:19302',
-        'stun:stun4.l.google.com:19302',
-      ],
-    },
+    { urls: 'stun:stun.l.google.com:19302' },
+    { urls: 'stun:stun1.l.google.com:19302' },
     {
       urls: [
         'turn:openrelay.metered.ca:80',
@@ -61,6 +57,7 @@ class WebRTCManager {
         if (this.currentSession && (this.currentSession.status === 'calling' || this.currentSession.status === 'ringing')) {
           this.currentSession.status = 'connected';
           RingtoneService.stop();
+          CallDebugger.logStage('WEBSOCKET', 'OK', { signal: 'CALL_ACCEPTED' });
           this.log('📞 CALL_ACCEPTED received from peer. Initiating WebRTC SDP offer handshake...');
           this.notify();
           this.startTimer();
@@ -74,6 +71,7 @@ class WebRTCManager {
         if (this.peerConnection && this.peerConnection.signalingState !== 'stable') {
           return;
         }
+        CallDebugger.logStage('WEBRTC', 'PENDING', { step: 'OFFER_RECEIVED' });
         this.log('⚡ WEBRTC_OFFER received from peer. Generating SDP Answer...');
         this.pendingOffer = payload.offer;
         if (this.currentSession && this.currentSession.status === 'connected') {
@@ -84,98 +82,45 @@ class WebRTCManager {
           if (this.peerConnection.signalingState === 'have-local-offer') {
             try {
               await this.peerConnection.setRemoteDescription(new SessionDescription(payload.answer));
+              CallDebugger.logStage('WEBRTC', 'OK', { step: 'ANSWER_APPLIED_CONNECTED' });
               this.log('✅ WEBRTC_ANSWER applied. P2P Direct Relay Established via STUN/TURN!');
               await this.drainIceCandidates();
             } catch (e) {
+              CallDebugger.logStage('WEBRTC', 'FAIL', { error: String(e) });
               this.log(`❌ WEBRTC_ANSWER error: ${e}`);
             }
-          } else {
-            this.log(`⚠️ Dropped WEBRTC_ANSWER. State was: ${this.peerConnection.signalingState}`);
           }
-        } else {
-          this.log(`⚠️ Dropped WEBRTC_ANSWER. peerConnection is null.`);
         }
       } else if (type === 'WEBRTC_ICE' && payload) {
         if (payload.candidate) {
-          this.log(`📥 Received ICE candidate from peer: ${payload.candidate.candidate}`);
-          if (this.peerConnection && this.peerConnection.remoteDescription && this.peerConnection.remoteDescription.type) {
-            try {
-              await this.peerConnection.addIceCandidate(new IceCandidate(payload.candidate));
-              this.log('🌐 ICE Candidate added to active connection.');
-            } catch (e) {}
-          } else {
-            this.log('⏳ Queuing ICE candidate (remoteDescription not set yet).');
-            this.iceCandidateQueue.push(payload.candidate);
-          }
+          await this.addIceCandidate(payload.candidate);
         }
-      } else if (type === 'LIVE_VIDEO_FRAME' && payload) {
-        if (this.currentSession && payload.callId === this.currentSession.id && payload.frame) {
-          this.remoteVideoFrame = payload.frame;
-          this.frameListeners.forEach(cb => {
-            try { cb(payload.frame); } catch (e) {}
-          });
+      } else if (type === 'CALL_REJECTED' && payload) {
+        if (this.currentSession && this.currentSession.id === payload.callId) {
+          CallDebugger.logStage('CALL_REJECTED', 'INFO', { callId: payload.callId });
+          this.log('❌ Call rejected by peer.');
+          this.cleanup();
+        }
+      } else if (type === 'CALL_ENDED' && payload) {
+        if (this.currentSession && this.currentSession.id === payload.callId) {
+          CallDebugger.logStage('CALL_ENDED', 'INFO', { callId: payload.callId });
+          this.log('🛑 Call ended by peer.');
+          this.cleanup();
         }
       } else if (type === 'CALL_UPGRADED_TO_VIDEO' && payload) {
-        if (this.currentSession) {
+        if (this.currentSession && this.currentSession.id === payload.callId) {
+          this.log('📹 Peer upgraded the call to Live Video!');
           this.currentSession.type = 'video';
           this.currentSession.isVideoEnabled = true;
           this.currentSession.isSpeakerOn = true;
           AudioRouteService.setSpeakerOn(true).catch(() => {});
-          this.log('🎥 Peer switched their camera on! Upgraded call to Video.');
           this.notify();
-        }
-      } else if (type === 'CALL_REJECTED' || type === 'CALL_ENDED') {
-        if (this.currentSession) {
-          this.log('🛑 Peer ended or rejected the call session.');
-          this.cleanup();
         }
       }
     });
   }
 
-  private getPeerUserId(): string {
-    if (!this.currentSession) return '';
-    // If I am the receiver (incoming call), the peer is the caller.
-    // We can identify if I am the receiver by checking if receiverId is the placeholder 'my_user_id' 
-    // or if the session is an incoming session (ringing).
-    if (this.currentSession.receiverId === 'my_user_id' || this.currentSession.status === 'ringing') {
-      return this.currentSession.callerId;
-    }
-    // If I am the caller, the peer is the receiver.
-    return this.currentSession.receiverId;
-  }
-
-  public onLog(listener: (msg: string) => void): () => void {
-    this.logListeners.add(listener);
-    return () => this.logListeners.delete(listener);
-  }
-
-  public onRemoteFrame(listener: FrameListener): () => void {
-    this.frameListeners.add(listener);
-    listener(this.remoteVideoFrame);
-    return () => this.frameListeners.delete(listener);
-  }
-
-  public log(msg: string) {
-    const time = new Date().toLocaleTimeString();
-    const entry = `[${time}] ${msg}`;
-    console.log(`[WEBRTC_DEBUG] ${entry}`);
-    this.logListeners.forEach(cb => {
-      try { cb(entry); } catch (e) {}
-    });
-  }
-
-  public subscribe(listener: CallStateListener): () => void {
-    this.listeners.add(listener);
-    listener(this.currentSession);
-    return () => this.listeners.delete(listener);
-  }
-
-  private notify() {
-    this.listeners.forEach(cb => cb(this.currentSession ? { ...this.currentSession } : null));
-  }
-
-  // 1. Start Outgoing Audio or Video Call
+  // 1. Initiate Outgoing Call
   public async startCall(params: {
     callerUser: UserProfile;
     targetUser: UserProfile;
@@ -198,6 +143,13 @@ class WebRTCManager {
     };
 
     this.currentSession = newSession;
+    CallDebugger.logStage('CALL DATA', 'OK', { 
+      callId: newSession.id, 
+      target: params.targetUser.name, 
+      type: params.type 
+    });
+    CallDebugger.printCallSummary(newSession.id, params.callerUser.name, params.type);
+
     this.log(`🚀 Starting outgoing ${params.type} call to ${params.targetUser.name}...`);
     this.notify();
 
@@ -247,6 +199,13 @@ class WebRTCManager {
     };
 
     this.currentSession = incomingSession;
+    CallDebugger.logStage('CALL DATA', 'OK', { 
+      callId: incomingSession.id, 
+      caller: callerUser.name, 
+      type 
+    });
+    CallDebugger.printCallSummary(incomingSession.id, callerUser.name, type);
+
     this.log(`📲 Incoming ${type} call ringing from ${callerUser.name}...`);
     this.notify();
 

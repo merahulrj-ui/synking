@@ -23,18 +23,25 @@ class AudioRouteModule(private val reactContext: ReactApplicationContext) : Reac
     fun setSpeakerphoneOn(on: Boolean, promise: Promise) {
         mainHandler.post {
             try {
-                audioManager.mode = AudioManager.MODE_IN_COMMUNICATION
-
-                if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
-                    // Modern Android 12, 13, 14, 15 Communication Device Routing
-                    if (on) {
+                if (on) {
+                    // 1. Loudspeaker Mode (Video Call OR Speaker Button ON)
+                    audioManager.mode = AudioManager.MODE_NORMAL
+                    audioManager.isSpeakerphoneOn = true
+                    if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
                         val speakerDevice = audioManager.availableCommunicationDevices.find { 
                             it.type == AudioDeviceInfo.TYPE_BUILTIN_SPEAKER 
                         }
                         if (speakerDevice != null) {
                             audioManager.setCommunicationDevice(speakerDevice)
+                        } else {
+                            audioManager.clearCommunicationDevice()
                         }
-                    } else {
+                    }
+                } else {
+                    // 2. Private Earpiece Mode (Voice Call Near Ear)
+                    audioManager.mode = AudioManager.MODE_IN_COMMUNICATION
+                    audioManager.isSpeakerphoneOn = false
+                    if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
                         val earpieceDevice = audioManager.availableCommunicationDevices.find { 
                             it.type == AudioDeviceInfo.TYPE_BUILTIN_EARPIECE 
                         }
@@ -46,8 +53,6 @@ class AudioRouteModule(private val reactContext: ReactApplicationContext) : Reac
                     }
                 }
 
-                // Universal fallback & enforce speaker state
-                audioManager.isSpeakerphoneOn = on
                 audioManager.isMicrophoneMute = false
                 promise.resolve(on)
             } catch (e: Exception) {

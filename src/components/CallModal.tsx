@@ -664,7 +664,7 @@ Remote Video Tracks (${remoteVideo.length}): ${JSON.stringify(remoteVideo)}
                   size={20}
                   color={session.isSpeakerOn ? '#38BDF8' : '#FFFFFF'}
                 />
-                <Text style={styles.controlLabel}>Speaker</Text>
+                <Text style={styles.controlLabel}>{session.isSpeakerOn ? 'Speaker' : 'Earpiece'}</Text>
               </TouchableOpacity>
 
               {/* Video Toggle */}

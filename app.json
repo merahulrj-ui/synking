@@ -21,6 +21,7 @@
     },
     "android": {
       "package": "com.synkon.app",
+      "googleServicesFile": "./google-services.json",
       "adaptiveIcon": {
         "backgroundColor": "#FD3A73",
         "foregroundImage": "./assets/images/android-icon-foreground.png",
@@ -54,13 +55,6 @@
         {
           "cameraPermission": "Allow SYNKING to access your camera for HD Video Calling.",
           "microphonePermission": "Allow SYNKING to access your microphone for HD Voice Calling."
-        }
-      ],
-      [
-        "expo-notifications",
-        {
-          "icon": "./assets/images/icon.png",
-          "color": "#FD3A73"
         }
       ]
     ],

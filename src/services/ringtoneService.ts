@@ -1,4 +1,5 @@
 import { Platform, Vibration } from 'react-native';
+import { CallDebugger } from './callDebugger';
 
 // Professional Ringtone Engine for SYNKING
 // Uses expo-audio on native Android/iOS & Web Audio API for Web browsers
@@ -44,6 +45,7 @@ class RingtoneServiceClass {
     this.stop();
     this.isPlaying = true;
     this.currentMode = 'outgoing';
+    CallDebugger.logStage('RINGTONE', 'OK', { mode: 'outgoing' });
 
     // Native expo-audio playback
     if (Platform.OS !== 'web' && ExpoAudioModule && typeof ExpoAudioModule.createAudioPlayer === 'function') {
@@ -101,11 +103,13 @@ class RingtoneServiceClass {
     this.stop();
     this.isPlaying = true;
     this.currentMode = 'incoming';
+    CallDebugger.logStage('RINGTONE', 'OK', { mode: 'incoming' });
 
     // 📳 Trigger standard incoming call vibration pattern on mobile
     if (Platform.OS !== 'web') {
       try {
         Vibration.vibrate([0, 800, 1000], true);
+        CallDebugger.logStage('VIBRATION', 'OK', { pattern: '[0, 800, 1000]' });
       } catch (e) {}
     }
 
