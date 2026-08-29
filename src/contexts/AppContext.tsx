@@ -463,7 +463,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
   // Relaxed Firestore Polling (WebSocket handles 0ms instant updates)
   useEffect(() => {
     syncCloudState();
-    const interval = setInterval(syncCloudState, 10000);
+    const interval = setInterval(syncCloudState, 45000);
     return () => clearInterval(interval);
   }, [currentUser?.id]);
 

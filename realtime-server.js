@@ -768,70 +768,6 @@ const server = http.createServer((req, res) => {
     return;
   }
 
-function sendCallPushNotification(targetUserId, callPayload) {
-  const pushToken = db.pushTokens?.[targetUserId] || db.profiles[targetUserId]?.pushToken;
-  if (!pushToken) {
-    console.log(`[PUSH_SKIP] No push token registered for target ${targetUserId}`);
-    return;
-  }
-
-  const callerName = callPayload.callerUser?.name || 'Someone';
-  const callType = callPayload.type === 'video' ? 'Video' : 'Voice';
-
-  const pushBody = JSON.stringify({
-    to: pushToken,
-    title: `📞 Incoming ${callType} Call`,
-    body: `${callerName} is calling you on SYNKING`,
-    data: {
-      type: 'INCOMING_CALL',
-      callId: callPayload.callId,
-      callerUser: callPayload.callerUser,
-      callType: callPayload.type,
-    },
-    priority: 'high',
-    channelId: 'incoming_calls',
-    categoryIdentifier: 'CALL',
-    sound: 'default',
-  });
-
-  const req = https.request('https://exp.host/--/api/v2/push/send', {
-    method: 'POST',
-    headers: {
-      'Content-Type': 'application/json',
-      'Content-Length': Buffer.byteLength(pushBody),
-    },
-  }, (res) => {
-    let respData = '';
-    res.on('data', chunk => respData += chunk);
-    res.on('end', () => {
-      console.log(`[PUSH_CALL_DISPATCHED] Sent high-priority push call to ${targetUserId}:`, respData);
-    });
-  });
-
-  req.on('error', (err) => {
-    console.error('[PUSH_CALL_ERROR]', err.message);
-  });
-
-  req.write(pushBody);
-  req.end();
-}
-
-function broadcastWs(data, excludeSocket = null) {
-  const msg = JSON.stringify(data);
-  const frame = encodeWebSocketFrame(msg);
-  for (const client of clients) {
-    if (excludeSocket && client === excludeSocket) continue;
-    try {
-      if (client && client.writable) {
-        client.write(frame);
-      }
-    } catch (e) {
-      clients.delete(client);
-    }
-  }
-}
-const broadcastToWebSockets = broadcastWs;
-
   // 2.1 DELETE /api/profiles/:id (Delete from Local DB + Turso Cloud SQLite)
   if (req.method === 'DELETE' && pathname.startsWith('/api/profiles/')) {
     const id = pathname.replace('/api/profiles/', '').trim();
@@ -1272,6 +1208,76 @@ const broadcastToWebSockets = broadcastWs;
   res.writeHead(404);
   res.end('Not Found');
 });
+
+function broadcastWs(data, excludeSocket = null) {
+  try {
+    const msg = JSON.stringify(data);
+    const frame = encodeWebSocketFrame(msg);
+    for (const client of clients) {
+      if (excludeSocket && client === excludeSocket) continue;
+      try {
+        if (client && client.writable) {
+          client.write(frame);
+        }
+      } catch (e) {
+        clients.delete(client);
+      }
+    }
+  } catch (e) {}
+}
+const broadcastToWebSockets = broadcastWs;
+
+function sendCallPushNotification(targetUserId, callPayload) {
+  try {
+    const pushToken = db.pushTokens?.[targetUserId] || db.profiles[targetUserId]?.pushToken;
+    if (!pushToken) {
+      console.log(`[PUSH_SKIP] No push token registered for target ${targetUserId}`);
+      return;
+    }
+
+    const callerName = callPayload?.callerUser?.name || 'Someone';
+    const callType = callPayload?.type === 'video' ? 'Video' : 'Voice';
+
+    const pushBody = JSON.stringify({
+      to: pushToken,
+      title: `📞 Incoming ${callType} Call`,
+      body: `${callerName} is calling you on SYNKING`,
+      data: {
+        type: 'INCOMING_CALL',
+        callId: callPayload?.callId,
+        callerUser: callPayload?.callerUser,
+        callType: callPayload?.type,
+      },
+      priority: 'high',
+      channelId: 'incoming_calls',
+      categoryIdentifier: 'CALL',
+      sound: 'default',
+    });
+
+    const req = https.request('https://exp.host/--/api/v2/push/send', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'Content-Length': Buffer.byteLength(pushBody),
+      },
+    }, (res) => {
+      let respData = '';
+      res.on('data', chunk => respData += chunk);
+      res.on('end', () => {
+        console.log(`[PUSH_CALL_DISPATCHED] Sent high-priority push call to ${targetUserId}:`, respData);
+      });
+    });
+
+    req.on('error', (err) => {
+      console.error('[PUSH_CALL_ERROR]', err.message);
+    });
+
+    req.write(pushBody);
+    req.end();
+  } catch (err) {
+    console.error('[PUSH_CALL_EXCEPTION]', err.message);
+  }
+}
 
 // WebSocket Protocol Handshake
 server.on('upgrade', (req, socket, head) => {
