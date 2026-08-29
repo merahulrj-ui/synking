@@ -8,20 +8,19 @@ import { RingtoneService } from '../services/ringtoneService';
 import { NativeRTCView } from '../services/webrtcCore';
 
 // 1. Live Self Video Component (PiP) - Real Hardware Front Camera
-const LiveSelfVideo: React.FC = () => {
+const LiveSelfVideo: React.FC<{ isPip?: boolean }> = ({ isPip = true }) => {
   const videoRef = useRef<any>(null);
 
-  useEffect(() => {
-    const attachSelf = () => {
+  const attachSelf = () => {
+    if (Platform.OS === 'web') {
       const stream = WebRTCService.getLocalStream();
-      if (Platform.OS === 'web' && stream && videoRef.current) {
-        if (videoRef.current.srcObject !== stream) {
-          videoRef.current.srcObject = stream;
-        }
-        WebRTCService.localVideoElementRef = videoRef.current;
-        videoRef.current.play().catch(() => {});
+      if (stream && videoRef.current && videoRef.current.srcObject !== stream) {
+        videoRef.current.srcObject = stream;
       }
-    };
+    }
+  };
+
+  useEffect(() => {
     attachSelf();
     const interval = setInterval(attachSelf, 400);
     return () => clearInterval(interval);
@@ -30,7 +29,7 @@ const LiveSelfVideo: React.FC = () => {
   const stream = WebRTCService.getLocalStream();
 
   return (
-    <View style={styles.selfVideoPlaceholder}>
+    <View style={[styles.selfVideoPlaceholder, { backgroundColor: '#000000', borderRadius: isPip ? 16 : 0 }]}>
       {Platform.OS === 'web' ? (
         // @ts-ignore
         <video
@@ -43,21 +42,21 @@ const LiveSelfVideo: React.FC = () => {
             height: '100%',
             objectFit: 'cover',
             transform: 'scaleX(-1)',
-            borderRadius: 16,
-            backgroundColor: '#000',
+            borderRadius: isPip ? 16 : 0,
+            backgroundColor: '#000000',
           }}
         />
       ) : (
         (NativeRTCView && stream) ? (
           <NativeRTCView
-            streamURL={stream.toURL()}
-            style={{ width: '100%', height: '100%', borderRadius: 16 }}
+            streamURL={typeof stream.toURL === 'function' ? stream.toURL() : stream}
+            style={{ width: '100%', height: '100%', borderRadius: isPip ? 16 : 0, backgroundColor: '#000000' }}
             objectFit="cover"
             mirror={true}
-            zOrder={1}
+            zOrder={isPip ? 1 : 0}
           />
         ) : (
-          <View style={{ width: '100%', height: '100%', borderRadius: 16, overflow: 'hidden', backgroundColor: '#1A1A1A', justifyContent: 'center', alignItems: 'center' }}>
+          <View style={{ width: '100%', height: '100%', borderRadius: isPip ? 16 : 0, overflow: 'hidden', backgroundColor: '#1A1A1A', justifyContent: 'center', alignItems: 'center' }}>
             <Ionicons name="videocam-off" size={24} color="#555" />
           </View>
         )
@@ -475,87 +474,90 @@ Remote Video Tracks (${remoteVideo.length}): ${JSON.stringify(remoteVideo)}
           colors={['#0F172A', '#05060A', '#020617']}
           style={styles.callingCard}
         >
-          {/* 1. REMOTE VIDEO (Web & Native) */}
-          <Animated.View 
-            style={!isLocalExpanded ? [styles.videoSurfaceContainer, { zIndex: 0 }] : [styles.pipSelfView, { transform: pipPan.getTranslateTransform(), zIndex: 20 }]}
-            {...(isLocalExpanded ? pipPanResponder.panHandlers : {})}
-          >
-            <TouchableOpacity 
-              activeOpacity={0.9} 
-              style={{ flex: 1, width: '100%', height: '100%', overflow: 'hidden' }}
-              onPress={() => isLocalExpanded && setIsLocalExpanded(false)}
-            >
-              {Platform.OS !== 'web' && NativeRTCView && remoteStream ? (
-                <NativeRTCView
-                  streamURL={typeof remoteStream.toURL === 'function' ? remoteStream.toURL() : remoteStream}
-                  style={styles.nativeRemoteVideo}
-                  objectFit="cover"
-                  zOrder={isLocalExpanded ? 1 : 0}
-                />
-              ) : (
-                <LiveRemoteMedia type={session.type === 'video' ? 'video' : 'voice'} photoUrl={session.callerPhoto} isSpeakerOn={session.isSpeakerOn} />
-              )}
-            </TouchableOpacity>
-          </Animated.View>
+          {/* 1. CONNECTED VIDEO CALL: Fullscreen Remote Video + Draggable Self PiP */}
+          {isConnected && (session.type === 'video' || session.isVideoEnabled) && (
+            <>
+              {/* Fullscreen Remote Video */}
+              <View style={styles.videoSurfaceContainer}>
+                {Platform.OS !== 'web' && NativeRTCView && remoteStream ? (
+                  <NativeRTCView
+                    streamURL={typeof remoteStream.toURL === 'function' ? remoteStream.toURL() : remoteStream}
+                    style={[styles.nativeRemoteVideo, { backgroundColor: '#000000' }]}
+                    objectFit="cover"
+                    zOrder={0}
+                  />
+                ) : (
+                  <LiveRemoteMedia type={session.type === 'video' ? 'video' : 'voice'} photoUrl={session.callerPhoto} isSpeakerOn={session.isSpeakerOn} />
+                )}
+              </View>
 
-          {/* 2. LOCAL VIDEO (PiP or Fullscreen) */}
-          {(session.type === 'video' || session.isVideoEnabled) && (
-            <Animated.View 
-              style={isLocalExpanded ? [styles.videoSurfaceContainer, { zIndex: 0 }] : [styles.pipSelfView, { transform: pipPan.getTranslateTransform(), zIndex: 20 }]}
-              {...(!isLocalExpanded ? pipPanResponder.panHandlers : {})}
-            >
-              <TouchableOpacity 
-                activeOpacity={0.9} 
-                style={{ flex: 1, width: '100%', height: '100%', overflow: 'hidden' }}
-                onPress={() => !isLocalExpanded && setIsLocalExpanded(true)}
+              {/* Draggable Self PiP Overlay */}
+              <Animated.View 
+                style={[styles.pipSelfView, { transform: pipPan.getTranslateTransform(), zIndex: 20 }]}
+                {...pipPanResponder.panHandlers}
               >
-                <LiveSelfVideo />
-                
-                {/* 📸 Majedar Flip Camera Button Overlay (ALWAYS on Local Video) */}
-                <TouchableOpacity 
-                  style={{
-                    position: 'absolute',
-                    bottom: 12,
-                    right: 12,
-                    backgroundColor: 'rgba(0, 0, 0, 0.6)',
-                    width: 36,
-                    height: 36,
-                    borderRadius: 18,
-                    alignItems: 'center',
-                    justifyContent: 'center',
-                    borderWidth: 1,
-                    borderColor: 'rgba(255, 255, 255, 0.3)',
-                    zIndex: 100,
-                  }}
-                  onPress={(e) => { 
-                    e.stopPropagation(); 
-                    WebRTCService.switchCamera(); 
-                  }}
-                  activeOpacity={0.7}
-                >
-                  <Ionicons name="camera-reverse" size={20} color="#00E5FF" />
-                </TouchableOpacity>
-              </TouchableOpacity>
-            </Animated.View>
+                <View style={{ flex: 1, width: '100%', height: '100%', overflow: 'hidden', backgroundColor: '#000000' }}>
+                  <LiveSelfVideo isPip={true} />
+                  
+                  {/* 📸 Flip Camera Button Overlay */}
+                  <TouchableOpacity 
+                    style={{
+                      position: 'absolute',
+                      bottom: 10,
+                      right: 10,
+                      backgroundColor: 'rgba(0, 0, 0, 0.6)',
+                      width: 34,
+                      height: 34,
+                      borderRadius: 17,
+                      alignItems: 'center',
+                      justifyContent: 'center',
+                      borderWidth: 1,
+                      borderColor: 'rgba(255, 255, 255, 0.3)',
+                      zIndex: 100,
+                    }}
+                    onPress={(e) => { 
+                      e.stopPropagation(); 
+                      WebRTCService.switchCamera(); 
+                    }}
+                    activeOpacity={0.7}
+                  >
+                    <Ionicons name="camera-reverse" size={18} color="#00E5FF" />
+                  </TouchableOpacity>
+                </View>
+              </Animated.View>
+            </>
           )}
 
-          {/* 3. Background Placeholder only while ringing */}
-          {!isConnected && (session.type === 'video' || session.isVideoEnabled) && (
-            <View style={[StyleSheet.absoluteFill, { alignItems: 'center', justifyContent: 'center', backgroundColor: '#070A14', zIndex: 5 }]} pointerEvents="none">
-              <Image
-                source={{ uri: session.callerPhoto }}
-                style={{ width: 120, height: 120, borderRadius: 60, borderWidth: 3, borderColor: '#FD3A73', marginBottom: 14 }}
-              />
-              <Text style={{ color: '#FFFFFF', fontSize: 20, fontWeight: '900', marginBottom: 4 }}>
-                {session.callerName}
-              </Text>
-              <Text style={{ color: '#00E5FF', fontSize: 13, fontWeight: '800', letterSpacing: -0.2 }}>
-                Ringing...
-              </Text>
+          {/* 2. OUTGOING VIDEO CALL (CALLER PREVIEW): Fullscreen Self Camera */}
+          {!isConnected && !isIncomingRinging && (session.type === 'video' || session.isVideoEnabled) && (
+            <View style={styles.videoSurfaceContainer}>
+              <LiveSelfVideo isPip={false} />
+              
+              {/* Flip Camera Button for Caller Preview */}
+              <TouchableOpacity 
+                style={{
+                  position: 'absolute',
+                  top: 60,
+                  right: 20,
+                  backgroundColor: 'rgba(0, 0, 0, 0.65)',
+                  width: 44,
+                  height: 44,
+                  borderRadius: 22,
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  borderWidth: 1.5,
+                  borderColor: 'rgba(0, 229, 255, 0.4)',
+                  zIndex: 100,
+                }}
+                onPress={() => WebRTCService.switchCamera()}
+                activeOpacity={0.7}
+              >
+                <Ionicons name="camera-reverse" size={22} color="#00E5FF" />
+              </TouchableOpacity>
             </View>
           )}
 
-          {/* 1. TOP STATUS HEADER (FLOATING OVERLAY) */}
+          {/* 1. TOP STATUS HEADER (ALWAYS AT TOP) */}
           <View style={[styles.topHeader, (session.type === 'video' || session.isVideoEnabled) && styles.topHeaderFloating]}>
             <View style={styles.e2eeBadge}>
               <Ionicons name="shield-checkmark" size={12} color="#22C55E" />
@@ -578,8 +580,8 @@ Remote Video Tracks (${remoteVideo.length}): ${JSON.stringify(remoteVideo)}
             </Text>
           </View>
 
-          {/* 2. CENTER AVATAR (ONLY FOR VOICE CALLS WITHOUT VIDEO) */}
-          {session.type !== 'video' && !session.isVideoEnabled && (
+          {/* 2. INCOMING CALL (RECEIVER DIALER) OR VOICE CALL: Center Avatar */}
+          {(session.type !== 'video' && !session.isVideoEnabled) || (isIncomingRinging && !isConnected) ? (
             <View style={styles.centerSection}>
               <View style={styles.avatarContainer}>
                 {/* Glowing Wave Rings */}
@@ -595,12 +597,14 @@ Remote Video Tracks (${remoteVideo.length}): ${JSON.stringify(remoteVideo)}
               <Text style={styles.callerName}>{session.callerName}</Text>
               <Text style={styles.callerSub}>
                 {isIncomingRinging
-                  ? 'Tap Green button to answer & connect'
+                  ? `Incoming ${session.type === 'video' ? 'Video 📹' : 'Voice 📞'} Call • Tap Accept`
                   : isConnected
                   ? '🔒 Direct Peer-to-Peer Encrypted'
                   : 'Connecting safely on SYNKING'}
               </Text>
             </View>
+          ) : (
+            <View style={{ flex: 1 }} />
           )}
 
           {/* 3. BOTTOM CONTROL BAR */}
@@ -792,14 +796,17 @@ const styles = StyleSheet.create({
     color: '#22C55E',
   },
   centerSection: {
+    flex: 1,
     alignItems: 'center',
-    gap: 12,
+    justifyContent: 'center',
+    gap: 14,
     width: '100%',
+    marginBottom: 80,
   },
   avatarContainer: {
     position: 'relative',
-    width: 140,
-    height: 140,
+    width: 150,
+    height: 150,
     alignItems: 'center',
     justifyContent: 'center',
     marginVertical: 12,
@@ -869,7 +876,7 @@ const styles = StyleSheet.create({
     overflow: 'hidden',
     borderWidth: 2,
     borderColor: '#00E5FF',
-    backgroundColor: '#1E293B',
+    backgroundColor: '#000000',
     zIndex: 25,
     elevation: 8,
   },

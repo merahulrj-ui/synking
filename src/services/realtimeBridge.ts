@@ -9,6 +9,7 @@ class RealtimeBridgeManager {
   private listeners: Set<RealtimeListener> = new Set();
   private isConnected = false;
   private registeredUserId: string | null = null;
+  private pingInterval: any = null;
 
   constructor() {
     // 1. Local Browser BroadcastChannel (0ms intra-device sync)
@@ -49,12 +50,23 @@ class RealtimeBridgeManager {
         if (this.registeredUserId) {
           this.registerUser(this.registeredUserId);
         }
+
+        // Heartbeat Ping every 15s to keep WebSocket alive in background
+        if (this.pingInterval) clearInterval(this.pingInterval);
+        this.pingInterval = setInterval(() => {
+          if (this.socket && this.socket.readyState === WebSocket.OPEN) {
+            try {
+              this.socket.send(JSON.stringify({ type: 'PING' }));
+            } catch (e) {}
+          }
+        }, 15000);
       };
 
       this.socket.onmessage = (event: any) => {
         try {
           const data = JSON.parse(event.data);
           if (data && data.type) {
+            if (data.type === 'PONG') return;
             this.notify(data);
           }
         } catch (e) {}
@@ -62,12 +74,14 @@ class RealtimeBridgeManager {
 
       this.socket.onclose = () => {
         this.isConnected = false;
+        if (this.pingInterval) clearInterval(this.pingInterval);
         // Auto reconnect after 2 seconds
         setTimeout(() => this.connectWebSocket(), 2000);
       };
 
       this.socket.onerror = () => {
         this.isConnected = false;
+        if (this.pingInterval) clearInterval(this.pingInterval);
       };
     } catch (e) {}
   }

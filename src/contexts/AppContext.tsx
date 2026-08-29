@@ -375,18 +375,6 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     }
 
     if (!currentUser) return; // Only stop here for requests/matches which require auth
-    
-    try {
-      const selfCheck = await fetch(`${getLocalBackendUrl()}/api/profiles`);
-      if (selfCheck.ok) {
-        const allUsers = await selfCheck.json();
-        if (Array.isArray(allUsers) && !allUsers.some(u => u.id === currentUser.id)) {
-          console.log('🚪 [PROFILE_MISSING_IN_CLOUD] User was deleted elsewhere. Logging out locally to prevent resurrection.');
-          logoutUser();
-          return;
-        }
-      }
-    } catch (e) {}
 
     // 2. Fetch Incoming Synk Requests sent to this user (filtered by pending)
     const cloudRequests = await fetchIncomingRequestsFromFirestore(currentUser.id);
@@ -443,7 +431,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
         const stored = await AsyncStorage.getItem('synking_my_user');
         if (stored && !currentUser) {
           const parsed = JSON.parse(stored);
-          if (parsed && !/^user_\d{4}$/.test(parsed.id)) {
+          if (parsed && parsed.id && parsed.name) {
             setCurrentUser(parsed);
             setIsLoggedIn(true);
           }

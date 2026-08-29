@@ -15,7 +15,6 @@ const { width: SCREEN_WIDTH } = Dimensions.get('window');
 export default function DiscoverScreen() {
   const { profiles, matches, sentRequests, incomingRequests, passedProfiles, currentUser, swipeProfile, isLoggedIn, isDarkMode, refreshDiscoverFeed } = useApp();
   const router = useRouter();
-  const [authModalVisible, setAuthModalVisible] = useState(false);
   const [requestSentProfile, setRequestSentProfile] = useState<any>(null);
 
   // Strictly filter out:
@@ -48,7 +47,7 @@ export default function DiscoverScreen() {
     }
 
     if (!isLoggedIn) {
-      setAuthModalVisible(true);
+      router.push('/(tabs)/profile');
       return;
     }
 
@@ -69,7 +68,7 @@ export default function DiscoverScreen() {
 
   const handleBoostProfile = () => {
     if (!isLoggedIn) {
-      setAuthModalVisible(true);
+      router.push('/(tabs)/profile');
       return;
     }
     Alert.alert(
@@ -219,13 +218,6 @@ export default function DiscoverScreen() {
           </View>
         )}
       </View>
-
-      {/* Auth Modal */}
-      <AuthModal
-        visible={authModalVisible}
-        onClose={() => setAuthModalVisible(false)}
-        targetUserName={currentProfile?.name}
-      />
 
       {/* Toast Notification */}
       {requestSentProfile && (
