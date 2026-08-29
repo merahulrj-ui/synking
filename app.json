@@ -42,12 +42,15 @@
         "FOREGROUND_SERVICE_SPECIAL_USE",
         "USE_FULL_SCREEN_INTENT",
         "BLUETOOTH",
-        "BLUETOOTH_CONNECT"
+        "BLUETOOTH_CONNECT",
+        "POST_NOTIFICATIONS"
       ],
       "runtimeVersion": "1.0.0"
     },
     "plugins": [
       "expo-router",
+      "expo-audio",
+      "expo-notifications",
       [
         "@config-plugins/react-native-webrtc",
         {

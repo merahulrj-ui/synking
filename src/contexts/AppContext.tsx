@@ -16,6 +16,7 @@ import {
 import { encryptE2EEMessage } from '../utils/encryption';
 import { RealtimeBridge } from '../services/realtimeBridge';
 import { WebRTCService } from '../services/webrtcService';
+import { NotificationService } from '../services/notificationService';
 import * as Location from 'expo-location';
 
 interface AppContextType {
@@ -330,8 +331,11 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
         }
       } else if (type === 'INCOMING_CALL' && payload) {
         if (payload.receiverId === currentUser?.id && payload.callerUser) {
+          NotificationService.showIncomingCallNotification(payload.callerUser.name, payload.type, payload.callId);
           WebRTCService.receiveIncomingCall(payload.callerUser, payload.type, payload.callId);
         }
+      } else if (type === 'CALL_ENDED' || type === 'CALL_REJECTED' || type === 'CALL_ACCEPTED') {
+        NotificationService.dismissCallNotification();
       } else if (type === 'USER_DELETED' && payload) {
         if (payload.userId === currentUser?.id) {
           console.log('🚪 [USER_DELETED_BY_ADMIN] Logging out deleted user:', currentUser?.id);

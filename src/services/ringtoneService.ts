@@ -1,14 +1,23 @@
 import { Platform, Vibration } from 'react-native';
 
-// Professional, Crash-Proof Ringtone & Vibration Engine for SYNKING
-// Uses Native Android/iOS Vibration patterns for incoming calls & Web Audio API for Web browsers
-// 100% Zero-Crash & Free of native UnsatisfiedLinkError binary issues
+// Professional Ringtone Engine for SYNKING
+// Uses expo-audio on native Android/iOS & Web Audio API for Web browsers
+// Completely isolated from WebRTC call audio to prevent interference
+
+let ExpoAudioModule: any = null;
+try {
+  ExpoAudioModule = require('expo-audio');
+} catch (e) {}
+
+const INCOMING_RINGTONE_URL = 'https://assets.mixkit.co/active_storage/sfx/2869/2869-preview.mp3';
+const OUTGOING_RINGTONE_URL = 'https://assets.mixkit.co/active_storage/sfx/1360/1360-preview.mp3';
 
 class RingtoneServiceClass {
   private audioCtx: any = null;
   private ringInterval: any = null;
   private isPlaying: boolean = false;
   private currentMode: 'incoming' | 'outgoing' | null = null;
+  private nativePlayer: any = null;
 
   private getAudioContext(): any {
     if (typeof window === 'undefined') return null;
@@ -36,7 +45,21 @@ class RingtoneServiceClass {
     this.isPlaying = true;
     this.currentMode = 'outgoing';
 
-    // Audio Oscillator for Web & Supported Native Environments
+    // Native expo-audio playback
+    if (Platform.OS !== 'web' && ExpoAudioModule && typeof ExpoAudioModule.createAudioPlayer === 'function') {
+      try {
+        const player = ExpoAudioModule.createAudioPlayer({ uri: OUTGOING_RINGTONE_URL });
+        player.loop = true;
+        player.volume = 0.8;
+        player.play();
+        this.nativePlayer = player;
+        return;
+      } catch (e) {
+        console.warn('[EXPO_AUDIO_OUTGOING_WARN]', e);
+      }
+    }
+
+    // Audio Oscillator for Web & Fallback Environments
     const playPulse = () => {
       if (!this.isPlaying || this.currentMode !== 'outgoing') return;
       const ctx = this.getAudioContext();
@@ -84,6 +107,20 @@ class RingtoneServiceClass {
       try {
         Vibration.vibrate([0, 800, 1000], true);
       } catch (e) {}
+    }
+
+    // Native expo-audio playback
+    if (Platform.OS !== 'web' && ExpoAudioModule && typeof ExpoAudioModule.createAudioPlayer === 'function') {
+      try {
+        const player = ExpoAudioModule.createAudioPlayer({ uri: INCOMING_RINGTONE_URL });
+        player.loop = true;
+        player.volume = 1.0;
+        player.play();
+        this.nativePlayer = player;
+        return;
+      } catch (e) {
+        console.warn('[EXPO_AUDIO_INCOMING_WARN]', e);
+      }
     }
 
     // Melodic Synth Chime for Web
@@ -141,6 +178,16 @@ class RingtoneServiceClass {
     if (this.ringInterval) {
       clearInterval(this.ringInterval);
       this.ringInterval = null;
+    }
+
+    if (this.nativePlayer) {
+      try {
+        this.nativePlayer.pause();
+        if (typeof this.nativePlayer.release === 'function') {
+          this.nativePlayer.release();
+        }
+      } catch (e) {}
+      this.nativePlayer = null;
     }
   }
 }
