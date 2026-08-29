@@ -40,14 +40,14 @@ export default function RootLayout() {
     async function checkOTA() {
       if (__DEV__) return;
       try {
-        const update = await Updates.checkForUpdateAsync();
-        if (update.isAvailable) {
-          await Updates.fetchUpdateAsync();
-          await Updates.reloadAsync();
+        if (Updates && Updates.isEnabled && typeof Updates.checkForUpdateAsync === 'function') {
+          const update = await Updates.checkForUpdateAsync().catch(() => null);
+          if (update && update.isAvailable) {
+            await Updates.fetchUpdateAsync().catch(() => null);
+            await Updates.reloadAsync().catch(() => null);
+          }
         }
-      } catch (e) {
-        // Skip silently if error
-      }
+      } catch (e) {}
     }
     checkOTA();
   }, []);
