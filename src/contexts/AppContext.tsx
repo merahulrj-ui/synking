@@ -66,7 +66,7 @@ const getInitialTheme = (): boolean => {
       }
     }
   } catch (e) {}
-  return false; // Default: Pure Light Mode
+  return true; // Default: PURE DARK MODE (#05060A / #08090F)
 };
 
 export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
@@ -212,6 +212,8 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
         const storedTheme = await AsyncStorage.getItem('synking_theme');
         if (storedTheme !== null) {
           setIsDarkMode(storedTheme === 'dark');
+        } else {
+          setIsDarkMode(true);
         }
 
         const storedStrikes = await AsyncStorage.getItem('synking_phone_strikes');

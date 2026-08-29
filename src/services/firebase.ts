@@ -203,19 +203,25 @@ export async function fetchChatMessagesFromFirestore(user1Id: string, user2Id: s
       if (Array.isArray(data) && data.length > 0) {
         const decryptedList = await Promise.all(
           data.map(async (m: any) => {
-            const rawText = m.plainText || m.text || m.cipherText || '';
+            let rawText = m.plainText || m.text || m.cipherText || '';
             if (rawText && typeof rawText === 'string' && rawText.startsWith('E2EE::')) {
-              const decrypted = await decryptE2EEMessage(rawText, m.senderId, m.receiverId);
-              return {
-                ...m,
-                text: decrypted,
-                plainText: decrypted,
-              };
+              rawText = await decryptE2EEMessage(rawText, m.senderId, m.receiverId);
+            }
+            let audioUrl = m.extraData?.audioUrl;
+            let displayText = rawText;
+            if (rawText && typeof rawText === 'string' && rawText.includes('|||AUDIO_DATA::')) {
+              const parts = rawText.split('|||AUDIO_DATA::');
+              displayText = parts[0];
+              audioUrl = parts[1];
             }
             return {
               ...m,
-              text: rawText,
-              plainText: rawText,
+              text: displayText,
+              plainText: displayText,
+              extraData: {
+                ...m.extraData,
+                audioUrl: audioUrl || m.extraData?.audioUrl,
+              },
             };
           })
         );

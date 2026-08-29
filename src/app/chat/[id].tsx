@@ -355,7 +355,8 @@ export default function ChatScreen() {
     }
 
     if (id) {
-      sendMessage(id, textLabel, 'voice', {
+      const fullText = audioDataUri ? `${textLabel}|||AUDIO_DATA::${audioDataUri}` : textLabel;
+      sendMessage(id, fullText, 'voice', {
         audioUrl: audioDataUri,
         audioDuration: duration,
       });
@@ -962,8 +963,7 @@ export default function ChatScreen() {
       {/* 4. CHAT THREAD & MATCH HERO */}
       <KeyboardAvoidingView
         style={{ flex: 1 }}
-        behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
-        keyboardVerticalOffset={Platform.OS === 'ios' ? 0 : 0}
+        behavior={Platform.OS === 'ios' ? 'padding' : undefined}
       >
         <FlatList
           data={userMessages}

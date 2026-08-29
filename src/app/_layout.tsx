@@ -3,7 +3,7 @@ import { View, StyleSheet, Platform, Alert } from 'react-native';
 import { Stack } from 'expo-router';
 import { StatusBar } from 'expo-status-bar';
 import * as Updates from 'expo-updates';
-import { AppProvider } from '../contexts/AppContext';
+import { AppProvider, useApp } from '../contexts/AppContext';
 import { Colors } from '../constants/theme';
 
 import { CallModal } from '../components/CallModal';
@@ -13,6 +13,7 @@ import { CallSession } from '../types';
 
 function GlobalCallOverlay() {
   const [activeCall, setActiveCall] = React.useState<CallSession | null>(null);
+  const { sendMessage, currentUser } = useApp();
 
   React.useEffect(() => {
     const unsubscribe = WebRTCService.subscribe(session => {
@@ -23,10 +24,25 @@ function GlobalCallOverlay() {
 
   if (!activeCall) return null;
 
+  const handleEndCall = () => {
+    const result = WebRTCService.endCall();
+    if (result && result.session && currentUser) {
+      const { session, durationFormatted } = result;
+      const targetId = session.callerUser?.id === currentUser.id ? session.targetUser?.id : session.callerUser?.id;
+      if (targetId) {
+        const callLogText =
+          session.type === 'video'
+            ? `📹 Video Call · ${session.durationSeconds > 0 ? durationFormatted : 'Missed'}`
+            : `📞 Voice Call · ${session.durationSeconds > 0 ? durationFormatted : 'Missed'}`;
+        sendMessage(targetId, callLogText, 'call');
+      }
+    }
+  };
+
   return (
     <CallModal
       session={activeCall}
-      onEndCall={() => WebRTCService.endCall()}
+      onEndCall={handleEndCall}
       onAcceptCall={() => WebRTCService.acceptCall()}
       onToggleMute={() => WebRTCService.toggleMute()}
       onToggleVideo={() => WebRTCService.toggleVideo()}

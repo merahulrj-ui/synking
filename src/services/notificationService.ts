@@ -177,7 +177,8 @@ class NotificationServiceClass {
 
       if (pushToken) {
         CallDebugger.logStage('FCM TOKEN', 'OK', { userId, pushToken: pushToken.substring(0, 20) + '...' });
-        const backendUrl = 'https://synking-9my2.onrender.com';
+        const { getLocalBackendUrl } = require('./firebase');
+        const backendUrl = getLocalBackendUrl();
         await fetch(`${backendUrl}/api/profiles/push-token`, {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
