@@ -41,24 +41,7 @@
         <category android:name="android.intent.category.LAUNCHER"/>
       </intent-filter>
     </activity>
-    <service
-      android:name="expo.modules.notifications.service.ExpoFirebaseMessagingService"
-      android:exported="false">
-      <intent-filter android:priority="-1">
-        <action android:name="com.google.firebase.MESSAGING_EVENT" />
-      </intent-filter>
-    </service>
-    <receiver
-      android:name="expo.modules.notifications.service.NotificationsReceiver"
-      android:exported="true"
-      android:permission="android.permission.POST_NOTIFICATIONS">
-      <intent-filter>
-        <action android:name="android.intent.action.BOOT_COMPLETED" />
-        <action android:name="android.intent.action.MY_PACKAGE_REPLACED" />
-        <action android:name="expo.modules.notifications.NOTIFICATION_RECEIVED" />
-      </intent-filter>
-    </receiver>
-    <meta-data android:name="expo.modules.updates.ENABLED" android:value="true"/>
+    <meta-data android:name="expo.modules.updates.ENABLED" android:value="false"/>
     <meta-data android:name="expo.modules.updates.EXPO_UPDATES_CHECK_ON_LAUNCH" android:value="ALWAYS"/>
     <meta-data android:name="expo.modules.updates.EXPO_UPDATES_LAUNCH_WAIT_MS" android:value="0"/>
     <meta-data android:name="expo.modules.updates.EXPO_UPDATE_URL" android:value="https://u.expo.dev/7991a7fd-8364-4a1c-a332-90ca559d0128"/>

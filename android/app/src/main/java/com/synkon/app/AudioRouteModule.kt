@@ -25,7 +25,7 @@ class AudioRouteModule(private val reactContext: ReactApplicationContext) : Reac
             try {
                 if (on) {
                     // 1. Loudspeaker Mode (Video Call OR Speaker Button ON)
-                    audioManager.mode = AudioManager.MODE_NORMAL
+                    audioManager.mode = AudioManager.MODE_IN_COMMUNICATION
                     audioManager.isSpeakerphoneOn = true
                     if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
                         val speakerDevice = audioManager.availableCommunicationDevices.find { 

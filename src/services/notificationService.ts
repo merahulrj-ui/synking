@@ -133,6 +133,7 @@ class NotificationServiceClass {
           sound: 'default',
           priority: Notifications.AndroidNotificationPriority.MAX,
           categoryIdentifier: 'CALL',
+          channelId: 'incoming_calls',
         },
         trigger: null,
       });

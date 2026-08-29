@@ -498,6 +498,20 @@ class WebRTCManager {
     }
   }
 
+  private async addIceCandidate(candidate: any) {
+    if (this.peerConnection && this.peerConnection.remoteDescription) {
+      try {
+        await this.peerConnection.addIceCandidate(new IceCandidate(candidate));
+        this.log('🌐 ICE Candidate applied directly to PeerConnection.');
+      } catch (e) {
+        this.log(`⚠️ addIceCandidate error: ${e}`);
+      }
+    } else {
+      this.iceCandidateQueue.push(candidate);
+      this.log('⏳ ICE Candidate queued (waiting for remote SDP handshake).');
+    }
+  }
+
   private async drainIceCandidates() {
     if (!this.peerConnection || !this.peerConnection.remoteDescription) return;
     while (this.iceCandidateQueue.length > 0) {
@@ -637,6 +651,14 @@ class WebRTCManager {
     this.log(isSpeaker ? '🔊 SPEAKER ON: Loudspeaker active' : '🔈 EARPIECE: Internal receiver active');
     this.notify();
     return this.currentSession.isSpeakerOn;
+  }
+
+  public getLocalStream(): any {
+    return this.localStream;
+  }
+
+  public getRemoteStream(): any {
+    return this.remoteStream;
   }
 
   public formatDuration(sec: number): string {

@@ -716,6 +716,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       plainText: text,
       isEncrypted: true,
       type: newMsg.type,
+      extraData: newMsg.extraData,
       timestamp: new Date().toISOString(),
     });
   };

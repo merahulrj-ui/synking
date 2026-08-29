@@ -194,6 +194,30 @@ class RingtoneServiceClass {
       this.nativePlayer = null;
     }
   }
+
+  // 4. IN-APP MESSAGE CHIME: Sweet notification ping ("Pop... Ting")
+  public playMessageChime() {
+    try {
+      const ctx = this.getAudioContext();
+      if (!ctx) return;
+
+      const now = ctx.currentTime;
+      const gain = ctx.createGain();
+      gain.gain.setValueAtTime(0, now);
+      gain.gain.linearRampToValueAtTime(0.18, now + 0.02);
+      gain.gain.exponentialRampToValueAtTime(0.001, now + 0.35);
+      gain.connect(ctx.destination);
+
+      const osc = ctx.createOscillator();
+      osc.type = 'sine';
+      osc.frequency.setValueAtTime(587.33, now);
+      osc.frequency.exponentialRampToValueAtTime(880, now + 0.15);
+      osc.connect(gain);
+
+      osc.start(now);
+      osc.stop(now + 0.35);
+    } catch (e) {}
+  }
 }
 
 export const RingtoneService = new RingtoneServiceClass();

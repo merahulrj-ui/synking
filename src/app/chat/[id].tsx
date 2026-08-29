@@ -84,6 +84,9 @@ export default function ChatScreen() {
   const [cloudMessages, setCloudMessages] = useState<ChatMessage[]>([]);
   const [isRecording, setIsRecording] = useState(false);
   const [recordingSeconds, setRecordingSeconds] = useState(0);
+  const [liveMicLevel, setLiveMicLevel] = useState<number>(0);
+  const [supportedMimes, setSupportedMimes] = useState<string>('default');
+  const [lastAudioSize, setLastAudioSize] = useState<string>('');
   const [playingMessageId, setPlayingMessageId] = useState<string | null>(null);
   const [strikeCount, setStrikeCount] = useState(0);
   const [isSuspended, setIsSuspended] = useState(false);
@@ -307,20 +310,25 @@ export default function ChatScreen() {
 
     let audioDataUri = '';
 
-    if (mediaRecorderRef.current && mediaRecorderRef.current.state !== 'inactive') {
-      await new Promise<void>((resolve) => {
-        mediaRecorderRef.current.onstop = () => resolve();
-        mediaRecorderRef.current.stop();
-      });
-    }
+    try {
+      if (mediaRecorderRef.current && mediaRecorderRef.current.state !== 'inactive') {
+        try {
+          if (typeof mediaRecorderRef.current.requestData === 'function') {
+            mediaRecorderRef.current.requestData();
+          }
+        } catch (e) {}
+        await new Promise<void>((resolve) => {
+          mediaRecorderRef.current.onstop = () => resolve();
+          mediaRecorderRef.current.stop();
+        });
+      }
 
-    if (mediaStreamRef.current) {
-      mediaStreamRef.current.getTracks().forEach((track: any) => track.stop());
-      mediaStreamRef.current = null;
-    }
+      if (mediaStreamRef.current) {
+        mediaStreamRef.current.getTracks().forEach((track: any) => track.stop());
+        mediaStreamRef.current = null;
+      }
 
-    if (audioChunksRef.current && audioChunksRef.current.length > 0) {
-      try {
+      if (audioChunksRef.current && audioChunksRef.current.length > 0) {
         const mime = supportedMimes || 'audio/webm';
         const audioBlob = new Blob(audioChunksRef.current, { type: mime });
         const sizeKb = (audioBlob.size / 1024).toFixed(1) + ' KB';
@@ -334,24 +342,23 @@ export default function ChatScreen() {
           reader.readAsDataURL(audioBlob);
         });
         addAudioLog(`✅ Base64 Data URI generated (length: ${audioDataUri.length})`);
-      } catch (e: any) {
-        addAudioLog(`❌ Audio encoding error: ${e.message || e}`);
+      } else {
+        addAudioLog('⚠️ Warning: 0 audio chunks captured.');
       }
-    } else {
-      addAudioLog('⚠️ Warning: 0 audio chunks were captured during recording.');
+    } catch (e: any) {
+      addAudioLog(`❌ Audio encoding error: ${e.message || e}`);
+    } finally {
+      audioChunksRef.current = [];
+      setIsRecording(false);
+      setRecordingSeconds(0);
     }
 
-    audioChunksRef.current = [];
-    setIsRecording(false);
-    setRecordingSeconds(0);
-
     if (id) {
-      const fullText = audioDataUri ? `${textLabel}|||AUDIO_DATA::${audioDataUri}` : textLabel;
-      sendMessage(id, fullText, 'voice', {
+      sendMessage(id, textLabel, 'voice', {
         audioUrl: audioDataUri,
         audioDuration: duration,
       });
-      addAudioLog(`🚀 Voice note broadcast with ${audioDataUri ? 'Real Encrypted Audio Payload' : 'Text Fallback'}`);
+      addAudioLog(`🚀 Voice note broadcast with ${audioDataUri ? 'Real Audio Payload' : 'Text Fallback'}`);
     }
   };
 
@@ -829,6 +836,16 @@ export default function ChatScreen() {
   };
 
   const handleBack = () => {
+    try {
+      if (isRecording) {
+        cancelRecording();
+      }
+      if (activeAudioRef.current) {
+        activeAudioRef.current.pause();
+        activeAudioRef.current = null;
+      }
+    } catch (e) {}
+
     if (router.canGoBack()) {
       router.back();
     } else {
