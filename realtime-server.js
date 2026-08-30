@@ -748,15 +748,21 @@ const server = http.createServer((req, res) => {
     req.on('data', chunk => { body += chunk; });
     req.on('end', () => {
       try {
-        const { userId, pushToken } = JSON.parse(body);
-        if (userId && pushToken) {
+        const { userId, pushToken, expoPushToken, fcmPushToken } = JSON.parse(body);
+        const resolvedToken = expoPushToken || fcmPushToken || pushToken;
+        if (userId && resolvedToken) {
           if (!db.pushTokens) db.pushTokens = {};
-          db.pushTokens[userId] = pushToken;
+          db.pushTokens[userId] = resolvedToken;
+          if (fcmPushToken) {
+            if (!db.fcmTokens) db.fcmTokens = {};
+            db.fcmTokens[userId] = fcmPushToken;
+          }
           if (db.profiles[userId]) {
-            db.profiles[userId].pushToken = pushToken;
+            db.profiles[userId].pushToken = resolvedToken;
+            if (fcmPushToken) db.profiles[userId].fcmPushToken = fcmPushToken;
           }
           saveDb();
-          console.log(`[PUSH_TOKEN_BOUND] Bound Push Token for User ${userId}`);
+          console.log(`[PUSH_TOKEN_BOUND] Bound Push Token for User ${userId}: ${resolvedToken.substring(0, 20)}...`);
           res.writeHead(200, { 'Content-Type': 'application/json' });
           res.end(JSON.stringify({ success: true }));
           return;
@@ -1179,6 +1185,23 @@ const server = http.createServer((req, res) => {
     return;
   }
 
+  // 7.1 DELETE /api/chats/:id (Delete Single Message from Memory & Turso SQLite)
+  if (req.method === 'DELETE' && pathname.startsWith('/api/chats/')) {
+    const msgId = pathname.replace('/api/chats/', '').trim();
+    if (msgId) {
+      db.chats = (db.chats || []).filter(c => c && c.id !== msgId);
+      saveDb();
+      queryTurso('DELETE FROM messages WHERE id = ?', [{ type: 'text', value: msgId }]).catch(() => {});
+      console.log(`🗑️ [MESSAGE_DELETED_PERMANENTLY] Message ${msgId} deleted from memory & Turso SQLite`);
+      res.writeHead(200, { 'Content-Type': 'application/json' });
+      res.end(JSON.stringify({ success: true, deletedId: msgId }));
+      return;
+    }
+    res.writeHead(400, { 'Content-Type': 'application/json' });
+    res.end(JSON.stringify({ success: false, error: 'Message ID missing' }));
+    return;
+  }
+
   // 8. GET /api/version (Zomato-Style Live In-App OTA Update Engine)
   if (req.method === 'GET' && pathname === '/api/version') {
     res.writeHead(200, { 'Content-Type': 'application/json' });
@@ -1218,17 +1241,22 @@ function sendCallPushNotification(targetUserId, callPayload) {
     }
 
     const callerName = callPayload?.callerUser?.name || 'Someone';
-    const callType = callPayload?.type === 'video' ? 'Video' : 'Voice';
+    const callerId = callPayload?.callerUser?.id || '';
+    const callerPhoto = callPayload?.callerUser?.photo || '';
+    const callType = callPayload?.type === 'video' ? 'video' : 'audio';
 
     const pushBody = JSON.stringify({
       to: pushToken,
-      title: `📞 Incoming ${callType} Call`,
+      title: `📞 Incoming ${callType === 'video' ? 'Video' : 'Voice'} Call`,
       body: `${callerName} is calling you on SYNKING`,
       data: {
         type: 'INCOMING_CALL',
         callId: callPayload?.callId,
+        callerId: callerId,
+        callerName: callerName,
+        callerPhoto: callerPhoto,
+        callType: callType,
         callerUser: callPayload?.callerUser,
-        callType: callPayload?.type,
       },
       priority: 'high',
       channelId: 'incoming_calls',

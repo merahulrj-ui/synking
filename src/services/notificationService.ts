@@ -214,6 +214,7 @@ class NotificationServiceClass {
       },
       body: JSON.stringify({
         userId,
+        pushToken: expoPushToken || fcmPushToken,
         expoPushToken,
         fcmPushToken,
       }),

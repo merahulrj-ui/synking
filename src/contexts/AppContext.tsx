@@ -12,6 +12,7 @@ import {
   fetchSentRequestsFromFirestore,
   updateRequestStatusInFirestore,
   deleteUserProfileFromBackend,
+  deleteChatMessageFromBackend,
 } from '../services/firebase';
 import { encryptE2EEMessage } from '../utils/encryption';
 import { RealtimeBridge } from '../services/realtimeBridge';
@@ -747,15 +748,15 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       return { ...prev, [partnerId]: filtered };
     });
 
+    // Permanently remove from Turso SQLite database & backend cache
+    deleteChatMessageFromBackend(messageId).catch(() => {});
+
     if (deleteForEveryone) {
-      RealtimeBridge.send({
-        type: 'DELETE_MESSAGE',
-        payload: {
-          messageId,
-          partnerId,
-          senderId: currentUser?.id,
-        }
-      });
+      try {
+        RealtimeBridge.broadcast('DELETE_MESSAGE', { messageId, partnerId, senderId: currentUser?.id }, partnerId);
+      } catch (e) {
+        console.warn('RealtimeBridge delete broadcast error:', e);
+      }
     }
   };
 

@@ -13,7 +13,13 @@ import {
   Alert,
   Modal,
 } from 'react-native';
-import { createAudioPlayer } from 'expo-audio';
+import {
+  createAudioPlayer,
+  AudioModule,
+  RecordingPresets,
+  requestRecordingPermissionsAsync,
+  setAudioModeAsync,
+} from 'expo-audio';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
@@ -22,7 +28,7 @@ import { useApp } from '../../contexts/AppContext';
 import { WebRTCService } from '../../services/webrtcService';
 import { CallModal } from '../../components/CallModal';
 import { CallSession, ChatMessage, UserProfile } from '../../types';
-import { fetchChatMessagesFromFirestore } from '../../services/firebase';
+import { fetchChatMessagesFromFirestore, getLocalBackendUrl } from '../../services/firebase';
 import { RealtimeBridge } from '../../services/realtimeBridge';
 
 import AsyncStorage from '@react-native-async-storage/async-storage';
@@ -85,23 +91,83 @@ export default function ChatScreen() {
   const [selectedMsgForAction, setSelectedMsgForAction] = useState<ChatMessage | null>(null);
   const [activeCall, setActiveCall] = useState<CallSession | null>(null);
   const [isPartnerTyping, setIsPartnerTyping] = useState(false);
-  const [cloudMessages, setCloudMessages] = useState<ChatMessage[]>([]);
+  const [cloudMessages, setCloudMessages] = useState<ChatMessage[]>((id && messages[id]) || []);
   const [isRecording, setIsRecording] = useState(false);
   const [recordingSeconds, setRecordingSeconds] = useState(0);
   const [liveMicLevel, setLiveMicLevel] = useState<number>(0);
   const [supportedMimes, setSupportedMimes] = useState<string>('default');
   const [lastAudioSize, setLastAudioSize] = useState<string>('');
+  const [visualLogs, setVisualLogs] = useState<string[]>([]);
   const [playingMessageId, setPlayingMessageId] = useState<string | null>(null);
   const [strikeCount, setStrikeCount] = useState(0);
   const [isSuspended, setIsSuspended] = useState(false);
   const [suspendedUntil, setSuspendedUntil] = useState<number | null>(null);
+  const [deletedMsgIds, setDeletedMsgIds] = useState<Set<string>>(new Set());
+  const [fetchedProfile, setFetchedProfile] = useState<UserProfile | null>(null);
 
-  // Load persistent 2-Strike & 3-Day Suspension Status
+  // Instant 0ms Preloading: Cache messages & Resolve Real User Profile
+  useEffect(() => {
+    if (!id) return;
+    // 1. Instant 0ms cached messages load from disk
+    AsyncStorage.getItem(`synking_cached_msgs_${id}`).then(cached => {
+      if (cached) {
+        try {
+          const parsed = JSON.parse(cached);
+          if (Array.isArray(parsed) && parsed.length > 0) {
+            setCloudMessages(prev => (prev.length === 0 ? parsed : prev));
+          }
+        } catch (e) {}
+      }
+    });
+
+    // 2. Resolve real user profile from Cloud SQLite / Backend
+    fetch(`${getLocalBackendUrl()}/api/profiles`).then(r => r.json()).then(list => {
+      if (Array.isArray(list)) {
+        const cleanDigits = id.replace(/\D/g, '').slice(-10);
+        const found = list.find((p: any) => 
+          p.id === id || 
+          (cleanDigits && p.phoneNumber && p.phoneNumber.replace(/\D/g, '').slice(-10) === cleanDigits)
+        );
+        if (found) {
+          setFetchedProfile(found);
+        }
+      }
+    }).catch(() => {});
+  }, [id]);
+
+  // Load locally deleted message IDs from AsyncStorage on mount
+  useEffect(() => {
+    if (!id) return;
+    AsyncStorage.getItem(`synking_deleted_${id}`).then(stored => {
+      if (stored) {
+        try {
+          const parsed = JSON.parse(stored);
+          if (Array.isArray(parsed)) {
+            setDeletedMsgIds(new Set(parsed));
+          }
+        } catch (e) {}
+      }
+    });
+  }, [id]);
+
+  const markMessageDeletedLocally = (msgId: string) => {
+    setDeletedMsgIds(prev => {
+      const next = new Set(prev);
+      next.add(msgId);
+      if (id) {
+        AsyncStorage.setItem(`synking_deleted_${id}`, JSON.stringify(Array.from(next))).catch(() => {});
+      }
+      return next;
+    });
+    setCloudMessages(prev => prev.filter(m => m && m.id !== msgId));
+  };
+
   const addAudioLog = (msg: string) => {
     const entry = `[${new Date().toLocaleTimeString()}] ${msg}`;
     console.log(`[AUDIO_DEBUG] ${entry}`);
     setVisualLogs(prev => [entry, ...prev].slice(0, 5));
   };
+
   useEffect(() => {
     const loadSuspension = async () => {
       try {
@@ -190,10 +256,16 @@ export default function ChatScreen() {
     try {
       addAudioLog('🎙️ Requesting microphone access...');
       if (Platform.OS !== 'web') {
-        addAudioLog('Native Audio recording temporarily unavailable');
-        
-        
-        
+        const perm = await requestRecordingPermissionsAsync();
+        if (!perm.granted) {
+          Alert.alert('Microphone Access Required', 'Please enable microphone permissions in settings to record voice notes.');
+          return;
+        }
+        await setAudioModeAsync({ allowsRecording: true, playsInSilentMode: true });
+        const recorder = new AudioModule.AudioRecorder(RecordingPresets.HIGH_QUALITY);
+        await recorder.prepareToRecordAsync();
+        recorder.record();
+        nativeRecordingRef.current = recorder;
         animFrameRef.current = setInterval(() => setLiveMicLevel(Math.floor(Math.random() * (80 - 20 + 1) + 20)), 150);
         setIsRecording(true);
         setRecordingSeconds(0);
@@ -214,6 +286,7 @@ export default function ChatScreen() {
           animFrameRef.current = setInterval(() => setLiveMicLevel(Math.floor(Math.random() * (80 - 20 + 1) + 20)), 150);
           setIsRecording(true);
           setRecordingSeconds(0);
+          addAudioLog('🎙️ Web Recording active!');
         }
       }
     } catch (err: any) {
@@ -228,7 +301,9 @@ export default function ChatScreen() {
     if (animFrameRef.current) clearInterval(animFrameRef.current);
     if (Platform.OS !== 'web') {
       if (nativeRecordingRef.current) {
-        
+        try {
+          await nativeRecordingRef.current.stop();
+        } catch (e) {}
         nativeRecordingRef.current = null;
       }
     } else {
@@ -260,12 +335,16 @@ export default function ChatScreen() {
     try {
       if (Platform.OS !== 'web') {
         if (nativeRecordingRef.current) {
-          await nativeRecordingRef.current.stopAndUnloadAsync();
-          const uri = null;
+          try {
+            await nativeRecordingRef.current.stop();
+          } catch (e) {}
+          const uri = nativeRecordingRef.current.uri;
+          addAudioLog(`🎙️ Native URI: ${uri}`);
           if (uri) {
             const FileSystem = require('expo-file-system');
             const base64 = await FileSystem.readAsStringAsync(uri, { encoding: FileSystem.EncodingType.Base64 });
             audioDataUri = `data:audio/m4a;base64,${base64}`;
+            addAudioLog(`📦 Encoded audio payload size: ${base64.length} bytes`);
           }
           nativeRecordingRef.current = null;
         }
@@ -310,15 +389,14 @@ export default function ChatScreen() {
 
   const togglePlayVoiceNote = async (messageId: string, audioUrl?: string) => {
     if (playingMessageId === messageId) {
-       if (Platform.OS !== 'web') nativeSoundRef.current?.pause();
-       else activeAudioRef.current?.pause();
-       setPlayingMessageId(null);
-       return;
+      if (Platform.OS !== 'web') nativeSoundRef.current?.pause();
+      else activeAudioRef.current?.pause();
+      setPlayingMessageId(null);
+      return;
     }
     
     if (Platform.OS !== 'web') {
       nativeSoundRef.current?.pause();
-      nativeSoundRef.current = null;
       nativeSoundRef.current = null;
     } else {
       activeAudioRef.current?.pause();
@@ -328,12 +406,12 @@ export default function ChatScreen() {
     if (audioUrl && audioUrl.startsWith('data:audio/')) {
       try {
         if (Platform.OS !== 'web') {
-          addAudioLog('? Playing audio note in Loudspeaker...');
-            const player = createAudioPlayer(audioUrl);
-            nativeSoundRef.current = player;
-            setPlayingMessageId(messageId);
-            player.play();
-            setTimeout(() => setPlayingMessageId(null), 3000);
+          addAudioLog('▶ Playing audio note in Loudspeaker...');
+          const player = createAudioPlayer(audioUrl);
+          nativeSoundRef.current = player;
+          setPlayingMessageId(messageId);
+          player.play();
+          setTimeout(() => setPlayingMessageId(null), 3000);
         } else {
           const HTMLAudio = (window as any).Audio;
           const audio = new HTMLAudio(audioUrl);
@@ -350,18 +428,19 @@ export default function ChatScreen() {
 
   // Real target profile resolution (NO fake mock profiles)
   const targetUser: UserProfile =
-    matches.find(m => m && m.id === id) ||
-    profiles.find(p => p && p.id === id) || {
+    fetchedProfile ||
+    matches.find(m => m && (m.id === id || (m.phoneNumber && id.includes(m.phoneNumber.replace(/\D/g, '').slice(-10))))) ||
+    profiles.find(p => p && (p.id === id || (p.phoneNumber && id.includes(p.phoneNumber.replace(/\D/g, '').slice(-10))))) || {
       id: id || 'user',
-      name: (profiles.find(p => p && p.id === id)?.name) || 'Member',
+      name: (fetchedProfile as any)?.name || (profiles.find(p => p && p.id === id)?.name) || (id && id.startsWith('user_') ? `User ${id.replace('user_', '').slice(-4)}` : 'Member'),
       age: 22,
       gender: 'other',
       occupation: 'Member',
       location: 'Roorkee',
       distance: '0 km',
       bio: 'Ready to connect!',
-      photo: 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=800',
-      photos: [],
+      photo: (fetchedProfile as any)?.photo || 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=800',
+      photos: (fetchedProfile as any)?.photos || [],
       interests: ['Coffee', 'Music'],
       compatibility: 100,
       isVerified: true,
@@ -413,6 +492,11 @@ export default function ChatScreen() {
           decryptAndAdd();
         }
       }
+
+      if (type === 'DELETE_MESSAGE' && payload?.messageId) {
+        markMessageDeletedLocally(payload.messageId);
+        addAudioLog(`🗑️ [DELETE_RECEIVED] Message ${payload.messageId.substring(0, 10)} deleted`);
+      }
     });
     return () => unsubscribe();
   }, [id, currentUser?.id]);
@@ -422,25 +506,27 @@ export default function ChatScreen() {
     if (!id || !currentUser) return;
     const fetchCloud = async () => {
       const msgs = await fetchChatMessagesFromFirestore(currentUser.id, id);
-      if (msgs.length > 0) {
-        setCloudMessages(msgs);
+      const filtered = msgs.filter(m => m && !deletedMsgIds.has(m.id));
+      setCloudMessages(filtered);
+      if (filtered.length > 0 && id) {
+        AsyncStorage.setItem(`synking_cached_msgs_${id}`, JSON.stringify(filtered)).catch(() => {});
       }
     };
     fetchCloud();
     const interval = setInterval(fetchCloud, 2000);
     return () => clearInterval(interval);
-  }, [id, currentUser?.id]);
+  }, [id, currentUser?.id, deletedMsgIds]);
 
   // Combine and strictly bifurcate cloud + local messages for this specific conversation (0 duplicates guaranteed)
   const userMessages = React.useMemo(() => {
     const myId = currentUser?.id || 'my_user_id';
     const seenIds = new Set<string>();
-    const seenKeys = new Set<string>();
     const result: ChatMessage[] = [];
 
     const all = [...cloudMessages, ...localMessages];
     for (const m of all) {
       if (!m || !m.id) continue;
+      if (deletedMsgIds.has(m.id)) continue;
       const isForThisThread =
         (m.senderId === id && m.receiverId === myId) ||
         (m.senderId === myId && m.receiverId === id);
@@ -876,25 +962,19 @@ export default function ChatScreen() {
         </TouchableOpacity>
       )}
 
-      {/* VISUAL AUDIO DEBUGGER OVERLAY */}
-        {visualLogs.length > 0 && (
-          <View style={{ position: "absolute", top: 140, left: 16, right: 16, backgroundColor: "rgba(0,0,0,0.85)", padding: 12, borderRadius: 12, zIndex: 999, borderWidth: 1, borderColor: "rgba(253, 58, 115, 0.4)" }}>
-            <Text style={{ color: "#FD3A73", fontSize: 11, fontWeight: "bold", marginBottom: 6 }}>AUDIO & MSG DEBUGGER (LATEST 5)</Text>
-            {visualLogs.map((log, i) => (
-              <Text key={i} style={{ color: "#22C55E", fontSize: 10, fontFamily: Platform.OS === "ios" ? "Courier" : "monospace", marginBottom: 2 }}>{log}</Text>
-            ))}
-          </View>
-        )}
-
-        {/* 4. CHAT THREAD & MATCH HERO */}
+      {/* 4. CHAT THREAD & MATCH HERO */}
       <KeyboardAvoidingView
         style={{ flex: 1 }}
-        behavior={Platform.OS === 'ios' ? 'padding' : 'height'} keyboardVerticalOffset={80}
+        behavior={Platform.OS === 'ios' ? 'padding' : undefined}
+        keyboardVerticalOffset={Platform.OS === 'ios' ? 90 : 0}
       >
         <FlatList
           data={userMessages}
           keyExtractor={item => item.id}
-          contentContainerStyle={styles.messagesList}
+          contentContainerStyle={[
+            styles.messagesList,
+            userMessages.length === 0 && { flexGrow: 1, justifyContent: 'flex-end', paddingTop: 20 }
+          ]}
           showsVerticalScrollIndicator={false}
           keyboardShouldPersistTaps="handled"
           keyboardDismissMode="on-drag"
@@ -960,7 +1040,18 @@ export default function ChatScreen() {
             // WhatsApp Style Call Log Bubble
             if (isCallLog) {
               return (
-                <View style={[styles.callLogBubble, { backgroundColor: cardBg, borderColor: borderCol }]}>
+                <View style={[
+                  styles.callLogBubble,
+                  {
+                    backgroundColor: cardBg,
+                    borderColor: isDarkMode ? 'rgba(253, 58, 115, 0.35)' : borderCol,
+                    shadowColor: isDarkMode ? '#FD3A73' : 'transparent',
+                    shadowOffset: { width: 0, height: 2 },
+                    shadowOpacity: isDarkMode ? 0.3 : 0,
+                    shadowRadius: 6,
+                    elevation: isDarkMode ? 3 : 0,
+                  }
+                ]}>
                   <View style={styles.callLogIconCircle}>
                     <Ionicons
                       name={item.text.startsWith('📹') ? 'videocam' : 'call'}
@@ -1007,8 +1098,28 @@ export default function ChatScreen() {
                   style={[
                     styles.bubble,
                     isMine
-                      ? styles.myBubble
-                      : [styles.theirBubble, { backgroundColor: isDarkMode ? '#141522' : '#FFFFFF', borderColor: borderCol }],
+                      ? [
+                          styles.myBubble,
+                          {
+                            shadowColor: '#FD3A73',
+                            shadowOffset: { width: 0, height: 2 },
+                            shadowOpacity: 0.45,
+                            shadowRadius: 10,
+                            elevation: 5,
+                          }
+                        ]
+                      : [
+                          styles.theirBubble,
+                          {
+                            backgroundColor: isDarkMode ? '#11121F' : '#FFFFFF',
+                            borderColor: isDarkMode ? 'rgba(0, 229, 255, 0.45)' : borderCol,
+                            shadowColor: isDarkMode ? '#00E5FF' : '#000000',
+                            shadowOffset: { width: 0, height: 2 },
+                            shadowOpacity: isDarkMode ? 0.35 : 0.05,
+                            shadowRadius: isDarkMode ? 8 : 2,
+                            elevation: isDarkMode ? 4 : 1,
+                          },
+                        ],
                     { minWidth: 200, paddingVertical: 10 }
                   ]}
                 >
@@ -1064,6 +1175,13 @@ export default function ChatScreen() {
                       color={isMine ? '#FFFFFF' : '#22C55E'}
                       style={{ marginLeft: 2 }}
                     />
+                    <TouchableOpacity
+                      onPress={() => setSelectedMsgForAction(item)}
+                      style={{ marginLeft: 4, paddingHorizontal: 2 }}
+                      hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
+                    >
+                      <Text style={{ fontSize: 12, color: isMine ? 'rgba(255, 255, 255, 0.7)' : subText, fontWeight: '900' }}>⋮</Text>
+                    </TouchableOpacity>
                   </View>
                 </TouchableOpacity>
               );
@@ -1079,8 +1197,28 @@ export default function ChatScreen() {
                 style={[
                   styles.bubble,
                   isMine
-                    ? styles.myBubble
-                    : [styles.theirBubble, { backgroundColor: isDarkMode ? '#141522' : '#FFFFFF', borderColor: borderCol }],
+                    ? [
+                        styles.myBubble,
+                        {
+                          shadowColor: '#FD3A73',
+                          shadowOffset: { width: 0, height: 2 },
+                          shadowOpacity: 0.45,
+                          shadowRadius: 10,
+                          elevation: 5,
+                        }
+                      ]
+                    : [
+                        styles.theirBubble,
+                        {
+                          backgroundColor: isDarkMode ? '#11121F' : '#FFFFFF',
+                          borderColor: isDarkMode ? 'rgba(0, 229, 255, 0.45)' : borderCol,
+                          shadowColor: isDarkMode ? '#00E5FF' : '#000000',
+                          shadowOffset: { width: 0, height: 2 },
+                          shadowOpacity: isDarkMode ? 0.35 : 0.05,
+                          shadowRadius: isDarkMode ? 8 : 2,
+                          elevation: isDarkMode ? 4 : 1,
+                        },
+                      ],
                 ]}
               >
                 <Text style={[styles.bubbleText, isMine ? styles.myText : { color: textColor }]}>
@@ -1119,7 +1257,7 @@ export default function ChatScreen() {
           </View>
         )}
 
-        {/* 5. QUICK ICEBREAKERS CAROUSEL */}
+                {/* 5. QUICK ICEBREAKERS CAROUSEL */}
         <View style={[styles.icebreakerContainer, { backgroundColor: bg }]}>
           <ScrollView
             horizontal
@@ -1325,7 +1463,9 @@ export default function ChatScreen() {
                 }}
                 onPress={() => {
                   if (selectedMsgForAction && id) {
-                    deleteMessage(id, selectedMsgForAction.id, false);
+                    const targetMsgId = selectedMsgForAction.id;
+                    markMessageDeletedLocally(targetMsgId);
+                    deleteMessage(id, targetMsgId, false);
                     Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium).catch(() => {});
                   }
                   setSelectedMsgForAction(null);
@@ -1351,7 +1491,9 @@ export default function ChatScreen() {
                   }}
                   onPress={() => {
                     if (selectedMsgForAction && id) {
-                      deleteMessage(id, selectedMsgForAction.id, true);
+                      const targetMsgId = selectedMsgForAction.id;
+                      markMessageDeletedLocally(targetMsgId);
+                      deleteMessage(id, targetMsgId, true);
                       Haptics.notificationAsync(Haptics.NotificationFeedbackType.Warning).catch(() => {});
                     }
                     setSelectedMsgForAction(null);

@@ -131,38 +131,75 @@ class IncomingCallActivity : Activity() {
             LinearLayout(this).apply {
                 orientation = LinearLayout.VERTICAL
                 gravity = Gravity.CENTER
-                setPadding(40, 40, 40, 40)
-                setBackgroundColor(Color.BLACK)
+                setPadding(48, 80, 48, 80)
+                setBackgroundColor(Color.parseColor("#05060A"))
             }
 
-        val title =
+        val logoText =
             TextView(this).apply {
-                text = "SYNKING CALL DEBUG\nCaller: $callerName ($callType)\n"
-                textSize = 22f
+                text = "⚡ SYNKING"
+                textSize = 14f
+                setTextColor(Color.parseColor("#FD3A73"))
+                gravity = Gravity.CENTER
+                setPadding(0, 0, 0, 30)
+            }
+
+        val callerTitle =
+            TextView(this).apply {
+                text = callerName
+                textSize = 28f
                 setTextColor(Color.WHITE)
                 gravity = Gravity.CENTER
+                setTypeface(null, android.graphics.Typeface.BOLD)
             }
 
-        val info =
+        val callSubtitle =
             TextView(this).apply {
-                text =
-                    "[FCM] RECEIVED       OK\n" +
-                    "[FCM] callId         OK\n" +
-                    "[PROCESS] STARTED    OK\n" +
-                    "[NOTIFICATION] POST  OK\n" +
-                    "[FULLSCREEN] LAUNCH  OK\n" +
-                    "[SCREEN] WAKE        OK\n" +
-                    "[RINGTONE] START     OK\n" +
-                    "[ACTIVITY] CREATED   OK\n" +
-                    "[WEBRTC] HANDOFF     Pending Answer\n"
-                textSize = 16f
-                setTextColor(Color.parseColor("#00E5FF")) // Cyan color for debug text
-                setPadding(0, 40, 0, 40)
+                text = "Incoming ${if (callType == "video") "Video" else "Voice"} Call..."
+                textSize = 15f
+                setTextColor(Color.parseColor("#94A3B8"))
+                gravity = Gravity.CENTER
+                setPadding(0, 8, 0, 80)
+            }
+
+        val btnRow =
+            LinearLayout(this).apply {
+                orientation = LinearLayout.HORIZONTAL
+                gravity = Gravity.CENTER
+                setPadding(0, 40, 0, 0)
+            }
+
+        val decline =
+            Button(this).apply {
+                text = "✕ Decline"
+                setBackgroundColor(Color.parseColor("#EF4444"))
+                setTextColor(Color.WHITE)
+                textSize = 15f
+                setPadding(40, 24, 40, 24)
+                setOnClickListener {
+                    debug(
+                        "DECLINE_PRESSED",
+                        "OK",
+                        "callId=$callId"
+                    )
+
+                    clearPendingCall()
+                    finish()
+                }
+            }
+
+        val spacer =
+            TextView(this).apply {
+                text = "    "
             }
 
         val answer =
             Button(this).apply {
-                text = "ANSWER (Trigger Handoff)"
+                text = "✓ Accept"
+                setBackgroundColor(Color.parseColor("#22C55E"))
+                setTextColor(Color.WHITE)
+                textSize = 15f
+                setPadding(40, 24, 40, 24)
                 setOnClickListener {
                     debug(
                         "ANSWER_PRESSED",
@@ -178,25 +215,14 @@ class IncomingCallActivity : Activity() {
                 }
             }
 
-        val decline =
-            Button(this).apply {
-                text = "DECLINE & CLOSE"
-                setOnClickListener {
-                    debug(
-                        "DECLINE_PRESSED",
-                        "OK",
-                        "callId=$callId"
-                    )
+        btnRow.addView(decline)
+        btnRow.addView(spacer)
+        btnRow.addView(answer)
 
-                    clearPendingCall()
-                    finish()
-                }
-            }
-
-        root.addView(title)
-        root.addView(info)
-        root.addView(answer)
-        root.addView(decline)
+        root.addView(logoText)
+        root.addView(callerTitle)
+        root.addView(callSubtitle)
+        root.addView(btnRow)
 
         setContentView(root)
     }

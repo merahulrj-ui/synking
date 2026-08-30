@@ -43,6 +43,7 @@ export interface EncryptedChatMessageRecord {
   cipherText: string;
   isEncrypted: boolean;
   type: 'text' | 'date_invite' | 'voice' | 'call' | 'system';
+  extraData?: any;
   timestamp: string;
 }
 
@@ -231,4 +232,18 @@ export async function fetchChatMessagesFromFirestore(user1Id: string, user2Id: s
   } catch (e) {}
 
   return [];
+}
+
+/**
+ * Permanently deletes a single chat message from backend & Turso SQLite
+ */
+export async function deleteChatMessageFromBackend(messageId: string): Promise<boolean> {
+  try {
+    const res = await fetch(`${getLocalBackendUrl()}/api/chats/${encodeURIComponent(messageId)}`, {
+      method: 'DELETE',
+    });
+    return res.ok;
+  } catch (e) {
+    return false;
+  }
 }

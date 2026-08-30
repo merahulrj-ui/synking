@@ -37,6 +37,12 @@ class AudioRouteModule(private val reactContext: ReactApplicationContext) : Reac
                             audioManager.clearCommunicationDevice()
                         }
                     }
+                    try {
+                        val maxCallVol = audioManager.getStreamMaxVolume(AudioManager.STREAM_VOICE_CALL)
+                        audioManager.setStreamVolume(AudioManager.STREAM_VOICE_CALL, maxCallVol, 0)
+                        val maxMusicVol = audioManager.getStreamMaxVolume(AudioManager.STREAM_MUSIC)
+                        audioManager.setStreamVolume(AudioManager.STREAM_MUSIC, maxMusicVol, 0)
+                    } catch (ve: Exception) {}
                 } else {
                     // 2. Private Earpiece Mode (Voice Call Near Ear)
                     audioManager.mode = AudioManager.MODE_IN_COMMUNICATION

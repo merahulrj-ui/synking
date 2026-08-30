@@ -1,7 +1,16 @@
 package com.synking
 
+import android.app.NotificationChannel
+import android.app.NotificationManager
+import android.app.PendingIntent
+import android.content.Context
 import android.content.Intent
+import android.media.AudioAttributes
+import android.media.RingtoneManager
+import android.os.Build
+import android.os.PowerManager
 import android.util.Log
+import androidx.core.app.NotificationCompat
 import com.google.firebase.messaging.FirebaseMessagingService
 import com.google.firebase.messaging.RemoteMessage
 
@@ -9,6 +18,8 @@ class MyFirebaseMessagingService : FirebaseMessagingService() {
 
     companion object {
         private const val TAG = "SYNKING_FCM"
+        private const val CHANNEL_ID = "incoming_calls"
+        private const val NOTIFICATION_ID = 9001
     }
 
     private fun debug(stage: String, status: String, details: String = "") {
@@ -26,11 +37,6 @@ class MyFirebaseMessagingService : FirebaseMessagingService() {
             "OK",
             "token=${token.take(16)}..."
         )
-
-        // Token is also obtainable through
-        // expo-notifications.getDevicePushTokenAsync().
-        //
-        // We deliberately do not modify WebRTC here.
     }
 
     override fun onMessageReceived(message: RemoteMessage) {
@@ -71,7 +77,20 @@ class MyFirebaseMessagingService : FirebaseMessagingService() {
             "callId=$callId caller=$callerName type=$callType"
         )
 
-        // Persist the call because React Native may not yet exist.
+        // 1. Wake screen instantly with PowerManager WakeLock
+        try {
+            val pm = getSystemService(Context.POWER_SERVICE) as PowerManager
+            val wl = pm.newWakeLock(
+                PowerManager.SCREEN_BRIGHT_WAKE_LOCK or PowerManager.ACQUIRE_CAUSES_WAKEUP or PowerManager.ON_AFTER_RELEASE,
+                "synking:fcm_call_wakeup"
+            )
+            wl.acquire(15_000L)
+            debug("WAKELOCK_ACQUIRED", "OK", "15s screen wake active")
+        } catch (e: Exception) {
+            debug("WAKELOCK_ACQUIRED", "FAIL", e.message ?: "")
+        }
+
+        // 2. Persist the call state
         val prefs = getSharedPreferences(
             "synking_call_state",
             MODE_PRIVATE
@@ -92,31 +111,87 @@ class MyFirebaseMessagingService : FirebaseMessagingService() {
             "callId=$callId"
         )
 
-        try {
-            val intent = Intent(
-                this,
-                IncomingCallActivity::class.java
+        // 3. Create FullScreenIntent PendingIntent for IncomingCallActivity
+        val fullScreenIntent = Intent(
+            this,
+            IncomingCallActivity::class.java
+        ).apply {
+            flags =
+                Intent.FLAG_ACTIVITY_NEW_TASK or
+                Intent.FLAG_ACTIVITY_SINGLE_TOP or
+                Intent.FLAG_ACTIVITY_CLEAR_TOP
+
+            putExtra("callId", callId)
+            putExtra("callerId", callerId)
+            putExtra("callerName", callerName)
+            putExtra("callerPhoto", callerPhoto)
+            putExtra("callType", callType)
+        }
+
+        val flags = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.M) {
+            PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE
+        } else {
+            PendingIntent.FLAG_UPDATE_CURRENT
+        }
+
+        val fullScreenPendingIntent = PendingIntent.getActivity(
+            this,
+            callId.hashCode(),
+            fullScreenIntent,
+            flags
+        )
+
+        // 4. Create Notification Channel with High Importance and Call Category
+        val notificationManager = getSystemService(Context.NOTIFICATION_SERVICE) as NotificationManager
+
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
+            val channel = NotificationChannel(
+                CHANNEL_ID,
+                "SYNKING Incoming Calls",
+                NotificationManager.IMPORTANCE_HIGH
             ).apply {
-                flags =
-                    Intent.FLAG_ACTIVITY_NEW_TASK or
-                    Intent.FLAG_ACTIVITY_SINGLE_TOP or
-                    Intent.FLAG_ACTIVITY_CLEAR_TOP
-
-                putExtra("callId", callId)
-                putExtra("callerId", callerId)
-                putExtra("callerName", callerName)
-                putExtra("callerPhoto", callerPhoto)
-                putExtra("callType", callType)
+                description = "Incoming voice & video calls from SYNKING"
+                enableLights(true)
+                enableVibration(true)
+                vibrationPattern = longArrayOf(0, 800, 1000, 800, 1000)
+                lockscreenVisibility = NotificationCompat.VISIBILITY_PUBLIC
+                setBypassDnd(true)
+                val ringtoneUri = RingtoneManager.getDefaultUri(RingtoneManager.TYPE_RINGTONE)
+                setSound(
+                    ringtoneUri,
+                    AudioAttributes.Builder()
+                        .setContentType(AudioAttributes.CONTENT_TYPE_SONIFICATION)
+                        .setUsage(AudioAttributes.USAGE_NOTIFICATION_RINGTONE)
+                        .build()
+                )
             }
+            notificationManager.createNotificationChannel(channel)
+        }
 
-            startActivity(intent)
+        val notification = NotificationCompat.Builder(this, CHANNEL_ID)
+            .setSmallIcon(R.mipmap.ic_launcher)
+            .setContentTitle("📞 Incoming ${if (callType == "video") "Video" else "Voice"} Call")
+            .setContentText("$callerName is calling you on SYNKING")
+            .setPriority(NotificationCompat.PRIORITY_MAX)
+            .setCategory(NotificationCompat.CATEGORY_CALL)
+            .setVisibility(NotificationCompat.VISIBILITY_PUBLIC)
+            .setAutoCancel(true)
+            .setOngoing(true)
+            .setFullScreenIntent(fullScreenPendingIntent, true)
+            .setContentIntent(fullScreenPendingIntent)
+            .build()
 
+        notificationManager.notify(NOTIFICATION_ID, notification)
+        debug("FULLSCREEN_NOTIFICATION_POSTED", "OK", "Notification with FullScreenIntent dispatched")
+
+        // 5. Try direct startActivity as well
+        try {
+            startActivity(fullScreenIntent)
             debug(
                 "INCOMING_CALL_ACTIVITY",
                 "OK",
                 "startActivity requested"
             )
-
         } catch (e: Exception) {
             debug(
                 "INCOMING_CALL_ACTIVITY",
