@@ -14,17 +14,35 @@ let fcmMessaging = null;
 try {
   const { initializeApp, cert } = require('firebase-admin/app');
   const { getMessaging } = require('firebase-admin/messaging');
-  const serviceAccountPath = path.join(__dirname, 'firebase-service-account.json');
-  if (fs.existsSync(serviceAccountPath)) {
-    const serviceAccount = require(serviceAccountPath);
+  
+  let serviceAccount = null;
+  
+  // Option 1: Load from environment variable (Render production deployment)
+  if (process.env.FIREBASE_SERVICE_ACCOUNT_JSON) {
+    serviceAccount = JSON.parse(process.env.FIREBASE_SERVICE_ACCOUNT_JSON);
+    console.log('[FIREBASE_ADMIN] Loaded service account from ENV variable');
+  }
+  
+  // Option 2: Load from local file (local development)
+  if (!serviceAccount) {
+    const serviceAccountPath = path.join(__dirname, 'firebase-service-account.json');
+    if (fs.existsSync(serviceAccountPath)) {
+      serviceAccount = require(serviceAccountPath);
+      console.log('[FIREBASE_ADMIN] Loaded service account from local file');
+    }
+  }
+
+  if (serviceAccount) {
     const firebaseApp = initializeApp({
       credential: cert(serviceAccount)
     });
     fcmMessaging = getMessaging(firebaseApp);
-    console.log('🔥 [FIREBASE_ADMIN_INITIALIZED] Native Google FCM v1 VoIP Push Engine is ONLINE!');
+    console.log('[FIREBASE_ADMIN_INITIALIZED] Native Google FCM v1 VoIP Push Engine is ONLINE!');
+  } else {
+    console.warn('[FIREBASE_ADMIN_WARN] No service account found. FCM push will be disabled.');
   }
 } catch (e) {
-  console.warn('⚠️ [FIREBASE_ADMIN_INIT_WARN]', e.message);
+  console.warn('[FIREBASE_ADMIN_INIT_WARN]', e.message);
 }
 // Turso 9GB Cloud SQLite is 100% Single Source of Truth (No Local JSON)
 
@@ -1280,16 +1298,7 @@ async function sendCallPushNotification(targetUserId, callPayload) {
         },
         android: {
           priority: 'high',
-          ttl: 35000,
-          notification: {
-            title: `📞 Incoming ${callType === 'video' ? 'Video' : 'Voice'} Call`,
-            body: `${callerName} is calling you on SYNKING`,
-            channelId: 'incoming_calls',
-            priority: 'max',
-            visibility: 'public',
-            defaultSound: true,
-            defaultVibrateTimings: true,
-          }
+          ttl: 30000,
         }
       };
 
