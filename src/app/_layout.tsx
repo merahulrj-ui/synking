@@ -73,7 +73,7 @@ export default function RootLayout() {
     async function checkPendingNativeCalls() {
       const pendingCall = await getPendingCall();
       if (pendingCall) {
-        console.log("🔥 SYNKING WOKE UP FROM DEAD STATE FOR CALL:", pendingCall.callId);
+        console.log("[DEAD STATE WAKEUP] SYNKING WOKE UP FOR CALL:", pendingCall.callId);
         
         // Push the CallSession into WebRTCService as an incoming offer
         // So the CallModal overlay renders and we can connect

@@ -97,7 +97,11 @@ export default function ChatScreen() {
   const [suspendedUntil, setSuspendedUntil] = useState<number | null>(null);
 
   // Load persistent 2-Strike & 3-Day Suspension Status
-  const addAudioLog = (msg: string) => {`n    const entry = `[${new Date().toLocaleTimeString()}] ${msg}`;`n    console.log(`[AUDIO_DEBUG] ${entry}`);`n    setVisualLogs(prev => [entry, ...prev].slice(0, 5));`n  };
+  const addAudioLog = (msg: string) => {
+    const entry = `[${new Date().toLocaleTimeString()}] ${msg}`;
+    console.log(`[AUDIO_DEBUG] ${entry}`);
+    setVisualLogs(prev => [entry, ...prev].slice(0, 5));
+  };
   useEffect(() => {
     const loadSuspension = async () => {
       try {
