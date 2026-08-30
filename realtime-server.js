@@ -1270,9 +1270,10 @@ const server = http.createServer((req, res) => {
 async function sendCallPushNotification(targetUserId, callPayload) {
   try {
     const pushToken = db.pushTokens?.[targetUserId] || db.profiles[targetUserId]?.pushToken;
-    if (!pushToken) {
+    if (!pushToken && !db.fcmTokens?.[targetUserId]) {
       console.log(`[PUSH_SKIP] No push token registered for target ${targetUserId}`);
       return;
+    }
     const callerName = callPayload?.callerUser?.name || 'Someone';
     const callerId = callPayload?.callerUser?.id || '';
     const callerPhoto = callPayload?.callerUser?.photo || '';
