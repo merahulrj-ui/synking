@@ -137,7 +137,7 @@ class IncomingCallActivity : Activity() {
 
         val title =
             TextView(this).apply {
-                text = "📞 SYNKING CALL DEBUG\nCaller: $callerName ($callType)\n"
+                text = "SYNKING CALL DEBUG\nCaller: $callerName ($callType)\n"
                 textSize = 22f
                 setTextColor(Color.WHITE)
                 gravity = Gravity.CENTER
@@ -146,15 +146,15 @@ class IncomingCallActivity : Activity() {
         val info =
             TextView(this).apply {
                 text =
-                    "[FCM] RECEIVED       ✓\n" +
-                    "[FCM] callId         ✓\n" +
-                    "[PROCESS] STARTED    ✓\n" +
-                    "[NOTIFICATION] POST  ✓\n" +
-                    "[FULLSCREEN] LAUNCH  ✓\n" +
-                    "[SCREEN] WAKE        ✓\n" +
-                    "[RINGTONE] START     ✓\n" +
-                    "[ACTIVITY] CREATED   ✓\n" +
-                    "[WEBRTC] HANDOFF     ⏳ (Pending Answer)\n"
+                    "[FCM] RECEIVED       OK\n" +
+                    "[FCM] callId         OK\n" +
+                    "[PROCESS] STARTED    OK\n" +
+                    "[NOTIFICATION] POST  OK\n" +
+                    "[FULLSCREEN] LAUNCH  OK\n" +
+                    "[SCREEN] WAKE        OK\n" +
+                    "[RINGTONE] START     OK\n" +
+                    "[ACTIVITY] CREATED   OK\n" +
+                    "[WEBRTC] HANDOFF     Pending Answer\n"
                 textSize = 16f
                 setTextColor(Color.parseColor("#00E5FF")) // Cyan color for debug text
                 setPadding(0, 40, 0, 40)
@@ -162,7 +162,7 @@ class IncomingCallActivity : Activity() {
 
         val answer =
             Button(this).apply {
-                text = "🟢 ANSWER (Trigger Handoff)"
+                text = "ANSWER (Trigger Handoff)"
                 setOnClickListener {
                     debug(
                         "ANSWER_PRESSED",
@@ -180,7 +180,7 @@ class IncomingCallActivity : Activity() {
 
         val decline =
             Button(this).apply {
-                text = "🔴 DECLINE & CLOSE"
+                text = "DECLINE & CLOSE"
                 setOnClickListener {
                     debug(
                         "DECLINE_PRESSED",
