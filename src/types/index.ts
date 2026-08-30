@@ -49,6 +49,7 @@ export interface EncryptedChatMessageRecord {
   cipherText: string;
   isEncrypted: boolean;
   type: 'text' | 'date_invite' | 'voice' | 'call' | 'system';
+  extraData?: ChatMessage['extraData'];
   timestamp: string;
 }
 
@@ -103,6 +104,7 @@ export interface ChatMessage {
   text: string;
   timestamp: string;
   type: 'text' | 'date_invite' | 'voice' | 'call' | 'system';
+  extraData?: ChatMessage['extraData'];
   extraData?: {
     bookingId?: string;
     venueName?: string;

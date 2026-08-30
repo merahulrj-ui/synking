@@ -112,7 +112,9 @@ class RealtimeBridgeManager {
       | 'WEBRTC_ANSWER'
       | 'WEBRTC_ICE'
       | 'LIVE_VIDEO_FRAME'
-      | 'LIVE_AUDIO_PULSE',
+      | 'LIVE_AUDIO_PULSE'
+      | 'CALL_UPGRADED_TO_VIDEO'
+      | 'DELETE_MESSAGE',
     payload: any,
     targetUserId?: string
   ) {
@@ -140,3 +142,4 @@ class RealtimeBridgeManager {
 }
 
 export const RealtimeBridge = new RealtimeBridgeManager();
+

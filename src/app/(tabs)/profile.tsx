@@ -145,6 +145,11 @@ export default function ProfileScreen() {
 
   // Auth Modal State (Unified Login)
   const [authModalVisible, setAuthModalVisible] = useState(false);
+  const [loginPhone, setLoginPhone] = useState('+91 ');
+  const [loginName, setLoginName] = useState('');
+  const [loginGender, setLoginGender] = useState<'male' | 'female' | 'other'>('male');
+  const [isOtpSent, setIsOtpSent] = useState(false);
+  const [loginOtp, setLoginOtp] = useState('');
 
   // Edit Modal State
   const [editModalVisible, setEditModalVisible] = useState(false);
@@ -1936,3 +1941,4 @@ const styles = StyleSheet.create({
     fontWeight: '800',
   },
 });
+

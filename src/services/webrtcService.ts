@@ -652,15 +652,6 @@ class WebRTCManager {
     this.notify();
     return this.currentSession.isSpeakerOn;
   }
-
-  public getLocalStream(): any {
-    return this.localStream;
-  }
-
-  public getRemoteStream(): any {
-    return this.remoteStream;
-  }
-
   public formatDuration(sec: number): string {
     const mins = Math.floor(sec / 60);
     const remainingSecs = sec % 60;
@@ -732,3 +723,4 @@ class WebRTCManager {
 }
 
 export const WebRTCService = new WebRTCManager();
+
