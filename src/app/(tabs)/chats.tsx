@@ -74,13 +74,13 @@ export default function ChatsScreen() {
 
               return (
                 <TouchableOpacity
-                  style={[styles.chatCard, { backgroundColor: cardBg, borderColor }]}
+                  style={[styles.chatCard, { backgroundColor: cardBg, borderColor: isDarkMode ? 'rgba(253, 58, 115, 0.22)' : borderColor }]}
                   onPress={() => router.push(`/chat/${item.id}`)}
                   activeOpacity={0.75}
                 >
                   {/* Avatar with Online Indicator */}
                   <View style={styles.avatarWrapper}>
-                    <Image source={{ uri: item.photo }} style={styles.avatar} />
+                    <Image source={{ uri: item.photo }} style={[styles.avatar, { borderColor: isDarkMode ? '#FD3A73' : 'transparent' }]} />
                     <View style={styles.onlineDot} />
                   </View>
 
@@ -156,6 +156,11 @@ const styles = StyleSheet.create({
     borderWidth: 1,
     marginBottom: 8,
     gap: 12,
+    shadowColor: '#FD3A73',
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.18,
+    shadowRadius: 12,
+    elevation: 6,
   },
   avatarWrapper: {
     position: 'relative',
@@ -164,6 +169,11 @@ const styles = StyleSheet.create({
     width: 52,
     height: 52,
     borderRadius: 26,
+    borderWidth: 2,
+    borderColor: '#FD3A73',
+    shadowColor: '#FD3A73',
+    shadowOpacity: 0.3,
+    shadowRadius: 6,
   },
   onlineDot: {
     width: 12,
@@ -214,6 +224,11 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
     marginBottom: 6,
+    shadowColor: '#FD3A73',
+    shadowOffset: { width: 0, height: 6 },
+    shadowOpacity: 0.3,
+    shadowRadius: 16,
+    elevation: 8,
   },
   emptyTitle: {
     fontSize: 18,
@@ -230,6 +245,11 @@ const styles = StyleSheet.create({
     paddingVertical: 12,
     borderRadius: 22,
     marginTop: 8,
+    shadowColor: '#FD3A73',
+    shadowOffset: { width: 0, height: 6 },
+    shadowOpacity: 0.45,
+    shadowRadius: 14,
+    elevation: 8,
   },
   discoverBtnText: {
     color: '#FFF',

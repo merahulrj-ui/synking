@@ -4,7 +4,7 @@ import * as Crypto from 'expo-crypto';
 // Messages are encrypted on the sender's device and decrypted only on the receiver's device.
 export class E2EEncryption {
   private static deriveKey(userId1: string, userId2: string): string {
-    const sorted = [userId1, userId2].sort().join('_synkon_e2ee_secret_salt_');
+    const sorted = [userId1, userId2].sort().join('_synking_e2ee_secret_salt_');
     return sorted;
   }
 

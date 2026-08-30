@@ -217,7 +217,7 @@ export const AuthModal: React.FC<Props> = ({ visible, onClose, targetUserName })
                 ? `Sign In to Synk with ${targetUserName} 💖`
                 : otpSent
                 ? 'Verify Your Mobile 📲'
-                : 'Turn your SynkOn. Meet IRL.'}
+                : 'Welcome to SYNKING. Meet IRL. 🔥'}
             </Text>
             <Text style={[styles.subtitle, { color: subText }]}>
               {otpSent

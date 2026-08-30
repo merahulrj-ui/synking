@@ -13,12 +13,30 @@ export const Header: React.FC = () => {
   const borderCol = isDarkMode ? 'rgba(255, 255, 255, 0.06)' : 'rgba(0, 0, 0, 0.06)';
 
   return (
-    <View style={[styles.header, { backgroundColor: headerBg, borderBottomColor: borderCol }]}>
+    <View style={[
+      styles.header,
+      { backgroundColor: headerBg, borderBottomColor: isDarkMode ? 'rgba(253, 58, 115, 0.15)' : borderCol },
+      isDarkMode && {
+        shadowColor: '#FD3A73',
+        shadowOffset: { width: 0, height: 4 },
+        shadowOpacity: 0.12,
+        shadowRadius: 12,
+        elevation: 8,
+      }
+    ]}>
       {/* Brand: Official Glowing Logo + SYNKING */}
       <View style={styles.brandRow}>
         <Image
           source={require('../../assets/images/logo_emblem.png')}
-          style={styles.logoImg}
+          style={[
+            styles.logoImg,
+            isDarkMode && {
+              shadowColor: '#FD3A73',
+              shadowOffset: { width: 0, height: 0 },
+              shadowOpacity: 0.6,
+              shadowRadius: 10,
+            }
+          ]}
           resizeMode="contain"
         />
         <Text style={[styles.logoText, { color: logoTextColor }]}>SYNKING</Text>
@@ -26,7 +44,16 @@ export const Header: React.FC = () => {
 
       {/* Right: VIP Crown Membership Action */}
       <TouchableOpacity
-        style={styles.vipBtn}
+        style={[
+          styles.vipBtn,
+          isDarkMode && {
+            shadowColor: '#FBBF24',
+            shadowOffset: { width: 0, height: 0 },
+            shadowOpacity: 0.5,
+            shadowRadius: 8,
+            elevation: 5,
+          }
+        ]}
         activeOpacity={0.7}
         onPress={() => router.push('/vip-membership')}
       >

@@ -11,6 +11,7 @@ import {
   Platform,
   ScrollView,
   Alert,
+  Modal,
 } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useLocalSearchParams, useRouter } from 'expo-router';
@@ -78,8 +79,9 @@ export default function ChatScreen() {
   const insets = useSafeAreaInsets();
   const { id } = useLocalSearchParams<{ id: string }>();
   const router = useRouter();
-  const { matches, profiles, messages, sendMessage, activeBookings, currentUser, isDarkMode } = useApp();
+  const { matches, profiles, messages, sendMessage, deleteMessage, activeBookings, currentUser, isDarkMode } = useApp();
   const [inputText, setInputText] = useState('');
+  const [selectedMsgForAction, setSelectedMsgForAction] = useState<ChatMessage | null>(null);
   const [activeCall, setActiveCall] = useState<CallSession | null>(null);
   const [isPartnerTyping, setIsPartnerTyping] = useState(false);
   const [cloudMessages, setCloudMessages] = useState<ChatMessage[]>([]);
@@ -531,6 +533,16 @@ export default function ChatScreen() {
       result.push(m);
     }
 
+    // WhatsApp-Style Inverted Sort: Newest at index 0 (bottom of screen), oldest at end (top)
+    result.sort((a, b) => {
+      const getMs = (t?: string) => {
+        if (!t || t === 'Just now') return Date.now();
+        const d = new Date(t).getTime();
+        return isNaN(d) ? 0 : d;
+      };
+      return getMs(b.timestamp) - getMs(a.timestamp);
+    });
+
     return result;
   }, [cloudMessages, localMessages, id, currentUser?.id]);
 
@@ -972,7 +984,8 @@ export default function ChatScreen() {
           showsVerticalScrollIndicator={false}
           keyboardShouldPersistTaps="handled"
           keyboardDismissMode="on-drag"
-          ListHeaderComponent={
+          inverted={true}
+          ListFooterComponent={
             userMessages.length === 0 ? (
               <View style={styles.heroMatchCard}>
                 <View style={styles.heroAvatarRing}>
@@ -1071,7 +1084,12 @@ export default function ChatScreen() {
               }
 
               return (
-                <View
+                <TouchableOpacity
+                  activeOpacity={0.9}
+                  onLongPress={() => {
+                    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium).catch(() => {});
+                    setSelectedMsgForAction(item);
+                  }}
                   style={[
                     styles.bubble,
                     isMine
@@ -1133,12 +1151,17 @@ export default function ChatScreen() {
                       style={{ marginLeft: 2 }}
                     />
                   </View>
-                </View>
+                </TouchableOpacity>
               );
             }
 
             return (
-              <View
+              <TouchableOpacity
+                activeOpacity={0.9}
+                onLongPress={() => {
+                  Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium).catch(() => {});
+                  setSelectedMsgForAction(item);
+                }}
                 style={[
                   styles.bubble,
                   isMine
@@ -1159,8 +1182,15 @@ export default function ChatScreen() {
                     color={isMine ? '#FFFFFF' : '#22C55E'}
                     style={{ marginLeft: 2 }}
                   />
+                  <TouchableOpacity
+                    onPress={() => setSelectedMsgForAction(item)}
+                    style={{ marginLeft: 4, paddingHorizontal: 2 }}
+                    hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
+                  >
+                    <Text style={{ fontSize: 12, color: isMine ? 'rgba(255, 255, 255, 0.7)' : subText, fontWeight: '900' }}>⋮</Text>
+                  </TouchableOpacity>
                 </View>
-              </View>
+              </TouchableOpacity>
             );
           }}
         />
@@ -1296,6 +1326,148 @@ export default function ChatScreen() {
           </View>
         )}
       </KeyboardAvoidingView>
+
+      {/* 6. COMPACT FLOATING MESSAGE ACTION & DELETE MODAL */}
+      <Modal
+        visible={!!selectedMsgForAction}
+        transparent
+        animationType="fade"
+        onRequestClose={() => setSelectedMsgForAction(null)}
+      >
+        <TouchableOpacity
+          style={{
+            flex: 1,
+            backgroundColor: 'rgba(0, 0, 0, 0.65)',
+            justifyContent: 'center',
+            alignItems: 'center',
+            padding: 24,
+          }}
+          activeOpacity={1}
+          onPress={() => setSelectedMsgForAction(null)}
+        >
+          <View
+            style={{
+              width: 280,
+              backgroundColor: isDarkMode ? '#141522' : '#FFFFFF',
+              borderRadius: 20,
+              paddingVertical: 14,
+              paddingHorizontal: 12,
+              borderWidth: 1.5,
+              borderColor: isDarkMode ? 'rgba(253, 58, 115, 0.35)' : '#E2E8F0',
+              shadowColor: '#FD3A73',
+              shadowOffset: { width: 0, height: 8 },
+              shadowOpacity: isDarkMode ? 0.35 : 0.15,
+              shadowRadius: 20,
+              elevation: 12,
+            }}
+          >
+            {/* Header Badge */}
+            <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 6, paddingBottom: 10, borderBottomWidth: 1, borderBottomColor: isDarkMode ? 'rgba(255, 255, 255, 0.08)' : '#F1F5F9' }}>
+              <Ionicons name="chatbubble-ellipses" size={14} color="#FD3A73" />
+              <Text style={{ fontSize: 12, fontWeight: '800', color: isDarkMode ? '#FD3A73' : '#E11D48', letterSpacing: 0.5 }}>
+                MESSAGE OPTIONS
+              </Text>
+            </View>
+
+            {/* Actions List */}
+            <View style={{ marginTop: 8, gap: 4 }}>
+              {/* Copy Text */}
+              <TouchableOpacity
+                style={{
+                  flexDirection: 'row',
+                  alignItems: 'center',
+                  gap: 12,
+                  paddingVertical: 10,
+                  paddingHorizontal: 12,
+                  borderRadius: 12,
+                  backgroundColor: isDarkMode ? 'rgba(255, 255, 255, 0.04)' : '#F8FAFC',
+                }}
+                onPress={() => {
+                  if (selectedMsgForAction?.text) {
+                    if (Platform.OS === 'web' && typeof navigator !== 'undefined' && navigator.clipboard) {
+                      navigator.clipboard.writeText(selectedMsgForAction.text);
+                    }
+                    Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success).catch(() => {});
+                  }
+                  setSelectedMsgForAction(null);
+                }}
+              >
+                <Ionicons name="copy-outline" size={18} color="#00E5FF" />
+                <Text style={{ fontSize: 13, fontWeight: '700', color: isDarkMode ? '#FFFFFF' : '#0F172A' }}>
+                  Copy Text
+                </Text>
+              </TouchableOpacity>
+
+              {/* Delete For Me */}
+              <TouchableOpacity
+                style={{
+                  flexDirection: 'row',
+                  alignItems: 'center',
+                  gap: 12,
+                  paddingVertical: 10,
+                  paddingHorizontal: 12,
+                  borderRadius: 12,
+                  backgroundColor: isDarkMode ? 'rgba(239, 68, 68, 0.08)' : '#FEF2F2',
+                }}
+                onPress={() => {
+                  if (selectedMsgForAction && id) {
+                    deleteMessage(id, selectedMsgForAction.id, false);
+                    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium).catch(() => {});
+                  }
+                  setSelectedMsgForAction(null);
+                }}
+              >
+                <Ionicons name="trash-outline" size={18} color="#EF4444" />
+                <Text style={{ fontSize: 13, fontWeight: '700', color: '#EF4444' }}>
+                  Delete for Me
+                </Text>
+              </TouchableOpacity>
+
+              {/* Delete For Everyone (Only if I sent the message) */}
+              {(selectedMsgForAction?.senderId === currentUser?.id || selectedMsgForAction?.senderId === 'my_user_id') && (
+                <TouchableOpacity
+                  style={{
+                    flexDirection: 'row',
+                    alignItems: 'center',
+                    gap: 12,
+                    paddingVertical: 10,
+                    paddingHorizontal: 12,
+                    borderRadius: 12,
+                    backgroundColor: isDarkMode ? 'rgba(239, 68, 68, 0.12)' : '#FEE2E2',
+                  }}
+                  onPress={() => {
+                    if (selectedMsgForAction && id) {
+                      deleteMessage(id, selectedMsgForAction.id, true);
+                      Haptics.notificationAsync(Haptics.NotificationFeedbackType.Warning).catch(() => {});
+                    }
+                    setSelectedMsgForAction(null);
+                  }}
+                >
+                  <Ionicons name="flame-outline" size={18} color="#EF4444" />
+                  <Text style={{ fontSize: 13, fontWeight: '800', color: '#EF4444' }}>
+                    Delete for Everyone
+                  </Text>
+                </TouchableOpacity>
+              )}
+
+              {/* Cancel Button */}
+              <TouchableOpacity
+                style={{
+                  alignItems: 'center',
+                  paddingVertical: 8,
+                  marginTop: 4,
+                  borderRadius: 10,
+                }}
+                onPress={() => setSelectedMsgForAction(null)}
+              >
+                <Text style={{ fontSize: 12, fontWeight: '600', color: subText }}>
+                  Cancel
+                </Text>
+              </TouchableOpacity>
+            </View>
+          </View>
+        </TouchableOpacity>
+      </Modal>
     </View>
   );
 }

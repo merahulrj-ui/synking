@@ -18,7 +18,17 @@ export const VenueCard: React.FC<Props> = ({ venue, onReserve }) => {
   const borderCol = isDarkMode ? 'rgba(255, 255, 255, 0.08)' : 'rgba(0, 0, 0, 0.08)';
 
   return (
-    <View style={[styles.card, { backgroundColor: cardBg, borderColor: borderCol }]}>
+    <View style={[
+      styles.card,
+      { backgroundColor: cardBg, borderColor: isDarkMode ? 'rgba(253, 58, 115, 0.2)' : borderCol },
+      isDarkMode && {
+        shadowColor: '#FD3A73',
+        shadowOffset: { width: 0, height: 6 },
+        shadowOpacity: 0.22,
+        shadowRadius: 18,
+        elevation: 8,
+      }
+    ]}>
       {/* Venue Photo & Badges */}
       <View style={styles.imageContainer}>
         <Image source={{ uri: venue.image }} style={styles.image} />
@@ -29,7 +39,15 @@ export const VenueCard: React.FC<Props> = ({ venue, onReserve }) => {
         </View>
 
         {/* Verified Badge */}
-        <View style={styles.safeBadge}>
+        <View style={[
+          styles.safeBadge,
+          isDarkMode && {
+            shadowColor: '#00E5FF',
+            shadowOffset: { width: 0, height: 2 },
+            shadowOpacity: 0.35,
+            shadowRadius: 6,
+          }
+        ]}>
           <Ionicons name="shield-checkmark" size={12} color="#00E5FF" />
           <Text style={styles.safeText}>Verified Safe</Text>
         </View>
@@ -59,7 +77,11 @@ export const VenueCard: React.FC<Props> = ({ venue, onReserve }) => {
         </View>
 
         {/* SYNKING Exclusive Perk Pill */}
-        <View style={[styles.perkBox, { backgroundColor: isDarkMode ? 'rgba(251, 133, 0, 0.12)' : '#FFFBEB' }]}>
+        <View style={[styles.perkBox, {
+          backgroundColor: isDarkMode ? 'rgba(251, 133, 0, 0.12)' : '#FFFBEB',
+          borderWidth: isDarkMode ? 1 : 0,
+          borderColor: isDarkMode ? 'rgba(251, 133, 0, 0.3)' : 'transparent',
+        }]}>
           <Ionicons name="gift" size={15} color="#FB8500" />
           <Text style={styles.perkText} numberOfLines={1}>
             <Text style={{ fontWeight: '800', color: '#FB8500' }}>Perk: </Text>
@@ -69,7 +91,16 @@ export const VenueCard: React.FC<Props> = ({ venue, onReserve }) => {
 
         {/* Action Button */}
         <TouchableOpacity
-          style={styles.planBtn}
+          style={[
+            styles.planBtn,
+            isDarkMode && {
+              shadowColor: '#FD3A73',
+              shadowOffset: { width: 0, height: 6 },
+              shadowOpacity: 0.55,
+              shadowRadius: 16,
+              elevation: 10,
+            }
+          ]}
           onPress={() => onReserve(venue)}
           activeOpacity={0.85}
         >

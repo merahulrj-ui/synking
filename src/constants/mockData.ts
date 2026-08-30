@@ -92,7 +92,7 @@ export const MOCK_VENUES: Venue[] = [
     distance: '1.2 km',
     image: 'https://images.unsplash.com/photo-1554118811-1e0d58224f24?w=800&auto=format&fit=crop&q=80',
     isVerifiedSafe: true,
-    perks: 'Free Artisan Dessert with SYNKON Booking',
+    perks: 'Free Artisan Dessert with SYNKING Booking',
     tag: 'Top First Date Pick 🔥'
   },
   {

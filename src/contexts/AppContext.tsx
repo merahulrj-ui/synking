@@ -47,6 +47,7 @@ interface AppContextType {
   declineRequest: (requestId: string) => void;
   bookDate: (params: { targetUser: UserProfile; venue: Venue; dateTime: string; splitType: 'split_50_50' | 'i_treat' | 'they_treat' }) => DateBooking;
   sendMessage: (receiverId: string, text: string, type?: 'text' | 'voice', extraData?: ChatMessage['extraData']) => void;
+  deleteMessage: (partnerId: string, messageId: string, deleteForEveryone?: boolean) => void;
   submitFeedback: (bookingId: string, feedback: { matched: boolean; respectful: boolean; safe: boolean; notes: string }) => void;
   refreshDiscoverFeed: () => Promise<void>;
   isSuspended: boolean;
@@ -307,6 +308,17 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
             const list = prev[threadKey] || [];
             if (list.some(m => m.id === msg.id)) return prev;
             return { ...prev, [threadKey]: [...list, msg] };
+          });
+        }
+      } else if (type === 'DELETE_MESSAGE' && payload) {
+        const { messageId } = payload;
+        if (messageId) {
+          setMessages(prev => {
+            const next = { ...prev };
+            for (const key of Object.keys(next)) {
+              next[key] = (next[key] || []).filter(m => m && m.id !== messageId);
+            }
+            return next;
           });
         }
       } else if (type === 'SYNK_REQUEST' && payload) {
@@ -728,6 +740,25 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     });
   };
 
+  const deleteMessage = (partnerId: string, messageId: string, deleteForEveryone = false) => {
+    setMessages(prev => {
+      const list = prev[partnerId] || [];
+      const filtered = list.filter(m => m && m.id !== messageId);
+      return { ...prev, [partnerId]: filtered };
+    });
+
+    if (deleteForEveryone) {
+      RealtimeBridge.send({
+        type: 'DELETE_MESSAGE',
+        payload: {
+          messageId,
+          partnerId,
+          senderId: currentUser?.id,
+        }
+      });
+    }
+  };
+
   const submitFeedback = (bookingId: string, feedback: { matched: boolean; respectful: boolean; safe: boolean; notes: string }) => {
     console.log('Feedback submitted anonymously for booking:', bookingId, feedback);
   };
@@ -771,6 +802,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
         declineRequest,
         bookDate,
         sendMessage,
+        deleteMessage,
         submitFeedback,
         refreshDiscoverFeed: syncCloudState,
         isSuspended,

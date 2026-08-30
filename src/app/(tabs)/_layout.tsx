@@ -82,7 +82,20 @@ export default function TabsLayout() {
         initialRouteName="index"
         screenOptions={{
           headerShown: false,
-          tabBarStyle: [styles.tabBar, { backgroundColor: tabBarBg, borderTopColor: borderCol }],
+          tabBarStyle: [
+            styles.tabBar,
+            {
+              backgroundColor: tabBarBg,
+              borderTopColor: isDarkMode ? 'rgba(253, 58, 115, 0.18)' : borderCol,
+              ...(isDarkMode ? {
+                shadowColor: '#FD3A73',
+                shadowOffset: { width: 0, height: -4 },
+                shadowOpacity: 0.15,
+                shadowRadius: 12,
+                elevation: 14,
+              } : {}),
+            }
+          ],
           tabBarActiveTintColor: activeColor,
           tabBarInactiveTintColor: inactiveColor,
           tabBarShowLabel: true,
@@ -119,7 +132,17 @@ export default function TabsLayout() {
             title: 'InSynk',
             tabBarIcon: ({ focused }) => (
               <View style={styles.inSynkTabIconWrapper}>
-                <View style={[styles.inSynkCircle, focused ? styles.inSynkCircleActive : styles.inSynkCircleInactive]}>
+                <View style={[
+                  styles.inSynkCircle,
+                  focused ? styles.inSynkCircleActive : styles.inSynkCircleInactive,
+                  focused && {
+                    shadowColor: '#FD3A73',
+                    shadowOffset: { width: 0, height: 0 },
+                    shadowOpacity: 0.7,
+                    shadowRadius: 10,
+                    elevation: 10,
+                  }
+                ]}>
                   <Image
                     source={require('../../../assets/images/logo_emblem.png')}
                     style={styles.inSynkTabIcon}

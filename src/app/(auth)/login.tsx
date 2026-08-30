@@ -17,8 +17,8 @@ export default function LoginScreen() {
   return (
     <SafeAreaView style={styles.safeArea}>
       <View style={styles.heroSection}>
-        <Text style={styles.logo}>⚡ SYNKON</Text>
-        <Text style={styles.tagline}>Turn your SynkOn. Meet IRL.</Text>
+        <Text style={styles.logo}>⚡ SYNKING</Text>
+        <Text style={styles.tagline}>Discover. Synk. Meet IRL. 🔥</Text>
         <View style={styles.safetyBadge}>
           <Text style={styles.safetyText}>🛡️ Identity Verified · Safe Public Outlets Only</Text>
         </View>
@@ -45,7 +45,7 @@ export default function LoginScreen() {
         />
 
         <GradientButton
-          title="Turn SynkOn ⚡"
+          title="Get Into SYNKING ⚡"
           onPress={handleLogin}
           style={{ marginTop: 8 }}
         />
@@ -55,7 +55,7 @@ export default function LoginScreen() {
           onPress={() => router.push('/(auth)/register')}
         >
           <Text style={styles.switchText}>
-            New to SYNKON? <Text style={{ color: Colors.neonCyan, fontWeight: '800' }}>Get InSynk</Text>
+            New to SYNKING? <Text style={{ color: Colors.neonCyan, fontWeight: '800' }}>Get InSynk</Text>
           </Text>
         </TouchableOpacity>
       </View>

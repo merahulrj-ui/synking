@@ -128,12 +128,12 @@ export default function DiscoverScreen() {
                   styles.largeBtn,
                   { 
                     backgroundColor: isDarkMode ? '#1E202B' : '#FFFFFF', 
-                    borderColor: isDarkMode ? 'rgba(255,255,255,0.05)' : 'rgba(0,0,0,0.05)',
+                    borderColor: isDarkMode ? 'rgba(239,68,68,0.2)' : 'rgba(0,0,0,0.05)',
                     shadowColor: '#EF4444',
                     shadowOffset: { width: 0, height: 8 },
-                    shadowOpacity: 0.3,
-                    shadowRadius: 12,
-                    elevation: 10
+                    shadowOpacity: isDarkMode ? 0.45 : 0.2,
+                    shadowRadius: 16,
+                    elevation: 12
                   }
                 ]}
                 activeOpacity={0.6}
@@ -149,12 +149,12 @@ export default function DiscoverScreen() {
                   styles.midBtn,
                   { 
                     backgroundColor: isDarkMode ? '#1E202B' : '#FFFFFF', 
-                    borderColor: isDarkMode ? 'rgba(255,255,255,0.05)' : 'rgba(0,0,0,0.05)',
+                    borderColor: isDarkMode ? 'rgba(0,229,255,0.2)' : 'rgba(0,0,0,0.05)',
                     shadowColor: '#00E5FF',
                     shadowOffset: { width: 0, height: 6 },
-                    shadowOpacity: 0.3,
-                    shadowRadius: 10,
-                    elevation: 8
+                    shadowOpacity: isDarkMode ? 0.5 : 0.2,
+                    shadowRadius: 14,
+                    elevation: 10
                   }
                 ]}
                 activeOpacity={0.6}
@@ -170,12 +170,12 @@ export default function DiscoverScreen() {
                   styles.largeBtn,
                   { 
                     backgroundColor: isDarkMode ? '#1E202B' : '#FFFFFF', 
-                    borderColor: isDarkMode ? 'rgba(255,255,255,0.05)' : 'rgba(0,0,0,0.05)',
+                    borderColor: isDarkMode ? 'rgba(253,58,115,0.3)' : 'rgba(0,0,0,0.05)',
                     shadowColor: '#FD3A73',
                     shadowOffset: { width: 0, height: 8 },
-                    shadowOpacity: 0.4,
-                    shadowRadius: 16,
-                    elevation: 12
+                    shadowOpacity: isDarkMode ? 0.6 : 0.3,
+                    shadowRadius: 20,
+                    elevation: 14
                   }
                 ]}
                 activeOpacity={0.6}

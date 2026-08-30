@@ -69,7 +69,11 @@ export default function VenuesScreen() {
                     styles.catPill,
                     {
                       backgroundColor: isActive ? '#FD3A73' : pillBg,
-                      borderColor: isActive ? '#FD3A73' : pillBorder,
+                      borderColor: isActive ? '#FD3A73' : (isDarkMode ? 'rgba(255,255,255,0.1)' : pillBorder),
+                      shadowColor: isActive ? '#FD3A73' : 'transparent',
+                      shadowOpacity: isActive ? 0.45 : 0,
+                      shadowRadius: isActive ? 10 : 0,
+                      elevation: isActive ? 6 : 0,
                     },
                     isActive && styles.catPillActiveShadow,
                   ]}
@@ -155,9 +159,9 @@ const styles = StyleSheet.create({
   catPillActiveShadow: {
     shadowColor: '#FD3A73',
     shadowOffset: { width: 0, height: 3 },
-    shadowOpacity: 0.35,
-    shadowRadius: 6,
-    elevation: 4,
+    shadowOpacity: 0.5,
+    shadowRadius: 10,
+    elevation: 8,
   },
   catText: {
     fontSize: 12.5,
