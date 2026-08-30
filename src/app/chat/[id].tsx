@@ -12,6 +12,7 @@ import {
   ScrollView,
   Alert,
   Modal,
+  Keyboard,
 } from 'react-native';
 import {
   createAudioPlayer,
@@ -104,6 +105,22 @@ export default function ChatScreen() {
   const [suspendedUntil, setSuspendedUntil] = useState<number | null>(null);
   const [deletedMsgIds, setDeletedMsgIds] = useState<Set<string>>(new Set());
   const [fetchedProfile, setFetchedProfile] = useState<UserProfile | null>(null);
+  const [isKeyboardOpen, setIsKeyboardOpen] = useState(false);
+
+  useEffect(() => {
+    const showSub = Keyboard.addListener(
+      Platform.OS === 'ios' ? 'keyboardWillShow' : 'keyboardDidShow',
+      () => setIsKeyboardOpen(true)
+    );
+    const hideSub = Keyboard.addListener(
+      Platform.OS === 'ios' ? 'keyboardWillHide' : 'keyboardDidHide',
+      () => setIsKeyboardOpen(false)
+    );
+    return () => {
+      showSub.remove();
+      hideSub.remove();
+    };
+  }, []);
 
   // Instant 0ms Preloading: Cache messages & Resolve Real User Profile
   useEffect(() => {
@@ -965,7 +982,7 @@ export default function ChatScreen() {
       {/* 4. CHAT THREAD & MATCH HERO */}
       <KeyboardAvoidingView
         style={{ flex: 1 }}
-        behavior={Platform.OS === 'ios' ? 'padding' : undefined}
+        behavior="padding"
         keyboardVerticalOffset={Platform.OS === 'ios' ? 90 : 0}
       >
         <FlatList
@@ -1282,7 +1299,7 @@ export default function ChatScreen() {
 
         {/* 6. BOTTOM INPUT BAR (WHATSAPP STYLE RECORDING / SUSPENSION LOCK) */}
         {isSuspended ? (
-          <View style={[styles.inputBar, { backgroundColor: isDarkMode ? '#200D11' : '#FEE2E2', borderTopColor: '#EF4444', paddingVertical: 14, paddingHorizontal: 16, alignItems: 'center', justifyContent: 'center', gap: 4 }]}>
+          <View style={[styles.inputBar, { backgroundColor: isDarkMode ? '#200D11' : '#FEE2E2', borderTopColor: '#EF4444', paddingVertical: 14, paddingHorizontal: 16, alignItems: 'center', justifyContent: 'center', gap: 4, paddingBottom: isKeyboardOpen ? 14 : Math.max(14, insets.bottom) }]}>
             <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
               <Ionicons name="lock-closed" size={18} color="#EF4444" />
               <Text style={{ color: '#EF4444', fontWeight: '900', fontSize: 13, letterSpacing: 0.3 }}>
@@ -1294,7 +1311,7 @@ export default function ChatScreen() {
             </Text>
           </View>
         ) : isRecording ? (
-          <View style={[styles.inputBar, { backgroundColor: isDarkMode ? '#1E1218' : '#FFF1F2', borderTopColor: '#FECDD3', paddingHorizontal: 16 }]}>
+          <View style={[styles.inputBar, { backgroundColor: isDarkMode ? '#1E1218' : '#FFF1F2', borderTopColor: '#FECDD3', paddingHorizontal: 16, paddingBottom: isKeyboardOpen ? 8 : Math.max(8, insets.bottom) }]}>
             {/* Pulsing Recording Indicator */}
             <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8, flex: 1 }}>
               <View style={{ width: 10, height: 10, borderRadius: 5, backgroundColor: '#EF4444' }} />
@@ -1329,7 +1346,7 @@ export default function ChatScreen() {
             </TouchableOpacity>
           </View>
         ) : (
-          <View style={[styles.inputBar, { backgroundColor: inputBg, borderTopColor: borderCol, paddingBottom: Math.max(8, insets.bottom) }]}>
+          <View style={[styles.inputBar, { backgroundColor: inputBg, borderTopColor: borderCol, paddingBottom: isKeyboardOpen ? 8 : Math.max(8, insets.bottom) }]}>
             {/* Plan Date Quick Icon */}
             <TouchableOpacity
               style={styles.actionIconBtn}

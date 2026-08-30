@@ -81,9 +81,18 @@ export default function RootLayout() {
           {
             id: pendingCall.callerId,
             name: pendingCall.callerName,
-            photoUrl: pendingCall.callerPhoto || '',
-            isOnline: true,
-            lastSeen: new Date().toISOString()
+            age: 22,
+            gender: 'other',
+            occupation: 'Member',
+            location: 'Nearby',
+            distance: '0 km',
+            bio: '',
+            photo: pendingCall.callerPhoto || 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=800',
+            photos: [],
+            interests: [],
+            compatibility: 100,
+            isVerified: true,
+            isVip: false,
           },
           pendingCall.callType as any,
           pendingCall.callId
