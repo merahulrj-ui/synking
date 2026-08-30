@@ -1140,7 +1140,7 @@ const server = http.createServer((req, res) => {
 
           // Limit text to 500 chars, block URLs, and basic XSS sanitize
           if (msg.text && typeof msg.text === 'string') {
-            if (msg.text.length > 500) {
+            if (!msg.text.includes('AUDIO_DATA::') && msg.text.length > 500) {
               res.writeHead(400, { 'Content-Type': 'application/json' });
               res.end(JSON.stringify({ success: false, error: 'Message exceeded 500 chars limit' }));
               return;
@@ -1148,7 +1148,7 @@ const server = http.createServer((req, res) => {
             
             // Block Links
             const urlPattern = /(https?:\/\/[^\s]+)|(www\.[^\s]+)|([a-zA-Z0-9-]+\.[a-zA-Z]{2,}(\/[^\s]*)?)/i;
-            if (urlPattern.test(msg.text)) {
+            if (!msg.text.includes('AUDIO_DATA::') && urlPattern.test(msg.text)) {
               res.writeHead(403, { 'Content-Type': 'application/json' });
               res.end(JSON.stringify({ success: false, error: 'Links are not allowed in messages' }));
               return;
@@ -1719,3 +1719,4 @@ server.listen(PORT, '0.0.0.0', () => {
   console.log(`💸 ₹0 Cost • 0 Firestore Dependency • Unlimited Reads/Writes`);
   console.log(`======================================================`);
 });
+

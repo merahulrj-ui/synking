@@ -2,6 +2,7 @@ package com.synking
 
 import android.os.Build
 import android.os.Bundle
+import android.content.Intent
 
 import com.facebook.react.ReactActivity
 import com.facebook.react.ReactActivityDelegate
@@ -11,12 +12,16 @@ import com.facebook.react.defaults.DefaultReactActivityDelegate
 import expo.modules.ReactActivityDelegateWrapper
 
 class MainActivity : ReactActivity() {
+
+  private var pendingIncomingCallIntent: Intent? = null
+
   override fun onCreate(savedInstanceState: Bundle?) {
     // Set the theme to AppTheme BEFORE onCreate to support
     // coloring the background, status bar, and navigation bar.
     // This is required for expo-splash-screen.
     setTheme(R.style.AppTheme);
     super.onCreate(null)
+    handleIncomingCallIntent(intent)
 
     // 1. Native High-Priority Incoming Calls Notification Channel for Lock Screen & AOD Wakeup
     try {
@@ -100,5 +105,29 @@ class MainActivity : ReactActivity() {
       // Use the default back button implementation on Android S
       // because it's doing more than [Activity.moveTaskToBack] in fact.
       super.invokeDefaultOnBackPressed()
+  }
+
+  override fun onNewIntent(intent: Intent?) {
+    super.onNewIntent(intent)
+    if (intent != null) {
+        setIntent(intent)
+        handleIncomingCallIntent(intent)
+    }
+  }
+
+  private fun handleIncomingCallIntent(intent: Intent?) {
+    if (intent?.getBooleanExtra("SYNKING_INCOMING_CALL", false) != true) {
+        return
+    }
+
+    val callId = intent.getStringExtra("callId") ?: ""
+    val callerName = intent.getStringExtra("callerName") ?: "Someone"
+    val callType = intent.getStringExtra("callType") ?: "audio"
+
+    android.util.Log.d(
+        "SYNKING_FCM",
+        "[SYNKING_CALL_DEBUG] [OK] MAIN_ACTIVITY_HANDOFF " +
+        "callId=$callId caller=$callerName type=$callType"
+    )
   }
 }

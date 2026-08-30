@@ -157,40 +157,80 @@ class NotificationServiceClass {
   }
 
   // Register device push token to backend for background / closed app call wakeups
-  public async registerForPushNotificationsAsync(userId: string) {
-    if (Platform.OS === 'web' || !Notifications || !userId) return;
+    public async registerForPushNotificationsAsync(userId: string) {
+  if (Platform.OS === 'web' || !Notifications || !userId) return;
 
+  try {
+    await this.initialize();
+
+    let expoPushToken: string | null = null;
+    let fcmPushToken: string | null = null;
+
+    // 1. Keep existing Expo token for fallback/rollback.
     try {
-      await this.initialize();
-      let pushToken: string | null = null;
-      try {
-        const tokenData = await Notifications.getExpoPushTokenAsync().catch(() => null);
-        pushToken = tokenData?.data || null;
-      } catch (e) {}
-
-      if (!pushToken) {
-        try {
-          const deviceTokenData = await Notifications.getDevicePushTokenAsync().catch(() => null);
-          pushToken = deviceTokenData?.data || null;
-        } catch (e) {}
-      }
-
-      if (pushToken) {
-        CallDebugger.logStage('FCM TOKEN', 'OK', { userId, pushToken: pushToken.substring(0, 20) + '...' });
-        const { getLocalBackendUrl } = require('./firebase');
-        const backendUrl = getLocalBackendUrl();
-        await fetch(`${backendUrl}/api/profiles/push-token`, {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ userId, pushToken }),
-        }).catch(() => {});
-      } else {
-        CallDebugger.logStage('FCM TOKEN', 'FAIL', { reason: 'No push token returned by device' });
-      }
-    } catch (e: any) {
-      CallDebugger.logStage('FCM TOKEN', 'FAIL', { error: e?.message });
+      const expoTokenData = await Notifications.getExpoPushTokenAsync().catch(() => null);
+      expoPushToken = expoTokenData?.data || null;
+    } catch (e) {
+      CallDebugger.logStage('EXPO TOKEN', 'INFO', {
+        error: e instanceof Error ? e.message : String(e),
+      });
     }
+
+    // 2. Get native Android FCM token.
+    if (Platform.OS === 'android') {
+      try {
+        const deviceTokenData =
+          await Notifications.getDevicePushTokenAsync().catch(() => null);
+
+        fcmPushToken = deviceTokenData?.data || null;
+      } catch (e) {
+        CallDebugger.logStage('FCM TOKEN', 'FAIL', {
+          error: e instanceof Error ? e.message : String(e),
+        });
+      }
+    }
+
+    CallDebugger.logStage(
+      'PUSH TOKENS',
+      expoPushToken || fcmPushToken ? 'OK' : 'FAIL',
+      {
+        userId,
+        expo: expoPushToken ? expoPushToken.substring(0, 20) + '...' : null,
+        fcm: fcmPushToken ? fcmPushToken.substring(0, 20) + '...' : null,
+      }
+    );
+
+    if (!expoPushToken && !fcmPushToken) {
+      return;
+    }
+
+    const { getLocalBackendUrl } = require('./firebase');
+    const backendUrl = getLocalBackendUrl();
+
+    await fetch("$backendUrl/api/profiles/push-token", {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({
+        userId,
+        expoPushToken,
+        fcmPushToken,
+      }),
+    });
+
+    CallDebugger.logStage('PUSH TOKEN REGISTERED', 'OK', {
+      userId,
+      expo: !!expoPushToken,
+      fcm: !!fcmPushToken,
+    });
+
+  } catch (e: any) {
+    CallDebugger.logStage('PUSH TOKEN REGISTER', 'FAIL', {
+      error: e?.message || String(e),
+    });
   }
+}
 }
 
 export const NotificationService = new NotificationServiceClass();

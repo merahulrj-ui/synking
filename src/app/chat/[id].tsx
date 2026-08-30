@@ -17,6 +17,7 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
 import * as Haptics from 'expo-haptics';
+import { Audio } from 'expo-av';
 import { useApp } from '../../contexts/AppContext';
 import { WebRTCService } from '../../services/webrtcService';
 import { CallModal } from '../../components/CallModal';
@@ -133,6 +134,8 @@ export default function ChatScreen() {
   const animFrameRef = useRef<any>(null);
   const isSendingRef = useRef<boolean>(false);
   const lastSentTimeRef = useRef<number>(0);
+  const nativeRecordingRef = useRef<any>(null);
+  const nativeSoundRef = useRef<any>(null);
 
   // Test Device Speaker with Synthetic Beep
   const testSpeakerSound = () => {
@@ -184,116 +187,58 @@ export default function ChatScreen() {
 
   const startRecording = async () => {
     try {
-      addAudioLog('🎙️ Requesting microphone access (getUserMedia)...');
-      if (typeof navigator !== 'undefined' && navigator.mediaDevices && navigator.mediaDevices.getUserMedia) {
-        const stream = await navigator.mediaDevices.getUserMedia({
-          audio: {
-            echoCancellation: true,
-            noiseSuppression: true,
-            autoGainControl: true,
-          }
-        });
-        mediaStreamRef.current = stream;
-        audioChunksRef.current = [];
-
-        // Check Audio Tracks
-        const audioTracks = stream.getAudioTracks();
-        addAudioLog(`🟢 Mic granted: ${audioTracks.length} track(s), label: "${audioTracks[0]?.label || 'Default Mic'}"`);
-
-        // Setup Web Audio VU Meter to detect speaking volume
-        try {
-          const AudioCtx = (window as any).AudioContext || (window as any).webkitAudioContext;
-          if (AudioCtx) {
-            const ctx = new AudioCtx();
-            if (ctx.state === 'suspended') ctx.resume();
-            audioContextRef.current = ctx;
-            const source = ctx.createMediaStreamSource(stream);
-            const analyser = ctx.createAnalyser();
-            analyser.fftSize = 256;
-            source.connect(analyser);
-            analyserRef.current = analyser;
-
-            const bufferLength = analyser.frequencyBinCount;
-            const dataArray = new Uint8Array(bufferLength);
-
-            const updateMeter = () => {
-              if (!analyserRef.current) return;
-              analyserRef.current.getByteFrequencyData(dataArray);
-              let sum = 0;
-              for (let i = 0; i < bufferLength; i++) {
-                sum += dataArray[i];
-              }
-              const avg = sum / bufferLength;
-              const normalized = Math.min(100, Math.round((avg / 128) * 100));
-              setLiveMicLevel(normalized);
-              animFrameRef.current = requestAnimationFrame(updateMeter);
-            };
-            updateMeter();
-          }
-        } catch (e) {}
-
-        // Pick best supported MIME type
-        let mimeType = '';
-        if (typeof MediaRecorder !== 'undefined') {
-          if (MediaRecorder.isTypeSupported('audio/webm;codecs=opus')) {
-            mimeType = 'audio/webm;codecs=opus';
-          } else if (MediaRecorder.isTypeSupported('audio/webm')) {
-            mimeType = 'audio/webm';
-          } else if (MediaRecorder.isTypeSupported('audio/ogg;codecs=opus')) {
-            mimeType = 'audio/ogg;codecs=opus';
-          } else if (MediaRecorder.isTypeSupported('audio/mp4')) {
-            mimeType = 'audio/mp4';
-          } else if (MediaRecorder.isTypeSupported('audio/aac')) {
-            mimeType = 'audio/aac';
-          }
-        }
-
-        addAudioLog(`📦 MediaRecorder selected MIME: "${mimeType || 'default'}"`);
-        setSupportedMimes(mimeType || 'default');
-
-        const recorderOptions = mimeType ? { mimeType } : undefined;
-        const recorder = new MediaRecorder(stream, recorderOptions);
-        
-        recorder.ondataavailable = (e: any) => {
-          if (e.data && e.data.size > 0) {
-            audioChunksRef.current.push(e.data);
-            addAudioLog(`📥 Audio chunk captured: ${e.data.size} bytes`);
-          }
-        };
-
-        recorder.start(250);
-        mediaRecorderRef.current = recorder;
+      addAudioLog('🎙️ Requesting microphone access...');
+      if (Platform.OS !== 'web') {
+        await Audio.requestPermissionsAsync();
+        await Audio.setAudioModeAsync({ allowsRecordingIOS: true, playsInSilentModeIOS: true });
+        const { recording } = await Audio.Recording.createAsync(Audio.RecordingOptionsPresets.HIGH_QUALITY);
+        nativeRecordingRef.current = recording;
+        animFrameRef.current = setInterval(() => setLiveMicLevel(Math.floor(Math.random() * (80 - 20 + 1) + 20)), 150);
         setIsRecording(true);
         setRecordingSeconds(0);
-        addAudioLog('🔴 Recording active! Speak into your microphone.');
+        addAudioLog('🎙️ Native Recording active!');
       } else {
-        addAudioLog('⚠️ Navigator mediaDevices not available on this device.');
-        setIsRecording(true);
-        setRecordingSeconds(0);
+        if (typeof navigator !== 'undefined' && navigator.mediaDevices && navigator.mediaDevices.getUserMedia) {
+          const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+          mediaStreamRef.current = stream;
+          audioChunksRef.current = [];
+          let mimeType = 'audio/webm';
+          if (MediaRecorder.isTypeSupported('audio/webm;codecs=opus')) mimeType = 'audio/webm;codecs=opus';
+          else if (MediaRecorder.isTypeSupported('audio/mp4')) mimeType = 'audio/mp4';
+          setSupportedMimes(mimeType);
+          const recorder = new MediaRecorder(stream, { mimeType });
+          recorder.ondataavailable = (e) => { if (e.data && e.data.size > 0) audioChunksRef.current.push(e.data); };
+          recorder.start(250);
+          mediaRecorderRef.current = recorder;
+          animFrameRef.current = setInterval(() => setLiveMicLevel(Math.floor(Math.random() * (80 - 20 + 1) + 20)), 150);
+          setIsRecording(true);
+          setRecordingSeconds(0);
+        }
       }
     } catch (err: any) {
       addAudioLog(`❌ Mic permission failed: ${err.message || err}`);
-      console.warn('[MIC_RECORD_ERROR]', err);
-      if (Platform.OS === 'web') {
-        window.alert('Microphone Access Required 🎙️\n\nPlease allow microphone permissions in your browser to record voice notes.');
-      } else {
-        Alert.alert('Microphone Access Required 🎙️', 'Please allow microphone permissions to record voice notes.');
-      }
+      if (Platform.OS === 'web') window.alert('Microphone Access Required');
+      else Alert.alert('Microphone Access Required');
     }
   };
 
-  const cancelRecording = () => {
-    addAudioLog('🚫 Recording cancelled by user.');
-    if (animFrameRef.current) cancelAnimationFrame(animFrameRef.current);
-    try {
-      if (mediaRecorderRef.current && mediaRecorderRef.current.state !== 'inactive') {
-        mediaRecorderRef.current.stop();
+  const cancelRecording = async () => {
+    addAudioLog('🛑 Recording cancelled by user.');
+    if (animFrameRef.current) clearInterval(animFrameRef.current);
+    if (Platform.OS !== 'web') {
+      if (nativeRecordingRef.current) {
+        await nativeRecordingRef.current.stopAndUnloadAsync().catch(() => {});
+        nativeRecordingRef.current = null;
       }
-      if (mediaStreamRef.current) {
-        mediaStreamRef.current.getTracks().forEach((track: any) => track.stop());
-        mediaStreamRef.current = null;
-      }
-    } catch (e) {}
+    } else {
+      try {
+        if (mediaRecorderRef.current && mediaRecorderRef.current.state !== 'inactive') mediaRecorderRef.current.stop();
+        if (mediaStreamRef.current) {
+          mediaStreamRef.current.getTracks().forEach((t: any) => t.stop());
+          mediaStreamRef.current = null;
+        }
+      } catch (e) {}
+    }
     audioChunksRef.current = [];
     setLiveMicLevel(0);
     setIsRecording(false);
@@ -301,55 +246,55 @@ export default function ChatScreen() {
   };
 
   const sendVoiceNote = async () => {
-    addAudioLog('🛑 Finishing voice note recording and encoding...');
-    if (animFrameRef.current) cancelAnimationFrame(animFrameRef.current);
+    addAudioLog('🚀 Finishing voice note...');
+    if (animFrameRef.current) clearInterval(animFrameRef.current);
     setLiveMicLevel(0);
-
     const duration = Math.max(1, recordingSeconds);
     const mins = Math.floor(duration / 60);
     const secs = duration % 60;
     const durStr = `${mins}:${secs.toString().padStart(2, '0')}`;
-    const textLabel = `🎙️ Voice Note (${durStr})`;
-
+    const textLabel = `🎵 Voice Note (${durStr})`;
     let audioDataUri = '';
 
     try {
-      if (mediaRecorderRef.current && mediaRecorderRef.current.state !== 'inactive') {
-        try {
-          if (typeof mediaRecorderRef.current.requestData === 'function') {
-            mediaRecorderRef.current.requestData();
+      if (Platform.OS !== 'web') {
+        if (nativeRecordingRef.current) {
+          await nativeRecordingRef.current.stopAndUnloadAsync();
+          const uri = nativeRecordingRef.current.getURI();
+          if (uri) {
+            const FileSystem = require('expo-file-system');
+            const base64 = await FileSystem.readAsStringAsync(uri, { encoding: FileSystem.EncodingType.Base64 });
+            audioDataUri = `data:audio/m4a;base64,${base64}`;
           }
-        } catch (e) {}
-        await new Promise<void>((resolve) => {
-          mediaRecorderRef.current.onstop = () => resolve();
-          mediaRecorderRef.current.stop();
-        });
-      }
-
-      if (mediaStreamRef.current) {
-        mediaStreamRef.current.getTracks().forEach((track: any) => track.stop());
-        mediaStreamRef.current = null;
-      }
-
-      if (audioChunksRef.current && audioChunksRef.current.length > 0) {
-        const mime = supportedMimes || 'audio/webm';
-        const audioBlob = new Blob(audioChunksRef.current, { type: mime });
-        const sizeKb = (audioBlob.size / 1024).toFixed(1) + ' KB';
-        setLastAudioSize(sizeKb);
-        addAudioLog(`📦 Encoded audio blob: ${sizeKb} (${audioBlob.type})`);
-
-        audioDataUri = await new Promise<string>((resolve) => {
-          const reader = new FileReader();
-          reader.onloadend = () => resolve(reader.result as string);
-          reader.onerror = () => resolve('');
-          reader.readAsDataURL(audioBlob);
-        });
-        addAudioLog(`✅ Base64 Data URI generated (length: ${audioDataUri.length})`);
+          nativeRecordingRef.current = null;
+        }
       } else {
-        addAudioLog('⚠️ Warning: 0 audio chunks captured.');
+        if (mediaRecorderRef.current && mediaRecorderRef.current.state !== 'inactive') {
+          await Promise.race([
+             new Promise<void>((resolve) => {
+               mediaRecorderRef.current.onstop = () => resolve();
+               mediaRecorderRef.current.stop();
+             }),
+             new Promise<void>((resolve) => setTimeout(resolve, 500))
+          ]);
+        }
+        if (mediaStreamRef.current) {
+          mediaStreamRef.current.getTracks().forEach((t: any) => t.stop());
+          mediaStreamRef.current = null;
+        }
+        if (audioChunksRef.current.length > 0) {
+          const mime = supportedMimes || 'audio/webm';
+          const audioBlob = new Blob(audioChunksRef.current, { type: mime });
+          audioDataUri = await new Promise<string>((resolve) => {
+            const reader = new FileReader();
+            reader.onloadend = () => resolve(reader.result as string);
+            reader.onerror = () => resolve('');
+            reader.readAsDataURL(audioBlob);
+          });
+        }
       }
     } catch (e: any) {
-      addAudioLog(`❌ Audio encoding error: ${e.message || e}`);
+      addAudioLog(`❌ Audio error: ${e.message}`);
     } finally {
       audioChunksRef.current = [];
       setIsRecording(false);
@@ -358,75 +303,52 @@ export default function ChatScreen() {
 
     if (id) {
       const fullText = audioDataUri ? `${textLabel}|||AUDIO_DATA::${audioDataUri}` : textLabel;
-      sendMessage(id, fullText, 'voice', {
-        audioUrl: audioDataUri,
-        audioDuration: duration,
-      });
-      addAudioLog(`🚀 Voice note broadcast with ${audioDataUri ? 'Real Audio Payload' : 'Text Fallback'}`);
+      sendMessage(id, fullText, 'voice', { audioUrl: audioDataUri, audioDuration: duration });
     }
   };
 
-  const togglePlayVoiceNote = (messageId: string, audioUrl?: string) => {
-    addAudioLog(`▶️ Toggle playback tapped for message: ${messageId}`);
+  const togglePlayVoiceNote = async (messageId: string, audioUrl?: string) => {
     if (playingMessageId === messageId) {
-      addAudioLog('⏸️ Paused current voice note.');
-      if (activeAudioRef.current) {
-        activeAudioRef.current.pause();
-        activeAudioRef.current = null;
-      }
-      setPlayingMessageId(null);
-      return;
+       if (Platform.OS !== 'web') await nativeSoundRef.current?.pauseAsync();
+       else activeAudioRef.current?.pause();
+       setPlayingMessageId(null);
+       return;
     }
-
-    if (activeAudioRef.current) {
-      activeAudioRef.current.pause();
+    
+    if (Platform.OS !== 'web') {
+      await nativeSoundRef.current?.stopAsync().catch(()=>{});
+      await nativeSoundRef.current?.unloadAsync().catch(()=>{});
+      nativeSoundRef.current = null;
+    } else {
+      activeAudioRef.current?.pause();
       activeAudioRef.current = null;
     }
 
     if (audioUrl && audioUrl.startsWith('data:audio/')) {
-      addAudioLog(`🔊 Creating HTML5 Audio element with Data URI (size: ${audioUrl.length} chars)...`);
       try {
-        const audio = new Audio(audioUrl);
-        audio.volume = 1.0;
-        activeAudioRef.current = audio;
-        setPlayingMessageId(messageId);
-
-        audio.onplay = () => {
-          addAudioLog('🟢 AUDIO PLAYING: Device speaker is actively streaming audio!');
-        };
-
-        audio.onended = () => {
-          addAudioLog('🏁 Voice note playback finished.');
-          setPlayingMessageId(null);
-          activeAudioRef.current = null;
-        };
-
-        audio.onerror = (e: any) => {
-          addAudioLog(`❌ Audio playback error: ${audio.error ? audio.error.message : 'Unknown audio error'}`);
-          setPlayingMessageId(null);
-          activeAudioRef.current = null;
-        };
-
-        audio.play().then(() => {
-          addAudioLog('✅ audio.play() promise resolved.');
-        }).catch((err: any) => {
-          addAudioLog(`❌ audio.play() blocked by browser policy: ${err.message}`);
-          setPlayingMessageId(null);
-          activeAudioRef.current = null;
-        });
-        return;
-      } catch (e: any) {
-        addAudioLog(`❌ Failed to initialize Audio: ${e.message || e}`);
+        if (Platform.OS !== 'web') {
+          const { sound } = await Audio.Sound.createAsync({ uri: audioUrl });
+          nativeSoundRef.current = sound;
+          setPlayingMessageId(messageId);
+          await sound.playAsync();
+          sound.setOnPlaybackStatusUpdate((status: any) => {
+             if (status.didJustFinish) {
+               setPlayingMessageId(null);
+               sound.unloadAsync();
+             }
+          });
+        } else {
+          const HTMLAudio = (window as any).Audio;
+          const audio = new HTMLAudio(audioUrl);
+          activeAudioRef.current = audio;
+          setPlayingMessageId(messageId);
+          audio.play();
+          audio.onended = () => setPlayingMessageId(null);
+        }
+      } catch (e) {
+        setPlayingMessageId(null);
       }
-    } else {
-      addAudioLog('ℹ️ No raw audio URL attached to message (fallback tone preview)');
     }
-
-    setPlayingMessageId(messageId);
-    testSpeakerSound();
-    setTimeout(() => {
-      setPlayingMessageId(null);
-    }, 2500);
   };
 
   // Real target profile resolution (NO fake mock profiles)
@@ -1847,3 +1769,4 @@ const styles = StyleSheet.create({
     opacity: 0.4,
   },
 });
+
