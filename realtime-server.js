@@ -9,6 +9,23 @@ const path = require('path');
 const crypto = require('crypto');
 
 const PORT = process.env.PORT || 8082;
+
+let fcmMessaging = null;
+try {
+  const { initializeApp, cert } = require('firebase-admin/app');
+  const { getMessaging } = require('firebase-admin/messaging');
+  const serviceAccountPath = path.join(__dirname, 'firebase-service-account.json');
+  if (fs.existsSync(serviceAccountPath)) {
+    const serviceAccount = require(serviceAccountPath);
+    const firebaseApp = initializeApp({
+      credential: cert(serviceAccount)
+    });
+    fcmMessaging = getMessaging(firebaseApp);
+    console.log('🔥 [FIREBASE_ADMIN_INITIALIZED] Native Google FCM v1 VoIP Push Engine is ONLINE!');
+  }
+} catch (e) {
+  console.warn('⚠️ [FIREBASE_ADMIN_INIT_WARN]', e.message);
+}
 // Turso 9GB Cloud SQLite is 100% Single Source of Truth (No Local JSON)
 
 // 9 GB Turso Cloud SQLite Configuration (AWS Mumbai - 0ms Latency)
@@ -1232,7 +1249,7 @@ const server = http.createServer((req, res) => {
   res.end('Not Found');
 });
 
-function sendCallPushNotification(targetUserId, callPayload) {
+async function sendCallPushNotification(targetUserId, callPayload) {
   try {
     const pushToken = db.pushTokens?.[targetUserId] || db.profiles[targetUserId]?.pushToken;
     if (!pushToken) {
@@ -1244,23 +1261,62 @@ function sendCallPushNotification(targetUserId, callPayload) {
     const callerId = callPayload?.callerUser?.id || '';
     const callerPhoto = callPayload?.callerUser?.photo || '';
     const callType = callPayload?.type === 'video' ? 'video' : 'audio';
+    const callId = callPayload?.callId || `call_${Date.now()}`;
 
+    console.log(`📲 [DISPATCHING_VOIP_PUSH] Target=${targetUserId} Token=${pushToken.slice(0, 15)}... Caller=${callerName} (${callType})`);
+
+    // 1. DIRECT NATIVE GOOGLE FIREBASE CLOUD MESSAGING (FCM) v1 Engine
+    if (fcmMessaging && !pushToken.startsWith('ExponentPushToken[') && !pushToken.startsWith('ExpoPushToken[')) {
+      const message = {
+        token: pushToken,
+        data: {
+          type: 'INCOMING_CALL',
+          callId: String(callId),
+          callerId: String(callerId),
+          callerName: String(callerName),
+          callerPhoto: String(callerPhoto),
+          callType: String(callType),
+          timestamp: String(Date.now()),
+        },
+        android: {
+          priority: 'high',
+          ttl: 35000,
+          notification: {
+            title: `📞 Incoming ${callType === 'video' ? 'Video' : 'Voice'} Call`,
+            body: `${callerName} is calling you on SYNKING`,
+            channelId: 'incoming_calls',
+            priority: 'max',
+            visibility: 'public',
+            defaultSound: true,
+            defaultVibrateTimings: true,
+          }
+        }
+      };
+
+      try {
+        const response = await fcmMessaging.send(message);
+        console.log(`✅ [FCM_NATIVE_VOIP_PUSH_SUCCESS] Message ID: ${response}`);
+        return;
+      } catch (fcmErr) {
+        console.error(`❌ [FCM_NATIVE_VOIP_PUSH_ERROR]`, fcmErr.message);
+      }
+    }
+
+    // 2. Fallback to Expo Push Notification Service if token is an Expo token
     const pushBody = JSON.stringify({
       to: pushToken,
       title: `📞 Incoming ${callType === 'video' ? 'Video' : 'Voice'} Call`,
       body: `${callerName} is calling you on SYNKING`,
       data: {
         type: 'INCOMING_CALL',
-        callId: callPayload?.callId,
-        callerId: callerId,
-        callerName: callerName,
-        callerPhoto: callerPhoto,
-        callType: callType,
-        callerUser: callPayload?.callerUser,
+        callId: String(callId),
+        callerId: String(callerId),
+        callerName: String(callerName),
+        callerPhoto: String(callerPhoto),
+        callType: String(callType),
       },
       priority: 'high',
       channelId: 'incoming_calls',
-      categoryIdentifier: 'CALL',
       sound: 'default',
     });
 
@@ -1274,12 +1330,12 @@ function sendCallPushNotification(targetUserId, callPayload) {
       let respData = '';
       res.on('data', chunk => respData += chunk);
       res.on('end', () => {
-        console.log(`[PUSH_CALL_DISPATCHED] Sent high-priority push call to ${targetUserId}:`, respData);
+        console.log(`[EXPO_PUSH_DISPATCHED] to ${targetUserId}:`, respData);
       });
     });
 
     req.on('error', (err) => {
-      console.error('[PUSH_CALL_ERROR]', err.message);
+      console.error('[EXPO_PUSH_ERROR]', err.message);
     });
 
     req.write(pushBody);

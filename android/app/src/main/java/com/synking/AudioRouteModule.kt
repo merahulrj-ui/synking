@@ -19,47 +19,46 @@ class AudioRouteModule(private val reactContext: ReactApplicationContext) : Reac
         return "AudioRouteModule"
     }
 
+    private fun applyAudioRoute(on: Boolean) {
+        try {
+            audioManager.mode = AudioManager.MODE_IN_COMMUNICATION
+            audioManager.isSpeakerphoneOn = on
+            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
+                val targetDevice = audioManager.availableCommunicationDevices.find { 
+                    if (on) it.type == AudioDeviceInfo.TYPE_BUILTIN_SPEAKER 
+                    else it.type == AudioDeviceInfo.TYPE_BUILTIN_EARPIECE 
+                }
+                if (targetDevice != null) {
+                    audioManager.setCommunicationDevice(targetDevice)
+                } else {
+                    audioManager.clearCommunicationDevice()
+                }
+            }
+            if (on) {
+                val maxCallVol = audioManager.getStreamMaxVolume(AudioManager.STREAM_VOICE_CALL)
+                audioManager.setStreamVolume(AudioManager.STREAM_VOICE_CALL, maxCallVol, 0)
+                val maxMusicVol = audioManager.getStreamMaxVolume(AudioManager.STREAM_MUSIC)
+                audioManager.setStreamVolume(AudioManager.STREAM_MUSIC, maxMusicVol, 0)
+                val maxSysVol = audioManager.getStreamMaxVolume(AudioManager.STREAM_SYSTEM)
+                audioManager.setStreamVolume(AudioManager.STREAM_SYSTEM, maxSysVol, 0)
+            }
+            audioManager.isMicrophoneMute = false
+        } catch (e: Exception) {}
+    }
+
     @ReactMethod
     fun setSpeakerphoneOn(on: Boolean, promise: Promise) {
         mainHandler.post {
             try {
-                if (on) {
-                    // 1. Loudspeaker Mode (Video Call OR Speaker Button ON)
-                    audioManager.mode = AudioManager.MODE_IN_COMMUNICATION
-                    audioManager.isSpeakerphoneOn = true
-                    if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
-                        val speakerDevice = audioManager.availableCommunicationDevices.find { 
-                            it.type == AudioDeviceInfo.TYPE_BUILTIN_SPEAKER 
-                        }
-                        if (speakerDevice != null) {
-                            audioManager.setCommunicationDevice(speakerDevice)
-                        } else {
-                            audioManager.clearCommunicationDevice()
-                        }
-                    }
-                    try {
-                        val maxCallVol = audioManager.getStreamMaxVolume(AudioManager.STREAM_VOICE_CALL)
-                        audioManager.setStreamVolume(AudioManager.STREAM_VOICE_CALL, maxCallVol, 0)
-                        val maxMusicVol = audioManager.getStreamMaxVolume(AudioManager.STREAM_MUSIC)
-                        audioManager.setStreamVolume(AudioManager.STREAM_MUSIC, maxMusicVol, 0)
-                    } catch (ve: Exception) {}
-                } else {
-                    // 2. Private Earpiece Mode (Voice Call Near Ear)
-                    audioManager.mode = AudioManager.MODE_IN_COMMUNICATION
-                    audioManager.isSpeakerphoneOn = false
-                    if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
-                        val earpieceDevice = audioManager.availableCommunicationDevices.find { 
-                            it.type == AudioDeviceInfo.TYPE_BUILTIN_EARPIECE 
-                        }
-                        if (earpieceDevice != null) {
-                            audioManager.setCommunicationDevice(earpieceDevice)
-                        } else {
-                            audioManager.clearCommunicationDevice()
-                        }
-                    }
+                // Immediate enforcement
+                applyAudioRoute(on)
+
+                // Multi-stage delayed enforcement to prevent WebRTC native C++ layer from overriding to earpiece
+                val delays = longArrayOf(150, 400, 800, 1500, 2500)
+                for (delay in delays) {
+                    mainHandler.postDelayed({ applyAudioRoute(on) }, delay)
                 }
 
-                audioManager.isMicrophoneMute = false
                 promise.resolve(on)
             } catch (e: Exception) {
                 promise.reject("AUDIO_ROUTE_ERROR", e.message)
