@@ -97,10 +97,7 @@ export default function ChatScreen() {
   const [suspendedUntil, setSuspendedUntil] = useState<number | null>(null);
 
   // Load persistent 2-Strike & 3-Day Suspension Status
-  const addAudioLog = (msg: string) => {
-    const entry = `[${new Date().toLocaleTimeString()}] ${msg}`;
-    console.log(`[AUDIO_DEBUG] ${entry}`);
-  };
+  const addAudioLog = (msg: string) => {`n    const entry = `[${new Date().toLocaleTimeString()}] ${msg}`;`n    console.log(`[AUDIO_DEBUG] ${entry}`);`n    setVisualLogs(prev => [entry, ...prev].slice(0, 5));`n  };
   useEffect(() => {
     const loadSuspension = async () => {
       try {
@@ -875,7 +872,7 @@ export default function ChatScreen() {
         </TouchableOpacity>
       )}
 
-      {/* 4. CHAT THREAD & MATCH HERO */}
+      {/* VISUAL AUDIO DEBUGGER OVERLAY */}`n        {visualLogs.length > 0 && (`n          <View style={{ position: "absolute", top: 140, left: 16, right: 16, backgroundColor: "rgba(0,0,0,0.85)", padding: 12, borderRadius: 12, zIndex: 999, borderWidth: 1, borderColor: "rgba(253, 58, 115, 0.4)" }}>`n            <Text style={{ color: "#FD3A73", fontSize: 11, fontWeight: "bold", marginBottom: 6 }}>AUDIO & MSG DEBUGGER (LATEST 5)</Text>`n            {visualLogs.map((log, i) => (`n              <Text key={i} style={{ color: "#22C55E", fontSize: 10, fontFamily: Platform.OS === "ios" ? "Courier" : "monospace", marginBottom: 2 }}>{log}</Text>`n            ))}`n          </View>`n        )}`n`n        {/* 4. CHAT THREAD & MATCH HERO */}
       <KeyboardAvoidingView
         style={{ flex: 1 }}
         behavior={Platform.OS === 'ios' ? 'padding' : 'height'} keyboardVerticalOffset={80}
@@ -1750,6 +1747,7 @@ const styles = StyleSheet.create({
     opacity: 0.4,
   },
 });
+
 
 
 

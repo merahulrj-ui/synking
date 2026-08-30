@@ -121,8 +121,16 @@ class MainActivity : ReactActivity() {
     }
 
     val callId = intent.getStringExtra("callId") ?: ""
+    val callerId = intent.getStringExtra("callerId") ?: ""
     val callerName = intent.getStringExtra("callerName") ?: "Someone"
     val callType = intent.getStringExtra("callType") ?: "audio"
+    val callerPhoto = intent.getStringExtra("callerPhoto")
+
+    CallIntentModule.pendingCallId = callId
+    CallIntentModule.pendingCallerId = callerId
+    CallIntentModule.pendingCallerName = callerName
+    CallIntentModule.pendingCallType = callType
+    CallIntentModule.pendingCallerPhoto = callerPhoto
 
     android.util.Log.d(
         "SYNKING_FCM",

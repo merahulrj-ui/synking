@@ -51,6 +51,8 @@ function GlobalCallOverlay() {
   );
 }
 
+import { getPendingCall, clearPendingCall } from '../services/CallIntentService';
+
 export default function RootLayout() {
   useEffect(() => {
     async function checkOTA() {
@@ -66,6 +68,31 @@ export default function RootLayout() {
       } catch (e) {}
     }
     checkOTA();
+
+    // Fix for 7-Point Test Cases (Dead State Wakeup)
+    async function checkPendingNativeCalls() {
+      const pendingCall = await getPendingCall();
+      if (pendingCall) {
+        console.log("🔥 SYNKING WOKE UP FROM DEAD STATE FOR CALL:", pendingCall.callId);
+        
+        // Push the CallSession into WebRTCService as an incoming offer
+        // So the CallModal overlay renders and we can connect
+        WebRTCService.receiveIncomingCall(
+          {
+            id: pendingCall.callerId,
+            name: pendingCall.callerName,
+            photoUrl: pendingCall.callerPhoto || '',
+            isOnline: true,
+            lastSeen: new Date().toISOString()
+          },
+          pendingCall.callType as any,
+          pendingCall.callId
+        );
+
+        clearPendingCall();
+      }
+    }
+    checkPendingNativeCalls();
   }, []);
 
   return (
