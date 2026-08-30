@@ -175,7 +175,7 @@ interface Props {
   onEndCall: () => void;
   onAcceptCall?: () => void;
   onToggleMute?: () => boolean;
-  onToggleVideo?: () => boolean;
+  onToggleVideo?: () => boolean | Promise<boolean>;
   onToggleSpeaker?: () => boolean | Promise<boolean>;
 }
 
@@ -1058,3 +1058,4 @@ const styles = StyleSheet.create({
     borderRadius: 4,
   },
 });
+

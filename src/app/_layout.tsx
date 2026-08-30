@@ -28,13 +28,13 @@ function GlobalCallOverlay() {
     const result = WebRTCService.endCall();
     if (result && result.session && currentUser) {
       const { session, durationFormatted } = result;
-      const targetId = session.callerUser?.id === currentUser.id ? session.targetUser?.id : session.callerUser?.id;
+      const targetId = session.callerId === currentUser.id ? session.receiverId : session.callerId;
       if (targetId) {
         const callLogText =
           session.type === 'video'
             ? `📹 Video Call · ${session.durationSeconds > 0 ? durationFormatted : 'Missed'}`
             : `📞 Voice Call · ${session.durationSeconds > 0 ? durationFormatted : 'Missed'}`;
-        sendMessage(targetId, callLogText, 'call');
+        sendMessage(targetId, callLogText, 'text');
       }
     }
   };

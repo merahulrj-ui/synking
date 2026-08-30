@@ -750,22 +750,7 @@ export default function ChatScreen() {
   const handleTriggerIncomingCall = (type: 'audio' | 'video' = 'audio') => {
     if (!targetUser) return;
     WebRTCService.receiveIncomingCall(targetUser, type);
-  };
-
-  // End Call & Log to Chat Thread
-  const handleEndCall = () => {
-    const result = WebRTCService.endCall();
-    if (result && id) {
-      const { session, durationFormatted } = result;
-      const callLogText =
-        session.type === 'video'
-          ? `📹 Video Call · ${session.durationSeconds > 0 ? durationFormatted : 'Missed'}`
-          : `📞 Voice Call · ${session.durationSeconds > 0 ? durationFormatted : 'Missed'}`;
-      sendMessage(id, callLogText);
-    }
-  };
-
-  const handleSendTestPing = () => {
+  };const handleSendTestPing = () => {
     if (id) {
       sendMessage(id, '⚡ Ping Test ' + new Date().toLocaleTimeString());
     }
@@ -1769,4 +1754,5 @@ const styles = StyleSheet.create({
     opacity: 0.4,
   },
 });
+
 
