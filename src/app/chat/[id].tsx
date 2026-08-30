@@ -17,7 +17,6 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
 import * as Haptics from 'expo-haptics';
-import { Audio } from 'expo-av';
 import { useApp } from '../../contexts/AppContext';
 import { WebRTCService } from '../../services/webrtcService';
 import { CallModal } from '../../components/CallModal';
@@ -189,10 +188,10 @@ export default function ChatScreen() {
     try {
       addAudioLog('🎙️ Requesting microphone access...');
       if (Platform.OS !== 'web') {
-        await Audio.requestPermissionsAsync();
-        await Audio.setAudioModeAsync({ allowsRecordingIOS: true, playsInSilentModeIOS: true });
-        const { recording } = await Audio.Recording.createAsync(Audio.RecordingOptionsPresets.HIGH_QUALITY);
-        nativeRecordingRef.current = recording;
+        addAudioLog('Native Audio recording temporarily unavailable');
+        
+        
+        
         animFrameRef.current = setInterval(() => setLiveMicLevel(Math.floor(Math.random() * (80 - 20 + 1) + 20)), 150);
         setIsRecording(true);
         setRecordingSeconds(0);
@@ -227,7 +226,7 @@ export default function ChatScreen() {
     if (animFrameRef.current) clearInterval(animFrameRef.current);
     if (Platform.OS !== 'web') {
       if (nativeRecordingRef.current) {
-        await nativeRecordingRef.current.stopAndUnloadAsync().catch(() => {});
+        
         nativeRecordingRef.current = null;
       }
     } else {
@@ -260,7 +259,7 @@ export default function ChatScreen() {
       if (Platform.OS !== 'web') {
         if (nativeRecordingRef.current) {
           await nativeRecordingRef.current.stopAndUnloadAsync();
-          const uri = nativeRecordingRef.current.getURI();
+          const uri = null;
           if (uri) {
             const FileSystem = require('expo-file-system');
             const base64 = await FileSystem.readAsStringAsync(uri, { encoding: FileSystem.EncodingType.Base64 });
@@ -1754,5 +1753,7 @@ const styles = StyleSheet.create({
     opacity: 0.4,
   },
 });
+
+
 
 
