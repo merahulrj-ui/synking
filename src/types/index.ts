@@ -104,7 +104,6 @@ export interface ChatMessage {
   text: string;
   timestamp: string;
   type: 'text' | 'date_invite' | 'voice' | 'call' | 'system';
-  extraData?: ChatMessage['extraData'];
   extraData?: {
     bookingId?: string;
     venueName?: string;
@@ -121,3 +120,4 @@ export interface SafetyContact {
   name: string;
   phone: string;
 }
+

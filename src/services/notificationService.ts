@@ -207,7 +207,7 @@ class NotificationServiceClass {
     const { getLocalBackendUrl } = require('./firebase');
     const backendUrl = getLocalBackendUrl();
 
-    await fetch("$backendUrl/api/profiles/push-token", {
+    await fetch(`${backendUrl}/api/profiles/push-token`, {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
@@ -234,3 +234,4 @@ class NotificationServiceClass {
 }
 
 export const NotificationService = new NotificationServiceClass();
+

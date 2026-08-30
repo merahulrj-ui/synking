@@ -13,6 +13,7 @@ import {
   Alert,
   Modal,
 } from 'react-native';
+import { createAudioPlayer } from 'expo-audio';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
@@ -308,15 +309,15 @@ export default function ChatScreen() {
 
   const togglePlayVoiceNote = async (messageId: string, audioUrl?: string) => {
     if (playingMessageId === messageId) {
-       if (Platform.OS !== 'web') await nativeSoundRef.current?.pauseAsync();
+       if (Platform.OS !== 'web') nativeSoundRef.current?.pause();
        else activeAudioRef.current?.pause();
        setPlayingMessageId(null);
        return;
     }
     
     if (Platform.OS !== 'web') {
-      await nativeSoundRef.current?.stopAsync().catch(()=>{});
-      await nativeSoundRef.current?.unloadAsync().catch(()=>{});
+      nativeSoundRef.current?.pause();
+      nativeSoundRef.current = null;
       nativeSoundRef.current = null;
     } else {
       activeAudioRef.current?.pause();
@@ -326,16 +327,12 @@ export default function ChatScreen() {
     if (audioUrl && audioUrl.startsWith('data:audio/')) {
       try {
         if (Platform.OS !== 'web') {
-          const { sound } = await Audio.Sound.createAsync({ uri: audioUrl });
-          nativeSoundRef.current = sound;
-          setPlayingMessageId(messageId);
-          await sound.playAsync();
-          sound.setOnPlaybackStatusUpdate((status: any) => {
-             if (status.didJustFinish) {
-               setPlayingMessageId(null);
-               sound.unloadAsync();
-             }
-          });
+          addAudioLog('? Playing audio note in Loudspeaker...');
+            const player = createAudioPlayer(audioUrl);
+            nativeSoundRef.current = player;
+            setPlayingMessageId(messageId);
+            player.play();
+            setTimeout(() => setPlayingMessageId(null), 3000);
         } else {
           const HTMLAudio = (window as any).Audio;
           const audio = new HTMLAudio(audioUrl);
@@ -881,7 +878,7 @@ export default function ChatScreen() {
       {/* 4. CHAT THREAD & MATCH HERO */}
       <KeyboardAvoidingView
         style={{ flex: 1 }}
-        behavior={Platform.OS === 'ios' ? 'padding' : undefined}
+        behavior={Platform.OS === 'ios' ? 'padding' : 'height'} keyboardVerticalOffset={80}
       >
         <FlatList
           data={userMessages}
@@ -1753,6 +1750,9 @@ const styles = StyleSheet.create({
     opacity: 0.4,
   },
 });
+
+
+
 
 
 
