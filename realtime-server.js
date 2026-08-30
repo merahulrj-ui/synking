@@ -1273,20 +1273,19 @@ async function sendCallPushNotification(targetUserId, callPayload) {
     if (!pushToken) {
       console.log(`[PUSH_SKIP] No push token registered for target ${targetUserId}`);
       return;
-    }
-
     const callerName = callPayload?.callerUser?.name || 'Someone';
     const callerId = callPayload?.callerUser?.id || '';
     const callerPhoto = callPayload?.callerUser?.photo || '';
     const callType = callPayload?.type === 'video' ? 'video' : 'audio';
     const callId = callPayload?.callId || `call_${Date.now()}`;
 
-    console.log(`📲 [DISPATCHING_VOIP_PUSH] Target=${targetUserId} Token=${pushToken.slice(0, 15)}... Caller=${callerName} (${callType})`);
+    // 1. DIRECT NATIVE FCM — check db.fcmTokens FIRST (separate from Expo token!)
+    const nativeFcmToken = db.fcmTokens?.[targetUserId] || db.profiles?.[targetUserId]?.fcmPushToken;
+    console.log(`📲 [DISPATCHING_VOIP_PUSH] Target=${targetUserId} NativeFCM=${!!nativeFcmToken} ExpoToken=${pushToken?.slice(0,15)}... Caller=${callerName} (${callType})`);
 
-    // 1. DIRECT NATIVE GOOGLE FIREBASE CLOUD MESSAGING (FCM) v1 Engine
-    if (fcmMessaging && !pushToken.startsWith('ExponentPushToken[') && !pushToken.startsWith('ExpoPushToken[')) {
+    if (fcmMessaging && nativeFcmToken) {
       const message = {
-        token: pushToken,
+        token: nativeFcmToken,
         data: {
           type: 'INCOMING_CALL',
           callId: String(callId),
@@ -1304,8 +1303,8 @@ async function sendCallPushNotification(targetUserId, callPayload) {
 
       try {
         const response = await fcmMessaging.send(message);
-        console.log(`✅ [FCM_NATIVE_VOIP_PUSH_SUCCESS] Message ID: ${response}`);
-        return;
+        console.log(`✅ [FCM_NATIVE_VOIP_PUSH_SUCCESS] ID: ${response} user=${targetUserId}`);
+        return; // FCM sent! No need for Expo fallback
       } catch (fcmErr) {
         console.error(`❌ [FCM_NATIVE_VOIP_PUSH_ERROR]`, fcmErr.message);
       }
