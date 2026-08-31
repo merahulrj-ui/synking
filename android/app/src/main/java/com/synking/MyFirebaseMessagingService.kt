@@ -84,6 +84,33 @@ class MyFirebaseMessagingService : FirebaseMessagingService() {
             "type=${data["type"]} callId=${data["callId"]}"
         )
 
+        if (data["type"] == "CALL_ENDED") {
+            debug("FCM_MISSED_CALL", "OK", "Processing call ended signal")
+            
+            val callId = data["callId"] ?: ""
+            val callerName = data["callerName"] ?: "Someone"
+            
+            // 1. Cancel the ringing notification
+            val notificationManager = getSystemService(Context.NOTIFICATION_SERVICE) as NotificationManager
+            notificationManager.cancel(NOTIFICATION_ID)
+            
+            // 2. Broadcast to close IncomingCallActivity if it's open
+            val closeIntent = Intent("com.synking.CLOSE_CALL_SCREEN")
+            sendBroadcast(closeIntent)
+
+            // 3. Post a standard "Missed Call" notification
+            val missedCallNotification = NotificationCompat.Builder(this, CHANNEL_ID)
+                .setSmallIcon(R.mipmap.ic_launcher)
+                .setContentTitle("Missed Call")
+                .setContentText("You missed a call from $callerName")
+                .setPriority(NotificationCompat.PRIORITY_HIGH)
+                .setAutoCancel(true)
+                .build()
+
+            notificationManager.notify(callId.hashCode(), missedCallNotification)
+            return
+        }
+
         if (data["type"] != "INCOMING_CALL") {
             debug(
                 "FCM_IGNORED",
@@ -139,37 +166,33 @@ class MyFirebaseMessagingService : FirebaseMessagingService() {
             "callId=$callId"
         )
 
-        // 3. Create FullScreenIntent PendingIntent for IncomingCallActivity
-        val fullScreenIntent = Intent(
-            this,
-            IncomingCallActivity::class.java
-        ).apply {
-            flags =
-                Intent.FLAG_ACTIVITY_NEW_TASK or
-                Intent.FLAG_ACTIVITY_SINGLE_TOP or
-                Intent.FLAG_ACTIVITY_CLEAR_TOP
+        // 3. Create Intent for when user taps the notification banner (goes to MainActivity)
+        val tapIntent = Intent(this, MainActivity::class.java).apply {
+            flags = Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_SINGLE_TOP or Intent.FLAG_ACTIVITY_CLEAR_TOP
+            putExtra("SYNKING_INCOMING_CALL", true)
+            putExtra("callId", callId)
+            putExtra("callerName", callerName)
+            putExtra("callType", callType)
+        }
+        val piFlags = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.M) {
+            PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE
+        } else {
+            PendingIntent.FLAG_UPDATE_CURRENT
+        }
+        val tapPendingIntent = PendingIntent.getActivity(this, callId.hashCode(), tapIntent, piFlags)
 
+        // 4. Create FullScreenIntent (goes to IncomingCallActivity) for lock screen
+        val fullScreenIntent = Intent(this, IncomingCallActivity::class.java).apply {
+            flags = Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_SINGLE_TOP or Intent.FLAG_ACTIVITY_CLEAR_TOP
             putExtra("callId", callId)
             putExtra("callerId", callerId)
             putExtra("callerName", callerName)
             putExtra("callerPhoto", callerPhoto)
             putExtra("callType", callType)
         }
+        val fullScreenPendingIntent = PendingIntent.getActivity(this, callId.hashCode() + 1, fullScreenIntent, piFlags)
 
-        val flags = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.M) {
-            PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE
-        } else {
-            PendingIntent.FLAG_UPDATE_CURRENT
-        }
-
-        val fullScreenPendingIntent = PendingIntent.getActivity(
-            this,
-            callId.hashCode(),
-            fullScreenIntent,
-            flags
-        )
-
-        // 4. Create Notification Channel with High Importance and Call Category
+        // 5. Create Notification Channel with High Importance and Call Category
         val notificationManager = getSystemService(Context.NOTIFICATION_SERVICE) as NotificationManager
 
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
@@ -205,50 +228,28 @@ class MyFirebaseMessagingService : FirebaseMessagingService() {
             .setVisibility(NotificationCompat.VISIBILITY_PUBLIC)
             .setAutoCancel(false)
             .setOngoing(true)
-            .setFullScreenIntent(fullScreenPendingIntent, true)
-            .setContentIntent(fullScreenPendingIntent)
+            .setFullScreenIntent(fullScreenPendingIntent, true) // For OS standard lockscreen
+            .setContentIntent(tapPendingIntent) // For standard unlocked banner tap
             .build()
 
         notificationManager.notify(NOTIFICATION_ID, notification)
         debug("NOTIFICATION_POSTED", "OK", "callId=$callId")
 
-        // 5. DIRECT ACTIVITY LAUNCH — Bypass Realme/ColorOS FullScreenIntent blocking!
-        // This directly launches IncomingCallActivity over lock screen
+        // 6. DIRECT ACTIVITY LAUNCH — Bypass Realme/ColorOS FullScreenIntent blocking!
+        // ONLY if the screen is locked or off. Otherwise, it interrupts the user with a double UI.
         try {
-            val directIntent = Intent(this, IncomingCallActivity::class.java).apply {
-                flags = Intent.FLAG_ACTIVITY_NEW_TASK or
-                        Intent.FLAG_ACTIVITY_CLEAR_TOP or
-                        Intent.FLAG_ACTIVITY_SINGLE_TOP
-                putExtra("callId", callId)
-                putExtra("callerId", callerId)
-                putExtra("callerName", callerName)
-                putExtra("callerPhoto", callerPhoto)
-                putExtra("callType", callType)
+            val keyguardManager = getSystemService(Context.KEYGUARD_SERVICE) as android.app.KeyguardManager
+            val powerManager = getSystemService(Context.POWER_SERVICE) as PowerManager
+            val isScreenLockedOrOff = keyguardManager.isKeyguardLocked || !powerManager.isInteractive
+
+            if (isScreenLockedOrOff) {
+                startActivity(fullScreenIntent)
+                debug("DIRECT_ACTIVITY_LAUNCH", "OK", "Screen locked/off. Forced IncomingCallActivity.")
+            } else {
+                debug("DIRECT_ACTIVITY_LAUNCH", "SKIPPED", "Screen is unlocked/interactive. Using banner only.")
             }
-            startActivity(directIntent)
-            debug("DIRECT_ACTIVITY_LAUNCH", "OK", "IncomingCallActivity launched directly")
         } catch (e: Exception) {
             debug("DIRECT_ACTIVITY_LAUNCH", "FAIL", e.message ?: "")
-        }
-
-
-        notificationManager.notify(NOTIFICATION_ID, notification)
-        debug("FULLSCREEN_NOTIFICATION_POSTED", "OK", "Notification with FullScreenIntent dispatched")
-
-        // 5. Try direct startActivity as well
-        try {
-            startActivity(fullScreenIntent)
-            debug(
-                "INCOMING_CALL_ACTIVITY",
-                "OK",
-                "startActivity requested"
-            )
-        } catch (e: Exception) {
-            debug(
-                "INCOMING_CALL_ACTIVITY",
-                "FAIL",
-                e.message ?: "unknown"
-            )
         }
     }
 }
