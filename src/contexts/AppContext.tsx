@@ -710,7 +710,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       senderId: senderId,
       receiverId: receiverId,
       text: text,
-      timestamp: 'Just now',
+      timestamp: new Date().toISOString(),
       type: type,
       extraData: extraData,
     };

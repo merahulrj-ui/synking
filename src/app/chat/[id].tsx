@@ -43,6 +43,10 @@ function formatWhatsAppTime(timestamp?: string): string {
     if (isNaN(d.getTime())) return timestamp;
 
     const now = new Date();
+    if (now.getTime() - d.getTime() < 60000) {
+      return 'Just now';
+    }
+
     const isToday =
       d.getDate() === now.getDate() &&
       d.getMonth() === now.getMonth() &&
