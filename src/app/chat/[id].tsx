@@ -992,6 +992,10 @@ export default function ChatScreen() {
         <FlatList
           data={userMessages}
           keyExtractor={item => item.id}
+          removeClippedSubviews={Platform.OS === 'android'}
+          initialNumToRender={15}
+          maxToRenderPerBatch={10}
+          windowSize={5}
           contentContainerStyle={[
             styles.messagesList,
             userMessages.length === 0 && { flexGrow: 1, justifyContent: 'flex-end', paddingTop: 20 }

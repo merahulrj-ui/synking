@@ -88,6 +88,15 @@ android {
     compileSdk rootProject.ext.compileSdkVersion
 
     namespace "com.synking"
+    splits {
+        abi {
+            reset()
+            enable true
+            universalApk false
+            include "armeabi-v7a", "arm64-v8a", "x86", "x86_64"
+        }
+    }
+
     defaultConfig {
         applicationId "com.synking"
         minSdkVersion rootProject.ext.minSdkVersion

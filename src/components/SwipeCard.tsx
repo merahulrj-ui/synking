@@ -1,5 +1,6 @@
 import React, { useState, useRef } from 'react';
-import { View, Text, StyleSheet, Image, Dimensions, Animated, PanResponder, TouchableOpacity } from 'react-native';
+import { View, Text, StyleSheet, Dimensions, Animated, PanResponder, TouchableOpacity } from 'react-native';
+import { Image } from 'expo-image';
 import { LinearGradient } from 'expo-linear-gradient';
 import { Ionicons, Feather, MaterialCommunityIcons } from '@expo/vector-icons';
 import { UserProfile } from '../types';
@@ -115,7 +116,7 @@ export const SwipeCard: React.FC<Props> = ({ profile, isFirst = true, onSwipe })
       style={[styles.card, cardStyle]}
       {...(isFirst ? panResponder.panHandlers : {})}
     >
-      <Image source={{ uri: photos[photoIndex] || profile.photo }} style={styles.photo} />
+      <Image source={{ uri: photos[photoIndex] || profile.photo }} style={styles.photo} contentFit="cover" transition={200} />
 
       {/* Top Dot Progress Indicators (Exact Tinder Dot Bars) */}
       <View style={styles.dotContainer}>
