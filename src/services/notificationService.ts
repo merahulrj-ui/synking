@@ -166,29 +166,41 @@ class NotificationServiceClass {
     let expoPushToken: string | null = null;
     let fcmPushToken: string | null = null;
 
-    // 1. Keep existing Expo token for fallback/rollback.
+    // 1. Get native Android FCM token FIRST (most reliable for dead-state wakeup)
+    if (Platform.OS === 'android') {
+      try {
+        // Try firebase/messaging first (most reliable native FCM token)
+        const { getMessaging, getToken } = await import('@react-native-firebase/messaging').catch(() => ({ getMessaging: null, getToken: null }));
+        if (getMessaging && getToken) {
+          const nativeToken = await getToken(getMessaging()).catch(() => null);
+          if (nativeToken) {
+            fcmPushToken = nativeToken;
+            CallDebugger.logStage('FCM TOKEN (native)', 'OK', { token: nativeToken.substring(0, 20) + '...' });
+          }
+        }
+      } catch (e) {}
+
+      // Fallback: expo-notifications getDevicePushTokenAsync
+      if (!fcmPushToken) {
+        try {
+          const deviceTokenData = await Notifications.getDevicePushTokenAsync().catch(() => null);
+          fcmPushToken = deviceTokenData?.data || null;
+          if (fcmPushToken) {
+            CallDebugger.logStage('FCM TOKEN (expo-device)', 'OK', { token: fcmPushToken.substring(0, 20) + '...' });
+          }
+        } catch (e) {
+          CallDebugger.logStage('FCM TOKEN', 'FAIL', {
+            error: e instanceof Error ? e.message : String(e),
+          });
+        }
+      }
+    }
+
+    // 2. Expo Push Token (optional fallback)
     try {
       const expoTokenData = await Notifications.getExpoPushTokenAsync().catch(() => null);
       expoPushToken = expoTokenData?.data || null;
-    } catch (e) {
-      CallDebugger.logStage('EXPO TOKEN', 'INFO', {
-        error: e instanceof Error ? e.message : String(e),
-      });
-    }
-
-    // 2. Get native Android FCM token.
-    if (Platform.OS === 'android') {
-      try {
-        const deviceTokenData =
-          await Notifications.getDevicePushTokenAsync().catch(() => null);
-
-        fcmPushToken = deviceTokenData?.data || null;
-      } catch (e) {
-        CallDebugger.logStage('FCM TOKEN', 'FAIL', {
-          error: e instanceof Error ? e.message : String(e),
-        });
-      }
-    }
+    } catch (e) {}
 
     CallDebugger.logStage(
       'PUSH TOKENS',

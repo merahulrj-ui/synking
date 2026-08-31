@@ -31,13 +31,41 @@ class MyFirebaseMessagingService : FirebaseMessagingService() {
 
     override fun onNewToken(token: String) {
         super.onNewToken(token)
+        debug("FCM_TOKEN_REFRESHED", "OK", "token=${token.take(16)}...")
 
-        debug(
-            "FCM_TOKEN_REFRESHED",
-            "OK",
-            "token=${token.take(16)}..."
-        )
+        // Auto-save native FCM token to server so dead-state wakeup works!
+        val prefs = getSharedPreferences("synking_call_state", MODE_PRIVATE)
+        val userId = prefs.getString("current_user_id", null)
+        if (userId != null) {
+            saveFcmTokenToServer(userId, token)
+        }
+        // Always store token locally so MainActivity can save it after login
+        prefs.edit().putString("pending_fcm_token", token).apply()
     }
+
+    private fun saveFcmTokenToServer(userId: String, fcmToken: String) {
+        Thread {
+            try {
+                val url = java.net.URL("https://synking-9my2.onrender.com/api/profiles/push-token")
+                val conn = url.openConnection() as java.net.HttpURLConnection
+                conn.requestMethod = "POST"
+                conn.setRequestProperty("Content-Type", "application/json")
+                conn.doOutput = true
+                conn.connectTimeout = 10000
+                conn.readTimeout = 10000
+
+                val body = """{"userId":"$userId","fcmPushToken":"$fcmToken"}"""
+                conn.outputStream.write(body.toByteArray())
+
+                val code = conn.responseCode
+                debug("FCM_TOKEN_SAVED_TO_SERVER", if (code == 200) "OK" else "FAIL", "userId=$userId code=$code")
+                conn.disconnect()
+            } catch (e: Exception) {
+                debug("FCM_TOKEN_SAVE_ERROR", "FAIL", e.message ?: "")
+            }
+        }.start()
+    }
+
 
     override fun onMessageReceived(message: RemoteMessage) {
         super.onMessageReceived(message)
@@ -175,11 +203,34 @@ class MyFirebaseMessagingService : FirebaseMessagingService() {
             .setPriority(NotificationCompat.PRIORITY_MAX)
             .setCategory(NotificationCompat.CATEGORY_CALL)
             .setVisibility(NotificationCompat.VISIBILITY_PUBLIC)
-            .setAutoCancel(true)
+            .setAutoCancel(false)
             .setOngoing(true)
             .setFullScreenIntent(fullScreenPendingIntent, true)
             .setContentIntent(fullScreenPendingIntent)
             .build()
+
+        notificationManager.notify(NOTIFICATION_ID, notification)
+        debug("NOTIFICATION_POSTED", "OK", "callId=$callId")
+
+        // 5. DIRECT ACTIVITY LAUNCH — Bypass Realme/ColorOS FullScreenIntent blocking!
+        // This directly launches IncomingCallActivity over lock screen
+        try {
+            val directIntent = Intent(this, IncomingCallActivity::class.java).apply {
+                flags = Intent.FLAG_ACTIVITY_NEW_TASK or
+                        Intent.FLAG_ACTIVITY_CLEAR_TOP or
+                        Intent.FLAG_ACTIVITY_SINGLE_TOP
+                putExtra("callId", callId)
+                putExtra("callerId", callerId)
+                putExtra("callerName", callerName)
+                putExtra("callerPhoto", callerPhoto)
+                putExtra("callType", callType)
+            }
+            startActivity(directIntent)
+            debug("DIRECT_ACTIVITY_LAUNCH", "OK", "IncomingCallActivity launched directly")
+        } catch (e: Exception) {
+            debug("DIRECT_ACTIVITY_LAUNCH", "FAIL", e.message ?: "")
+        }
+
 
         notificationManager.notify(NOTIFICATION_ID, notification)
         debug("FULLSCREEN_NOTIFICATION_POSTED", "OK", "Notification with FullScreenIntent dispatched")
