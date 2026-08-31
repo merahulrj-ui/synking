@@ -1,4 +1,4 @@
-﻿import { NativeModules, Platform } from 'react-native';
+import { NativeModules, Platform } from 'react-native';
 
 const { AudioRouteModule } = NativeModules;
 
@@ -21,6 +21,14 @@ export const AudioRouteService = {
       } catch (e) {}
     }
     return false;
+  },
+
+  setProximitySensorEnabled: async (enabled: boolean): Promise<void> => {
+    if (Platform.OS === 'android' && AudioRouteModule?.setProximitySensorEnabled) {
+      try {
+        await AudioRouteModule.setProximitySensorEnabled(enabled);
+      } catch (e) {}
+    }
   },
 
   resetAudioRoute: async (): Promise<void> => {

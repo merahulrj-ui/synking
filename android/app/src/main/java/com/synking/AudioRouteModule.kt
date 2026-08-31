@@ -99,5 +99,33 @@ class AudioRouteModule(private val reactContext: ReactApplicationContext) : Reac
             }
         }
     }
+
+    private var proximityWakeLock: android.os.PowerManager.WakeLock? = null
+
+    @ReactMethod
+    fun setProximitySensorEnabled(enabled: Boolean, promise: Promise) {
+        mainHandler.post {
+            try {
+                val powerManager = reactContext.getSystemService(Context.POWER_SERVICE) as android.os.PowerManager
+                if (enabled) {
+                    if (proximityWakeLock == null) {
+                        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.LOLLIPOP && powerManager.isWakeLockLevelSupported(android.os.PowerManager.PROXIMITY_SCREEN_OFF_WAKE_LOCK)) {
+                            proximityWakeLock = powerManager.newWakeLock(android.os.PowerManager.PROXIMITY_SCREEN_OFF_WAKE_LOCK, "Synking:ProximityWakeLock")
+                        }
+                    }
+                    if (proximityWakeLock?.isHeld == false) {
+                        proximityWakeLock?.acquire()
+                    }
+                } else {
+                    if (proximityWakeLock?.isHeld == true) {
+                        proximityWakeLock?.release()
+                    }
+                }
+                promise.resolve(true)
+            } catch (e: Exception) {
+                promise.reject("PROXIMITY_ERROR", e.message)
+            }
+        }
+    }
 }
 

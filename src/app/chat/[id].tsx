@@ -279,7 +279,7 @@ export default function ChatScreen() {
           return;
         }
         await setAudioModeAsync({ allowsRecording: true, playsInSilentMode: true });
-        const recorder = new AudioModule.AudioRecorder(RecordingPresets.HIGH_QUALITY);
+        const recorder = new AudioModule.AudioRecorder(RecordingPresets.LOW_QUALITY);
         await recorder.prepareToRecordAsync();
         recorder.record();
         nativeRecordingRef.current = recorder;
