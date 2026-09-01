@@ -65,20 +65,35 @@ function GlobalCallOverlay() {
     if (Platform.OS === 'android' && NativeModules.TelecomModule) {
       const { NativeEventEmitter } = require('react-native');
       const emitter = new NativeEventEmitter(NativeModules.TelecomModule);
-        const sub1 = emitter.addListener('onTelecomCallAnswered', () => {
-          WebRTCService.log('📞 Native Android UI accepted the call, auto-answering WebRTC...');
-          WebRTCService.acceptCall();
-        });
-        const sub2 = emitter.addListener('onTelecomMuteToggled', (isMuted) => {
-          WebRTCService.toggleMute();
-        });
-        const sub3 = emitter.addListener('onTelecomSpeakerToggled', (isSpeakerOn) => {
-          WebRTCService.toggleSpeaker();
-        });
-        const sub4 = emitter.addListener('onTelecomEndCall', () => {
-          WebRTCService.endCall();
-        });
-        nativeSub = { remove: () => { sub1.remove(); sub2.remove(); sub3.remove(); sub4.remove(); } };
+      const sub1 = emitter.addListener('onTelecomCallAnswered', async (data?: any) => {
+        WebRTCService.log('📞 Native Android UI accepted the call: ' + JSON.stringify(data));
+        // Auto-initialize session if not present in JS yet
+        if (data && data.callId && (!WebRTCService.currentSession || WebRTCService.currentSession.id !== data.callId)) {
+          WebRTCService.receiveIncomingCall(
+            {
+              id: data.callerId || 'caller',
+              name: data.callerName || 'Caller',
+              age: 22,
+              gender: 'other',
+              avatar: '',
+            },
+            data.callType || 'audio',
+            data.callId,
+            false
+          );
+        }
+        await WebRTCService.acceptCall();
+      });
+      const sub2 = emitter.addListener('onTelecomMuteToggled', (isMuted) => {
+        WebRTCService.toggleMute();
+      });
+      const sub3 = emitter.addListener('onTelecomSpeakerToggled', (isSpeakerOn) => {
+        WebRTCService.toggleSpeaker();
+      });
+      const sub4 = emitter.addListener('onTelecomEndCall', () => {
+        WebRTCService.endCall();
+      });
+      nativeSub = { remove: () => { sub1.remove(); sub2.remove(); sub3.remove(); sub4.remove(); } };
     }
 
     return () => {
@@ -87,18 +102,11 @@ function GlobalCallOverlay() {
     };
   }, []);
 
-  if (!activeCall) return null;
+  const isIncomingRinging = activeCall?.status === 'ringing';
+  const isIncoming = activeCall ? activeCall.callerId !== currentUser?.id : false;
 
-  // HIDE React Native UI completely if it's an incoming call that is still ringing on Android.
-  // The Android Native UI (Lockscreen) is handling the ringing display!
-  // The Android Native UI (IncomingCallActivity.kt) handles the Ringing phase AND Active Audio Call natively!
-  const isIncomingRinging = activeCall.status === 'ringing';
-  const isIncoming = activeCall.callerId !== currentUser?.id;
-  const isAudioCall = activeCall.type === 'audio';
-
-  
   React.useEffect(() => {
-    if (Platform.OS === 'android' && isIncoming && isIncomingRinging) {
+    if (Platform.OS === 'android' && isIncoming && isIncomingRinging && activeCall) {
       const { AppState, NativeModules } = require('react-native');
       if (AppState.currentState === 'active' && NativeModules.TelecomModule?.launchIncomingCallActivity) {
         NativeModules.TelecomModule.launchIncomingCallActivity(
@@ -109,6 +117,8 @@ function GlobalCallOverlay() {
       }
     }
   }, [isIncoming, isIncomingRinging, activeCall?.id]);
+
+  if (!activeCall) return null;
 
   if (Platform.OS === 'android' && isIncoming) {
 

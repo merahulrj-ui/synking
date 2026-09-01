@@ -122,10 +122,14 @@ class WebRTCManager {
 
   private getPeerUserId(): string {
     if (!this.currentSession) return '';
-    if (this.currentSession.receiverId === 'my_user_id' || this.currentSession.status === 'ringing') {
+    const myId = RealtimeBridge.myUserId;
+    if (myId && this.currentSession.callerId === myId) {
+      return this.currentSession.receiverId;
+    }
+    if (myId && this.currentSession.receiverId === myId) {
       return this.currentSession.callerId;
     }
-    return this.currentSession.receiverId;
+    return this.currentSession.callerId || this.currentSession.receiverId || '';
   }
 
   public onLog(listener: (msg: string) => void): () => void {

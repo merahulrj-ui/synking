@@ -147,9 +147,20 @@ class TelecomModule(reactContext: ReactApplicationContext) : ReactContextBaseJav
         var globalReactContext: ReactApplicationContext? = null
         private var reactContext: ReactApplicationContext? = null
 
-        fun emitAcceptEvent() {
-            reactContext?.getJSModule(DeviceEventManagerModule.RCTDeviceEventEmitter::class.java)
-                ?.emit("onTelecomCallAnswered", null)
+        fun emitAcceptEvent(callId: String = "", callerId: String = "", callerName: String = "", callType: String = "audio") {
+            try {
+                val map = com.facebook.react.bridge.Arguments.createMap().apply {
+                    putString("callId", callId)
+                    putString("callerId", callerId)
+                    putString("callerName", callerName)
+                    putString("callType", callType)
+                }
+                Log.d("SYNKING_DEBUG", "[BRIDGE] emitAcceptEvent -> onTelecomCallAnswered: callId=$callId, caller=$callerName, type=$callType")
+                reactContext?.getJSModule(DeviceEventManagerModule.RCTDeviceEventEmitter::class.java)
+                    ?.emit("onTelecomCallAnswered", map)
+            } catch (e: Exception) {
+                Log.e("SYNKING_DEBUG", "[BRIDGE] emitAcceptEvent_ERROR: ${e.message}")
+            }
         }
 
         fun emitMuteToggled(isMuted: Boolean) {

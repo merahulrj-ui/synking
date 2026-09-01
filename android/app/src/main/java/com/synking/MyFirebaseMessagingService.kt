@@ -106,9 +106,9 @@ class MyFirebaseMessagingService : FirebaseMessagingService() {
             notificationManager.cancel(NOTIFICATION_ID)
             notificationManager.cancelAll()
             
-            // 3. Broadcast to close any open call screen
-            val closeIntent = Intent("com.synking.CLOSE_CALL_SCREEN")
-            sendBroadcast(closeIntent)
+            // 3. Broadcast to close any open call screen immediately
+            sendBroadcast(Intent("com.synking.CLOSE_CALL_SCREEN"))
+            sendBroadcast(Intent("com.synking.CALL_ENDED_FROM_JS"))
 
             // 4. Create dedicated Missed Call Notification Channel (standard notification sound, no looping ringtone)
             val missedChannelId = "synking_missed_calls_channel"

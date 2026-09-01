@@ -35,16 +35,22 @@ class IncomingCallActivity : Activity() {
 
     companion object {
         var activeRingtone: Ringtone? = null
+        var activeVibrator: Vibrator? = null
+
         fun stopRingtoneGlobally() {
             try {
                 activeRingtone?.stop()
                 activeRingtone = null
             } catch (e: Exception) {}
+            try {
+                activeVibrator?.cancel()
+                activeVibrator = null
+            } catch (e: Exception) {}
         }
     }
 
-    private var vibrator: Vibrator? = null
     private var callId: String = ""
+    private var callerId: String = ""
     private var callerName: String = ""
     private var callType: String = ""
 
@@ -122,21 +128,20 @@ class IncomingCallActivity : Activity() {
             )
         }
 
-        // Dismiss keyguard (PIN/Pattern lock) so call UI is directly interactive
-        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
-            val keyguardManager = getSystemService(Context.KEYGUARD_SERVICE) as KeyguardManager
-            keyguardManager.requestDismissKeyguard(this, null)
+        val cancelFilter = IntentFilter().apply {
+            addAction("com.synking.CALL_ENDED_FROM_JS")
+            addAction("com.synking.CLOSE_CALL_SCREEN")
         }
-
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
-            registerReceiver(callEndedReceiver, IntentFilter("com.synking.CALL_ENDED_FROM_JS"), Context.RECEIVER_NOT_EXPORTED)
+            registerReceiver(callEndedReceiver, cancelFilter, Context.RECEIVER_NOT_EXPORTED)
             registerReceiver(videoConnectedReceiver, IntentFilter("com.synking.VIDEO_CALL_CONNECTED_FROM_JS"), Context.RECEIVER_NOT_EXPORTED)
         } else {
-            registerReceiver(callEndedReceiver, IntentFilter("com.synking.CALL_ENDED_FROM_JS"))
+            registerReceiver(callEndedReceiver, cancelFilter)
             registerReceiver(videoConnectedReceiver, IntentFilter("com.synking.VIDEO_CALL_CONNECTED_FROM_JS"))
         }
 
         callId = intent.getStringExtra("callId") ?: ""
+        callerId = intent.getStringExtra("callerId") ?: ""
         callerName = intent.getStringExtra("callerName") ?: "Unknown"
         callType = intent.getStringExtra("callType") ?: "audio"
 
@@ -450,9 +455,10 @@ class IncomingCallActivity : Activity() {
     }
 
     private fun handleAccept() {
+        Log.d("SYNKING_DEBUG", "[UI] ACCEPT_BUTTON_TAPPED: callId=$callId callerId=$callerId callerName=$callerName type=$callType")
         stopRingtoneAndVibration()
         CallConnectionManager.answerCall()
-        TelecomModule.emitAcceptEvent()
+        TelecomModule.emitAcceptEvent(callId, callerId, callerName, callType)
 
         if (callType == "video") {
             incomingActionsRow?.visibility = View.GONE
@@ -474,6 +480,7 @@ class IncomingCallActivity : Activity() {
 
     private fun playRingtoneAndVibrate() {
         try {
+            Log.d("SYNKING_DEBUG", "[AUDIO] START_RINGTONE_AND_VIBRATION: Initiating audio & haptics")
             val uri = RingtoneManager.getDefaultUri(RingtoneManager.TYPE_RINGTONE)
             activeRingtone = RingtoneManager.getRingtone(applicationContext, uri)
             if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.LOLLIPOP) {
@@ -487,20 +494,21 @@ class IncomingCallActivity : Activity() {
             }
             activeRingtone?.play()
 
-            vibrator = getSystemService(Context.VIBRATOR_SERVICE) as Vibrator
+            activeVibrator = getSystemService(Context.VIBRATOR_SERVICE) as Vibrator
             if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
-                vibrator?.vibrate(VibrationEffect.createWaveform(longArrayOf(0, 1000, 1000), 0))
+                activeVibrator?.vibrate(VibrationEffect.createWaveform(longArrayOf(0, 1000, 1000), 0))
             } else {
                 @Suppress("DEPRECATION")
-                vibrator?.vibrate(longArrayOf(0, 1000, 1000), 0)
+                activeVibrator?.vibrate(longArrayOf(0, 1000, 1000), 0)
             }
-        } catch (e: Exception) {}
+            Log.d("SYNKING_DEBUG", "[AUDIO] RINGTONE_AND_VIBRATION: Active and playing")
+        } catch (e: Exception) {
+            Log.e("SYNKING_DEBUG", "[AUDIO] RINGTONE_ERROR: ${e.message}")
+        }
     }
 
     private fun stopRingtoneAndVibration() {
+        Log.d("SYNKING_DEBUG", "[AUDIO] STOP_RINGTONE_AND_VIBRATION: Cancelling all audio and vibration globally")
         stopRingtoneGlobally()
-        try {
-            vibrator?.cancel()
-        } catch (e: Exception) {}
     }
 }
