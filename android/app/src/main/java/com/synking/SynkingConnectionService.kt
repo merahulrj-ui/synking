@@ -12,10 +12,16 @@ class SynkingConnectionService : ConnectionService() {
         connectionManagerPhoneAccount: PhoneAccountHandle?,
         request: ConnectionRequest?
     ): Connection {
-        val extras = request?.extras
-        val callId = extras?.getString("callId") ?: "unknown_call_id"
-        val callerName = extras?.getString("callerName") ?: "Unknown"
-        val callType = extras?.getString("callType") ?: "audio"
+        val rawExtras = request?.extras
+        val incomingExtras = if (android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.TIRAMISU) {
+            rawExtras?.getParcelable(android.telecom.TelecomManager.EXTRA_INCOMING_CALL_EXTRAS, android.os.Bundle::class.java) ?: rawExtras
+        } else {
+            @Suppress("DEPRECATION")
+            rawExtras?.getParcelable(android.telecom.TelecomManager.EXTRA_INCOMING_CALL_EXTRAS) ?: rawExtras
+        }
+        val callId = incomingExtras?.getString("callId") ?: rawExtras?.getString("callId") ?: "unknown_call_id"
+        val callerName = incomingExtras?.getString("callerName") ?: rawExtras?.getString("callerName") ?: "Unknown"
+        val callType = incomingExtras?.getString("callType") ?: rawExtras?.getString("callType") ?: "audio"
 
         Log.d("SYNKING_TELECOM", "[TELECOM] CONNECTION_CREATED: Handling incoming for $callerName ($callId)")
 
