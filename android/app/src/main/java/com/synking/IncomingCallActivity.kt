@@ -11,7 +11,6 @@ import android.media.Ringtone
 import android.media.RingtoneManager
 import android.os.Build
 import android.os.Bundle
-import android.widget.FrameLayout
 import com.oney.WebRTCModule.WebRTCView
 import com.facebook.react.ReactApplication
 import com.facebook.react.ReactInstanceManager
@@ -59,7 +58,7 @@ class IncomingCallActivity : AppCompatActivity() {
     
     private var isMuted = false
     private var isSpeakerOn = false
-    private var uiLayer: LinearLayout? = null
+    private lateinit var uiLayer: LinearLayout
     // WebRTC Variables
     private var remoteVideoContainer: FrameLayout? = null
     private var localVideoContainer: FrameLayout? = null
@@ -152,8 +151,8 @@ class IncomingCallActivity : AppCompatActivity() {
         } catch (e: Exception) {
             e.printStackTrace()
         }
-        uiLayer?.setBackgroundColor(Color.TRANSPARENT)
-        uiLayer?.getChildAt(0)?.visibility = View.GONE // Hide avatar/name layout which is usually the first child
+        uiLayer.setBackgroundColor(Color.TRANSPARENT)
+        uiLayer.getChildAt(0)?.visibility = View.GONE // Hide avatar/name layout which is usually the first child
 
         remoteVideoContainer?.visibility = View.VISIBLE
         
