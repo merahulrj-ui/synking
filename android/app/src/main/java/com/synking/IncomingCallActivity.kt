@@ -11,6 +11,12 @@ import android.media.Ringtone
 import android.media.RingtoneManager
 import android.os.Build
 import android.os.Bundle
+import android.widget.FrameLayout
+import com.oney.WebRTCModule.WebRTCView
+import com.facebook.react.ReactApplication
+import com.facebook.react.ReactInstanceManager
+import com.facebook.react.bridge.ReactContext
+
 import android.os.Handler
 import android.os.Looper
 import android.os.SystemClock
@@ -86,6 +92,16 @@ class IncomingCallActivity : AppCompatActivity() {
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
+
+        TelecomModule.incomingActivityInstance = this
+        
+        // Boot JS in background if not running (to handle WebRTC signaling)
+        val reactHost = (application as? ReactApplication)?.reactNativeHost
+        val reactManager = reactHost?.reactInstanceManager
+        if (reactManager?.hasStartedCreatingInitialContext() == false) {
+            reactManager.createReactContextInBackground()
+        }
+
         
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O_MR1) {
             setShowWhenLocked(true)
@@ -114,8 +130,42 @@ class IncomingCallActivity : AppCompatActivity() {
         playRingtoneAndVibrate()
     }
 
+    
+    fun attachRemoteVideo(streamUrl: String) {
+        val ctx = TelecomModule.globalReactContext ?: return
+        if (remoteWebRTCView == null) {
+            remoteWebRTCView = WebRTCView(ctx)
+            remoteVideoContainer?.addView(remoteWebRTCView)
+        }
+        remoteWebRTCView?.setStreamURL(streamUrl)
+        remoteVideoContainer?.visibility = View.VISIBLE
+        
+        // Hide avatar and name since we have video
+        avatarImageView?.visibility = View.GONE
+        callerNameView?.visibility = View.GONE
+        subtitleView?.visibility = View.GONE
+        
+        // Bring controls to front
+        activeActionsRow?.bringToFront()
+        localVideoContainer?.bringToFront()
+    }
+
+    fun attachLocalVideo(streamUrl: String) {
+        val ctx = TelecomModule.globalReactContext ?: return
+        if (localWebRTCView == null) {
+            localWebRTCView = WebRTCView(ctx)
+            localWebRTCView?.setMirror(true)
+            localVideoContainer?.addView(localWebRTCView)
+        }
+        localWebRTCView?.setStreamURL(streamUrl)
+        localVideoContainer?.visibility = View.VISIBLE
+    }
+
     override fun onDestroy() {
         super.onDestroy()
+
+        TelecomModule.incomingActivityInstance = null
+
         stopRingtoneAndVibration()
         timerHandler.removeCallbacks(timerRunnable)
         try {

@@ -57,12 +57,9 @@ function GlobalCallOverlay() {
   const isAudioCall = activeCall.type === 'audio';
 
   if (Platform.OS === 'android' && isIncoming) {
-    if (isIncomingRinging) {
-      return null; // Don't show RN ringing banner
-    }
-    if (isAudioCall) {
-      return null; // Fully Native Seamless Audio Dialer handles the entire call, no RN UI needed!
-    }
+    // Both Audio and Video Incoming Calls are now handled 100% natively by IncomingCallActivity.
+    // JS runs purely headless to manage WebRTC state.
+    return null; 
   }
 
   const handleEndCall = () => {

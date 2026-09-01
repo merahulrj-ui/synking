@@ -12,6 +12,7 @@ class TelecomModule(reactContext: ReactApplicationContext) : ReactContextBaseJav
 
     init {
         TelecomModule.reactContext = reactContext
+        globalReactContext = reactContext
     }
 
     override fun getName(): String {
@@ -40,6 +41,32 @@ class TelecomModule(reactContext: ReactApplicationContext) : ReactContextBaseJav
     }
 
     @ReactMethod
+    
+    @ReactMethod
+    fun attachRemoteVideo(streamUrl: String, promise: Promise) {
+        try {
+            currentActivity?.runOnUiThread {
+                incomingActivityInstance?.attachRemoteVideo(streamUrl)
+            }
+            promise.resolve(true)
+        } catch (e: Exception) {
+            promise.reject("ERR", e.message)
+        }
+    }
+
+    @ReactMethod
+    fun attachLocalVideo(streamUrl: String, promise: Promise) {
+        try {
+            currentActivity?.runOnUiThread {
+                incomingActivityInstance?.attachLocalVideo(streamUrl)
+            }
+            promise.resolve(true)
+        } catch (e: Exception) {
+            promise.reject("ERR", e.message)
+        }
+    }
+
+    @ReactMethod
     fun endCall(promise: Promise) {
         try {
             CallConnectionManager.endCall()
@@ -53,6 +80,8 @@ class TelecomModule(reactContext: ReactApplicationContext) : ReactContextBaseJav
     }
 
     companion object {
+        var incomingActivityInstance: IncomingCallActivity? = null
+        var globalReactContext: ReactApplicationContext? = null
         private var reactContext: ReactApplicationContext? = null
 
         fun emitAcceptEvent() {

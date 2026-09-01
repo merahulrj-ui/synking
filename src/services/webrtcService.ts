@@ -408,6 +408,7 @@ class WebRTCManager {
             }
           } else {
             this.remoteStream = stream;
+          this.notifyNativeVideoStreams();
           }
 
           if (this.remoteStream) {
@@ -424,6 +425,7 @@ class WebRTCManager {
           this.log(`📡 onaddstream fired!`);
           if (event.stream) {
             this.remoteStream = event.stream;
+            this.notifyNativeVideoStreams();
             this.log(`🎥 REMOTE STREAM READY (Legacy)! Audio: ${this.remoteStream.getAudioTracks().length}, Video: ${this.remoteStream.getVideoTracks().length}`);
             const shouldBeSpeaker = this.currentSession?.isSpeakerOn ?? (this.currentSession?.type === 'video');
             AudioRouteService.setSpeakerOn(shouldBeSpeaker).catch(() => {});
@@ -732,6 +734,23 @@ class WebRTCManager {
         this.endCall();
       }
     }, seconds * 1000);
+  }
+
+  
+  private notifyNativeVideoStreams() {
+    try {
+      const { NativeModules, Platform } = require('react-native');
+      if (Platform.OS === 'android' && this.currentSession?.type === 'video') {
+        if (this.localStream && NativeModules.TelecomModule?.attachLocalVideo) {
+          NativeModules.TelecomModule.attachLocalVideo(this.localStream.toURL());
+        }
+        if (this.remoteStream && NativeModules.TelecomModule?.attachRemoteVideo) {
+          NativeModules.TelecomModule.attachRemoteVideo(this.remoteStream.toURL());
+        }
+      }
+    } catch (e) {
+      console.warn('Native WebRTC bridge failed:', e);
+    }
   }
 
   private startTimer() {
