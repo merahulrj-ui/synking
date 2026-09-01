@@ -54,4 +54,15 @@ class TelecomModule(reactContext: ReactApplicationContext) : ReactContextBaseJav
             promise.reject("TELECOM_ERROR", e.message)
         }
     }
+
+    @ReactMethod
+    fun endCall(promise: Promise) {
+        try {
+            CallConnectionManager.endCall()
+            Log.d("SYNKING_TELECOM", "[TELECOM] CALL_ENDED: Connection destroyed from React Native")
+            promise.resolve(true)
+        } catch (e: Exception) {
+            promise.reject("TELECOM_ERROR", e.message)
+        }
+    }
 }

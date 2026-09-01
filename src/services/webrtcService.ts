@@ -5,7 +5,7 @@ import { RealtimeBridge } from './realtimeBridge';
 import { RingtoneService } from './ringtoneService';
 import { AudioRouteService } from './audioRouteService';
 import { UserProfile, CallSession } from '../types';
-import { PermissionsAndroid, Platform } from 'react-native';
+import { PermissionsAndroid, Platform, NativeModules } from 'react-native';
 import { MediaDevices, PeerConnection, SessionDescription, IceCandidate } from './webrtcCore';
 import { NotificationService } from './notificationService';
 import { CallDebugger } from './callDebugger';
@@ -759,6 +759,12 @@ class WebRTCManager {
     this.cleanupTimers();
     RingtoneService.stop();
     AudioRouteService.resetAudioRoute().catch(() => {});
+    
+    // TELL OS THAT CALL IS OVER SO NATIVE DIALER IS UNBLOCKED
+    if (Platform.OS === 'android' && NativeModules.TelecomModule?.endCall) {
+      NativeModules.TelecomModule.endCall().catch(() => {});
+    }
+
     this.iceStatus = 'disconnected';
     this.pendingOffer = null;
     this.iceCandidateQueue = [];
