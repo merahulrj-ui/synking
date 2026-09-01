@@ -290,12 +290,13 @@ class WebRTCManager {
     this.startTimer();
 
     const peerId = this.getPeerUserId();
+    this.log(`🚀 Broadcasting CALL_ACCEPTED for callId=${this.currentSession.id} to peerId=${peerId || 'ALL'}`);
     RealtimeBridge.broadcast(
       'CALL_ACCEPTED',
       {
         callId: this.currentSession.id,
       },
-      peerId
+      peerId || undefined
     );
 
     if (this.pendingOffer) {

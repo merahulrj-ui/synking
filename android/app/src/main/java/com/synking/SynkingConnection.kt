@@ -14,6 +14,7 @@ import androidx.core.app.NotificationCompat
 class SynkingConnection(
     private val context: Context,
     private val callId: String,
+    private val callerId: String = "",
     private val callerName: String,
     private val callType: String
 ) : Connection() {
@@ -26,11 +27,12 @@ class SynkingConnection(
 
     override fun onShowIncomingCallUi() {
         super.onShowIncomingCallUi()
-        Log.d("SYNKING_TELECOM", "[UI] INCOMING_CALL_SHOWN: Showing custom IncomingCallActivity for $callId")
+        Log.d("SYNKING_TELECOM", "[UI] INCOMING_CALL_SHOWN: Showing custom IncomingCallActivity for $callId ($callerId)")
 
         val fullScreenIntent = Intent(context, IncomingCallActivity::class.java).apply {
             flags = Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_SINGLE_TOP or Intent.FLAG_ACTIVITY_REORDER_TO_FRONT
             putExtra("callId", callId)
+            putExtra("callerId", callerId)
             putExtra("callerName", callerName)
             putExtra("callType", callType)
         }
@@ -74,6 +76,7 @@ class SynkingConnection(
         val acceptIntent = Intent(context, IncomingCallActivity::class.java).apply {
             flags = Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_SINGLE_TOP
             putExtra("callId", callId)
+            putExtra("callerId", callerId)
             putExtra("callerName", callerName)
             putExtra("callType", callType)
             putExtra("autoAccept", true)

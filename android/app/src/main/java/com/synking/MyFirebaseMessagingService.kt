@@ -101,12 +101,22 @@ class MyFirebaseMessagingService : FirebaseMessagingService() {
             IncomingCallActivity.stopRingtoneGlobally()
             CallConnectionManager.endCall()
 
-            // 2. Cancel the ringing incoming call notification
+            // 2. Directly dismiss open call activity with zero latency
+            TelecomModule.incomingActivityInstance?.let { activity ->
+                activity.runOnUiThread {
+                    try {
+                        activity.finishAndRemoveTask()
+                    } catch (e: Exception) {}
+                    activity.finish()
+                }
+            }
+
+            // 3. Cancel the ringing incoming call notification
             val notificationManager = getSystemService(Context.NOTIFICATION_SERVICE) as NotificationManager
             notificationManager.cancel(NOTIFICATION_ID)
             notificationManager.cancelAll()
             
-            // 3. Broadcast to close any open call screen immediately
+            // 4. Broadcast to close any open call screen immediately
             sendBroadcast(Intent("com.synking.CLOSE_CALL_SCREEN"))
             sendBroadcast(Intent("com.synking.CALL_ENDED_FROM_JS"))
 

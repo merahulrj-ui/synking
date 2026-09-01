@@ -85,7 +85,14 @@ class IncomingCallActivity : Activity() {
 
     private val callEndedReceiver = object : BroadcastReceiver() {
         override fun onReceive(context: Context?, intent: Intent?) {
-            finish()
+            Log.d("SYNKING_DEBUG", "[UI] CALL_ENDED_RECEIVER triggered by ${intent?.action}")
+            stopRingtoneAndVibration()
+            runOnUiThread {
+                try {
+                    finishAndRemoveTask()
+                } catch (e: Exception) {}
+                finish()
+            }
         }
     }
 
