@@ -23,7 +23,7 @@ class MyFirebaseMessagingService : FirebaseMessagingService() {
     companion object {
         private const val TAG = "SYNKING_FCM"
         private const val CHANNEL_ID = "incoming_calls"
-        private const val NOTIFICATION_ID = 9001
+        const val NOTIFICATION_ID = 9001
     }
 
     private fun debug(stage: String, status: String, details: String = "") {
