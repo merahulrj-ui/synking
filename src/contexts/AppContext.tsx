@@ -335,6 +335,19 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
             return next;
           });
         }
+      } else if (type === 'MESSAGE_REACTION' && payload) {
+          const { messageId, threadKey, emoji } = payload;
+          if (messageId && threadKey) {
+            setMessages(prev => {
+              const list = prev[threadKey] || [];
+              const updated = list.map(m => 
+                m.id === messageId 
+                  ? { ...m, extraData: { ...m.extraData, reaction: emoji } } 
+                  : m
+              );
+              return { ...prev, [threadKey]: updated };
+            });
+          }
       } else if (type === 'SYNK_REQUEST' && payload) {
         const req = payload as SynkRequest;
         if (req.toUserId === currentUser?.id && req.fromUser?.id !== currentUser?.id) {

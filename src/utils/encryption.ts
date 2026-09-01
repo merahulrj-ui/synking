@@ -12,14 +12,27 @@ export function getChatSessionKey(user1Id: string, user2Id: string): string {
   return `synking_e2ee_key_${sortedIds}`;
 }
 
+// Fallback for insecure HTTP (Phone Chrome) where Web Crypto API is blocked
+async function getSafeHash(key: string): Promise<string> {
+  try {
+    return await Crypto.digestStringAsync(Crypto.CryptoDigestAlgorithm.SHA256, key);
+  } catch (e) {
+    let hash = 0;
+    for (let i = 0; i < key.length; i++) {
+      hash = ((hash << 5) - hash) + key.charCodeAt(i);
+      hash = hash & hash;
+    }
+    let hex = Math.abs(hash).toString(16).padStart(16, '0');
+    while(hex.length < 64) hex += hex;
+    return hex.substring(0, 64);
+  }
+}
+
 // Simple & fast reversible XOR cipher with SHA-256 hash stream for zero-dependency E2EE
 export async function encryptE2EEMessage(plainText: string, senderId: string, receiverId: string): Promise<{ ciphertext: string; hash: string }> {
   try {
     const sessionKey = getChatSessionKey(senderId, receiverId);
-    const keyHash = await Crypto.digestStringAsync(
-      Crypto.CryptoDigestAlgorithm.SHA256,
-      sessionKey
-    );
+    const keyHash = await getSafeHash(sessionKey);
 
     // Encrypt text into hex stream using derived key hash
     let encrypted = '';
@@ -51,10 +64,7 @@ export async function decryptE2EEMessage(cipherText: string, senderId: string, r
 
     const hexContent = cipherText.replace('E2EE::', '');
     const sessionKey = getChatSessionKey(senderId, receiverId);
-    const keyHash = await Crypto.digestStringAsync(
-      Crypto.CryptoDigestAlgorithm.SHA256,
-      sessionKey
-    );
+    const keyHash = await getSafeHash(sessionKey);
 
     let decrypted = '';
     for (let i = 0; i < hexContent.length; i += 4) {

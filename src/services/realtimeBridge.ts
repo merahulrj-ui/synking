@@ -116,6 +116,7 @@ class RealtimeBridgeManager {
       | 'CALL_ENDED'
       | 'SYNK_REQUEST'
       | 'TYPING'
+      | 'MESSAGE_REACTION'
       | 'REQUEST_ACCEPTED'
       | 'WEBRTC_OFFER'
       | 'WEBRTC_ANSWER'

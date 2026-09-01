@@ -224,6 +224,7 @@ export default function ChatScreen() {
   const lastSentTimeRef = useRef<number>(0);
   const nativeRecordingRef = useRef<any>(null);
   const nativeSoundRef = useRef<any>(null);
+  const typingTimeoutRef = useRef<any>(null);
 
   // Test Device Speaker with Synthetic Beep
   const testSpeakerSound = () => {
@@ -489,9 +490,13 @@ export default function ChatScreen() {
   // 1. Instant 0ms Real-Time Message Listener (WhatsApp Speed)
   useEffect(() => {
     const unsubscribe = RealtimeBridge.subscribe(({ type, payload }) => {
-      if (type === 'NEW_MESSAGE' && payload) {
+      const myId = currentUser?.id || 'my_user_id';
+      
+      if (type === 'TYPING' && payload?.senderId === id) {
+        setIsPartnerTyping(true);
+        setTimeout(() => setIsPartnerTyping(false), 2000);
+      } else if (type === 'NEW_MESSAGE' && payload) {
         const msg = payload as ChatMessage;
-        const myId = currentUser?.id || 'my_user_id';
         const isForThisThread =
           (msg.senderId === id && msg.receiverId === myId) ||
           (msg.senderId === myId && msg.receiverId === id);
@@ -827,14 +832,16 @@ export default function ChatScreen() {
       isSendingRef.current = false;
       addAudioLog('✅ [MSG_SENT] Ready for next message');
     }, 500);
+  };
 
-    // Simulate real-time partner typing after user sends a message
-    setTimeout(() => {
-      setIsPartnerTyping(true);
-      setTimeout(() => {
-        setIsPartnerTyping(false);
-      }, 3000);
-    }, 1500);
+  const handleTyping = (text: string) => {
+    setInputText(text);
+    if (!typingTimeoutRef.current) {
+      RealtimeBridge.broadcast('TYPING', { senderId: currentUser?.id }, id);
+      typingTimeoutRef.current = setTimeout(() => {
+        typingTimeoutRef.current = null;
+      }, 1500);
+    }
   };
 
   const handleVoiceNote = () => {
@@ -1204,6 +1211,12 @@ export default function ChatScreen() {
                     </View>
                   </View>
 
+                  {item.extraData?.reaction && (
+                    <View style={{ position: 'absolute', bottom: -8, right: isMine ? 25 : -8, backgroundColor: isDarkMode ? '#1E293B' : '#FFFFFF', borderRadius: 12, paddingHorizontal: 4, paddingVertical: 2, elevation: 3, shadowColor: '#000', shadowOffset: { width: 0, height: 1 }, shadowOpacity: 0.2, shadowRadius: 2, borderWidth: 1, borderColor: isDarkMode ? 'rgba(255,255,255,0.1)' : '#E2E8F0' }}>
+                      <Text style={{ fontSize: 12 }}>{item.extraData.reaction}</Text>
+                    </View>
+                  )}
+
                   <View style={styles.bubbleFooter}>
                     <Text style={[styles.timestamp, { color: isMine ? 'rgba(255, 255, 255, 0.75)' : subText }]}>
                       {formatWhatsAppTime(item.timestamp)}
@@ -1389,7 +1402,7 @@ export default function ChatScreen() {
                 },
               ]}
               value={inputText}
-              onChangeText={setInputText}
+              onChangeText={handleTyping}
               placeholder="Type a message..."
               placeholderTextColor={subText}
               multiline
@@ -1458,6 +1471,28 @@ export default function ChatScreen() {
               <Text style={{ fontSize: 12, fontWeight: '800', color: isDarkMode ? '#FD3A73' : '#E11D48', letterSpacing: 0.5 }}>
                 MESSAGE OPTIONS
               </Text>
+            </View>
+
+            {/* Emoji Reactions Row */}
+            <View style={{ flexDirection: 'row', justifyContent: 'space-between', paddingVertical: 12, paddingHorizontal: 4, borderBottomWidth: 1, borderBottomColor: isDarkMode ? 'rgba(255, 255, 255, 0.08)' : '#F1F5F9' }}>
+              {['❤️', '😂', '🔥', '👍', '😢'].map((emoji) => (
+                 <TouchableOpacity
+                   key={emoji}
+                   onPress={() => {
+                      if (selectedMsgForAction && id) {
+                         RealtimeBridge.broadcast('MESSAGE_REACTION', { messageId: selectedMsgForAction.id, threadKey: id, emoji }, id);
+                         if (Platform.OS !== 'web') {
+                           const Haptics = require('expo-haptics');
+                           Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light).catch(() => {});
+                         }
+                      }
+                      setSelectedMsgForAction(null);
+                   }}
+                   style={{ padding: 6, backgroundColor: isDarkMode ? 'rgba(255,255,255,0.05)' : '#F1F5F9', borderRadius: 20 }}
+                 >
+                   <Text style={{ fontSize: 22 }}>{emoji}</Text>
+                 </TouchableOpacity>
+              ))}
             </View>
 
             {/* Actions List */}
