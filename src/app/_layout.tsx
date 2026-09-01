@@ -11,6 +11,45 @@ import { InAppNotificationBanner } from '../components/InAppNotificationBanner';
 import { WebRTCService } from '../services/webrtcService';
 import { CallSession } from '../types';
 
+import AsyncStorage from '@react-native-async-storage/async-storage';
+import { RealtimeBridge } from '../services/realtimeBridge';
+import { getPendingCall, clearPendingCall } from '../services/CallIntentService';
+
+// --- HEADLESS BOOTER FOR KILLED STATE WAKEUP ---
+// This runs immediately when JS boots (even in background without UI)
+setTimeout(async () => {
+  try {
+    const stored = await AsyncStorage.getItem('synking_my_user');
+    if (stored) {
+      const parsed = JSON.parse(stored);
+      if (parsed && parsed.id) {
+        RealtimeBridge.registerUser(parsed.id);
+        WebRTCService.log('[HEADLESS_BOOT] Registered user: ' + parsed.id);
+        
+        const pendingCall = await getPendingCall();
+        if (pendingCall) {
+          WebRTCService.log("[HEADLESS_BOOT] WOKE UP FOR CALL: " + pendingCall.callId);
+          WebRTCService.receiveIncomingCall(
+            {
+              id: pendingCall.callerId,
+              name: pendingCall.callerName,
+              age: 22,
+              gender: 'other',
+              avatar: pendingCall.callerPhoto || 'https://via.placeholder.com/150'
+            },
+            pendingCall.callType as any,
+            true // autoAccept = true!
+          );
+          clearPendingCall();
+        }
+      }
+    }
+  } catch (e) {
+    console.warn('Headless boot error:', e);
+  }
+}, 500); // Slight delay to let WebRTCService initialize fully
+
+
 function GlobalCallOverlay() {
   const [activeCall, setActiveCall] = React.useState<CallSession | null>(null);
   const { sendMessage, currentUser } = useApp();
@@ -118,43 +157,7 @@ export default function RootLayout() {
     }
     checkOTA();
 
-    // Fix for 7-Point Test Cases (Dead State Wakeup)
-    async function checkPendingNativeCalls() {
-      const pendingCall = await getPendingCall();
-      if (pendingCall) {
-        console.log("[DEAD STATE WAKEUP] SYNKING WOKE UP FOR CALL:", pendingCall.callId);
-        
-        // Push the CallSession into WebRTCService as an incoming offer
-        // Native Activity already accepted it, so we pass autoAccept = true!
-        WebRTCService.receiveIncomingCall(
-          {
-            id: pendingCall.callerId,
-            name: pendingCall.callerName,
-            age: 22,
-            gender: 'other',
-            occupation: 'Member',
-            location: 'Nearby',
-            distance: '0 km',
-            bio: '',
-            photo: pendingCall.callerPhoto || 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=800',
-            photos: [],
-            interests: [],
-            compatibility: 100,
-            isVerified: true,
-            isVip: false,
-          },
-          pendingCall.callType as any,
-          pendingCall.callId,
-          true // <-- autoAccept!
-        );
-
-        // Remove the manual acceptCall because receiveIncomingCall handles it now
-        // WebRTCService.acceptCall();
-
-        clearPendingCall();
-      }
-    }
-    checkPendingNativeCalls();
+    
   }, []);
 
   return (
