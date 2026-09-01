@@ -120,7 +120,9 @@ class NotificationServiceClass {
   }
 
   public async showIncomingCallNotification(callerName: string, callType: 'audio' | 'video', callId: string) {
-    if (Platform.OS === 'web' || !Notifications) return;
+    // On Android, Native TelecomManager & MyFirebaseMessagingService handle the incoming call banner 100% natively.
+    // Scheduling an Expo notification here creates a duplicate second banner on Android!
+    if (Platform.OS === 'web' || Platform.OS === 'android' || !Notifications) return;
 
     try {
       await this.initialize();
