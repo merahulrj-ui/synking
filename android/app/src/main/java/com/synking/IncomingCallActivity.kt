@@ -7,6 +7,7 @@ import android.content.Intent
 import android.content.IntentFilter
 import android.graphics.Color
 import android.graphics.drawable.GradientDrawable
+import android.media.AudioAttributes
 import android.media.Ringtone
 import android.media.RingtoneManager
 import android.os.Build
@@ -139,8 +140,8 @@ class IncomingCallActivity : Activity() {
         callerName = intent.getStringExtra("callerName") ?: "Unknown"
         callType = intent.getStringExtra("callType") ?: "audio"
 
-        buildUI()
         playRingtoneAndVibrate()
+        buildUI()
 
         // Auto-accept if launched from notification Accept button
         val autoAccept = intent.getBooleanExtra("autoAccept", false)
@@ -475,6 +476,15 @@ class IncomingCallActivity : Activity() {
         try {
             val uri = RingtoneManager.getDefaultUri(RingtoneManager.TYPE_RINGTONE)
             activeRingtone = RingtoneManager.getRingtone(applicationContext, uri)
+            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.LOLLIPOP) {
+                activeRingtone?.audioAttributes = AudioAttributes.Builder()
+                    .setUsage(AudioAttributes.USAGE_NOTIFICATION_RINGTONE)
+                    .setContentType(AudioAttributes.CONTENT_TYPE_SONIFICATION)
+                    .build()
+            }
+            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.P) {
+                activeRingtone?.isLooping = true
+            }
             activeRingtone?.play()
 
             vibrator = getSystemService(Context.VIBRATOR_SERVICE) as Vibrator
