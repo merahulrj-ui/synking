@@ -31,6 +31,25 @@ class TelecomModule(reactContext: ReactApplicationContext) : ReactContextBaseJav
     }
 
     @ReactMethod
+    
+    @ReactMethod
+    fun launchIncomingCallActivity(callId: String, callerName: String, callType: String, promise: Promise) {
+        try {
+            val ctx = reactApplicationContext
+            val intent = Intent(ctx, IncomingCallActivity::class.java).apply {
+                flags = Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_CLEAR_TOP
+                putExtra("callId", callId)
+                putExtra("callerName", callerName)
+                putExtra("callType", callType)
+            }
+            ctx.startActivity(intent)
+            promise.resolve(true)
+        } catch (e: Exception) {
+            promise.reject("LAUNCH_ERR", e.message)
+        }
+    }
+
+    @ReactMethod
     fun minimizeApp(promise: Promise) {
         try {
             reactApplicationContext.currentActivity?.moveTaskToBack(true)

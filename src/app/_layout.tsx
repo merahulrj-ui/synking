@@ -95,7 +95,22 @@ function GlobalCallOverlay() {
   const isIncoming = activeCall.callerId !== currentUser?.id;
   const isAudioCall = activeCall.type === 'audio';
 
+  
+  React.useEffect(() => {
+    if (Platform.OS === 'android' && isIncoming && isIncomingRinging) {
+      const { AppState, NativeModules } = require('react-native');
+      if (AppState.currentState === 'active' && NativeModules.TelecomModule?.launchIncomingCallActivity) {
+        NativeModules.TelecomModule.launchIncomingCallActivity(
+          activeCall.id,
+          activeCall.callerName || 'Unknown',
+          activeCall.type || 'video'
+        ).catch(() => {});
+      }
+    }
+  }, [isIncoming, isIncomingRinging, activeCall?.id]);
+
   if (Platform.OS === 'android' && isIncoming) {
+
     // Both Audio and Video Incoming Calls are now handled 100% natively by IncomingCallActivity.
     // JS runs purely headless to manage WebRTC state.
     return null; 
