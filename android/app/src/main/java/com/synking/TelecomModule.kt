@@ -33,7 +33,7 @@ class TelecomModule(reactContext: ReactApplicationContext) : ReactContextBaseJav
     @ReactMethod
     fun minimizeApp(promise: Promise) {
         try {
-            currentActivity?.moveTaskToBack(true)
+            reactApplicationContext.currentActivity?.moveTaskToBack(true)
             promise.resolve(true)
         } catch (e: Exception) {
             promise.reject("MINIMIZE_ERROR", e.message)
@@ -41,11 +41,9 @@ class TelecomModule(reactContext: ReactApplicationContext) : ReactContextBaseJav
     }
 
     @ReactMethod
-    
-    @ReactMethod
     fun attachRemoteVideo(streamUrl: String, promise: Promise) {
         try {
-            currentActivity?.runOnUiThread {
+            reactApplicationContext.currentActivity?.runOnUiThread {
                 incomingActivityInstance?.attachRemoteVideo(streamUrl)
             }
             promise.resolve(true)
@@ -57,7 +55,7 @@ class TelecomModule(reactContext: ReactApplicationContext) : ReactContextBaseJav
     @ReactMethod
     fun attachLocalVideo(streamUrl: String, promise: Promise) {
         try {
-            currentActivity?.runOnUiThread {
+            reactApplicationContext.currentActivity?.runOnUiThread {
                 incomingActivityInstance?.attachLocalVideo(streamUrl)
             }
             promise.resolve(true)

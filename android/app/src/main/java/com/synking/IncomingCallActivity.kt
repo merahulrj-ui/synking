@@ -59,6 +59,7 @@ class IncomingCallActivity : AppCompatActivity() {
     
     private var isMuted = false
     private var isSpeakerOn = false
+    private var uiLayer: LinearLayout? = null
     // WebRTC Variables
     private var remoteVideoContainer: FrameLayout? = null
     private var localVideoContainer: FrameLayout? = null
@@ -143,13 +144,23 @@ class IncomingCallActivity : AppCompatActivity() {
             remoteWebRTCView = WebRTCView(ctx)
             remoteVideoContainer?.addView(remoteWebRTCView)
         }
-        remoteWebRTCView?.setStreamURL(streamUrl)
+        
+        try {
+            val method = remoteWebRTCView!!.javaClass.getDeclaredMethod("setStreamURL", String::class.java)
+            method.isAccessible = true
+            method.invoke(remoteWebRTCView, streamUrl)
+        } catch (e: Exception) {
+            e.printStackTrace()
+        }
+        uiLayer?.setBackgroundColor(Color.TRANSPARENT)
+        uiLayer?.getChildAt(0)?.visibility = View.GONE // Hide avatar/name layout which is usually the first child
+
         remoteVideoContainer?.visibility = View.VISIBLE
         
         // Hide avatar and name since we have video
-        avatarImageView?.visibility = View.GONE
-        callerNameView?.visibility = View.GONE
-        subtitleView?.visibility = View.GONE
+        // UI updates handled dynamically
+        
+        
         
         // Bring controls to front
         activeActionsRow?.bringToFront()
@@ -163,7 +174,15 @@ class IncomingCallActivity : AppCompatActivity() {
             localWebRTCView?.setMirror(true)
             localVideoContainer?.addView(localWebRTCView)
         }
-        localWebRTCView?.setStreamURL(streamUrl)
+        
+        try {
+            val method = localWebRTCView!!.javaClass.getDeclaredMethod("setStreamURL", String::class.java)
+            method.isAccessible = true
+            method.invoke(localWebRTCView, streamUrl)
+        } catch (e: Exception) {
+            e.printStackTrace()
+        }
+
         localVideoContainer?.visibility = View.VISIBLE
     }
 
@@ -186,7 +205,7 @@ class IncomingCallActivity : AppCompatActivity() {
         remoteVideoContainer = FrameLayout(this).apply { layoutParams = FrameLayout.LayoutParams(FrameLayout.LayoutParams.MATCH_PARENT, FrameLayout.LayoutParams.MATCH_PARENT); visibility = View.GONE; setBackgroundColor(Color.parseColor("#05060A")) }
         root.addView(remoteVideoContainer)
         
-        val uiLayer = LinearLayout(this).apply {
+        uiLayer = LinearLayout(this).apply {
             orientation = LinearLayout.VERTICAL
             gravity = Gravity.CENTER_HORIZONTAL
             setPadding(dpToPx(24), dpToPx(72), dpToPx(24), dpToPx(56))
@@ -411,7 +430,7 @@ class IncomingCallActivity : AppCompatActivity() {
             // Audio call - Transition to Active UI natively!
             incomingActionsRow?.visibility = View.GONE
             activeActionsRow?.visibility = View.VISIBLE
-            subtitleView?.visibility = View.GONE
+            
             timerTextView?.visibility = View.VISIBLE
             
             callStartTime = SystemClock.elapsedRealtime()
