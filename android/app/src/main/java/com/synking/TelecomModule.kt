@@ -48,6 +48,42 @@ class TelecomModule(reactContext: ReactApplicationContext) : ReactContextBaseJav
     }
 
     @ReactMethod
+    fun requestVoipPermissions(promise: Promise) {
+        try {
+            val ctx = reactApplicationContext
+            val pkg = ctx.packageName
+
+            // 1. Battery Optimization (Bypass Doze for instant call wakeups)
+            if (android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.M) {
+                val pm = ctx.getSystemService(android.content.Context.POWER_SERVICE) as? android.os.PowerManager
+                if (pm != null && !pm.isIgnoringBatteryOptimizations(pkg)) {
+                    val intent = Intent(android.provider.Settings.ACTION_REQUEST_IGNORE_BATTERY_OPTIMIZATIONS).apply {
+                        data = android.net.Uri.parse("package:$pkg")
+                        flags = Intent.FLAG_ACTIVITY_NEW_TASK
+                    }
+                    ctx.startActivity(intent)
+                }
+            }
+
+            // 2. Full Screen Intent (Android 14+ / API 34+ for lock screen calls)
+            if (android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.UPSIDE_DOWN_CAKE) {
+                val nm = ctx.getSystemService(android.content.Context.NOTIFICATION_SERVICE) as? android.app.NotificationManager
+                if (nm != null && !nm.canUseFullScreenIntent()) {
+                    val intent = Intent(android.provider.Settings.ACTION_MANAGE_APP_USE_FULL_SCREEN_INTENT).apply {
+                        data = android.net.Uri.parse("package:$pkg")
+                        flags = Intent.FLAG_ACTIVITY_NEW_TASK
+                    }
+                    ctx.startActivity(intent)
+                }
+            }
+
+            promise.resolve(true)
+        } catch (e: Exception) {
+            promise.reject("PERM_ERR", e.message)
+        }
+    }
+
+    @ReactMethod
     fun minimizeApp(promise: Promise) {
         try {
             reactApplicationContext.currentActivity?.moveTaskToBack(true)
