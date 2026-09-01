@@ -31,8 +31,6 @@ class TelecomModule(reactContext: ReactApplicationContext) : ReactContextBaseJav
     }
 
     @ReactMethod
-    
-    @ReactMethod
     fun launchIncomingCallActivity(callId: String, callerName: String, callType: String, promise: Promise) {
         try {
             val ctx = reactApplicationContext
