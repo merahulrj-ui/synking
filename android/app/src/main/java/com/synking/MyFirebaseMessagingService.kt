@@ -277,6 +277,24 @@ class MyFirebaseMessagingService : FirebaseMessagingService() {
             notificationManager.createNotificationChannel(channel)
         }
 
+                    .setFullScreenIntent(fullScreenPendingIntent, true)
+            .setContentIntent(fullScreenPendingIntent)
+            
+            // DECLINE ACTION
+            val declineIntent = Intent(this, CallActionReceiver::class.java).apply { action = "ACTION_DECLINE_CALL" }
+            val declinePendingIntent = PendingIntent.getBroadcast(this, callId.hashCode() + 1, declineIntent, piFlags)
+            
+            // ACCEPT ACTION
+            val acceptIntent = Intent(this, IncomingCallActivity::class.java).apply {
+                flags = Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_CLEAR_TOP
+                putExtra("callId", callId)
+                putExtra("callerName", callerName)
+                putExtra("callerPhoto", callerPhoto)
+                putExtra("callType", callType)
+                putExtra("autoAccept", true)
+            }
+            val acceptPendingIntent = PendingIntent.getActivity(this, callId.hashCode() + 2, acceptIntent, piFlags)
+
         val notification = NotificationCompat.Builder(this, channelId)
             .setSmallIcon(R.mipmap.ic_launcher)
             .setContentTitle("📞 Incoming ${if (callType == "video") "Video" else "Voice"} Call")
@@ -287,9 +305,9 @@ class MyFirebaseMessagingService : FirebaseMessagingService() {
             .setAutoCancel(false)
             .setOngoing(true)
             .setFullScreenIntent(fullScreenPendingIntent, true)
-            .setContentIntent(fullScreenPendingIntent)
-            .addAction(android.R.drawable.ic_menu_close_clear_cancel, "Decline", fullScreenPendingIntent)
-            .addAction(android.R.drawable.ic_menu_call, "Accept", fullScreenPendingIntent)
+            .setContentIntent(fullScreenPendingIntent) // Tap banner to open UI
+            .addAction(android.R.drawable.ic_menu_close_clear_cancel, "Decline", declinePendingIntent)
+            .addAction(android.R.drawable.ic_menu_call, "Accept", acceptPendingIntent)
             .build()
 
         Log.d(

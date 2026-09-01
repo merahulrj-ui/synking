@@ -1,0 +1,21 @@
+package com.synking
+
+import android.app.NotificationManager
+import android.content.BroadcastReceiver
+import android.content.Context
+import android.content.Intent
+import android.util.Log
+
+class CallActionReceiver : BroadcastReceiver() {
+    override fun onReceive(context: Context, intent: Intent) {
+        val action = intent.action
+        if (action == "ACTION_DECLINE_CALL") {
+            Log.d("SYNKING_CALL", "Decline button tapped from notification")
+            IncomingCallActivity.stopRingtoneGlobally()
+            CallConnectionManager.rejectCall()
+            TelecomModule.emitEndCallEvent()
+            val nm = context.getSystemService(Context.NOTIFICATION_SERVICE) as NotificationManager
+            nm.cancel(MyFirebaseMessagingService.NOTIFICATION_ID)
+        }
+    }
+}
