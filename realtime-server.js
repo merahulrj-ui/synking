@@ -1354,14 +1354,15 @@ async function sendCallPushNotification(targetUserId, callPayload, isEndCall = f
       }
     }
 
-    // 2. Fallback to Expo Push Notification Service
+    // 2. Fallback to Expo Push Notification Service if token is an Expo token
     const title = isEndCall ? 'Missed Call' : `📞 Incoming ${callType === 'video' ? 'Video' : 'Voice'} Call`;
     const bodyText = isEndCall ? `You missed a call from ${callerName}` : `${callerName} is calling you on SYNKING`;
 
     const pushBody = JSON.stringify({
       to: pushToken,
-      title: title,
-      body: bodyText,
+      // Restore title and body for Missed Calls ONLY! Incoming calls stay silent to avoid double banners
+      title: isEndCall ? title : undefined,
+      body: isEndCall ? bodyText : undefined,
       data: dataPayload,
       priority: 'high',
       channelId: 'incoming_calls',

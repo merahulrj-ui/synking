@@ -19,10 +19,32 @@ function GlobalCallOverlay() {
     const unsubscribe = WebRTCService.subscribe(session => {
       setActiveCall(session);
     });
-    return () => unsubscribe();
+    
+    // Listen for Native UI (Lockscreen) Answer Event
+    let nativeSub: any = null;
+    if (Platform.OS === 'android' && NativeModules.TelecomModule) {
+      const { NativeEventEmitter } = require('react-native');
+      const emitter = new NativeEventEmitter(NativeModules.TelecomModule);
+      nativeSub = emitter.addListener('onTelecomCallAnswered', () => {
+        WebRTCService.log('📞 Native Android UI accepted the call, auto-answering WebRTC...');
+        WebRTCService.acceptCall();
+      });
+    }
+
+    return () => {
+      unsubscribe();
+      if (nativeSub) nativeSub.remove();
+    };
   }, []);
 
   if (!activeCall) return null;
+
+  // HIDE React Native UI completely if it's an incoming call that is still ringing on Android.
+  // The Android Native UI (Lockscreen) is handling the ringing display!
+  const isIncomingRinging = activeCall.status === 'ringing';
+  if (Platform.OS === 'android' && isIncomingRinging) {
+    return null; // Don't show the duplicate React Native popup!
+  }
 
   const handleEndCall = () => {
     const result = WebRTCService.endCall();

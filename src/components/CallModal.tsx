@@ -213,7 +213,7 @@ export const CallModal: React.FC<Props> = ({ session, onEndCall, onAcceptCall })
 
   const [showDebugger, setShowDebugger] = useState(false);
   const [isLocalExpanded, setIsLocalExpanded] = useState(false);
-  const isIncomingRinging = session.status === 'ringing' && (session.receiverId === 'my_user_id' || !session.callerId);
+  const isIncomingRinging = session.status === 'ringing';
   const isConnected = session.status === 'connected';
   const durationText = WebRTCService.formatDuration(session.durationSeconds);
   const localStream = WebRTCService.getLocalStream();

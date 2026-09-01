@@ -135,8 +135,11 @@ class IncomingCallActivity : Activity() {
         val root = LinearLayout(this).apply {
             orientation = LinearLayout.VERTICAL
             gravity = Gravity.CENTER_HORIZONTAL
-            setPadding(dpToPx(24), dpToPx(56), dpToPx(24), dpToPx(48))
-            setBackgroundColor(Color.parseColor("#05060A"))
+            setPadding(dpToPx(24), dpToPx(72), dpToPx(24), dpToPx(56))
+            background = GradientDrawable(
+                GradientDrawable.Orientation.TL_BR,
+                intArrayOf(Color.parseColor("#0F172A"), Color.parseColor("#020617"))
+            )
             layoutParams = LinearLayout.LayoutParams(
                 LinearLayout.LayoutParams.MATCH_PARENT,
                 LinearLayout.LayoutParams.MATCH_PARENT
@@ -287,12 +290,13 @@ class IncomingCallActivity : Activity() {
             gravity = Gravity.CENTER
         }
         val acceptBtn = FrameLayout(this).apply {
-            val size = dpToPx(74)
+            val size = dpToPx(76)
             layoutParams = LinearLayout.LayoutParams(size, size)
-            background = GradientDrawable().apply {
+            background = GradientDrawable(
+                GradientDrawable.Orientation.TL_BR,
+                intArrayOf(Color.parseColor("#00E5FF"), Color.parseColor("#22C55E"))
+            ).apply {
                 shape = GradientDrawable.OVAL
-                setColor(Color.parseColor("#22C55E"))
-                setStroke(dpToPx(2), Color.parseColor("#86EFAC"))
             }
             setOnClickListener {
                 debug("ANSWER_PRESSED", "OK", "callId=$callId")
@@ -375,6 +379,10 @@ class IncomingCallActivity : Activity() {
 
     private fun handoffToReactNative(callId: String, callerName: String, callType: String) {
         stopRingtoneAndVibration()
+        
+        // Tell React Native to auto-accept the call immediately!
+        TelecomModule.emitAcceptEvent()
+
         val intent = Intent(this, MainActivity::class.java).apply {
             flags = Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_CLEAR_TOP or Intent.FLAG_ACTIVITY_REORDER_TO_FRONT
             putExtra("SYNKING_INCOMING_CALL", true)

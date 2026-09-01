@@ -310,7 +310,7 @@ class WebRTCManager {
 
   // 5. End Ongoing Call
   public endCall(): { session: CallSession; durationFormatted: string } | null {
-    if (!this.currentSession) return null;
+    if (!this.currentSession) { this.cleanup(); return null; }
     const sessionCopy = { ...this.currentSession };
     const durationFormatted = this.formatDuration(sessionCopy.durationSeconds);
     const callId = sessionCopy.id;

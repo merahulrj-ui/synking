@@ -10,8 +10,26 @@ import com.facebook.react.bridge.ReactApplicationContext
 import com.facebook.react.bridge.ReactContextBaseJavaModule
 import com.facebook.react.bridge.ReactMethod
 import com.facebook.react.bridge.Promise
+import com.facebook.react.modules.core.DeviceEventManagerModule
 
 class TelecomModule(reactContext: ReactApplicationContext) : ReactContextBaseJavaModule(reactContext) {
+
+    init {
+        companionContext = reactContext
+    }
+
+    companion object {
+        var companionContext: ReactApplicationContext? = null
+
+        fun emitAcceptEvent() {
+            try {
+                companionContext?.getJSModule(DeviceEventManagerModule.RCTDeviceEventEmitter::class.java)
+                    ?.emit("onTelecomCallAnswered", null)
+            } catch (e: Exception) {
+                Log.e("SYNKING_TELECOM", "Failed to emit event: ${e.message}")
+            }
+        }
+    }
 
     override fun getName(): String {
         return "TelecomModule"
