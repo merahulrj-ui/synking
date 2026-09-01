@@ -147,15 +147,25 @@ class TelecomModule(reactContext: ReactApplicationContext) : ReactContextBaseJav
         var globalReactContext: ReactApplicationContext? = null
         private var reactContext: ReactApplicationContext? = null
 
-        fun emitAcceptEvent(callId: String = "", callerId: String = "", callerName: String = "", callType: String = "audio") {
+        fun emitAcceptEvent(
+            callId: String = "",
+            callerId: String = "",
+            callerName: String = "",
+            callType: String = ""
+        ) {
             try {
+                val finalCallId = if (callId.isNotEmpty()) callId else (incomingActivityInstance?.callId ?: "")
+                val finalCallerId = if (callerId.isNotEmpty()) callerId else (incomingActivityInstance?.callerId ?: "")
+                val finalCallerName = if (callerName.isNotEmpty()) callerName else (incomingActivityInstance?.callerName ?: "")
+                val finalCallType = if (callType.isNotEmpty()) callType else (incomingActivityInstance?.callType ?: "audio")
+
                 val map = com.facebook.react.bridge.Arguments.createMap().apply {
-                    putString("callId", callId)
-                    putString("callerId", callerId)
-                    putString("callerName", callerName)
-                    putString("callType", callType)
+                    putString("callId", finalCallId)
+                    putString("callerId", finalCallerId)
+                    putString("callerName", finalCallerName)
+                    putString("callType", finalCallType)
                 }
-                Log.d("SYNKING_DEBUG", "[BRIDGE] emitAcceptEvent -> onTelecomCallAnswered: callId=$callId, caller=$callerName, type=$callType")
+                Log.d("SYNKING_DEBUG", "[BRIDGE] emitAcceptEvent -> onTelecomCallAnswered: callId=$finalCallId, caller=$finalCallerName, type=$finalCallType")
                 reactContext?.getJSModule(DeviceEventManagerModule.RCTDeviceEventEmitter::class.java)
                     ?.emit("onTelecomCallAnswered", map)
             } catch (e: Exception) {

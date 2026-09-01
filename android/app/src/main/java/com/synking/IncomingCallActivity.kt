@@ -49,10 +49,10 @@ class IncomingCallActivity : Activity() {
         }
     }
 
-    private var callId: String = ""
-    private var callerId: String = ""
-    private var callerName: String = ""
-    private var callType: String = ""
+    var callId: String = ""
+    var callerId: String = ""
+    var callerName: String = ""
+    var callType: String = ""
 
     // UI Elements
     private var callerInfoLayout: LinearLayout? = null
