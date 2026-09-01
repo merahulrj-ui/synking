@@ -46,22 +46,7 @@ class MainActivity : ReactActivity() {
       android.util.Log.w("SYNKING_NATIVE", "NotificationChannel warning: ${e.message}")
     }
 
-    // 2. Lock Screen & Turn Screen On Flags
-    try {
-      if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O_MR1) {
-        setShowWhenLocked(true)
-        setTurnScreenOn(true)
-      } else {
-        window.addFlags(
-          android.view.WindowManager.LayoutParams.FLAG_SHOW_WHEN_LOCKED or
-          android.view.WindowManager.LayoutParams.FLAG_TURN_SCREEN_ON or
-          android.view.WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON
-        )
-      }
-    } catch (e: Exception) {
-      android.util.Log.w("SYNKING_NATIVE", "Lockscreen flag warning: ${e.message}")
-    }
-    android.util.Log.d("SYNKING_NATIVE", "MainActivity: Lockscreen & TurnScreenOn flags applied.")
+    // 2. Main dating app is secure behind phone lock screen (only IncomingCallActivity displays over lock screen)
 
     // 3. Automated WhatsApp-style VoIP Call Permissions Prompt
     requestEssentialCallPermissions()
