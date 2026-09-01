@@ -35,7 +35,7 @@ class TelecomModule(reactContext: ReactApplicationContext) : ReactContextBaseJav
         try {
             val ctx = reactApplicationContext
             val intent = Intent(ctx, IncomingCallActivity::class.java).apply {
-                flags = Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_CLEAR_TOP
+                flags = Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_SINGLE_TOP
                 putExtra("callId", callId)
                 putExtra("callerName", callerName)
                 putExtra("callType", callType)

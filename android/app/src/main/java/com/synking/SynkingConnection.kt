@@ -29,7 +29,7 @@ class SynkingConnection(
         Log.d("SYNKING_TELECOM", "[UI] INCOMING_CALL_SHOWN: Showing custom IncomingCallActivity for $callId")
 
         val fullScreenIntent = Intent(context, IncomingCallActivity::class.java).apply {
-            flags = Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_CLEAR_TOP or Intent.FLAG_ACTIVITY_REORDER_TO_FRONT
+            flags = Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_SINGLE_TOP or Intent.FLAG_ACTIVITY_REORDER_TO_FRONT
             putExtra("callId", callId)
             putExtra("callerName", callerName)
             putExtra("callType", callType)
@@ -72,7 +72,7 @@ class SynkingConnection(
 
         // ── Accept Action ──
         val acceptIntent = Intent(context, IncomingCallActivity::class.java).apply {
-            flags = Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_CLEAR_TOP
+            flags = Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_SINGLE_TOP
             putExtra("callId", callId)
             putExtra("callerName", callerName)
             putExtra("callType", callType)

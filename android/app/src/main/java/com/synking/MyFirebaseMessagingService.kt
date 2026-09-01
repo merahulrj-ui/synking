@@ -248,7 +248,7 @@ class MyFirebaseMessagingService : FirebaseMessagingService() {
         }
 
         val fullScreenIntent = Intent(this, IncomingCallActivity::class.java).apply {
-            flags = Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_CLEAR_TOP or Intent.FLAG_ACTIVITY_REORDER_TO_FRONT
+            flags = Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_SINGLE_TOP or Intent.FLAG_ACTIVITY_REORDER_TO_FRONT
             putExtra("callId", callId)
             putExtra("callerId", callerId)
             putExtra("callerName", callerName)
@@ -286,7 +286,7 @@ class MyFirebaseMessagingService : FirebaseMessagingService() {
             
             // ACCEPT ACTION
             val acceptIntent = Intent(this, IncomingCallActivity::class.java).apply {
-                flags = Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_CLEAR_TOP
+                flags = Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_SINGLE_TOP
                 putExtra("callId", callId)
                 putExtra("callerName", callerName)
                 putExtra("callerPhoto", callerPhoto)
