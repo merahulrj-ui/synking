@@ -1,34 +1,17 @@
 package com.synking
 
-import android.content.ComponentName
-import android.content.Context
-import android.telecom.PhoneAccount
-import android.telecom.PhoneAccountHandle
-import android.telecom.TelecomManager
+import android.content.Intent
 import android.util.Log
+import com.facebook.react.bridge.Promise
 import com.facebook.react.bridge.ReactApplicationContext
 import com.facebook.react.bridge.ReactContextBaseJavaModule
 import com.facebook.react.bridge.ReactMethod
-import com.facebook.react.bridge.Promise
 import com.facebook.react.modules.core.DeviceEventManagerModule
 
 class TelecomModule(reactContext: ReactApplicationContext) : ReactContextBaseJavaModule(reactContext) {
 
     init {
-        companionContext = reactContext
-    }
-
-    companion object {
-        var companionContext: ReactApplicationContext? = null
-
-        fun emitAcceptEvent() {
-            try {
-                companionContext?.getJSModule(DeviceEventManagerModule.RCTDeviceEventEmitter::class.java)
-                    ?.emit("onTelecomCallAnswered", null)
-            } catch (e: Exception) {
-                Log.e("SYNKING_TELECOM", "Failed to emit event: ${e.message}")
-            }
-        }
+        TelecomModule.reactContext = reactContext
     }
 
     override fun getName(): String {
@@ -36,40 +19,23 @@ class TelecomModule(reactContext: ReactApplicationContext) : ReactContextBaseJav
     }
 
     @ReactMethod
-    fun registerPhoneAccount(promise: Promise) {
+    fun notifyVideoCallConnected(promise: Promise) {
         try {
-            val telecomManager = reactApplicationContext.getSystemService(Context.TELECOM_SERVICE) as TelecomManager
-            val componentName = ComponentName(reactApplicationContext, SynkingConnectionService::class.java)
-            val phoneAccountHandle = PhoneAccountHandle(componentName, "SynkingPhoneAccount")
-
-            val phoneAccount = PhoneAccount.builder(phoneAccountHandle, "SYNKING Direct")
-                .setCapabilities(PhoneAccount.CAPABILITY_SELF_MANAGED)
-                .build()
-
-            telecomManager.registerPhoneAccount(phoneAccount)
-            Log.d("SYNKING_TELECOM", "[TELECOM] PHONE_ACCOUNT_READY: Successfully registered SynkingPhoneAccount")
+            val intent = Intent("com.synking.VIDEO_CALL_CONNECTED_FROM_JS")
+            reactContext?.sendBroadcast(intent)
             promise.resolve(true)
         } catch (e: Exception) {
-            Log.e("SYNKING_TELECOM", "[TELECOM] ERROR: Failed to register PhoneAccount", e)
             promise.reject("TELECOM_ERROR", e.message)
         }
     }
 
     @ReactMethod
-    fun setSpeakerOn(isOn: Boolean, promise: Promise) {
+    fun minimizeApp(promise: Promise) {
         try {
-            val connection = CallConnectionManager.currentConnection
-            if (connection != null) {
-                val route = if (isOn) android.telecom.CallAudioState.ROUTE_SPEAKER else android.telecom.CallAudioState.ROUTE_EARPIECE
-                connection.setAudioRoute(route)
-                Log.d("SYNKING_TELECOM", "[TELECOM] AUDIO_ROUTE: Set speaker to $isOn")
-                promise.resolve(true)
-            } else {
-                Log.w("SYNKING_TELECOM", "[TELECOM] AUDIO_ROUTE: No active connection to change route")
-                promise.resolve(false) // Fallback to normal AudioManager
-            }
+            currentActivity?.moveTaskToBack(true)
+            promise.resolve(true)
         } catch (e: Exception) {
-            promise.reject("TELECOM_ERROR", e.message)
+            promise.reject("MINIMIZE_ERROR", e.message)
         }
     }
 
@@ -77,10 +43,36 @@ class TelecomModule(reactContext: ReactApplicationContext) : ReactContextBaseJav
     fun endCall(promise: Promise) {
         try {
             CallConnectionManager.endCall()
+            val intent = Intent("com.synking.CALL_ENDED_FROM_JS")
+            reactContext?.sendBroadcast(intent)
             Log.d("SYNKING_TELECOM", "[TELECOM] CALL_ENDED: Connection destroyed from React Native")
             promise.resolve(true)
         } catch (e: Exception) {
             promise.reject("TELECOM_ERROR", e.message)
+        }
+    }
+
+    companion object {
+        private var reactContext: ReactApplicationContext? = null
+
+        fun emitAcceptEvent() {
+            reactContext?.getJSModule(DeviceEventManagerModule.RCTDeviceEventEmitter::class.java)
+                ?.emit("onTelecomCallAnswered", null)
+        }
+
+        fun emitMuteToggled(isMuted: Boolean) {
+            reactContext?.getJSModule(DeviceEventManagerModule.RCTDeviceEventEmitter::class.java)
+                ?.emit("onTelecomMuteToggled", isMuted)
+        }
+
+        fun emitSpeakerToggled(isSpeakerOn: Boolean) {
+            reactContext?.getJSModule(DeviceEventManagerModule.RCTDeviceEventEmitter::class.java)
+                ?.emit("onTelecomSpeakerToggled", isSpeakerOn)
+        }
+
+        fun emitEndCallEvent() {
+            reactContext?.getJSModule(DeviceEventManagerModule.RCTDeviceEventEmitter::class.java)
+                ?.emit("onTelecomEndCall", null)
         }
     }
 }

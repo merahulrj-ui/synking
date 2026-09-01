@@ -25,10 +25,20 @@ function GlobalCallOverlay() {
     if (Platform.OS === 'android' && NativeModules.TelecomModule) {
       const { NativeEventEmitter } = require('react-native');
       const emitter = new NativeEventEmitter(NativeModules.TelecomModule);
-      nativeSub = emitter.addListener('onTelecomCallAnswered', () => {
-        WebRTCService.log('📞 Native Android UI accepted the call, auto-answering WebRTC...');
-        WebRTCService.acceptCall();
-      });
+        const sub1 = emitter.addListener('onTelecomCallAnswered', () => {
+          WebRTCService.log('📞 Native Android UI accepted the call, auto-answering WebRTC...');
+          WebRTCService.acceptCall();
+        });
+        const sub2 = emitter.addListener('onTelecomMuteToggled', (isMuted) => {
+          WebRTCService.toggleMute();
+        });
+        const sub3 = emitter.addListener('onTelecomSpeakerToggled', (isSpeakerOn) => {
+          WebRTCService.toggleSpeaker();
+        });
+        const sub4 = emitter.addListener('onTelecomEndCall', () => {
+          WebRTCService.endCall();
+        });
+        nativeSub = { remove: () => { sub1.remove(); sub2.remove(); sub3.remove(); sub4.remove(); } };
     }
 
     return () => {
@@ -41,9 +51,18 @@ function GlobalCallOverlay() {
 
   // HIDE React Native UI completely if it's an incoming call that is still ringing on Android.
   // The Android Native UI (Lockscreen) is handling the ringing display!
+  // The Android Native UI (IncomingCallActivity.kt) handles the Ringing phase AND Active Audio Call natively!
   const isIncomingRinging = activeCall.status === 'ringing';
-  if (Platform.OS === 'android' && isIncomingRinging) {
-    return null; // Don't show the duplicate React Native popup!
+  const isIncoming = activeCall.callerId !== currentUser?.id;
+  const isAudioCall = activeCall.type === 'audio';
+
+  if (Platform.OS === 'android' && isIncoming) {
+    if (isIncomingRinging) {
+      return null; // Don't show RN ringing banner
+    }
+    if (isAudioCall) {
+      return null; // Fully Native Seamless Audio Dialer handles the entire call, no RN UI needed!
+    }
   }
 
   const handleEndCall = () => {
@@ -57,6 +76,11 @@ function GlobalCallOverlay() {
             ? `📹 Video Call · ${session.durationSeconds > 0 ? durationFormatted : 'Missed'}`
             : `📞 Voice Call · ${session.durationSeconds > 0 ? durationFormatted : 'Missed'}`;
         sendMessage(targetId, callLogText, 'text');
+      }
+
+      // If this was an incoming call, auto-minimize to mimic WhatsApp's behavior
+      if (session.callerId !== currentUser.id && Platform.OS === 'android') {
+        NativeModules.TelecomModule?.minimizeApp?.();
       }
     }
   };

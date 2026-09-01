@@ -6,7 +6,6 @@ import { CallSession } from '../types';
 import { WebRTCService } from '../services/webrtcService';
 import { RingtoneService } from '../services/ringtoneService';
 import { NativeRTCView } from '../services/webrtcCore';
-import { useKeepAwake } from 'expo-keep-awake';
 import { AudioRouteService } from '../services/audioRouteService';
 
 // 1. Live Self Video Component (PiP) - Real Hardware Front Camera
@@ -183,22 +182,6 @@ interface Props {
 
 export const CallModal: React.FC<Props> = ({ session, onEndCall, onAcceptCall }) => {
   if (!session) return null;
-
-  // Prevent screen from sleeping while modal is open (Safe for Web)
-  useEffect(() => {
-    let keepAwakeTag = 'call-modal-' + Date.now();
-    try {
-      const { activateKeepAwakeAsync, deactivateKeepAwake } = require('expo-keep-awake');
-      activateKeepAwakeAsync(keepAwakeTag).catch(() => {});
-      return () => {
-        try {
-          deactivateKeepAwake(keepAwakeTag);
-        } catch (e) {}
-      };
-    } catch (e) {
-      return () => {};
-    }
-  }, []);
 
   useEffect(() => {
     // If it's an audio call and connected, turn on proximity sensor to turn screen black near ear

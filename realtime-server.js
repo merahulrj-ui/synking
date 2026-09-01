@@ -1630,7 +1630,7 @@ server.on('upgrade', (req, socket, head) => {
           // 📲 High-Priority Push Notification to wake up phone if app is closed or locked!
           if (parsed.type === 'INCOMING_CALL' && parsed.payload) {
             sendCallPushNotification(targetUserId, parsed.payload);
-          } else if ((parsed.type === 'END_CALL' || parsed.type === 'CALL_DECLINED') && parsed.payload) {
+          } else if ((parsed.type === 'END_CALL' || parsed.type === 'CALL_DECLINED' || parsed.type === 'CALL_ENDED' || parsed.type === 'CALL_REJECTED') && parsed.payload) {
             // Send a Missed Call push to clear the native ringing state!
             sendCallPushNotification(targetUserId, parsed.payload, true);
           }

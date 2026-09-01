@@ -1,6 +1,5 @@
 package com.synking
 
-import android.app.Activity
 import android.app.KeyguardManager
 import android.content.BroadcastReceiver
 import android.content.Context
@@ -8,130 +7,124 @@ import android.content.Intent
 import android.content.IntentFilter
 import android.graphics.Color
 import android.graphics.drawable.GradientDrawable
+import android.media.Ringtone
+import android.media.RingtoneManager
 import android.os.Build
 import android.os.Bundle
-import android.os.PowerManager
+import android.os.Handler
+import android.os.Looper
+import android.os.SystemClock
+import android.os.VibrationEffect
+import android.os.Vibrator
 import android.util.Log
 import android.util.TypedValue
 import android.view.Gravity
 import android.view.View
+import android.view.WindowManager
 import android.view.animation.Animation
 import android.view.animation.ScaleAnimation
 import android.widget.FrameLayout
 import android.widget.LinearLayout
 import android.widget.TextView
+import androidx.appcompat.app.AppCompatActivity
 
-class IncomingCallActivity : Activity() {
+class IncomingCallActivity : AppCompatActivity() {
 
     companion object {
-        private const val TAG = "SYNKING_CALL_ACTIVITY"
-        @Volatile var currentActivity: IncomingCallActivity? = null
-        @Volatile var ringtoneInstance: android.media.Ringtone? = null
-        @Volatile var vibratorInstance: android.os.Vibrator? = null
-
+        var activeRingtone: Ringtone? = null
         fun stopRingtoneGlobally() {
             try {
-                ringtoneInstance?.stop()
-                ringtoneInstance = null
-                vibratorInstance?.cancel()
-                vibratorInstance = null
-                currentActivity?.finish()
-                currentActivity = null
-                Log.d(TAG, "Ringtone stopped globally.")
-            } catch (e: Exception) {
-                Log.e(TAG, "Error stopping ringtone globally: ${e.message}")
-            }
+                activeRingtone?.stop()
+                activeRingtone = null
+            } catch (e: Exception) {}
         }
     }
 
-    private var wakeLock: PowerManager.WakeLock? = null
-    private var closeReceiver: BroadcastReceiver? = null
+    private var vibrator: Vibrator? = null
+    private var callId: String = ""
+    private var callerName: String = ""
+    private var callType: String = ""
+    
+    // UI Elements for Active State
+    private var timerTextView: TextView? = null
+    private var subtitleView: TextView? = null
+    private var incomingActionsRow: LinearLayout? = null
+    private var activeActionsRow: LinearLayout? = null
+    
+    private var isMuted = false
+    private var isSpeakerOn = false
+    
+    private var callStartTime = 0L
+    private val timerHandler = Handler(Looper.getMainLooper())
+    private val timerRunnable = object : Runnable {
+        override fun run() {
+            val duration = (SystemClock.elapsedRealtime() - callStartTime) / 1000
+            val min = duration / 60
+            val sec = duration % 60
+            timerTextView?.text = String.format("%02d:%02d", min, sec)
+            timerHandler.postDelayed(this, 1000)
+        }
+    }
 
-    private fun debug(stage: String, status: String, details: String = "") {
-        Log.d("SYNKING_FCM", "[SYNKING_CALL_DEBUG] [$status] $stage $details")
+    private val callEndedReceiver = object : BroadcastReceiver() {
+        override fun onReceive(context: Context?, intent: Intent?) {
+            finish()
+        }
+    }
+
+    private val videoConnectedReceiver = object : BroadcastReceiver() {
+        override fun onReceive(context: Context?, intent: Intent?) {
+            if (callType == "video") {
+                val launchIntent = Intent(this@IncomingCallActivity, MainActivity::class.java).apply {
+                    flags = Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_CLEAR_TOP
+                }
+                startActivity(launchIntent)
+                finish()
+            }
+        }
     }
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
-        currentActivity = this
-
-        applyLockscreenFlags()
-        acquireWakeLock()
-        startRingtoneAndVibration()
-        registerCloseReceiver()
-
-        val callId = intent.getStringExtra("callId") ?: ""
-        val callerName = intent.getStringExtra("callerName") ?: "Someone"
-        val callType = intent.getStringExtra("callType") ?: "audio"
-
-        debug("CALL_ACTIVITY_CREATED", "OK", "callId=$callId caller=$callerName type=$callType")
-        buildWhatsAppStyleUI(callerName, callType, callId)
-    }
-
-    private fun registerCloseReceiver() {
-        closeReceiver = object : BroadcastReceiver() {
-            override fun onReceive(context: Context?, intent: Intent?) {
-                debug("CLOSE_BROADCAST_RECEIVED", "OK", "Dismissing IncomingCallActivity")
-                stopRingtoneAndVibration()
-                finish()
-            }
-        }
-        val filter = IntentFilter("com.synking.CLOSE_CALL_SCREEN")
-        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
-            registerReceiver(closeReceiver, filter, Context.RECEIVER_NOT_EXPORTED)
+        
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O_MR1) {
+            setShowWhenLocked(true)
+            setTurnScreenOn(true)
         } else {
-            registerReceiver(closeReceiver, filter)
-        }
-    }
-
-    private fun applyLockscreenFlags() {
-        try {
-            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O_MR1) {
-                setShowWhenLocked(true)
-                setTurnScreenOn(true)
-                val keyguard = getSystemService(Context.KEYGUARD_SERVICE) as KeyguardManager
-                keyguard.requestDismissKeyguard(this, null)
-            } else {
-                window.addFlags(
-                    android.view.WindowManager.LayoutParams.FLAG_SHOW_WHEN_LOCKED or
-                    android.view.WindowManager.LayoutParams.FLAG_TURN_SCREEN_ON or
-                    android.view.WindowManager.LayoutParams.FLAG_DISMISS_KEYGUARD or
-                    android.view.WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON
-                )
-            }
-            debug("SCREEN_WAKE_REQUEST", "OK")
-        } catch (e: Exception) {
-            debug("SCREEN_WAKE_REQUEST", "FAIL", e.message ?: "unknown")
-        }
-    }
-
-    private fun acquireWakeLock() {
-        try {
-            val pm = getSystemService(Context.POWER_SERVICE) as PowerManager
-            wakeLock = pm.newWakeLock(
-                PowerManager.SCREEN_BRIGHT_WAKE_LOCK or PowerManager.ACQUIRE_CAUSES_WAKEUP,
-                "synking:incoming_call_activity"
+            window.addFlags(
+                WindowManager.LayoutParams.FLAG_SHOW_WHEN_LOCKED or
+                WindowManager.LayoutParams.FLAG_TURN_SCREEN_ON or
+                WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON
             )
-            wakeLock?.acquire(30_000L)
-            debug("WAKELOCK", "OK", "30 seconds wake")
-        } catch (e: Exception) {
-            debug("WAKELOCK", "FAIL", e.message ?: "unknown")
         }
+        
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
+            registerReceiver(callEndedReceiver, IntentFilter("com.synking.CALL_ENDED_FROM_JS"), Context.RECEIVER_NOT_EXPORTED)
+            registerReceiver(videoConnectedReceiver, IntentFilter("com.synking.VIDEO_CALL_CONNECTED_FROM_JS"), Context.RECEIVER_NOT_EXPORTED)
+        } else {
+            registerReceiver(callEndedReceiver, IntentFilter("com.synking.CALL_ENDED_FROM_JS"))
+            registerReceiver(videoConnectedReceiver, IntentFilter("com.synking.VIDEO_CALL_CONNECTED_FROM_JS"))
+        }
+
+        callId = intent.getStringExtra("callId") ?: ""
+        callerName = intent.getStringExtra("callerName") ?: "Unknown"
+        callType = intent.getStringExtra("callType") ?: "audio"
+
+        buildUI()
+        playRingtoneAndVibrate()
     }
 
-    private fun dpToPx(dp: Int): Int {
-        return TypedValue.applyDimension(
-            TypedValue.COMPLEX_UNIT_DIP,
-            dp.toFloat(),
-            resources.displayMetrics
-        ).toInt()
+    override fun onDestroy() {
+        super.onDestroy()
+        stopRingtoneAndVibration()
+        timerHandler.removeCallbacks(timerRunnable)
+        try {
+            unregisterReceiver(callEndedReceiver)
+            unregisterReceiver(videoConnectedReceiver)
+        } catch (e: Exception) {}
     }
 
-    private fun buildWhatsAppStyleUI(
-        callerName: String,
-        callType: String,
-        callId: String
-    ) {
+    private fun buildUI() {
         val root = LinearLayout(this).apply {
             orientation = LinearLayout.VERTICAL
             gravity = Gravity.CENTER_HORIZONTAL
@@ -146,278 +139,242 @@ class IncomingCallActivity : Activity() {
             )
         }
 
-        // Top Brand Header
+        // Top Brand Header (Pill)
         val brandHeader = LinearLayout(this).apply {
             orientation = LinearLayout.HORIZONTAL
             gravity = Gravity.CENTER
-            setPadding(dpToPx(16), dpToPx(6), dpToPx(16), dpToPx(6))
-            background = GradientDrawable().apply {
-                setColor(Color.parseColor("#151622"))
-                cornerRadius = dpToPx(20).toFloat()
-                setStroke(dpToPx(1), Color.parseColor("#FD3A73"))
+            setPadding(dpToPx(20), dpToPx(8), dpToPx(20), dpToPx(8))
+            background = GradientDrawable(
+                GradientDrawable.Orientation.LEFT_RIGHT,
+                intArrayOf(Color.parseColor("#33FD3A73"), Color.parseColor("#339D00FF"))
+            ).apply {
+                cornerRadius = dpToPx(30).toFloat()
+                setStroke(dpToPx(1), Color.parseColor("#80FD3A73"))
             }
         }
         val brandText = TextView(this).apply {
-            text = "⚡ SYNKING DIRECT"
-            textSize = 12f
-            setTextColor(Color.parseColor("#FD3A73"))
+            text = "⚡ SECURE P2P WEBRTC"
+            textSize = 11f
+            setTextColor(Color.WHITE)
             typeface = android.graphics.Typeface.DEFAULT_BOLD
+            letterSpacing = 0.1f
         }
         brandHeader.addView(brandText)
         root.addView(brandHeader)
 
-        // Spacer
-        root.addView(View(this).apply {
-            layoutParams = LinearLayout.LayoutParams(1, dpToPx(36))
-        })
+        root.addView(View(this).apply { layoutParams = LinearLayout.LayoutParams(1, dpToPx(50)) })
 
-        // Circular Avatar with Glowing Neon Ring
         val avatarContainer = FrameLayout(this).apply {
-            val size = dpToPx(130)
-            layoutParams = LinearLayout.LayoutParams(size, size).apply {
-                gravity = Gravity.CENTER_HORIZONTAL
-            }
-            background = GradientDrawable().apply {
-                shape = GradientDrawable.OVAL
-                setColor(Color.parseColor("#11121A"))
-                setStroke(dpToPx(3), Color.parseColor("#FD3A73"))
-            }
+            val size = dpToPx(140)
+            layoutParams = LinearLayout.LayoutParams(size, size).apply { gravity = Gravity.CENTER_HORIZONTAL }
+            background = GradientDrawable(
+                GradientDrawable.Orientation.TR_BL,
+                intArrayOf(Color.parseColor("#FD3A73"), Color.parseColor("#00E5FF"))
+            ).apply { shape = GradientDrawable.OVAL }
+            setPadding(dpToPx(4), dpToPx(4), dpToPx(4), dpToPx(4))
+        }
+        
+        val avatarInner = FrameLayout(this).apply {
+            layoutParams = FrameLayout.LayoutParams(FrameLayout.LayoutParams.MATCH_PARENT, FrameLayout.LayoutParams.MATCH_PARENT)
+            background = GradientDrawable().apply { shape = GradientDrawable.OVAL; setColor(Color.parseColor("#11121A")) }
         }
 
         val avatarInitial = TextView(this).apply {
             text = if (callerName.isNotBlank()) callerName.take(1).uppercase() else "S"
-            textSize = 48f
+            textSize = 56f
             setTextColor(Color.WHITE)
             gravity = Gravity.CENTER
             typeface = android.graphics.Typeface.DEFAULT_BOLD
-            layoutParams = FrameLayout.LayoutParams(
-                FrameLayout.LayoutParams.MATCH_PARENT,
-                FrameLayout.LayoutParams.MATCH_PARENT
-            )
+            layoutParams = FrameLayout.LayoutParams(FrameLayout.LayoutParams.MATCH_PARENT, FrameLayout.LayoutParams.MATCH_PARENT)
         }
-        avatarContainer.addView(avatarInitial)
+        avatarInner.addView(avatarInitial)
+        avatarContainer.addView(avatarInner)
         root.addView(avatarContainer)
 
-        // Caller Name
         val nameView = TextView(this).apply {
             text = callerName
-            textSize = 28f
+            textSize = 32f
             setTextColor(Color.WHITE)
             gravity = Gravity.CENTER
             typeface = android.graphics.Typeface.DEFAULT_BOLD
-            setPadding(0, dpToPx(20), 0, dpToPx(4))
+            setPadding(0, dpToPx(32), 0, dpToPx(8))
         }
         root.addView(nameView)
 
-        // Subtitle
-        val subView = TextView(this).apply {
+        subtitleView = TextView(this).apply {
             text = "Incoming ${if (callType == "video") "Video 📹" else "Voice 📞"} Call..."
-            textSize = 15f
+            textSize = 16f
             setTextColor(Color.parseColor("#94A3B8"))
             gravity = Gravity.CENTER
         }
-        root.addView(subView)
+        root.addView(subtitleView!!)
 
-        // Flexible Expanding Space
-        root.addView(View(this).apply {
-            layoutParams = LinearLayout.LayoutParams(
-                LinearLayout.LayoutParams.MATCH_PARENT,
-                0,
-                1.0f
-            )
-        })
+        timerTextView = TextView(this).apply {
+            text = "00:00"
+            textSize = 16f
+            setTextColor(Color.parseColor("#22C55E"))
+            gravity = Gravity.CENTER
+            visibility = View.GONE
+        }
+        root.addView(timerTextView!!)
 
-        // Bottom Action Buttons Row (WhatsApp / iOS style circular buttons)
-        val actionsRow = LinearLayout(this).apply {
+        root.addView(View(this).apply { layoutParams = LinearLayout.LayoutParams(LinearLayout.LayoutParams.MATCH_PARENT, 0, 1.0f) })
+
+        // INCOMING ROW
+        incomingActionsRow = LinearLayout(this).apply {
             orientation = LinearLayout.HORIZONTAL
             gravity = Gravity.CENTER
-            layoutParams = LinearLayout.LayoutParams(
-                LinearLayout.LayoutParams.MATCH_PARENT,
-                LinearLayout.LayoutParams.WRAP_CONTENT
-            )
+            layoutParams = LinearLayout.LayoutParams(LinearLayout.LayoutParams.MATCH_PARENT, LinearLayout.LayoutParams.WRAP_CONTENT)
         }
 
-        // Decline Button (Red Circle)
-        val declineCol = LinearLayout(this).apply {
-            orientation = LinearLayout.VERTICAL
-            gravity = Gravity.CENTER
-        }
+        val declineCol = LinearLayout(this).apply { orientation = LinearLayout.VERTICAL; gravity = Gravity.CENTER }
         val declineBtn = FrameLayout(this).apply {
-            val size = dpToPx(74)
+            val size = dpToPx(76)
             layoutParams = LinearLayout.LayoutParams(size, size)
-            background = GradientDrawable().apply {
-                shape = GradientDrawable.OVAL
-                setColor(Color.parseColor("#EF4444"))
-                setStroke(dpToPx(2), Color.parseColor("#FCA5A5"))
-            }
+            background = GradientDrawable().apply { shape = GradientDrawable.OVAL; setColor(Color.parseColor("#1E1E28")) }
             setOnClickListener {
-                debug("DECLINE_PRESSED", "OK", "callId=$callId")
                 stopRingtoneAndVibration()
                 CallConnectionManager.rejectCall()
-                clearPendingCall()
                 finish()
             }
         }
-        val declineIcon = TextView(this).apply {
-            text = "✕"
-            textSize = 28f
-            setTextColor(Color.WHITE)
-            gravity = Gravity.CENTER
-            layoutParams = FrameLayout.LayoutParams(
-                FrameLayout.LayoutParams.MATCH_PARENT,
-                FrameLayout.LayoutParams.MATCH_PARENT
-            )
-        }
-        declineBtn.addView(declineIcon)
-        val declineLabel = TextView(this).apply {
-            text = "Decline"
-            textSize = 13f
-            setTextColor(Color.parseColor("#94A3B8"))
-            gravity = Gravity.CENTER
-            setPadding(0, dpToPx(8), 0, 0)
-        }
+        declineBtn.addView(TextView(this).apply { text = "✕"; textSize = 30f; setTextColor(Color.parseColor("#EF4444")); gravity = Gravity.CENTER })
         declineCol.addView(declineBtn)
-        declineCol.addView(declineLabel)
+        declineCol.addView(TextView(this).apply { text = "Decline"; textSize = 14f; setTextColor(Color.parseColor("#94A3B8")); setPadding(0, dpToPx(12), 0, 0) })
 
-        // Middle Spacing
-        val buttonSpacer = View(this).apply {
-            layoutParams = LinearLayout.LayoutParams(dpToPx(70), 1)
-        }
-
-        // Accept Button (Green Circle with Ringing Pulse)
-        val acceptCol = LinearLayout(this).apply {
-            orientation = LinearLayout.VERTICAL
-            gravity = Gravity.CENTER
-        }
+        val acceptCol = LinearLayout(this).apply { orientation = LinearLayout.VERTICAL; gravity = Gravity.CENTER }
         val acceptBtn = FrameLayout(this).apply {
             val size = dpToPx(76)
             layoutParams = LinearLayout.LayoutParams(size, size)
-            background = GradientDrawable(
-                GradientDrawable.Orientation.TL_BR,
-                intArrayOf(Color.parseColor("#00E5FF"), Color.parseColor("#22C55E"))
-            ).apply {
-                shape = GradientDrawable.OVAL
-            }
+            background = GradientDrawable(GradientDrawable.Orientation.TL_BR, intArrayOf(Color.parseColor("#00E5FF"), Color.parseColor("#22C55E"))).apply { shape = GradientDrawable.OVAL }
             setOnClickListener {
-                debug("ANSWER_PRESSED", "OK", "callId=$callId")
-                stopRingtoneAndVibration()
-                CallConnectionManager.answerCall()
-                handoffToReactNative(callId, callerName, callType)
+                handleAccept()
             }
         }
-        val acceptIcon = TextView(this).apply {
-            text = "✓"
-            textSize = 30f
-            setTextColor(Color.WHITE)
-            gravity = Gravity.CENTER
-            layoutParams = FrameLayout.LayoutParams(
-                FrameLayout.LayoutParams.MATCH_PARENT,
-                FrameLayout.LayoutParams.MATCH_PARENT
-            )
+        acceptBtn.addView(TextView(this).apply { text = "📞"; textSize = 32f; setTextColor(Color.WHITE); gravity = Gravity.CENTER })
+        val acceptPulse = ScaleAnimation(1.0f, 1.15f, 1.0f, 1.15f, Animation.RELATIVE_TO_SELF, 0.5f, Animation.RELATIVE_TO_SELF, 0.5f).apply {
+            duration = 500; repeatCount = Animation.INFINITE; repeatMode = Animation.REVERSE
         }
-        acceptBtn.addView(acceptIcon)
-
-        val pulse = ScaleAnimation(
-            1.0f, 1.15f, 1.0f, 1.15f,
-            Animation.RELATIVE_TO_SELF, 0.5f,
-            Animation.RELATIVE_TO_SELF, 0.5f
-        ).apply {
-            duration = 500
-            repeatCount = Animation.INFINITE
-            repeatMode = Animation.REVERSE
-        }
-        acceptBtn.startAnimation(pulse)
-
-        val acceptLabel = TextView(this).apply {
-            text = "Accept"
-            textSize = 13f
-            setTextColor(Color.parseColor("#22C55E"))
-            gravity = Gravity.CENTER
-            typeface = android.graphics.Typeface.DEFAULT_BOLD
-            setPadding(0, dpToPx(8), 0, 0)
-        }
+        acceptBtn.startAnimation(acceptPulse)
         acceptCol.addView(acceptBtn)
-        acceptCol.addView(acceptLabel)
+        acceptCol.addView(TextView(this).apply { text = "Accept"; textSize = 14f; setTextColor(Color.WHITE); typeface = android.graphics.Typeface.DEFAULT_BOLD; setPadding(0, dpToPx(12), 0, 0) })
 
-        actionsRow.addView(declineCol)
-        actionsRow.addView(buttonSpacer)
-        actionsRow.addView(acceptCol)
+        incomingActionsRow?.addView(declineCol)
+        incomingActionsRow?.addView(View(this).apply { layoutParams = LinearLayout.LayoutParams(dpToPx(70), 1) })
+        incomingActionsRow?.addView(acceptCol)
+        root.addView(incomingActionsRow!!)
 
-        root.addView(actionsRow)
+        // ACTIVE ROW
+        activeActionsRow = LinearLayout(this).apply {
+            orientation = LinearLayout.HORIZONTAL
+            gravity = Gravity.CENTER
+            layoutParams = LinearLayout.LayoutParams(LinearLayout.LayoutParams.MATCH_PARENT, LinearLayout.LayoutParams.WRAP_CONTENT)
+            visibility = View.GONE
+        }
+
+        val muteBtn = createControlButton("🎙️", "Mute") { btn, label ->
+            isMuted = !isMuted
+            val bg = btn.background as GradientDrawable
+            bg.setColor(Color.parseColor(if (isMuted) "#EF4444" else "#1E1E28"))
+            label.text = if (isMuted) "Unmute" else "Mute"
+            TelecomModule.emitMuteToggled(isMuted)
+        }
+        
+        val speakerBtn = createControlButton("🔊", "Speaker") { btn, label ->
+            isSpeakerOn = !isSpeakerOn
+            val bg = btn.background as GradientDrawable
+            bg.setColor(Color.parseColor(if (isSpeakerOn) "#3B82F6" else "#1E1E28"))
+            label.text = if (isSpeakerOn) "Speaker Off" else "Speaker On"
+            TelecomModule.emitSpeakerToggled(isSpeakerOn)
+        }
+
+        val endBtnCol = LinearLayout(this).apply { orientation = LinearLayout.VERTICAL; gravity = Gravity.CENTER }
+        val endBtn = FrameLayout(this).apply {
+            val size = dpToPx(76)
+            layoutParams = LinearLayout.LayoutParams(size, size)
+            background = GradientDrawable().apply { shape = GradientDrawable.OVAL; setColor(Color.parseColor("#EF4444")) }
+            setOnClickListener {
+                TelecomModule.emitEndCallEvent()
+                CallConnectionManager.endCall()
+                finish()
+            }
+        }
+        endBtn.addView(TextView(this).apply { text = "📞"; textSize = 30f; setTextColor(Color.WHITE); gravity = Gravity.CENTER; rotation = 135f })
+        endBtnCol.addView(endBtn)
+        endBtnCol.addView(TextView(this).apply { text = "End"; textSize = 14f; setTextColor(Color.parseColor("#94A3B8")); setPadding(0, dpToPx(12), 0, 0) })
+
+        activeActionsRow?.addView(muteBtn)
+        activeActionsRow?.addView(View(this).apply { layoutParams = LinearLayout.LayoutParams(dpToPx(30), 1) })
+        activeActionsRow?.addView(speakerBtn)
+        activeActionsRow?.addView(View(this).apply { layoutParams = LinearLayout.LayoutParams(dpToPx(30), 1) })
+        activeActionsRow?.addView(endBtnCol)
+        
+        root.addView(activeActionsRow!!)
         setContentView(root)
     }
 
-    private fun startRingtoneAndVibration() {
-        try {
-            val ringtoneUri = android.media.RingtoneManager.getDefaultUri(android.media.RingtoneManager.TYPE_RINGTONE)
-            ringtoneInstance = android.media.RingtoneManager.getRingtone(applicationContext, ringtoneUri)
-            ringtoneInstance?.play()
-
-            vibratorInstance = getSystemService(Context.VIBRATOR_SERVICE) as? android.os.Vibrator
-            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
-                vibratorInstance?.vibrate(android.os.VibrationEffect.createWaveform(longArrayOf(0, 1000, 1000), 0))
-            } else {
-                vibratorInstance?.vibrate(longArrayOf(0, 1000, 1000), 0)
-            }
-            debug("RINGTONE_STARTED", "OK")
-        } catch (e: Exception) {
-            debug("RINGTONE_STARTED", "FAIL", e.message ?: "")
+    private fun createControlButton(iconText: String, labelText: String, onClick: (FrameLayout, TextView) -> Unit): LinearLayout {
+        val col = LinearLayout(this).apply { orientation = LinearLayout.VERTICAL; gravity = Gravity.CENTER }
+        val btn = FrameLayout(this).apply {
+            val size = dpToPx(60)
+            layoutParams = LinearLayout.LayoutParams(size, size)
+            background = GradientDrawable().apply { shape = GradientDrawable.OVAL; setColor(Color.parseColor("#1E1E28")) }
         }
+        btn.addView(TextView(this).apply { text = iconText; textSize = 24f; setTextColor(Color.WHITE); gravity = Gravity.CENTER })
+        val label = TextView(this).apply { text = labelText; textSize = 12f; setTextColor(Color.parseColor("#94A3B8")); setPadding(0, dpToPx(8), 0, 0) }
+        btn.setOnClickListener { onClick(btn, label) }
+        col.addView(btn)
+        col.addView(label)
+        return col
+    }
+
+    private fun handleAccept() {
+        stopRingtoneAndVibration()
+        CallConnectionManager.answerCall()
+        TelecomModule.emitAcceptEvent()
+
+        if (callType == "video") {
+            // Video call - Show Connecting... and wait for RN to connect!
+            incomingActionsRow?.visibility = View.GONE
+            activeActionsRow?.visibility = View.VISIBLE
+            subtitleView?.text = "Connecting..."
+            subtitleView?.setTextColor(Color.parseColor("#3B82F6"))
+            subtitleView?.visibility = View.VISIBLE
+            timerTextView?.visibility = View.GONE
+        } else {
+            // Audio call - Transition to Active UI natively!
+            incomingActionsRow?.visibility = View.GONE
+            activeActionsRow?.visibility = View.VISIBLE
+            subtitleView?.visibility = View.GONE
+            timerTextView?.visibility = View.VISIBLE
+            
+            callStartTime = SystemClock.elapsedRealtime()
+            timerHandler.post(timerRunnable)
+        }
+    }
+
+    private fun dpToPx(dp: Int): Int = TypedValue.applyDimension(TypedValue.COMPLEX_UNIT_DIP, dp.toFloat(), resources.displayMetrics).toInt()
+
+    private fun playRingtoneAndVibrate() {
+        try {
+            val uri = RingtoneManager.getDefaultUri(RingtoneManager.TYPE_RINGTONE)
+            activeRingtone = RingtoneManager.getRingtone(applicationContext, uri)
+            activeRingtone?.play()
+            
+            vibrator = getSystemService(Context.VIBRATOR_SERVICE) as Vibrator
+            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
+                vibrator?.vibrate(VibrationEffect.createWaveform(longArrayOf(0, 1000, 1000), 0))
+            } else {
+                @Suppress("DEPRECATION")
+                vibrator?.vibrate(longArrayOf(0, 1000, 1000), 0)
+            }
+        } catch (e: Exception) {}
     }
 
     private fun stopRingtoneAndVibration() {
+        stopRingtoneGlobally()
         try {
-            ringtoneInstance?.stop()
-            ringtoneInstance = null
-            vibratorInstance?.cancel()
-            vibratorInstance = null
-            debug("RINGTONE_STOPPED", "OK")
-        } catch (e: Exception) {
-            debug("RINGTONE_STOPPED", "FAIL", e.message ?: "")
-        }
-    }
-
-    private fun handoffToReactNative(callId: String, callerName: String, callType: String) {
-        stopRingtoneAndVibration()
-        
-        // Tell React Native to auto-accept the call immediately!
-        TelecomModule.emitAcceptEvent()
-
-        val intent = Intent(this, MainActivity::class.java).apply {
-            flags = Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_CLEAR_TOP or Intent.FLAG_ACTIVITY_REORDER_TO_FRONT
-            putExtra("SYNKING_INCOMING_CALL", true)
-            putExtra("callId", callId)
-            putExtra("callerName", callerName)
-            putExtra("callType", callType)
-        }
-        startActivity(intent)
-        debug("REACT_NATIVE_HANDOFF", "OK", "callId=$callId")
-        finish()
-    }
-
-    private fun clearPendingCall() {
-        stopRingtoneAndVibration()
-        getSharedPreferences("synking_call_state", MODE_PRIVATE)
-            .edit()
-            .clear()
-            .apply()
-    }
-
-    override fun onPause() {
-        super.onPause()
-        stopRingtoneAndVibration()
-    }
-
-    override fun onDestroy() {
-        super.onDestroy()
-        stopRingtoneAndVibration()
-        try {
-            closeReceiver?.let { unregisterReceiver(it) }
-        } catch (_: Exception) {}
-        try {
-            wakeLock?.let { if (it.isHeld) it.release() }
-        } catch (_: Exception) {}
-        currentActivity = null
-        debug("CALL_ACTIVITY_DESTROYED", "INFO")
+            vibrator?.cancel()
+        } catch (e: Exception) {}
     }
 }
