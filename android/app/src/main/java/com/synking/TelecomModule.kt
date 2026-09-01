@@ -60,10 +60,16 @@ class TelecomModule(reactContext: ReactApplicationContext) : ReactContextBaseJav
     @ReactMethod
     fun attachRemoteVideo(streamUrl: String, promise: Promise) {
         try {
-            reactApplicationContext.currentActivity?.runOnUiThread {
-                incomingActivityInstance?.attachRemoteVideo(streamUrl)
+            val activity = incomingActivityInstance
+            if (activity != null) {
+                activity.runOnUiThread {
+                    activity.attachRemoteVideo(streamUrl)
+                }
+                promise.resolve(true)
+            } else {
+                Log.w("SYNKING_TELECOM", "[VIDEO] attachRemoteVideo: incomingActivityInstance is null")
+                promise.resolve(false)
             }
-            promise.resolve(true)
         } catch (e: Exception) {
             promise.reject("ERR", e.message)
         }
@@ -72,10 +78,16 @@ class TelecomModule(reactContext: ReactApplicationContext) : ReactContextBaseJav
     @ReactMethod
     fun attachLocalVideo(streamUrl: String, promise: Promise) {
         try {
-            reactApplicationContext.currentActivity?.runOnUiThread {
-                incomingActivityInstance?.attachLocalVideo(streamUrl)
+            val activity = incomingActivityInstance
+            if (activity != null) {
+                activity.runOnUiThread {
+                    activity.attachLocalVideo(streamUrl)
+                }
+                promise.resolve(true)
+            } else {
+                Log.w("SYNKING_TELECOM", "[VIDEO] attachLocalVideo: incomingActivityInstance is null")
+                promise.resolve(false)
             }
-            promise.resolve(true)
         } catch (e: Exception) {
             promise.reject("ERR", e.message)
         }

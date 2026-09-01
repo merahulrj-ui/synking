@@ -11,11 +11,6 @@ import android.media.Ringtone
 import android.media.RingtoneManager
 import android.os.Build
 import android.os.Bundle
-import com.oney.WebRTCModule.WebRTCView
-import com.facebook.react.ReactApplication
-import com.facebook.react.ReactInstanceManager
-import com.facebook.react.bridge.ReactContext
-
 import android.os.Handler
 import android.os.Looper
 import android.os.SystemClock
@@ -32,6 +27,8 @@ import android.widget.FrameLayout
 import android.widget.LinearLayout
 import android.widget.TextView
 import androidx.appcompat.app.AppCompatActivity
+import com.facebook.react.ReactApplication
+import com.oney.WebRTCModule.WebRTCView
 
 class IncomingCallActivity : AppCompatActivity() {
 
@@ -49,23 +46,24 @@ class IncomingCallActivity : AppCompatActivity() {
     private var callId: String = ""
     private var callerName: String = ""
     private var callType: String = ""
-    
-    // UI Elements for Active State
+
+    // UI Elements
+    private var callerInfoLayout: LinearLayout? = null
     private var timerTextView: TextView? = null
     private var subtitleView: TextView? = null
     private var incomingActionsRow: LinearLayout? = null
     private var activeActionsRow: LinearLayout? = null
-    
+
     private var isMuted = false
     private var isSpeakerOn = false
     private lateinit var uiLayer: LinearLayout
-    // WebRTC Variables
+
+    // WebRTC Video Containers
     private var remoteVideoContainer: FrameLayout? = null
     private var localVideoContainer: FrameLayout? = null
     private var remoteWebRTCView: WebRTCView? = null
     private var localWebRTCView: WebRTCView? = null
 
-    
     private var callStartTime = 0L
     private val timerHandler = Handler(Looper.getMainLooper())
     private val timerRunnable = object : Runnable {
@@ -87,11 +85,13 @@ class IncomingCallActivity : AppCompatActivity() {
     private val videoConnectedReceiver = object : BroadcastReceiver() {
         override fun onReceive(context: Context?, intent: Intent?) {
             if (callType == "video") {
-                val launchIntent = Intent(this@IncomingCallActivity, MainActivity::class.java).apply {
-                    flags = Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_CLEAR_TOP
+                subtitleView?.visibility = View.GONE
+                timerTextView?.visibility = View.VISIBLE
+                if (callStartTime == 0L) {
+                    callStartTime = SystemClock.elapsedRealtime()
+                    timerHandler.post(timerRunnable)
                 }
-                startActivity(launchIntent)
-                finish()
+                Log.d("SYNKING_TELECOM", "[UI] VIDEO_CONNECTED: Staying in native IncomingCallActivity for lock screen")
             }
         }
     }
@@ -100,7 +100,7 @@ class IncomingCallActivity : AppCompatActivity() {
         super.onCreate(savedInstanceState)
 
         TelecomModule.incomingActivityInstance = this
-        
+
         // Boot JS in background if not running (to handle WebRTC signaling)
         val reactHost = (application as? ReactApplication)?.reactNativeHost
         val reactManager = reactHost?.reactInstanceManager
@@ -108,7 +108,6 @@ class IncomingCallActivity : AppCompatActivity() {
             reactManager.createReactContextInBackground()
         }
 
-        
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O_MR1) {
             setShowWhenLocked(true)
             setTurnScreenOn(true)
@@ -120,12 +119,12 @@ class IncomingCallActivity : AppCompatActivity() {
             )
         }
 
-        // ✅ Dismiss keyguard (PIN/Pattern lock) so call UI is accessible
+        // Dismiss keyguard (PIN/Pattern lock) so call UI is directly interactive
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
             val keyguardManager = getSystemService(Context.KEYGUARD_SERVICE) as KeyguardManager
             keyguardManager.requestDismissKeyguard(this, null)
         }
-        
+
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
             registerReceiver(callEndedReceiver, IntentFilter("com.synking.CALL_ENDED_FROM_JS"), Context.RECEIVER_NOT_EXPORTED)
             registerReceiver(videoConnectedReceiver, IntentFilter("com.synking.VIDEO_CALL_CONNECTED_FROM_JS"), Context.RECEIVER_NOT_EXPORTED)
@@ -141,23 +140,22 @@ class IncomingCallActivity : AppCompatActivity() {
         buildUI()
         playRingtoneAndVibrate()
 
-        // ✅ Auto-accept if launched from notification Accept button
+        // Auto-accept if launched from notification Accept button
         val autoAccept = intent.getBooleanExtra("autoAccept", false)
         if (autoAccept) {
             Handler(Looper.getMainLooper()).postDelayed({
                 handleAccept()
-            }, 300) // Small delay to let UI render first
+            }, 300)
         }
     }
 
-    
     fun attachRemoteVideo(streamUrl: String) {
         val ctx = TelecomModule.globalReactContext ?: return
         if (remoteWebRTCView == null) {
             remoteWebRTCView = WebRTCView(ctx)
             remoteVideoContainer?.addView(remoteWebRTCView)
         }
-        
+
         try {
             val method = remoteWebRTCView!!.javaClass.getDeclaredMethod("setStreamURL", String::class.java)
             method.isAccessible = true
@@ -165,19 +163,14 @@ class IncomingCallActivity : AppCompatActivity() {
         } catch (e: Exception) {
             e.printStackTrace()
         }
-        uiLayer.setBackgroundColor(Color.TRANSPARENT)
-        uiLayer.getChildAt(0)?.visibility = View.GONE // Hide avatar/name layout which is usually the first child
 
+        uiLayer.setBackgroundColor(Color.TRANSPARENT)
+        callerInfoLayout?.visibility = View.GONE
         remoteVideoContainer?.visibility = View.VISIBLE
-        
-        // Hide avatar and name since we have video
-        // UI updates handled dynamically
-        
-        
-        
-        // Bring controls to front
+
         activeActionsRow?.bringToFront()
         localVideoContainer?.bringToFront()
+        timerTextView?.bringToFront()
     }
 
     fun attachLocalVideo(streamUrl: String) {
@@ -187,7 +180,7 @@ class IncomingCallActivity : AppCompatActivity() {
             localWebRTCView?.setMirror(true)
             localVideoContainer?.addView(localWebRTCView)
         }
-        
+
         try {
             val method = localWebRTCView!!.javaClass.getDeclaredMethod("setStreamURL", String::class.java)
             method.isAccessible = true
@@ -197,6 +190,7 @@ class IncomingCallActivity : AppCompatActivity() {
         }
 
         localVideoContainer?.visibility = View.VISIBLE
+        localVideoContainer?.bringToFront()
     }
 
     override fun onDestroy() {
@@ -214,10 +208,14 @@ class IncomingCallActivity : AppCompatActivity() {
 
     private fun buildUI() {
         val root = FrameLayout(this)
-        
-        remoteVideoContainer = FrameLayout(this).apply { layoutParams = FrameLayout.LayoutParams(FrameLayout.LayoutParams.MATCH_PARENT, FrameLayout.LayoutParams.MATCH_PARENT); visibility = View.GONE; setBackgroundColor(Color.parseColor("#05060A")) }
+
+        remoteVideoContainer = FrameLayout(this).apply {
+            layoutParams = FrameLayout.LayoutParams(FrameLayout.LayoutParams.MATCH_PARENT, FrameLayout.LayoutParams.MATCH_PARENT)
+            visibility = View.GONE
+            setBackgroundColor(Color.parseColor("#05060A"))
+        }
         root.addView(remoteVideoContainer)
-        
+
         uiLayer = LinearLayout(this).apply {
             orientation = LinearLayout.VERTICAL
             gravity = Gravity.CENTER_HORIZONTAL
@@ -232,7 +230,17 @@ class IncomingCallActivity : AppCompatActivity() {
             )
         }
 
-        // Top Brand Header (Pill)
+        // Caller Info Container (easily hidden during video call)
+        callerInfoLayout = LinearLayout(this).apply {
+            orientation = LinearLayout.VERTICAL
+            gravity = Gravity.CENTER_HORIZONTAL
+            layoutParams = LinearLayout.LayoutParams(
+                LinearLayout.LayoutParams.MATCH_PARENT,
+                LinearLayout.LayoutParams.WRAP_CONTENT
+            )
+        }
+
+        // Brand Header Pill
         val brandHeader = LinearLayout(this).apply {
             orientation = LinearLayout.HORIZONTAL
             gravity = Gravity.CENTER
@@ -246,16 +254,16 @@ class IncomingCallActivity : AppCompatActivity() {
             }
         }
         val brandText = TextView(this).apply {
-            text = "âš¡ SECURE P2P WEBRTC"
+            text = "SECURE P2P WEBRTC"
             textSize = 11f
             setTextColor(Color.WHITE)
             typeface = android.graphics.Typeface.DEFAULT_BOLD
             letterSpacing = 0.1f
         }
         brandHeader.addView(brandText)
-        root.addView(brandHeader)
+        callerInfoLayout?.addView(brandHeader)
 
-        root.addView(View(this).apply { layoutParams = LinearLayout.LayoutParams(1, dpToPx(50)) })
+        callerInfoLayout?.addView(View(this).apply { layoutParams = LinearLayout.LayoutParams(1, dpToPx(36)) })
 
         val avatarContainer = FrameLayout(this).apply {
             val size = dpToPx(140)
@@ -266,7 +274,7 @@ class IncomingCallActivity : AppCompatActivity() {
             ).apply { shape = GradientDrawable.OVAL }
             setPadding(dpToPx(4), dpToPx(4), dpToPx(4), dpToPx(4))
         }
-        
+
         val avatarInner = FrameLayout(this).apply {
             layoutParams = FrameLayout.LayoutParams(FrameLayout.LayoutParams.MATCH_PARENT, FrameLayout.LayoutParams.MATCH_PARENT)
             background = GradientDrawable().apply { shape = GradientDrawable.OVAL; setColor(Color.parseColor("#11121A")) }
@@ -282,7 +290,7 @@ class IncomingCallActivity : AppCompatActivity() {
         }
         avatarInner.addView(avatarInitial)
         avatarContainer.addView(avatarInner)
-        root.addView(avatarContainer)
+        callerInfoLayout?.addView(avatarContainer)
 
         val nameView = TextView(this).apply {
             text = callerName
@@ -290,30 +298,34 @@ class IncomingCallActivity : AppCompatActivity() {
             setTextColor(Color.WHITE)
             gravity = Gravity.CENTER
             typeface = android.graphics.Typeface.DEFAULT_BOLD
-            setPadding(0, dpToPx(32), 0, dpToPx(8))
+            setPadding(0, dpToPx(28), 0, dpToPx(8))
         }
-        root.addView(nameView)
+        callerInfoLayout?.addView(nameView)
 
         subtitleView = TextView(this).apply {
-            text = "Incoming ${if (callType == "video") "Video ðŸ“¹" else "Voice ðŸ“ž"} Call..."
+            text = "Incoming ${if (callType == "video") "Video Call..." else "Voice Call..."}"
             textSize = 16f
             setTextColor(Color.parseColor("#94A3B8"))
             gravity = Gravity.CENTER
         }
-        root.addView(subtitleView!!)
+        callerInfoLayout?.addView(subtitleView!!)
+
+        uiLayer.addView(callerInfoLayout)
 
         timerTextView = TextView(this).apply {
             text = "00:00"
-            textSize = 16f
+            textSize = 20f
             setTextColor(Color.parseColor("#22C55E"))
             gravity = Gravity.CENTER
             visibility = View.GONE
+            setPadding(0, dpToPx(16), 0, dpToPx(8))
         }
-        root.addView(timerTextView!!)
+        uiLayer.addView(timerTextView!!)
 
-        root.addView(View(this).apply { layoutParams = LinearLayout.LayoutParams(LinearLayout.LayoutParams.MATCH_PARENT, 0, 1.0f) })
+        // Flexible spacer to push buttons to bottom
+        uiLayer.addView(View(this).apply { layoutParams = LinearLayout.LayoutParams(LinearLayout.LayoutParams.MATCH_PARENT, 0, 1.0f) })
 
-        // INCOMING ROW
+        // INCOMING ACTIONS ROW
         incomingActionsRow = LinearLayout(this).apply {
             orientation = LinearLayout.HORIZONTAL
             gravity = Gravity.CENTER
@@ -331,7 +343,7 @@ class IncomingCallActivity : AppCompatActivity() {
                 finish()
             }
         }
-        declineBtn.addView(TextView(this).apply { text = "âœ•"; textSize = 30f; setTextColor(Color.parseColor("#EF4444")); gravity = Gravity.CENTER })
+        declineBtn.addView(TextView(this).apply { text = "\u2715"; textSize = 30f; setTextColor(Color.parseColor("#EF4444")); gravity = Gravity.CENTER })
         declineCol.addView(declineBtn)
         declineCol.addView(TextView(this).apply { text = "Decline"; textSize = 14f; setTextColor(Color.parseColor("#94A3B8")); setPadding(0, dpToPx(12), 0, 0) })
 
@@ -344,7 +356,7 @@ class IncomingCallActivity : AppCompatActivity() {
                 handleAccept()
             }
         }
-        acceptBtn.addView(TextView(this).apply { text = "ðŸ“ž"; textSize = 32f; setTextColor(Color.WHITE); gravity = Gravity.CENTER })
+        acceptBtn.addView(TextView(this).apply { text = "\uD83D\uDCDE"; textSize = 32f; setTextColor(Color.WHITE); gravity = Gravity.CENTER })
         val acceptPulse = ScaleAnimation(1.0f, 1.15f, 1.0f, 1.15f, Animation.RELATIVE_TO_SELF, 0.5f, Animation.RELATIVE_TO_SELF, 0.5f).apply {
             duration = 500; repeatCount = Animation.INFINITE; repeatMode = Animation.REVERSE
         }
@@ -357,7 +369,7 @@ class IncomingCallActivity : AppCompatActivity() {
         incomingActionsRow?.addView(acceptCol)
         uiLayer.addView(incomingActionsRow!!)
 
-        // ACTIVE ROW
+        // ACTIVE ACTIONS ROW
         activeActionsRow = LinearLayout(this).apply {
             orientation = LinearLayout.HORIZONTAL
             gravity = Gravity.CENTER
@@ -365,15 +377,15 @@ class IncomingCallActivity : AppCompatActivity() {
             visibility = View.GONE
         }
 
-        val muteBtn = createControlButton("ðŸŽ™ï¸", "Mute") { btn, label ->
+        val muteBtn = createControlButton("\uD83C\uDF99\uFE0F", "Mute") { btn, label ->
             isMuted = !isMuted
             val bg = btn.background as GradientDrawable
             bg.setColor(Color.parseColor(if (isMuted) "#EF4444" else "#1E1E28"))
             label.text = if (isMuted) "Unmute" else "Mute"
             TelecomModule.emitMuteToggled(isMuted)
         }
-        
-        val speakerBtn = createControlButton("ðŸ”Š", "Speaker") { btn, label ->
+
+        val speakerBtn = createControlButton("\uD83D\uDD0A", "Speaker") { btn, label ->
             isSpeakerOn = !isSpeakerOn
             val bg = btn.background as GradientDrawable
             bg.setColor(Color.parseColor(if (isSpeakerOn) "#3B82F6" else "#1E1E28"))
@@ -392,7 +404,7 @@ class IncomingCallActivity : AppCompatActivity() {
                 finish()
             }
         }
-        endBtn.addView(TextView(this).apply { text = "ðŸ“ž"; textSize = 30f; setTextColor(Color.WHITE); gravity = Gravity.CENTER; rotation = 135f })
+        endBtn.addView(TextView(this).apply { text = "\uD83D\uDCDE"; textSize = 30f; setTextColor(Color.WHITE); gravity = Gravity.CENTER; rotation = 135f })
         endBtnCol.addView(endBtn)
         endBtnCol.addView(TextView(this).apply { text = "End"; textSize = 14f; setTextColor(Color.parseColor("#94A3B8")); setPadding(0, dpToPx(12), 0, 0) })
 
@@ -401,13 +413,21 @@ class IncomingCallActivity : AppCompatActivity() {
         activeActionsRow?.addView(speakerBtn)
         activeActionsRow?.addView(View(this).apply { layoutParams = LinearLayout.LayoutParams(dpToPx(30), 1) })
         activeActionsRow?.addView(endBtnCol)
-        
+
         uiLayer.addView(activeActionsRow!!)
         root.addView(uiLayer)
-        
-        localVideoContainer = FrameLayout(this).apply { layoutParams = FrameLayout.LayoutParams(dpToPx(110), dpToPx(160)).apply { gravity = Gravity.BOTTOM or Gravity.END; setMargins(0,0,dpToPx(24),dpToPx(130)) }; visibility = View.GONE; setBackgroundColor(Color.parseColor("#11121A")); elevation = 20f }
+
+        localVideoContainer = FrameLayout(this).apply {
+            layoutParams = FrameLayout.LayoutParams(dpToPx(110), dpToPx(160)).apply {
+                gravity = Gravity.BOTTOM or Gravity.END
+                setMargins(0, 0, dpToPx(24), dpToPx(130))
+            }
+            visibility = View.GONE
+            setBackgroundColor(Color.parseColor("#11121A"))
+            elevation = 20f
+        }
         root.addView(localVideoContainer)
-        
+
         setContentView(root)
     }
 
@@ -432,20 +452,16 @@ class IncomingCallActivity : AppCompatActivity() {
         TelecomModule.emitAcceptEvent()
 
         if (callType == "video") {
-            // Video call - Show Connecting... and wait for RN to connect!
             incomingActionsRow?.visibility = View.GONE
             activeActionsRow?.visibility = View.VISIBLE
-            subtitleView?.text = "Connecting..."
+            subtitleView?.text = "Connecting video..."
             subtitleView?.setTextColor(Color.parseColor("#3B82F6"))
             subtitleView?.visibility = View.VISIBLE
             timerTextView?.visibility = View.GONE
         } else {
-            // Audio call - Transition to Active UI natively!
             incomingActionsRow?.visibility = View.GONE
             activeActionsRow?.visibility = View.VISIBLE
-            
             timerTextView?.visibility = View.VISIBLE
-            
             callStartTime = SystemClock.elapsedRealtime()
             timerHandler.post(timerRunnable)
         }
@@ -458,7 +474,7 @@ class IncomingCallActivity : AppCompatActivity() {
             val uri = RingtoneManager.getDefaultUri(RingtoneManager.TYPE_RINGTONE)
             activeRingtone = RingtoneManager.getRingtone(applicationContext, uri)
             activeRingtone?.play()
-            
+
             vibrator = getSystemService(Context.VIBRATOR_SERVICE) as Vibrator
             if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
                 vibrator?.vibrate(VibrationEffect.createWaveform(longArrayOf(0, 1000, 1000), 0))
