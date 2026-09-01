@@ -33,6 +33,7 @@ class RealtimeBridgeManager {
     if (this.socket && this.socket.readyState === WebSocket.OPEN && userId) {
       try {
         this.socket.send(JSON.stringify({ type: 'REGISTER_SOCKET', userId }));
+        this.socket.send(JSON.stringify({ type: 'GET_PENDING_MESSAGES' }));
       } catch (e) {}
     }
   }
@@ -67,6 +68,14 @@ class RealtimeBridgeManager {
           const data = JSON.parse(event.data);
           if (data && data.type) {
             if (data.type === 'PONG') return;
+            
+            // Auto-ACK to delete from Server Waiting Room (Turso)
+            if (data.type === 'NEW_MESSAGE' && data.payload && data.payload.id) {
+              try {
+                this.socket.send(JSON.stringify({ type: 'MESSAGE_ACK', messageId: data.payload.id }));
+              } catch(e) {}
+            }
+
             this.notify(data);
           }
         } catch (e) {}

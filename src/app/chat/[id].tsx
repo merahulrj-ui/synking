@@ -434,11 +434,27 @@ export default function ChatScreen() {
           player.play();
           setTimeout(() => setPlayingMessageId(null), 3000);
         } else {
+          let finalUrl = audioUrl;
+          // Fix for Windows Chrome/Edge rejecting raw m4a MIME types from mobile
+          if (finalUrl.includes('audio/m4a')) {
+            finalUrl = finalUrl.replace('audio/m4a', 'audio/mp4');
+          }
           const HTMLAudio = (window as any).Audio;
-          const audio = new HTMLAudio(audioUrl);
+          const audio = new HTMLAudio(finalUrl);
           activeAudioRef.current = audio;
           setPlayingMessageId(messageId);
-          audio.play();
+          
+          audio.play().catch((err: any) => {
+            console.error('[WEB_AUDIO_ERR] Play failed, trying fallback...', err);
+            if (finalUrl.includes('audio/mp4')) {
+              const fallbackAudio = new HTMLAudio(finalUrl.replace('audio/mp4', 'audio/aac'));
+              activeAudioRef.current = fallbackAudio;
+              fallbackAudio.play().catch(() => setPlayingMessageId(null));
+              fallbackAudio.onended = () => setPlayingMessageId(null);
+            } else {
+              setPlayingMessageId(null);
+            }
+          });
           audio.onended = () => setPlayingMessageId(null);
         }
       } catch (e) {
@@ -534,8 +550,6 @@ export default function ChatScreen() {
       }
     };
     fetchCloud();
-    const interval = setInterval(fetchCloud, 2000);
-    return () => clearInterval(interval);
   }, [id, currentUser?.id, deletedMsgIds]);
 
   // Combine and strictly bifurcate cloud + local messages for this specific conversation (0 duplicates guaranteed)

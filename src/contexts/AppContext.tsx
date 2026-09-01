@@ -304,6 +304,19 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
         const myId = currentUser?.id;
         // ⛔ Only accept messages where current user is sender or receiver
         if (myId && (msg.senderId === myId || msg.receiverId === myId)) {
+          
+          // Play Incoming Message Sound/Haptic if we are receiving it from someone else
+          if (msg.receiverId === myId && msg.senderId !== myId) {
+            try {
+              if (Platform.OS !== 'web') {
+                const Haptics = require('expo-haptics');
+                Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success).catch(() => {});
+              }
+              const { RingtoneService } = require('../services/ringtoneService');
+              if (RingtoneService) RingtoneService.playMessageChime();
+            } catch(e) {}
+          }
+
           const threadKey = msg.senderId === myId ? msg.receiverId : msg.senderId;
           setMessages(prev => {
             const list = prev[threadKey] || [];
@@ -714,6 +727,18 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       type: type,
       extraData: extraData,
     };
+
+      // 1. Play WhatsApp style 'Kat' send sound and vibration
+      try {
+        if (Platform.OS !== 'web') {
+          const Haptics = require('expo-haptics');
+          Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light).catch(() => {});
+        }
+        const { RingtoneService } = require('../services/ringtoneService');
+        if (RingtoneService) {
+          RingtoneService.playMessageChime();
+        }
+      } catch(e) {}
 
     setMessages(prev => {
       const existing = prev[receiverId] || [];

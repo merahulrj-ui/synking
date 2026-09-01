@@ -2,8 +2,10 @@ package com.synking
 
 import android.app.Activity
 import android.app.KeyguardManager
+import android.content.BroadcastReceiver
 import android.content.Context
 import android.content.Intent
+import android.content.IntentFilter
 import android.os.Build
 import android.os.Bundle
 import android.os.PowerManager
@@ -12,10 +14,22 @@ import android.view.Gravity
 import android.widget.Button
 import android.widget.LinearLayout
 import android.widget.TextView
+import java.net.HttpURLConnection
+import java.net.URL
+import kotlin.concurrent.thread
 
 class IncomingCallActivity : Activity() {
 
     private var wakeLock: PowerManager.WakeLock? = null
+    
+    private val closeReceiver = object : BroadcastReceiver() {
+        override fun onReceive(context: Context?, intent: Intent?) {
+            if (intent?.action == "com.synking.CLOSE_CALL_SCREEN") {
+                debug("CALL_SCREEN_CLOSED_EXTERNALLY", "OK", "Received close broadcast")
+                finish()
+            }
+        }
+    }
 
     private fun debug(stage: String, status: String, details: String = "") {
         android.util.Log.d(
@@ -26,32 +40,25 @@ class IncomingCallActivity : Activity() {
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
+        
+        // Register receiver to close this screen if caller hangs up
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
+            registerReceiver(closeReceiver, IntentFilter("com.synking.CLOSE_CALL_SCREEN"), Context.RECEIVER_NOT_EXPORTED)
+        } else {
+            registerReceiver(closeReceiver, IntentFilter("com.synking.CLOSE_CALL_SCREEN"))
+        }
 
         applyLockscreenFlags()
         acquireWakeLock()
 
-        val callId =
-            intent.getStringExtra("callId") ?: ""
+        val callId = intent.getStringExtra("callId") ?: ""
+        val callerId = intent.getStringExtra("callerId") ?: ""
+        val callerName = intent.getStringExtra("callerName") ?: "Someone"
+        val callType = intent.getStringExtra("callType") ?: "audio"
 
-        val callerName =
-            intent.getStringExtra("callerName")
-                ?: "Someone"
+        debug("CALL_ACTIVITY_CREATED", "OK", "callId=$callId caller=$callerName type=$callType")
 
-        val callType =
-            intent.getStringExtra("callType")
-                ?: "audio"
-
-        debug(
-            "CALL_ACTIVITY_CREATED",
-            "OK",
-            "callId=$callId caller=$callerName type=$callType"
-        )
-
-        showCallDebugger(
-            callerName,
-            callType,
-            callId
-        )
+        showCallDebugger(callerName, callType, callId, callerId)
     }
 
     private fun applyLockscreenFlags() {
@@ -125,7 +132,8 @@ class IncomingCallActivity : Activity() {
     private fun showCallDebugger(
         callerName: String,
         callType: String,
-        callId: String
+        callId: String,
+        callerId: String
     ) {
         val root =
             LinearLayout(this).apply {
@@ -135,13 +143,17 @@ class IncomingCallActivity : Activity() {
                 setBackgroundColor(Color.parseColor("#05060A"))
             }
 
-        val logoText =
-            TextView(this).apply {
-                text = "⚡ SYNKING"
-                textSize = 14f
-                setTextColor(Color.parseColor("#FD3A73"))
-                gravity = Gravity.CENTER
-                setPadding(0, 0, 0, 30)
+        val logoImage =
+            android.widget.ImageView(this).apply {
+                setImageResource(R.mipmap.ic_launcher_round)
+                layoutParams = LinearLayout.LayoutParams(
+                    (80 * resources.displayMetrics.density).toInt(),
+                    (80 * resources.displayMetrics.density).toInt()
+                ).apply {
+                    setMargins(0, 0, 0, (30 * resources.displayMetrics.density).toInt())
+                    gravity = Gravity.CENTER
+                }
+                scaleType = android.widget.ImageView.ScaleType.FIT_CENTER
             }
 
         val callerTitle =
@@ -177,11 +189,25 @@ class IncomingCallActivity : Activity() {
                 textSize = 15f
                 setPadding(40, 24, 40, 24)
                 setOnClickListener {
-                    debug(
-                        "DECLINE_PRESSED",
-                        "OK",
-                        "callId=$callId"
-                    )
+                    debug("DECLINE_PRESSED", "OK", "callId=$callId")
+                    
+                    // Tell server we declined the call natively
+                    thread {
+                        try {
+                            val url = URL("https://synking-9my2.onrender.com/api/calls/decline")
+                            val conn = url.openConnection() as HttpURLConnection
+                            conn.requestMethod = "POST"
+                            conn.setRequestProperty("Content-Type", "application/json")
+                            conn.doOutput = true
+                            val body = """{"callId":"$callId","callerId":"$callerId"}"""
+                            conn.outputStream.write(body.toByteArray())
+                            val code = conn.responseCode
+                            debug("DECLINE_HTTP_SENT", if (code == 200) "OK" else "FAIL", "code=$code")
+                            conn.disconnect()
+                        } catch (e: Exception) {
+                            debug("DECLINE_HTTP_ERROR", "FAIL", e.message ?: "")
+                        }
+                    }
 
                     clearPendingCall()
                     finish()
@@ -219,7 +245,7 @@ class IncomingCallActivity : Activity() {
         btnRow.addView(spacer)
         btnRow.addView(answer)
 
-        root.addView(logoText)
+        root.addView(logoImage)
         root.addView(callerTitle)
         root.addView(callSubtitle)
         root.addView(btnRow)

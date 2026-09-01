@@ -170,6 +170,16 @@ async function initTursoTables() {
         created_at DATETIME DEFAULT CURRENT_TIMESTAMP
       );
     `);
+    await queryTurso(`
+      CREATE TABLE IF NOT EXISTS pending_messages (
+        id TEXT PRIMARY KEY,
+        sender_id TEXT,
+        receiver_id TEXT,
+        encrypted_payload TEXT,
+        timestamp TEXT,
+        created_at DATETIME DEFAULT CURRENT_TIMESTAMP
+      );
+    `);
     // Load existing users from Turso SQLite into memory
     const userRes = await queryTurso(`SELECT * FROM users`);
     if (userRes && userRes.results && userRes.results[0] && userRes.results[0].response && userRes.results[0].response.result) {
@@ -809,7 +819,38 @@ const server = http.createServer((req, res) => {
     return;
   }
 
-  // 2.1 DELETE /api/profiles/:id (Delete from Local DB + Turso Cloud SQLite)
+    // 3.0 POST /api/calls/decline (Native Android Decline Call without opening app)
+    if (req.method === 'POST' && pathname === '/api/calls/decline') {
+      let body = '';
+      req.on('data', chunk => { body += chunk; });
+      req.on('end', () => {
+        try {
+          const { callId, callerId } = JSON.parse(body);
+          if (callId && callerId) {
+            const declineMsg = { type: 'CALL_DECLINED', payload: { callId } };
+            const frame = encodeWebSocketFrame(JSON.stringify(declineMsg));
+            let delivered = false;
+            for (const client of clients) {
+              if (client.userId === callerId) {
+                client.write(frame);
+                delivered = true;
+                console.log(`[HTTP_DECLINE] Forwarded CALL_DECLINED to caller ${callerId}`);
+              }
+            }
+            res.writeHead(200, { 'Content-Type': 'application/json' });
+            res.end(JSON.stringify({ success: delivered }));
+            return;
+          }
+        } catch (e) {
+          console.error('[HTTP_DECLINE_ERROR]', e.message);
+        }
+        res.writeHead(400, { 'Content-Type': 'application/json' });
+        res.end(JSON.stringify({ success: false, error: 'Invalid payload' }));
+      });
+      return;
+    }
+
+    // 2.1 DELETE /api/profiles/:id (Delete from Local DB + Turso Cloud SQLite)
   if (req.method === 'DELETE' && pathname.startsWith('/api/profiles/')) {
     const id = pathname.replace('/api/profiles/', '').trim();
     if (id) {
@@ -1064,7 +1105,7 @@ const server = http.createServer((req, res) => {
       console.log(`[REQUEST_DELETED] ${id}`);
       res.writeHead(200, { 'Content-Type': 'application/json' });
       res.end(JSON.stringify({ success: true }));
-      return;
+
     }
     res.writeHead(404, { 'Content-Type': 'application/json' });
     res.end(JSON.stringify({ success: false, error: 'Request not found' }));
@@ -1267,42 +1308,44 @@ const server = http.createServer((req, res) => {
   res.end('Not Found');
 });
 
-async function sendCallPushNotification(targetUserId, callPayload) {
+async function sendCallPushNotification(targetUserId, callPayload, isEndCall = false) {
   try {
     const pushToken = db.pushTokens?.[targetUserId] || db.profiles[targetUserId]?.pushToken;
     if (!pushToken && !db.fcmTokens?.[targetUserId]) {
       console.log(`[PUSH_SKIP] No push token registered for target ${targetUserId}`);
       return;
     }
-    const callerName = callPayload?.callerUser?.name || 'Someone';
-    const callerId = callPayload?.callerUser?.id || '';
-    const callerPhoto = callPayload?.callerUser?.photo || '';
-    const callType = callPayload?.type === 'video' ? 'video' : 'audio';
+
+    const callerName = callPayload?.callerUser?.name || callPayload?.callerName || 'Someone';
+    const callerId = callPayload?.callerUser?.id || callPayload?.callerId || '';
+    const callerPhoto = callPayload?.callerUser?.photo || callPayload?.callerPhoto || '';
+    const callType = (callPayload?.type === 'video' || callPayload?.callType === 'video') ? 'video' : 'audio';
     const callId = callPayload?.callId || `call_${Date.now()}`;
+
+    // Reconstruct the data payload exactly as Android expects it
+    const dataPayload = {
+      type: isEndCall ? 'CALL_ENDED' : 'INCOMING_CALL',
+      callId: String(callId),
+      callerId: String(callerId),
+      callerName: String(callerName),
+      callerPhoto: String(callerPhoto),
+      callType: String(callType),
+      timestamp: String(Date.now()),
+    };
+
+    const message = {
+      token: '', // will be set below
+      data: dataPayload,
+      android: { priority: 'high', ttl: 30000 }
+    };
 
     // 1. DIRECT NATIVE FCM — check db.fcmTokens FIRST (separate from Expo token!)
     const nativeFcmToken = db.fcmTokens?.[targetUserId] || db.profiles?.[targetUserId]?.fcmPushToken;
-    console.log(`📲 [DISPATCHING_VOIP_PUSH] Target=${targetUserId} NativeFCM=${!!nativeFcmToken} ExpoToken=${pushToken?.slice(0,15)}... Caller=${callerName} (${callType})`);
+    console.log(`📲 [DISPATCHING_VOIP_PUSH] Target=${targetUserId} NativeFCM=${!!nativeFcmToken} ExpoToken=${pushToken?.slice(0,15)}... Caller=${callerName} (${callType}) IsEndCall=${isEndCall}`);
 
     if (fcmMessaging && nativeFcmToken) {
-      const message = {
-        token: nativeFcmToken,
-        data: {
-          type: 'INCOMING_CALL',
-          callId: String(callId),
-          callerId: String(callerId),
-          callerName: String(callerName),
-          callerPhoto: String(callerPhoto),
-          callType: String(callType),
-          timestamp: String(Date.now()),
-        },
-        android: {
-          priority: 'high',
-          ttl: 30000,
-        }
-      };
-
       try {
+        message.token = nativeFcmToken;
         const response = await fcmMessaging.send(message);
         console.log(`✅ [FCM_NATIVE_VOIP_PUSH_SUCCESS] ID: ${response} user=${targetUserId}`);
         return; // FCM sent! No need for Expo fallback
@@ -1311,22 +1354,18 @@ async function sendCallPushNotification(targetUserId, callPayload) {
       }
     }
 
-    // 2. Fallback to Expo Push Notification Service if token is an Expo token
+    // 2. Fallback to Expo Push Notification Service
+    const title = isEndCall ? 'Missed Call' : `📞 Incoming ${callType === 'video' ? 'Video' : 'Voice'} Call`;
+    const bodyText = isEndCall ? `You missed a call from ${callerName}` : `${callerName} is calling you on SYNKING`;
+
     const pushBody = JSON.stringify({
       to: pushToken,
-      title: `📞 Incoming ${callType === 'video' ? 'Video' : 'Voice'} Call`,
-      body: `${callerName} is calling you on SYNKING`,
-      data: {
-        type: 'INCOMING_CALL',
-        callId: String(callId),
-        callerId: String(callerId),
-        callerName: String(callerName),
-        callerPhoto: String(callerPhoto),
-        callType: String(callType),
-      },
+      title: title,
+      body: bodyText,
+      data: dataPayload,
       priority: 'high',
       channelId: 'incoming_calls',
-      sound: 'default',
+      sound: 'default'
     });
 
     const req = https.request('https://exp.host/--/api/v2/push/send', {
@@ -1470,6 +1509,34 @@ server.on('upgrade', (req, socket, head) => {
           continue;
         }
 
+        // WhatsApp Style Offline Queue & ACK Protocol
+        if (parsed.type === 'MESSAGE_ACK' && parsed.messageId) {
+          queryTurso('DELETE FROM pending_messages WHERE id = ?', [{ type: 'text', value: parsed.messageId }])
+            .then(() => console.log(`[WS_ACK] Deleted message ${parsed.messageId} from Turso Waiting Room`))
+            .catch(e => console.error('[WS_ACK_ERR]', e.message));
+          continue;
+        }
+
+        if (parsed.type === 'GET_PENDING_MESSAGES' && socket.userId) {
+          queryTurso('SELECT * FROM pending_messages WHERE receiver_id = ?', [{ type: 'text', value: socket.userId }])
+            .then(res => {
+              if (res && res.results && res.results[0]?.response?.result) {
+                const rows = res.results[0].response.result.rows || [];
+                const cols = (res.results[0].response.result.cols || []).map(c => c.name);
+                rows.forEach(r => {
+                  let msg = {};
+                  cols.forEach((c, i) => msg[c] = r[i]?.value);
+                  try {
+                    const payload = JSON.parse(msg.encrypted_payload);
+                    const frame = encodeWebSocketFrame(JSON.stringify({ type: 'NEW_MESSAGE', payload }));
+                    socket.write(frame);
+                  } catch(e) {}
+                });
+              }
+            }).catch(e => console.error('[WS_PENDING_ERR]', e.message));
+          continue;
+        }
+
         // --------------------------------------------------
         // 2. Targeted signaling (WebRTC Offer, Answer, ICE, Call Signals)
         // --------------------------------------------------
@@ -1542,15 +1609,29 @@ server.on('upgrade', (req, socket, head) => {
           if (delivered) {
             console.log(`[WS_TARGETED_SIGNAL] ${parsed.type} → Delivered strictly to ${targetUserId}`);
           } else {
-            console.log(
-              `[WS_TARGETED_SIGNAL] ${parsed.type} → Target ${targetUserId} not bound yet. Broadcasting fallback to all peers.`
-            );
-            broadcastToWebSockets(parsed, socket);
+            if (parsed.type === 'NEW_MESSAGE' && parsed.payload) {
+              console.log(`[WS_OFFLINE_QUEUE] Target ${targetUserId} offline. Saving to Turso pending_messages.`);
+              const payloadStr = JSON.stringify(parsed.payload);
+              const sid = parsed.payload.senderId || socket.userId;
+              const msgId = parsed.payload.id || Date.now().toString();
+              queryTurso('INSERT INTO pending_messages (id, sender_id, receiver_id, encrypted_payload) VALUES (?, ?, ?, ?)', [
+                { type: 'text', value: msgId },
+                { type: 'text', value: sid },
+                { type: 'text', value: targetUserId },
+                { type: 'text', value: payloadStr }
+              ]).catch(err => console.error('[TURSO_PENDING_ERR]', err.message));
+            } else {
+              console.log(`[WS_TARGETED_SIGNAL] ${parsed.type} Target ${targetUserId} not bound yet. Broadcasting fallback.`);
+              broadcastToWebSockets(parsed, socket);
+            }
           }
 
           // 📲 High-Priority Push Notification to wake up phone if app is closed or locked!
           if (parsed.type === 'INCOMING_CALL' && parsed.payload) {
             sendCallPushNotification(targetUserId, parsed.payload);
+          } else if ((parsed.type === 'END_CALL' || parsed.type === 'CALL_DECLINED') && parsed.payload) {
+            // Send a Missed Call push to clear the native ringing state!
+            sendCallPushNotification(targetUserId, parsed.payload, true);
           }
           continue;
         }
