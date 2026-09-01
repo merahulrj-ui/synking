@@ -277,8 +277,8 @@ class MyFirebaseMessagingService : FirebaseMessagingService() {
             notificationManager.createNotificationChannel(channel)
         }
 
-                    .setFullScreenIntent(fullScreenPendingIntent, true)
-            .setContentIntent(fullScreenPendingIntent)
+
+
             
             // DECLINE ACTION
             val declineIntent = Intent(this, CallActionReceiver::class.java).apply { action = "ACTION_DECLINE_CALL" }
@@ -304,7 +304,7 @@ class MyFirebaseMessagingService : FirebaseMessagingService() {
             .setVisibility(NotificationCompat.VISIBILITY_PUBLIC)
             .setAutoCancel(false)
             .setOngoing(true)
-            .setFullScreenIntent(fullScreenPendingIntent, true)
+
             .setContentIntent(fullScreenPendingIntent) // Tap banner to open UI
             .addAction(android.R.drawable.ic_menu_close_clear_cancel, "Decline", declinePendingIntent)
             .addAction(android.R.drawable.ic_menu_call, "Accept", acceptPendingIntent)
