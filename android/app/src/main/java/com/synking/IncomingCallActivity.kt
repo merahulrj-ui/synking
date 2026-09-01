@@ -101,11 +101,12 @@ class IncomingCallActivity : AppCompatActivity() {
 
         TelecomModule.incomingActivityInstance = this
 
-        // Boot JS in background if not running (to handle WebRTC signaling)
-        val reactHost = (application as? ReactApplication)?.reactNativeHost
-        val reactManager = reactHost?.reactInstanceManager
-        if (reactManager?.hasStartedCreatingInitialContext() == false) {
-            reactManager.createReactContextInBackground()
+        // Boot JS in background if not running (MainApplication already calls loadReactNative)
+        try {
+            val app = application as? MainApplication
+            app?.reactHost?.start()
+        } catch (e: Throwable) {
+            Log.w("SYNKING_CALL", "Background ReactHost init note: ${e.message}")
         }
 
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O_MR1) {
