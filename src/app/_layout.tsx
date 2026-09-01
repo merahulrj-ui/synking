@@ -15,6 +15,7 @@ import AsyncStorage from '@react-native-async-storage/async-storage';
 import { RealtimeBridge } from '../services/realtimeBridge';
 import { getPendingCall, clearPendingCall } from '../services/CallIntentService';
 
+
 // --- HEADLESS BOOTER FOR KILLED STATE WAKEUP ---
 // This runs immediately when JS boots (even in background without UI)
 setTimeout(async () => {
@@ -148,7 +149,7 @@ function GlobalCallOverlay() {
   );
 }
 
-import { getPendingCall, clearPendingCall } from '../services/CallIntentService';
+
 import { NativeModules } from 'react-native';
 
 export default function RootLayout() {
