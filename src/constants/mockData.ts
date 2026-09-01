@@ -39,45 +39,7 @@ export const MOCK_PROFILES: UserProfile[] = [
     compatibility: 92,
     isVerified: true,
     isVip: false,
-  },
-  {
-    id: 'user_priya_03',
-    name: 'Priya Malhotra',
-    age: 22,
-    gender: 'female',
-    occupation: 'Psychology Researcher',
-    location: 'Roorkee, Uttarakhand',
-    distance: '3.2 km away',
-    bio: 'Art gallery enthusiast, midnight drives & boba tea addict 🧋 Down for spontaneous weekend getaways!',
-    photo: 'https://images.unsplash.com/photo-1494790108377-be9c29b29330?w=800&auto=format&fit=crop&q=80',
-    photos: [
-      'https://images.unsplash.com/photo-1494790108377-be9c29b29330?w=800&auto=format&fit=crop&q=80',
-      'https://images.unsplash.com/photo-1544005313-94ddf0286df2?w=800&auto=format&fit=crop&q=80',
-    ],
-    interests: ['Psychology 🧠', 'Boba Tea 🧋', 'Art 🖼️', 'Night Drives 🚗', 'Cinema 🎬'],
-    compatibility: 98,
-    isVerified: true,
-    isVip: true,
-  },
-  {
-    id: 'user_kabir_04',
-    name: 'Kabir Mehra',
-    age: 26,
-    gender: 'male',
-    occupation: 'Architect & Traveler',
-    location: 'Roorkee, Uttarakhand',
-    distance: '4.0 km away',
-    bio: 'Designing spaces & chasing sunsets 🏔️ Love outdoor trekking, foodie trails, and chill indie music.',
-    photo: 'https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?w=800&auto=format&fit=crop&q=80',
-    photos: [
-      'https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?w=800&auto=format&fit=crop&q=80',
-      'https://images.unsplash.com/photo-1492562080023-ab3db95bfbce?w=800&auto=format&fit=crop&q=80',
-    ],
-    interests: ['Trekking 🏔️', 'Architecture 🏛️', 'Cooking 🍳', 'Indie Music 🎵', 'Fitness 🏃‍♂️'],
-    compatibility: 94,
-    isVerified: true,
-    isVip: false,
-  },
+  }
 ];
 
 export const MOCK_VENUES: Venue[] = [
