@@ -23,14 +23,14 @@ import android.view.View
 import android.view.WindowManager
 import android.view.animation.Animation
 import android.view.animation.ScaleAnimation
+import android.app.Activity
 import android.widget.FrameLayout
 import android.widget.LinearLayout
 import android.widget.TextView
-import androidx.appcompat.app.AppCompatActivity
 import com.facebook.react.ReactApplication
 import com.oney.WebRTCModule.WebRTCView
 
-class IncomingCallActivity : AppCompatActivity() {
+class IncomingCallActivity : Activity() {
 
     companion object {
         var activeRingtone: Ringtone? = null
@@ -97,6 +97,7 @@ class IncomingCallActivity : AppCompatActivity() {
     }
 
     override fun onCreate(savedInstanceState: Bundle?) {
+        setTheme(R.style.AppTheme)
         super.onCreate(savedInstanceState)
 
         TelecomModule.incomingActivityInstance = this
