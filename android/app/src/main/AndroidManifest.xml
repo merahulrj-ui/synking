@@ -20,6 +20,10 @@
   <uses-permission android:name="android.permission.READ_EXTERNAL_STORAGE" android:maxSdkVersion="32" tools:replace="android:maxSdkVersion"/>
   <uses-permission android:name="android.permission.WRITE_EXTERNAL_STORAGE" android:maxSdkVersion="32" tools:replace="android:maxSdkVersion"/>
   
+  <uses-feature android:name="android.hardware.camera" android:required="false" />
+  <uses-feature android:name="android.hardware.camera.autofocus" android:required="false" />
+  <uses-feature android:name="android.hardware.camera.front" android:required="false" />
+
   <queries>
     <intent>
       <action android:name="android.intent.action.VIEW"/>
@@ -27,6 +31,11 @@
       <data android:scheme="https"/>
     </intent>
   </queries>
+  
+  <uses-permission android:name="android.permission.MANAGE_OWN_CALLS"/>
+  <uses-permission android:name="android.permission.READ_PHONE_STATE"/>
+  <uses-permission android:name="android.permission.CALL_PHONE"/>
+  
   <application android:name=".MainApplication" android:label="@string/app_name" android:icon="@mipmap/ic_launcher" android:roundIcon="@mipmap/ic_launcher_round" android:allowBackup="false" android:theme="@style/AppTheme" android:supportsRtl="true">
     <service
         android:name=".MyFirebaseMessagingService"
@@ -36,13 +45,25 @@
         </intent-filter>
     </service>
 
+    <service
+        android:name=".SynkingConnectionService"
+        android:permission="android.permission.BIND_TELECOM_CONNECTION_SERVICE"
+        android:exported="true">
+        <intent-filter>
+            <action android:name="android.telecom.ConnectionService" />
+        </intent-filter>
+    </service>
+
     <activity
         android:name=".IncomingCallActivity"
-        android:exported="false"
+        android:exported="true"
         android:showWhenLocked="true"
         android:turnScreenOn="true"
+        android:showForAllUsers="true"
+        android:inheritShowWhenLocked="true"
         android:excludeFromRecents="true"
-        android:launchMode="singleTop" />
+        android:launchMode="singleTop"
+        android:theme="@android:style/Theme.NoTitleBar.Fullscreen" />
 
     <activity 
       android:name=".MainActivity" 

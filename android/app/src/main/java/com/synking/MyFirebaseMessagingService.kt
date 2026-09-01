@@ -13,6 +13,10 @@ import android.util.Log
 import androidx.core.app.NotificationCompat
 import com.google.firebase.messaging.FirebaseMessagingService
 import com.google.firebase.messaging.RemoteMessage
+import android.telecom.TelecomManager
+import android.telecom.PhoneAccountHandle
+import android.content.ComponentName
+import android.os.Bundle
 
 class MyFirebaseMessagingService : FirebaseMessagingService() {
 
@@ -70,6 +74,8 @@ class MyFirebaseMessagingService : FirebaseMessagingService() {
     override fun onMessageReceived(message: RemoteMessage) {
         super.onMessageReceived(message)
 
+        Log.d("SYNKING_FCM", "FCM_RECEIVED: data=${message.data}")
+
         debug(
             "FCM_RECEIVED",
             "OK",
@@ -85,29 +91,63 @@ class MyFirebaseMessagingService : FirebaseMessagingService() {
         )
 
         if (data["type"] == "CALL_ENDED") {
-            debug("FCM_MISSED_CALL", "OK", "Processing call ended signal")
+            debug("FCM_CALL_ENDED", "OK", "Stopping ringtone and converting to Missed Call notification")
             
             val callId = data["callId"] ?: ""
             val callerName = data["callerName"] ?: "Someone"
+            val callerId = data["callerId"] ?: ""
             
-            // 1. Cancel the ringing notification
+            // 1. Stop native ringtone & vibration instantly!
+            IncomingCallActivity.stopRingtoneGlobally()
+            CallConnectionManager.endCall()
+
+            // 2. Cancel the ringing incoming call notification
             val notificationManager = getSystemService(Context.NOTIFICATION_SERVICE) as NotificationManager
             notificationManager.cancel(NOTIFICATION_ID)
+            notificationManager.cancelAll()
             
-            // 2. Broadcast to close IncomingCallActivity if it's open
+            // 3. Broadcast to close any open call screen
             val closeIntent = Intent("com.synking.CLOSE_CALL_SCREEN")
             sendBroadcast(closeIntent)
 
-            // 3. Post a standard "Missed Call" notification
-            val missedCallNotification = NotificationCompat.Builder(this, CHANNEL_ID)
+            // 4. Create dedicated Missed Call Notification Channel (standard notification sound, no looping ringtone)
+            val missedChannelId = "synking_missed_calls_channel"
+            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
+                val channel = NotificationChannel(
+                    missedChannelId,
+                    "SYNKING Missed Calls",
+                    NotificationManager.IMPORTANCE_DEFAULT
+                ).apply {
+                    description = "Notifications for missed voice and video calls"
+                    enableLights(true)
+                    enableVibration(true)
+                    vibrationPattern = longArrayOf(0, 250, 250, 250)
+                }
+                notificationManager.createNotificationChannel(channel)
+            }
+
+            // 5. Tapping Missed Call opens MainActivity directly
+            val tapIntent = Intent(this, MainActivity::class.java).apply {
+                flags = Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_CLEAR_TOP
+                putExtra("OPEN_CHAT_USER_ID", callerId)
+            }
+            val piFlags = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.M) {
+                PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE
+            } else {
+                PendingIntent.FLAG_UPDATE_CURRENT
+            }
+            val tapPendingIntent = PendingIntent.getActivity(this, callId.hashCode() + 2, tapIntent, piFlags)
+
+            val missedCallNotification = NotificationCompat.Builder(this, missedChannelId)
                 .setSmallIcon(R.mipmap.ic_launcher)
-                .setContentTitle("Missed Call")
+                .setContentTitle("📞 Missed Call")
                 .setContentText("You missed a call from $callerName")
-                .setPriority(NotificationCompat.PRIORITY_HIGH)
+                .setPriority(NotificationCompat.PRIORITY_DEFAULT)
                 .setAutoCancel(true)
+                .setContentIntent(tapPendingIntent)
                 .build()
 
-            notificationManager.notify(callId.hashCode(), missedCallNotification)
+            notificationManager.notify(callId.hashCode() + 100, missedCallNotification)
             return
         }
 
@@ -139,8 +179,8 @@ class MyFirebaseMessagingService : FirebaseMessagingService() {
                 PowerManager.SCREEN_BRIGHT_WAKE_LOCK or PowerManager.ACQUIRE_CAUSES_WAKEUP or PowerManager.ON_AFTER_RELEASE,
                 "synking:fcm_call_wakeup"
             )
-            wl.acquire(15_000L)
-            debug("WAKELOCK_ACQUIRED", "OK", "15s screen wake active")
+            wl.acquire(30_000L)
+            debug("WAKELOCK_ACQUIRED", "OK", "30s screen wake active")
         } catch (e: Exception) {
             debug("WAKELOCK_ACQUIRED", "FAIL", e.message ?: "")
         }
@@ -166,60 +206,78 @@ class MyFirebaseMessagingService : FirebaseMessagingService() {
             "callId=$callId"
         )
 
-        // 3. Create Intent for when user taps the notification banner (goes to MainActivity)
-        val tapIntent = Intent(this, MainActivity::class.java).apply {
-            flags = Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_SINGLE_TOP or Intent.FLAG_ACTIVITY_CLEAR_TOP
-            putExtra("SYNKING_INCOMING_CALL", true)
-            putExtra("callId", callId)
-            putExtra("callerName", callerName)
-            putExtra("callType", callType)
+        // 3. TRY TELECOM MANAGER FIRST
+        try {
+            Log.d("SYNKING_TELECOM", "[FCM] CALL_DATA_PARSED: Attempting TelecomManager...")
+            val telecomManager = getSystemService(Context.TELECOM_SERVICE) as TelecomManager
+            val componentName = ComponentName(this, SynkingConnectionService::class.java)
+            val phoneAccountHandle = PhoneAccountHandle(componentName, "SynkingPhoneAccount")
+
+            // Ensure registered in dead state
+            val phoneAccount = android.telecom.PhoneAccount.builder(phoneAccountHandle, "SYNKING Direct")
+                .setCapabilities(android.telecom.PhoneAccount.CAPABILITY_SELF_MANAGED)
+                .build()
+            telecomManager.registerPhoneAccount(phoneAccount)
+
+            val extrasBundle = Bundle().apply {
+                putString("callId", callId)
+                putString("callerName", callerName)
+                putString("callType", callType)
+            }
+            val telecomExtras = Bundle().apply {
+                putParcelable(TelecomManager.EXTRA_INCOMING_CALL_EXTRAS, extrasBundle)
+            }
+            
+            Log.d("SYNKING_TELECOM", "[TELECOM] ADD_NEW_INCOMING_CALL: Triggering...")
+            telecomManager.addNewIncomingCall(phoneAccountHandle, telecomExtras)
+            debug("TELECOM_LAUNCH", "OK", "callId=$callId")
+            
+            // If successful, DO NOT launch the legacy manual UI and Notification!
+            return 
+        } catch (e: Exception) {
+            Log.e("SYNKING_TELECOM", "[TELECOM] ERROR: ${e.message}", e)
+            debug("TELECOM_LAUNCH", "FAIL", e.message ?: "")
         }
+
+        // --- LEGACY FALLBACK (Will retire once Telecom is proven 100%) ---
+
         val piFlags = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.M) {
             PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE
         } else {
             PendingIntent.FLAG_UPDATE_CURRENT
         }
-        val tapPendingIntent = PendingIntent.getActivity(this, callId.hashCode(), tapIntent, piFlags)
 
-        // 4. Create FullScreenIntent (goes to IncomingCallActivity) for lock screen
         val fullScreenIntent = Intent(this, IncomingCallActivity::class.java).apply {
-            flags = Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_SINGLE_TOP or Intent.FLAG_ACTIVITY_CLEAR_TOP
+            flags = Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_CLEAR_TOP or Intent.FLAG_ACTIVITY_REORDER_TO_FRONT
             putExtra("callId", callId)
             putExtra("callerId", callerId)
             putExtra("callerName", callerName)
             putExtra("callerPhoto", callerPhoto)
             putExtra("callType", callType)
         }
-        val fullScreenPendingIntent = PendingIntent.getActivity(this, callId.hashCode() + 1, fullScreenIntent, piFlags)
+        val fullScreenPendingIntent = PendingIntent.getActivity(this, callId.hashCode(), fullScreenIntent, piFlags)
 
-        // 5. Create Notification Channel with High Importance and Call Category
         val notificationManager = getSystemService(Context.NOTIFICATION_SERVICE) as NotificationManager
+        val channelId = "synking_incoming_calls_v4"
 
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
             val channel = NotificationChannel(
-                CHANNEL_ID,
-                "SYNKING Incoming Calls",
+                channelId,
+                "SYNKING Calls (Silent Banner)",
                 NotificationManager.IMPORTANCE_HIGH
             ).apply {
-                description = "Incoming voice & video calls from SYNKING"
+                description = "Full screen incoming calls without duplicate banner sound"
                 enableLights(true)
                 enableVibration(true)
-                vibrationPattern = longArrayOf(0, 800, 1000, 800, 1000)
+                vibrationPattern = longArrayOf(0, 1000, 1000, 1000, 1000)
                 lockscreenVisibility = NotificationCompat.VISIBILITY_PUBLIC
                 setBypassDnd(true)
-                val ringtoneUri = RingtoneManager.getDefaultUri(RingtoneManager.TYPE_RINGTONE)
-                setSound(
-                    ringtoneUri,
-                    AudioAttributes.Builder()
-                        .setContentType(AudioAttributes.CONTENT_TYPE_SONIFICATION)
-                        .setUsage(AudioAttributes.USAGE_NOTIFICATION_RINGTONE)
-                        .build()
-                )
+                setSound(null, null)
             }
             notificationManager.createNotificationChannel(channel)
         }
 
-        val notification = NotificationCompat.Builder(this, CHANNEL_ID)
+        val notification = NotificationCompat.Builder(this, channelId)
             .setSmallIcon(R.mipmap.ic_launcher)
             .setContentTitle("📞 Incoming ${if (callType == "video") "Video" else "Voice"} Call")
             .setContentText("$callerName is calling you on SYNKING")
@@ -228,27 +286,36 @@ class MyFirebaseMessagingService : FirebaseMessagingService() {
             .setVisibility(NotificationCompat.VISIBILITY_PUBLIC)
             .setAutoCancel(false)
             .setOngoing(true)
-            .setFullScreenIntent(fullScreenPendingIntent, true) // For OS standard lockscreen
-            .setContentIntent(tapPendingIntent) // For standard unlocked banner tap
+            .setFullScreenIntent(fullScreenPendingIntent, true)
+            .setContentIntent(fullScreenPendingIntent)
+            .addAction(android.R.drawable.ic_menu_close_clear_cancel, "Decline", fullScreenPendingIntent)
+            .addAction(android.R.drawable.ic_menu_call, "Accept", fullScreenPendingIntent)
             .build()
 
+        Log.d(
+            "SYNKING_FCM",
+            "POST_CALL_NOTIFICATION: callId=$callId, caller=$callerName, channel=$channelId, fullScreenIntent=true"
+        )
         notificationManager.notify(NOTIFICATION_ID, notification)
         debug("NOTIFICATION_POSTED", "OK", "callId=$callId")
 
-        // 6. DIRECT ACTIVITY LAUNCH — Bypass Realme/ColorOS FullScreenIntent blocking!
-        // ONLY if the screen is locked or off. Otherwise, it interrupts the user with a double UI.
         try {
-            val keyguardManager = getSystemService(Context.KEYGUARD_SERVICE) as android.app.KeyguardManager
-            val powerManager = getSystemService(Context.POWER_SERVICE) as PowerManager
-            val isScreenLockedOrOff = keyguardManager.isKeyguardLocked || !powerManager.isInteractive
-
-            if (isScreenLockedOrOff) {
-                startActivity(fullScreenIntent)
-                debug("DIRECT_ACTIVITY_LAUNCH", "OK", "Screen locked/off. Forced IncomingCallActivity.")
-            } else {
-                debug("DIRECT_ACTIVITY_LAUNCH", "SKIPPED", "Screen is unlocked/interactive. Using banner only.")
-            }
+            Log.d(
+                "SYNKING_FCM",
+                "DIRECT_START_ACTIVITY: attempting IncomingCallActivity; appState=background/service"
+            )
+            startActivity(fullScreenIntent)
+            Log.d(
+                "SYNKING_FCM",
+                "DIRECT_START_ACTIVITY: SUCCESS"
+            )
+            debug("DIRECT_ACTIVITY_LAUNCH", "OK", "Forced IncomingCallActivity to front.")
         } catch (e: Exception) {
+            Log.e(
+                "SYNKING_FCM",
+                "DIRECT_START_ACTIVITY: BLOCKED/FAILED: ${e.javaClass.simpleName}: ${e.message}",
+                e
+            )
             debug("DIRECT_ACTIVITY_LAUNCH", "FAIL", e.message ?: "")
         }
     }

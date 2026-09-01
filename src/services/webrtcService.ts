@@ -194,11 +194,13 @@ class WebRTCManager {
     // Play Outgoing Ringtone (Tring... Tring...)
     RingtoneService.playOutgoingRing();
 
-    // Route Audio: Earpiece for voice calls, Loudspeaker for video calls
-    AudioRouteService.setSpeakerOn(params.type === 'video').catch(() => {});
-
-    // Capture Local Hardware Microphone & Camera
+    // Capture Local Hardware Microphone & Camera (This resets the audio route)
     await this.initLocalStream(params.type === 'video');
+
+    // FIX: Delay speaker activation to ensure OS doesn't override it!
+    setTimeout(() => {
+        AudioRouteService.setSpeakerOn(true).catch(() => {});
+    }, 500);
 
     // Send Targeted INCOMING_CALL to recipient device
     RealtimeBridge.broadcast(
@@ -219,7 +221,12 @@ class WebRTCManager {
   }
 
   // 2. Receive Incoming Call
-  public receiveIncomingCall(callerUser: UserProfile, type: 'audio' | 'video' = 'audio', callId?: string): CallSession {
+  public receiveIncomingCall(callerUser: UserProfile, type: 'audio' | 'video' = 'audio', callId?: string, autoAccept: boolean = false): CallSession {
+    if (callId && this.currentSession && this.currentSession.id === callId && this.currentSession.status === 'ringing') {
+      this.log(`📲 Duplicate call event ignored for callId=${callId}`);
+      return this.currentSession;
+    }
+
     this.cleanup();
 
     const incomingSession: CallSession = {
@@ -229,10 +236,10 @@ class WebRTCManager {
       callerName: callerUser.name,
       callerPhoto: callerUser.photo || callerUser.photos?.[0] || '',
       type,
-      status: 'ringing',
+      status: autoAccept ? 'connected' : 'ringing', // Bypass ringing if coming from native accept!
       durationSeconds: 0,
       isMuted: false,
-      isSpeakerOn: type === 'video',
+      isSpeakerOn: true, // Forcing loudspeaker for testing
       isVideoEnabled: type === 'video',
     };
 
@@ -244,14 +251,18 @@ class WebRTCManager {
     });
     CallDebugger.printCallSummary(incomingSession.id, callerUser.name, type);
 
-    this.log(`📲 Incoming ${type} call ringing from ${callerUser.name}...`);
+    this.log(`📲 Incoming ${type} call from ${callerUser.name} (autoAccept: ${autoAccept})...`);
     this.notify();
 
-    // Play Melodic Incoming Ringtone
-    RingtoneService.playIncomingRing();
-
-    // ⏱️ Auto-disconnect if unanswered in 35s
-    this.startRingingTimeout(35);
+    if (autoAccept) {
+      // Native lockscreen already accepted it, skip ringtone and timer!
+      this.initLocalStream(type === 'video');
+      this.startTimer();
+    } else {
+      // Normal React Native incoming call flow
+      RingtoneService.playIncomingRing();
+      this.startRingingTimeout(35);
+    }
 
     return incomingSession;
   }
@@ -261,11 +272,14 @@ class WebRTCManager {
     if (!this.currentSession) return;
     this.cleanupTimers();
     RingtoneService.stop();
-
-    this.log('📞 Answering call: Capturing local audio/video media stream...');
-    const isVideo = this.currentSession.type === 'video';
-    AudioRouteService.setSpeakerOn(isVideo).catch(() => {});
+    const isVideo = this.currentSession?.type === 'video';
+    // Initialize Local Media First (This grabs the microphone and resets audio route)
     await this.initLocalStream(isVideo);
+
+    // FIX: Set speaker ON only AFTER WebRTC initializes the mic!
+    setTimeout(() => {
+        AudioRouteService.setSpeakerOn(true).catch(() => {});
+    }, 500);
 
     this.currentSession.status = 'connected';
     this.notify();
@@ -618,27 +632,77 @@ class WebRTCManager {
     return this.currentSession.isVideoEnabled;
   }
 
-  public switchCamera(): void {
+  public async switchCamera(): Promise<void> {
     if (!this.currentSession || !this.localStream) return;
     
     // Default to front camera initially if undefined
     if (this.currentSession.isFrontCamera === undefined) {
       this.currentSession.isFrontCamera = true;
     }
-    
+
+    const nextIsFront = !this.currentSession.isFrontCamera;
+    const targetFacingMode = nextIsFront ? 'user' : 'environment';
+
     const videoTracks = this.localStream.getVideoTracks();
     if (videoTracks && videoTracks.length > 0) {
       const videoTrack = videoTracks[0];
-      
-      // Native react-native-webrtc provides _switchCamera method
+
+      // Method 1: Try Native react-native-webrtc _switchCamera method
       if (typeof videoTrack._switchCamera === 'function') {
-        videoTrack._switchCamera();
-        this.currentSession.isFrontCamera = !this.currentSession.isFrontCamera;
-        this.log(`🔄 CAMERA SWITCHED: Now using ${this.currentSession.isFrontCamera ? 'Front' : 'Back'} camera.`);
-        this.notify();
-      } else {
-        // Fallback for Web/Browser which doesn't have _switchCamera easily without re-creating stream
-        this.log(`⚠️ switchCamera not directly supported on this platform without stream recreation.`);
+        try {
+          const res = videoTrack._switchCamera();
+          if (res instanceof Promise) {
+            await res;
+          }
+          this.currentSession.isFrontCamera = nextIsFront;
+          this.log(`🔄 CAMERA SWITCHED (Native): Now using ${nextIsFront ? 'Front' : 'Back'} camera.`);
+          this.notify();
+          return;
+        } catch (nativeErr) {
+          this.log(`⚠️ Native _switchCamera error: ${nativeErr}, attempting re-capture fallback...`);
+        }
+      }
+
+      // Method 2: Universal Fallback for Browsers & Multi-Lens Android Devices
+      try {
+        if (MediaDevices && MediaDevices.getUserMedia) {
+          this.log(`🔄 Re-capturing camera stream with facingMode='${targetFacingMode}'...`);
+          
+          let newVideoStream: any = null;
+          try {
+            newVideoStream = await MediaDevices.getUserMedia({
+              video: { facingMode: targetFacingMode, width: { ideal: 640 }, height: { ideal: 480 } },
+              audio: false,
+            });
+          } catch (facingErr) {
+            newVideoStream = await MediaDevices.getUserMedia({
+              video: { facingMode: targetFacingMode },
+              audio: false,
+            });
+          }
+
+          const newVideoTrack = newVideoStream?.getVideoTracks()?.[0];
+          if (newVideoTrack) {
+            videoTrack.stop();
+            this.localStream.removeTrack(videoTrack);
+            this.localStream.addTrack(newVideoTrack);
+
+            if (this.peerConnection) {
+              const senders = this.peerConnection.getSenders ? this.peerConnection.getSenders() : [];
+              const videoSender = senders.find((s: any) => s.track && s.track.kind === 'video');
+              if (videoSender && typeof videoSender.replaceTrack === 'function') {
+                await videoSender.replaceTrack(newVideoTrack);
+                this.log('✅ Replaced video track on RTCRtpSender successfully.');
+              }
+            }
+
+            this.currentSession.isFrontCamera = nextIsFront;
+            this.log(`🔄 CAMERA SWITCHED (Fallback): Now using ${nextIsFront ? 'Front' : 'Back'} camera.`);
+            this.notify();
+          }
+        }
+      } catch (err) {
+        this.log(`❌ Failed to switch camera: ${err}`);
       }
     }
   }

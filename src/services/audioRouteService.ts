@@ -4,9 +4,16 @@ const { AudioRouteModule } = NativeModules;
 
 export const AudioRouteService = {
   setSpeakerOn: async (enableSpeaker: boolean): Promise<boolean> => {
-    if (Platform.OS === 'android' && AudioRouteModule?.setSpeakerphoneOn) {
+    if (Platform.OS === 'android') {
       try {
-        return await AudioRouteModule.setSpeakerphoneOn(enableSpeaker);
+        // Try Telecom layer first
+        if (NativeModules.TelecomModule?.setSpeakerOn) {
+          await NativeModules.TelecomModule.setSpeakerOn(enableSpeaker);
+        }
+        // Also fallback to AudioManager layer
+        if (AudioRouteModule?.setSpeakerphoneOn) {
+          return await AudioRouteModule.setSpeakerphoneOn(enableSpeaker);
+        }
       } catch (e) {
         console.warn('[AudioRouteService] setSpeakerphoneOn error:', e);
       }

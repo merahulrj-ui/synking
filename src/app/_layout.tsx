@@ -52,9 +52,15 @@ function GlobalCallOverlay() {
 }
 
 import { getPendingCall, clearPendingCall } from '../services/CallIntentService';
+import { NativeModules } from 'react-native';
 
 export default function RootLayout() {
   useEffect(() => {
+    // 1. Register Telecom Phone Account for Lockscreen / VoIP
+    if (Platform.OS === 'android' && NativeModules.TelecomModule?.registerPhoneAccount) {
+      NativeModules.TelecomModule.registerPhoneAccount().catch((e: any) => console.log('Telecom Register Error:', e));
+    }
+
     async function checkOTA() {
       if (__DEV__) return;
       try {
@@ -76,7 +82,7 @@ export default function RootLayout() {
         console.log("[DEAD STATE WAKEUP] SYNKING WOKE UP FOR CALL:", pendingCall.callId);
         
         // Push the CallSession into WebRTCService as an incoming offer
-        // So the CallModal overlay renders and we can connect
+        // Native Activity already accepted it, so we pass autoAccept = true!
         WebRTCService.receiveIncomingCall(
           {
             id: pendingCall.callerId,
@@ -95,8 +101,12 @@ export default function RootLayout() {
             isVip: false,
           },
           pendingCall.callType as any,
-          pendingCall.callId
+          pendingCall.callId,
+          true // <-- autoAccept!
         );
+
+        // Remove the manual acceptCall because receiveIncomingCall handles it now
+        // WebRTCService.acceptCall();
 
         clearPendingCall();
       }
