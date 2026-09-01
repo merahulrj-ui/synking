@@ -119,6 +119,12 @@ class IncomingCallActivity : AppCompatActivity() {
                 WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON
             )
         }
+
+        // ✅ Dismiss keyguard (PIN/Pattern lock) so call UI is accessible
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
+            val keyguardManager = getSystemService(Context.KEYGUARD_SERVICE) as KeyguardManager
+            keyguardManager.requestDismissKeyguard(this, null)
+        }
         
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
             registerReceiver(callEndedReceiver, IntentFilter("com.synking.CALL_ENDED_FROM_JS"), Context.RECEIVER_NOT_EXPORTED)
@@ -134,6 +140,14 @@ class IncomingCallActivity : AppCompatActivity() {
 
         buildUI()
         playRingtoneAndVibrate()
+
+        // ✅ Auto-accept if launched from notification Accept button
+        val autoAccept = intent.getBooleanExtra("autoAccept", false)
+        if (autoAccept) {
+            Handler(Looper.getMainLooper()).postDelayed({
+                handleAccept()
+            }, 300) // Small delay to let UI render first
+        }
     }
 
     
