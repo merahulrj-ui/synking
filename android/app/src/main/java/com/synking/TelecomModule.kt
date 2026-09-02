@@ -297,6 +297,11 @@ class TelecomModule(reactContext: ReactApplicationContext) : ReactContextBaseJav
                 ?.emit("onTelecomSpeakerToggled", isSpeakerOn)
         }
 
+        fun emitVideoToggled(isVideoEnabled: Boolean) {
+            reactContext?.getJSModule(DeviceEventManagerModule.RCTDeviceEventEmitter::class.java)
+                ?.emit("onTelecomVideoToggled", isVideoEnabled)
+        }
+
         fun emitEndCallEvent() {
             reactContext?.getJSModule(DeviceEventManagerModule.RCTDeviceEventEmitter::class.java)
                 ?.emit("onTelecomEndCall", null)

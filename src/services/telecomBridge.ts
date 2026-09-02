@@ -79,6 +79,11 @@ export function ensureTelecomBridgeReady() {
     WebRTCService.toggleSpeaker();
   });
 
+  // 4b. Video Camera Toggle
+  DeviceEventEmitter.addListener('onTelecomVideoToggled', () => {
+    WebRTCService.toggleVideo();
+  });
+
   // 5. End Call Event
   DeviceEventEmitter.addListener('onTelecomEndCall', () => {
     WebRTCService.endCall();

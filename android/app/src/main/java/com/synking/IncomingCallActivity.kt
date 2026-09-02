@@ -374,6 +374,38 @@ class IncomingCallActivity : Activity() {
             typeface = android.graphics.Typeface.DEFAULT_BOLD
             layoutParams = FrameLayout.LayoutParams(FrameLayout.LayoutParams.MATCH_PARENT, FrameLayout.LayoutParams.MATCH_PARENT)
         }
+        val avatarImageView = ImageView(this).apply {
+            layoutParams = FrameLayout.LayoutParams(FrameLayout.LayoutParams.MATCH_PARENT, FrameLayout.LayoutParams.MATCH_PARENT)
+            scaleType = ImageView.ScaleType.CENTER_CROP
+            visibility = View.GONE
+            clipToOutline = true
+            outlineProvider = object : android.view.ViewOutlineProvider() {
+                override fun getOutline(view: View, outline: android.graphics.Outline) {
+                    outline.setOval(0, 0, view.width, view.height)
+                }
+            }
+        }
+        avatarInner.addView(avatarImageView)
+
+        val photoUrl = intent.getStringExtra("callerPhoto")
+        if (!photoUrl.isNullOrBlank()) {
+            java.util.concurrent.Executors.newSingleThreadExecutor().execute {
+                try {
+                    val url = java.net.URL(photoUrl)
+                    val bmp = android.graphics.BitmapFactory.decodeStream(url.openConnection().getInputStream())
+                    runOnUiThread {
+                        if (bmp != null) {
+                            avatarImageView.setImageBitmap(bmp)
+                            avatarImageView.visibility = View.VISIBLE
+                            avatarInitial.visibility = View.GONE
+                        }
+                    }
+                } catch (e: Exception) {
+                    Log.w("SYNKING_DEBUG", "Photo load note: ${e.message}")
+                }
+            }
+        }
+
         avatarInner.addView(avatarInitial)
         avatarContainer.addView(avatarInner)
         callerInfoLayout?.addView(avatarContainer)
@@ -430,6 +462,7 @@ class IncomingCallActivity : Activity() {
                 setStroke(dpToPx(2), Color.parseColor("#EF4444"))
             }
             setOnClickListener {
+                dismissNotificationBanner()
                 stopRingtoneAndVibration()
                 CallConnectionManager.rejectCall()
                 PendingCallStore.clear(this@IncomingCallActivity)
@@ -463,6 +496,7 @@ class IncomingCallActivity : Activity() {
                 intArrayOf(Color.parseColor("#10B981"), Color.parseColor("#059669"))
             ).apply { shape = GradientDrawable.OVAL }
             setOnClickListener {
+                dismissNotificationBanner()
                 handleAccept()
             }
         }
@@ -479,7 +513,7 @@ class IncomingCallActivity : Activity() {
         incomingActionsRow?.addView(acceptCol)
         uiLayer.addView(incomingActionsRow!!)
 
-        // ACTIVE ACTIONS ROW
+        // ACTIVE ACTIONS ROW (4-Button Ultra-Luxury Control Dock)
         activeActionsRow = LinearLayout(this).apply {
             orientation = LinearLayout.HORIZONTAL
             gravity = Gravity.CENTER
@@ -503,12 +537,22 @@ class IncomingCallActivity : Activity() {
             TelecomModule.emitSpeakerToggled(isSpeakerOn)
         }
 
+        var isCameraActive = callType == "video"
+        val cameraBtn = createControlButton("\uD83D\uDCF9", if (isCameraActive) "Camera Off" else "Camera On") { btn, label ->
+            isCameraActive = !isCameraActive
+            val bg = btn.background as GradientDrawable
+            bg.setColor(Color.parseColor(if (isCameraActive) "#00E5FF" else "#1E293B"))
+            label.text = if (isCameraActive) "Camera Off" else "Camera On"
+            TelecomModule.emitVideoToggled(isCameraActive)
+        }
+
         val endBtnCol = LinearLayout(this).apply { orientation = LinearLayout.VERTICAL; gravity = Gravity.CENTER }
         val endBtn = FrameLayout(this).apply {
-            val size = dpToPx(76)
+            val size = dpToPx(72)
             layoutParams = LinearLayout.LayoutParams(size, size)
             background = GradientDrawable().apply { shape = GradientDrawable.OVAL; setColor(Color.parseColor("#EF4444")) }
             setOnClickListener {
+                dismissNotificationBanner()
                 val finalCallId = if (callId.isNotEmpty()) callId else (intent.getStringExtra("callId") ?: "")
                 val finalCallerId = if (callerId.isNotEmpty()) callerId else (intent.getStringExtra("callerId") ?: "")
 
@@ -523,14 +567,16 @@ class IncomingCallActivity : Activity() {
                 finish()
             }
         }
-        endBtn.addView(TextView(this).apply { text = "\uD83D\uDCDE"; textSize = 30f; setTextColor(Color.WHITE); gravity = Gravity.CENTER; rotation = 135f })
+        endBtn.addView(TextView(this).apply { text = "\uD83D\uDCDE"; textSize = 28f; setTextColor(Color.WHITE); gravity = Gravity.CENTER; rotation = 135f })
         endBtnCol.addView(endBtn)
-        endBtnCol.addView(TextView(this).apply { text = "End"; textSize = 13f; setTextColor(Color.parseColor("#EF4444")); setPadding(0, dpToPx(10), 0, 0) })
+        endBtnCol.addView(TextView(this).apply { text = "End"; textSize = 13f; setTextColor(Color.parseColor("#EF4444")); setPadding(0, dpToPx(8), 0, 0) })
 
         activeActionsRow?.addView(muteBtn)
-        activeActionsRow?.addView(View(this).apply { layoutParams = LinearLayout.LayoutParams(dpToPx(28), 1) })
+        activeActionsRow?.addView(View(this).apply { layoutParams = LinearLayout.LayoutParams(dpToPx(16), 1) })
         activeActionsRow?.addView(speakerBtn)
-        activeActionsRow?.addView(View(this).apply { layoutParams = LinearLayout.LayoutParams(dpToPx(28), 1) })
+        activeActionsRow?.addView(View(this).apply { layoutParams = LinearLayout.LayoutParams(dpToPx(16), 1) })
+        activeActionsRow?.addView(cameraBtn)
+        activeActionsRow?.addView(View(this).apply { layoutParams = LinearLayout.LayoutParams(dpToPx(16), 1) })
         activeActionsRow?.addView(endBtnCol)
 
         uiLayer.addView(activeActionsRow!!)
@@ -548,6 +594,16 @@ class IncomingCallActivity : Activity() {
         root.addView(localVideoContainer)
 
         setContentView(root)
+    }
+
+    private fun dismissNotificationBanner() {
+        try {
+            val nm = getSystemService(Context.NOTIFICATION_SERVICE) as? android.app.NotificationManager
+            nm?.cancel(1001)
+            nm?.cancel(1002)
+            nm?.cancel(1003)
+            nm?.cancelAll()
+        } catch (e: Exception) {}
     }
 
     private fun createControlButton(iconText: String, labelText: String, onClick: (FrameLayout, TextView) -> Unit): LinearLayout {
@@ -574,8 +630,10 @@ class IncomingCallActivity : Activity() {
         val finalCallerId = if (callerId.isNotEmpty()) callerId else (intent.getStringExtra("callerId") ?: "")
         val finalCallerName = if (callerName.isNotEmpty()) callerName else (intent.getStringExtra("callerName") ?: "Unknown")
         val finalCallType = if (callType.isNotEmpty()) callType else (intent.getStringExtra("callType") ?: "audio")
+        val finalCallerPhoto = intent.getStringExtra("callerPhoto")
 
         Log.d("SYNKING_DEBUG", "[UI] ACCEPT_BUTTON_TAPPED: callId=$finalCallId callerId=$finalCallerId callerName=$finalCallerName type=$finalCallType")
+        dismissNotificationBanner()
         stopRingtoneAndVibration()
         CallConnectionManager.answerCall()
 
@@ -583,7 +641,7 @@ class IncomingCallActivity : Activity() {
             callId = finalCallId,
             callerId = finalCallerId,
             callerName = finalCallerName,
-            callerPhoto = null,
+            callerPhoto = finalCallerPhoto,
             callType = finalCallType
         )
 
@@ -596,20 +654,27 @@ class IncomingCallActivity : Activity() {
         // 🚀 3. Save pending call for JS cold-boot recovery
         PendingCallStore.save(this, call)
 
-        if (finalCallType == "video") {
-            incomingActionsRow?.visibility = View.GONE
-            activeActionsRow?.visibility = View.VISIBLE
-            subtitleView?.text = "Connecting video..."
-            subtitleView?.setTextColor(Color.parseColor("#3B82F6"))
-            subtitleView?.visibility = View.VISIBLE
-            timerTextView?.visibility = View.GONE
-        } else {
-            incomingActionsRow?.visibility = View.GONE
-            activeActionsRow?.visibility = View.VISIBLE
-            timerTextView?.visibility = View.VISIBLE
-            callStartTime = SystemClock.elapsedRealtime()
-            timerHandler.post(timerRunnable)
+        // 🚀 4. Seamless Handoff to React Native Live Calling Screen (MainActivity)
+        try {
+            val mainIntent = Intent(this, MainActivity::class.java).apply {
+                flags = Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_SINGLE_TOP
+                putExtra("SYNKING_INCOMING_CALL", true)
+                putExtra("callId", finalCallId)
+                putExtra("callerId", finalCallerId)
+                putExtra("callerName", finalCallerName)
+                putExtra("callType", finalCallType)
+                putExtra("callerPhoto", finalCallerPhoto)
+                putExtra("AUTO_ACCEPT", true)
+            }
+            startActivity(mainIntent)
+        } catch (e: Exception) {
+            Log.w("SYNKING_DEBUG", "MainActivity handoff note: ${e.message}")
         }
+
+        try {
+            finishAndRemoveTask()
+        } catch (e: Exception) {}
+        finish()
     }
 
     private fun dpToPx(dp: Int): Int = TypedValue.applyDimension(TypedValue.COMPLEX_UNIT_DIP, dp.toFloat(), resources.displayMetrics).toInt()
