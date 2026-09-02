@@ -15,7 +15,6 @@ const OUTGOING_RINGTONE_URL = 'https://assets.mixkit.co/active_storage/sfx/1360/
 
 class RingtoneServiceClass {
   private audioCtx: any = null;
-  private ringInterval: any = null;
   private isPlaying: boolean = false;
   private currentMode: 'incoming' | 'outgoing' | null = null;
   private nativePlayer: any = null;
@@ -41,10 +40,14 @@ class RingtoneServiceClass {
 
   // 1. OUTGOING CALL: Modern Dial Tone ("Tring... Tring...")
   public async playOutgoingRing() {
-    if (this.isPlaying && this.currentMode === 'outgoing') return;
+    if ((globalThis as any).__SYNKING_RINGTONE_PLAYING__ && (globalThis as any).__SYNKING_RINGTONE_MODE__ === 'outgoing') {
+      return;
+    }
     this.stop();
     this.isPlaying = true;
     this.currentMode = 'outgoing';
+    (globalThis as any).__SYNKING_RINGTONE_PLAYING__ = true;
+    (globalThis as any).__SYNKING_RINGTONE_MODE__ = 'outgoing';
     CallDebugger.logStage('RINGTONE', 'OK', { mode: 'outgoing' });
 
     // Native expo-audio playback
@@ -61,7 +64,7 @@ class RingtoneServiceClass {
       }
     }
 
-    // Audio Oscillator for Web & Fallback Environments
+    // Audio Oscillator for Web
     const playPulse = () => {
       if (!this.isPlaying || this.currentMode !== 'outgoing') return;
       const ctx = this.getAudioContext();
@@ -94,22 +97,25 @@ class RingtoneServiceClass {
     };
 
     playPulse();
-    this.ringInterval = setInterval(playPulse, 3200);
+    (globalThis as any).__SYNKING_RINGTONE_INTERVAL__ = setInterval(playPulse, 3200);
   }
 
   // 2. INCOMING CALL: Melodic Marimba Tone + Looping Vibration
   public async playIncomingRing() {
-    if (this.isPlaying && this.currentMode === 'incoming') return;
+    if ((globalThis as any).__SYNKING_RINGTONE_PLAYING__ && (globalThis as any).__SYNKING_RINGTONE_MODE__ === 'incoming') {
+      return;
+    }
     this.stop();
     this.isPlaying = true;
     this.currentMode = 'incoming';
+    (globalThis as any).__SYNKING_RINGTONE_PLAYING__ = true;
+    (globalThis as any).__SYNKING_RINGTONE_MODE__ = 'incoming';
     CallDebugger.logStage('RINGTONE', 'OK', { mode: 'incoming' });
 
-    // 📳 Trigger standard incoming call vibration pattern on mobile
+    // Trigger vibration on mobile
     if (Platform.OS !== 'web') {
       try {
         Vibration.vibrate([0, 800, 1000], true);
-        CallDebugger.logStage('VIBRATION', 'OK', { pattern: '[0, 800, 1000]' });
       } catch (e) {}
     }
 
@@ -149,7 +155,7 @@ class RingtoneServiceClass {
           const noteEnd = noteStart + dur;
           const gain = ctx.createGain();
           gain.gain.setValueAtTime(0, noteStart);
-          gain.gain.linearRampToValueAtTime(0.22, noteStart + 0.02);
+          gain.gain.linearRampToValueAtTime(0.18, noteStart + 0.02);
           gain.gain.exponentialRampToValueAtTime(0.001, noteEnd);
           gain.connect(ctx.destination);
 
@@ -165,23 +171,25 @@ class RingtoneServiceClass {
     };
 
     playMelody();
-    this.ringInterval = setInterval(playMelody, 2200);
+    (globalThis as any).__SYNKING_RINGTONE_INTERVAL__ = setInterval(playMelody, 2600);
   }
 
   // 3. STOP RINGTONE INSTANTLY & CANCEL VIBRATION
   public async stop() {
     this.isPlaying = false;
     this.currentMode = null;
+    (globalThis as any).__SYNKING_RINGTONE_PLAYING__ = false;
+    (globalThis as any).__SYNKING_RINGTONE_MODE__ = null;
+
+    if ((globalThis as any).__SYNKING_RINGTONE_INTERVAL__) {
+      clearInterval((globalThis as any).__SYNKING_RINGTONE_INTERVAL__);
+      (globalThis as any).__SYNKING_RINGTONE_INTERVAL__ = null;
+    }
 
     if (Platform.OS !== 'web') {
       try {
         Vibration.cancel();
       } catch (e) {}
-    }
-
-    if (this.ringInterval) {
-      clearInterval(this.ringInterval);
-      this.ringInterval = null;
     }
 
     if (this.nativePlayer) {
