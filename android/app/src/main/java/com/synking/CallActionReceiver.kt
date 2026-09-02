@@ -14,6 +14,14 @@ class CallActionReceiver : BroadcastReceiver() {
             IncomingCallActivity.stopRingtoneGlobally()
             CallConnectionManager.rejectCall()
             TelecomModule.emitEndCallEvent()
+            TelecomModule.incomingActivityInstance?.let { activity ->
+                activity.runOnUiThread {
+                    try {
+                        activity.finishAndRemoveTask()
+                    } catch (e: Exception) {}
+                    activity.finish()
+                }
+            }
             val nm = context.getSystemService(Context.NOTIFICATION_SERVICE) as NotificationManager
             nm.cancel(MyFirebaseMessagingService.NOTIFICATION_ID)
         }

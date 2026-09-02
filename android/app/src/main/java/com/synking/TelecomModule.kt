@@ -133,6 +133,15 @@ class TelecomModule(reactContext: ReactApplicationContext) : ReactContextBaseJav
     fun endCall(promise: Promise) {
         try {
             CallConnectionManager.endCall()
+            IncomingCallActivity.stopRingtoneGlobally()
+            incomingActivityInstance?.let { activity ->
+                activity.runOnUiThread {
+                    try {
+                        activity.finishAndRemoveTask()
+                    } catch (e: Exception) {}
+                    activity.finish()
+                }
+            }
             val intent = Intent("com.synking.CALL_ENDED_FROM_JS")
             reactContext?.sendBroadcast(intent)
             Log.d("SYNKING_TELECOM", "[TELECOM] CALL_ENDED: Connection destroyed from React Native")
