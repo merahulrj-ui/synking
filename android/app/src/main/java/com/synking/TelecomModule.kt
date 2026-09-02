@@ -1,6 +1,8 @@
 package com.synking
 
 import android.content.Intent
+import android.os.Handler
+import android.os.Looper
 import android.util.Log
 import com.facebook.react.bridge.Arguments
 import com.facebook.react.bridge.Promise
