@@ -59,6 +59,15 @@ class IncomingCallActivity : Activity() {
     var callType: String = ""
 
     private var callWakeLock: android.os.PowerManager.WakeLock? = null
+    private var hasHandedOff = false
+    private var connectingTimeoutHandler: Handler? = null
+
+    private val webrtcConnectedReceiver = object : BroadcastReceiver() {
+        override fun onReceive(context: Context?, intent: Intent?) {
+            Log.d("SYNKING_DEBUG", "[UI] WEBRTC_CONNECTED broadcast received — handing off to MainActivity")
+            performHandoffToMainActivity()
+        }
+    }
 
     private val callEndedReceiver = object : BroadcastReceiver() {
         override fun onReceive(context: Context?, intent: Intent?) {
@@ -113,10 +122,13 @@ class IncomingCallActivity : Activity() {
             addAction("com.synking.CALL_ENDED_FROM_JS")
             addAction("com.synking.CLOSE_CALL_SCREEN")
         }
+        val connectedFilter = IntentFilter("com.synking.WEBRTC_CONNECTED")
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
             registerReceiver(callEndedReceiver, cancelFilter, Context.RECEIVER_NOT_EXPORTED)
+            registerReceiver(webrtcConnectedReceiver, connectedFilter, Context.RECEIVER_NOT_EXPORTED)
         } else {
             registerReceiver(callEndedReceiver, cancelFilter)
+            registerReceiver(webrtcConnectedReceiver, connectedFilter)
         }
 
         callId = intent.getStringExtra("callId") ?: ""
@@ -330,6 +342,8 @@ class IncomingCallActivity : Activity() {
     }
 
     private fun handleAccept() {
+        if (hasHandedOff) return // Prevent double-tap
+        
         val finalCallId = if (callId.isNotEmpty()) callId else (intent.getStringExtra("callId") ?: "")
         val finalCallerId = if (callerId.isNotEmpty()) callerId else (intent.getStringExtra("callerId") ?: "")
         val finalCallerName = if (callerName.isNotEmpty()) callerName else (intent.getStringExtra("callerName") ?: "Unknown")
@@ -340,6 +354,9 @@ class IncomingCallActivity : Activity() {
         dismissNotificationBanner()
         stopRingtoneAndVibration()
         CallConnectionManager.answerCall()
+
+        // 🟡 Show "Connecting..." UI (same screen, no activity jump!)
+        showConnectingUI()
 
         val call = PendingCall(
             callId = finalCallId,
@@ -358,7 +375,7 @@ class IncomingCallActivity : Activity() {
         // 🚀 3. Save pending call for JS cold-boot recovery
         PendingCallStore.save(this, call)
 
-        // 🚀 4. Seamless Handoff to React Native Live Calling Screen (MainActivity)
+        // 🚀 4. Launch MainActivity in BACKGROUND (don't finish yet!)
         try {
             val mainIntent = Intent(this, MainActivity::class.java).apply {
                 flags = Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_SINGLE_TOP
@@ -374,6 +391,78 @@ class IncomingCallActivity : Activity() {
         } catch (e: Exception) {
             Log.w("SYNKING_DEBUG", "MainActivity handoff note: ${e.message}")
         }
+
+        // 🕐 5. Timeout fallback: if WebRTC doesn't connect in 15s, hand off anyway
+        connectingTimeoutHandler = Handler(Looper.getMainLooper())
+        connectingTimeoutHandler?.postDelayed({
+            if (!hasHandedOff) {
+                Log.w("SYNKING_DEBUG", "[UI] CONNECTING_TIMEOUT: 15s elapsed, forcing handoff to MainActivity")
+                performHandoffToMainActivity()
+            }
+        }, 15000)
+    }
+
+    private fun showConnectingUI() {
+        val root = LinearLayout(this).apply {
+            orientation = LinearLayout.VERTICAL
+            gravity = Gravity.CENTER
+            setPadding(dpToPx(24), dpToPx(64), dpToPx(24), dpToPx(56))
+            background = GradientDrawable(
+                GradientDrawable.Orientation.TOP_BOTTOM,
+                intArrayOf(Color.parseColor("#060813"), Color.parseColor("#0B1120"))
+            )
+            layoutParams = LinearLayout.LayoutParams(
+                LinearLayout.LayoutParams.MATCH_PARENT,
+                LinearLayout.LayoutParams.MATCH_PARENT
+            )
+        }
+
+        // Caller Name
+        val nameView = TextView(this).apply {
+            text = callerName
+            textSize = 30f
+            setTextColor(Color.WHITE)
+            gravity = Gravity.CENTER
+            typeface = android.graphics.Typeface.DEFAULT_BOLD
+            setPadding(0, dpToPx(24), 0, dpToPx(16))
+        }
+        root.addView(nameView)
+
+        // "Connecting..." text with pulse animation
+        val connectingText = TextView(this).apply {
+            text = "Connecting..."
+            textSize = 18f
+            setTextColor(Color.parseColor("#38BDF8"))
+            gravity = Gravity.CENTER
+            typeface = android.graphics.Typeface.DEFAULT_BOLD
+        }
+        val pulseAnim = android.view.animation.AlphaAnimation(1.0f, 0.3f).apply {
+            duration = 800
+            repeatCount = Animation.INFINITE
+            repeatMode = Animation.REVERSE
+        }
+        connectingText.startAnimation(pulseAnim)
+        root.addView(connectingText)
+
+        // 🔒 Encrypted badge
+        val badge = TextView(this).apply {
+            text = "🔒 End-to-End Encrypted"
+            textSize = 12f
+            setTextColor(Color.parseColor("#64748B"))
+            gravity = Gravity.CENTER
+            setPadding(0, dpToPx(24), 0, 0)
+        }
+        root.addView(badge)
+
+        setContentView(root)
+    }
+
+    private fun performHandoffToMainActivity() {
+        if (hasHandedOff) return
+        hasHandedOff = true
+
+        connectingTimeoutHandler?.removeCallbacksAndMessages(null)
+        Log.d("SYNKING_DEBUG", "[UI] HANDOFF_TO_MAIN: Seamless transition to live call screen")
 
         try {
             finish()
@@ -429,8 +518,12 @@ class IncomingCallActivity : Activity() {
     override fun onDestroy() {
         super.onDestroy()
         stopRingtoneAndVibration()
+        connectingTimeoutHandler?.removeCallbacksAndMessages(null)
         try {
             unregisterReceiver(callEndedReceiver)
+        } catch (e: Exception) {}
+        try {
+            unregisterReceiver(webrtcConnectedReceiver)
         } catch (e: Exception) {}
         try {
             callWakeLock?.release()

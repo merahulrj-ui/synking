@@ -105,6 +105,18 @@ class TelecomModule(reactContext: ReactApplicationContext) : ReactContextBaseJav
     }
 
     @ReactMethod
+    fun notifyWebRTCConnected(promise: Promise) {
+        try {
+            Log.d("SYNKING_DEBUG", "[BRIDGE] notifyWebRTCConnected: JS signaled WebRTC is connected, sending handoff broadcast")
+            val intent = Intent("com.synking.WEBRTC_CONNECTED")
+            reactContextInstance?.sendBroadcast(intent)
+            promise.resolve(true)
+        } catch (e: Exception) {
+            promise.reject("TELECOM_ERROR", e.message)
+        }
+    }
+
+    @ReactMethod
     fun launchIncomingCallActivity(callId: String, callerName: String, callType: String, promise: Promise) {
         try {
             val ctx = reactApplicationContext

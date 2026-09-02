@@ -1,4 +1,4 @@
-﻿package com.synking
+package com.synking
 
 import android.content.Context
 
@@ -6,7 +6,7 @@ object CallState {
     private const val PREFS = "synking_call_state"
     private const val KEY_ACTIVE_ID = "active_call_id"
     private const val KEY_TS = "active_call_ts"
-    private const val STALE_THRESHOLD_MS = 90_000L
+    private const val STALE_THRESHOLD_MS = 45_000L
 
     @Volatile private var activeCallId: String? = null
 

@@ -479,6 +479,10 @@ class WebRTCManager {
         if (Platform.OS === 'android' && NativeModules.TelecomModule?.updateDebugStatus) {
           NativeModules.TelecomModule.updateDebugStatus('WEBRTC', pc.connectionState.toUpperCase()).catch(() => {});
         }
+        // 🚀 Signal IncomingCallActivity to hand off when WebRTC is connected
+        if (pc.connectionState === 'connected' && Platform.OS === 'android' && NativeModules.TelecomModule?.notifyWebRTCConnected) {
+          NativeModules.TelecomModule.notifyWebRTCConnected().catch(() => {});
+        }
         if (pc.connectionState === 'disconnected' || pc.connectionState === 'failed' || pc.connectionState === 'closed') {
           this.log('🛑 Remote peer disconnected. Auto cleaning up...');
           this.cleanup();
