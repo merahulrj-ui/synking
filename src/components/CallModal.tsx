@@ -578,20 +578,20 @@ Remote Video Tracks (${remoteVideo.length}): ${JSON.stringify(remoteVideo)}
           {/* 1. TOP STATUS HEADER (ALWAYS AT TOP) */}
           <View style={[styles.topHeader, (session.type === 'video' || session.isVideoEnabled) && styles.topHeaderFloating]}>
             <View style={styles.e2eeBadge}>
-              <Ionicons name="shield-checkmark" size={12} color="#22C55E" />
-              <Text style={styles.e2eeText}>P2P WebRTC Direct</Text>
+              <Ionicons name="lock-closed" size={13} color="#38BDF8" />
+              <Text style={styles.e2eeText}>End-to-End Encrypted HD</Text>
             </View>
 
             <Text style={styles.callTypeTitle}>
               {isIncomingRinging
-                ? `Incoming ${session.type === 'video' ? 'Video' : 'Voice'} Call 📲`
+                ? `Incoming ${session.type === 'video' ? 'Video' : 'Voice'} Call`
                 : session.callerName}
             </Text>
 
             <Text style={[styles.callStatus, isConnected && styles.callStatusConnected]}>
-              {isIncomingRinging && 'Incoming Call... 📲'}
+              {isIncomingRinging && 'Incoming Call...'}
               {!isIncomingRinging && session.status === 'calling' && 'Connecting to peer...'}
-              {!isIncomingRinging && session.status === 'ringing' && 'Ringing... 📲'}
+              {!isIncomingRinging && session.status === 'ringing' && 'Ringing...'}
               {session.status === 'connected' && `Connected • ${durationText}`}
               {session.status === 'ended' && 'Call Ended'}
               {session.status === 'rejected' && 'Call Declined'}
@@ -602,20 +602,39 @@ Remote Video Tracks (${remoteVideo.length}): ${JSON.stringify(remoteVideo)}
           {(session.type !== 'video' && !session.isVideoEnabled) || (isIncomingRinging && !isConnected) ? (
             <View style={styles.centerSection}>
               <View style={styles.avatarContainer}>
-                {/* Glowing Wave Rings */}
-                <View style={[styles.pulseRing, isConnected ? styles.pulseRingActive : styles.pulseRingIncoming]} />
-                <View style={[styles.pulseRingOuter, isConnected ? styles.pulseRingOuterActive : styles.pulseRingOuterIncoming]} />
-
-                <Image
-                  source={{ uri: session.callerPhoto }}
-                  style={styles.avatar}
-                />
+                <LinearGradient
+                  colors={['#A855F7', '#38BDF8']}
+                  start={{ x: 0, y: 0 }}
+                  end={{ x: 1, y: 1 }}
+                  style={{
+                    width: 154,
+                    height: 154,
+                    borderRadius: 77,
+                    padding: 3,
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                    shadowColor: '#38BDF8',
+                    shadowOpacity: 0.5,
+                    shadowRadius: 12,
+                    elevation: 10,
+                  }}
+                >
+                  <Image
+                    source={{ uri: session.callerPhoto }}
+                    style={{
+                      width: 148,
+                      height: 148,
+                      borderRadius: 74,
+                      backgroundColor: '#0F172A',
+                    }}
+                  />
+                </LinearGradient>
               </View>
 
               <Text style={styles.callerName}>{session.callerName}</Text>
               <Text style={styles.callerSub}>
                 {isIncomingRinging
-                  ? `Incoming ${session.type === 'video' ? 'Video 📹' : 'Voice 📞'} Call • Tap Accept`
+                  ? `Incoming ${session.type === 'video' ? 'Video' : 'Voice'} Call • Tap Accept`
                   : isConnected
                   ? '🔒 Direct Peer-to-Peer Encrypted'
                   : 'Connecting safely on SYNKING'}
