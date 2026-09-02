@@ -10,18 +10,42 @@ import com.facebook.react.bridge.ReactContextBaseJavaModule
 import com.facebook.react.bridge.ReactMethod
 import com.facebook.react.bridge.WritableNativeMap
 import com.facebook.react.modules.core.DeviceEventManagerModule
+import java.util.concurrent.ConcurrentHashMap
 import java.util.concurrent.ConcurrentLinkedQueue
+import java.util.concurrent.atomic.AtomicBoolean
 
 class TelecomModule(reactContext: ReactApplicationContext) : ReactContextBaseJavaModule(reactContext) {
 
     init {
-        TelecomModule.reactContext = reactContext
         globalReactContext = reactContext
-        onReactContextReady(reactContext)
+        reactContextInstance = reactContext
     }
 
     override fun getName(): String {
         return "TelecomModule"
+    }
+
+    @ReactMethod
+    fun signalJSBridgeReady(promise: Promise) {
+        try {
+            Log.i("SYNKING_DEBUG", "✅ [BRIDGE] signalJSBridgeReady received from JS — flushing ${pendingEvents.size} queued call events")
+            isJSBridgeReady.set(true)
+            flushPendingEvents()
+            promise.resolve(true)
+        } catch (e: Exception) {
+            promise.resolve(false)
+        }
+    }
+
+    @ReactMethod
+    fun acknowledgeEvent(callId: String, action: String, promise: Promise) {
+        try {
+            Log.i("SYNKING_DEBUG", "✅ [BRIDGE] ACK received from JS: callId=$callId, action=$action")
+            acknowledgedEvents[callId] = true
+            promise.resolve(true)
+        } catch (e: Exception) {
+            promise.resolve(false)
+        }
     }
 
     @ReactMethod
@@ -71,7 +95,7 @@ class TelecomModule(reactContext: ReactApplicationContext) : ReactContextBaseJav
     fun notifyVideoCallConnected(promise: Promise) {
         try {
             val intent = Intent("com.synking.VIDEO_CALL_CONNECTED_FROM_JS")
-            reactContext?.sendBroadcast(intent)
+            reactContextInstance?.sendBroadcast(intent)
             promise.resolve(true)
         } catch (e: Exception) {
             promise.reject("TELECOM_ERROR", e.message)
@@ -165,7 +189,7 @@ class TelecomModule(reactContext: ReactApplicationContext) : ReactContextBaseJav
                 }
             }
             val intent = Intent("com.synking.CALL_ENDED_FROM_JS")
-            reactContext?.sendBroadcast(intent)
+            reactContextInstance?.sendBroadcast(intent)
             Log.d("SYNKING_TELECOM", "[TELECOM] CALL_ENDED: Connection destroyed from React Native")
             promise.resolve(true)
         } catch (e: Exception) {
@@ -176,26 +200,61 @@ class TelecomModule(reactContext: ReactApplicationContext) : ReactContextBaseJav
     companion object {
         var incomingActivityInstance: IncomingCallActivity? = null
         var globalReactContext: ReactApplicationContext? = null
-        var reactContext: ReactContext? = null
+        var reactContextInstance: ReactContext? = null
+        val reactContext: ReactContext?
+            get() = reactContextInstance
+
         private val pendingEvents = ConcurrentLinkedQueue<PendingCall>()
+        private val isJSBridgeReady = AtomicBoolean(false)
+        private val acknowledgedEvents = ConcurrentHashMap<String, Boolean>()
+        private val handler = Handler(Looper.getMainLooper())
+        private const val RETRY_DELAY_MS = 500L
+        private const val MAX_RETRIES = 20
 
         fun emitAcceptEvent(call: PendingCall) {
-            val ctx = reactContext
-            if (ctx == null || !ctx.hasActiveCatalystInstance()) {
-                Log.d("SYNKING_DEBUG", "[BRIDGE] reactContext inactive, queuing pending call: ${call.callId}")
+            if (isJSBridgeReady.get() && reactContext?.hasActiveCatalystInstance() == true) {
+                sendAcceptDirect(call)
+            } else {
+                Log.w("SYNKING_DEBUG", "⏳ [BRIDGE] JS not ready yet, QUEUING call event: ${call.callId}")
                 pendingEvents.add(call)
-                return
             }
+        }
+
+        private fun sendAcceptDirect(call: PendingCall, retryCount: Int = 0) {
+            val ctx = reactContext ?: return
+            if (!ctx.hasActiveCatalystInstance()) return
+
             val params = Arguments.createMap().apply {
                 putString("callId", call.callId)
                 putString("callerId", call.callerId)
                 putString("callerName", call.callerName)
                 putString("callerPhoto", call.callerPhoto ?: "")
                 putString("callType", call.callType)
+                putBoolean("isRetry", retryCount > 0)
+                putInt("retryCount", retryCount)
             }
-            Log.d("SYNKING_DEBUG", "[BRIDGE] emitAcceptEvent -> onTelecomCallAnswered: callId=${call.callId}, caller=${call.callerName}, type=${call.callType}")
+
+            Log.d("SYNKING_DEBUG", "📤 [BRIDGE] emitAcceptEvent -> onTelecomCallAnswered: callId=${call.callId} (attempt ${retryCount + 1})")
             ctx.getJSModule(DeviceEventManagerModule.RCTDeviceEventEmitter::class.java)
                 .emit("onTelecomCallAnswered", params)
+
+            scheduleAckCheck(call, retryCount)
+        }
+
+        private fun scheduleAckCheck(call: PendingCall, retryCount: Int) {
+            handler.postDelayed({
+                if (acknowledgedEvents.containsKey(call.callId)) {
+                    Log.i("SYNKING_DEBUG", "✅ [BRIDGE] ACK confirmed for callId=${call.callId} after $retryCount retries")
+                    acknowledgedEvents.remove(call.callId)
+                    return@postDelayed
+                }
+                if (retryCount < MAX_RETRIES) {
+                    Log.w("SYNKING_DEBUG", "⚠️ [BRIDGE] No ACK for onTelecomCallAnswered (callId=${call.callId}), RETRY #${retryCount + 1}")
+                    sendAcceptDirect(call, retryCount + 1)
+                } else {
+                    Log.e("SYNKING_DEBUG", "❌ [BRIDGE] FAILED: No ACK after $MAX_RETRIES retries for callId=${call.callId}")
+                }
+            }, RETRY_DELAY_MS)
         }
 
         fun emitAcceptEvent(
@@ -235,12 +294,19 @@ class TelecomModule(reactContext: ReactApplicationContext) : ReactContextBaseJav
                 ?.emit("onTelecomEndCall", null)
         }
 
-        fun onReactContextReady(ctx: ReactContext) {
-            reactContext = ctx
-            Log.d("SYNKING_DEBUG", "[BRIDGE] onReactContextReady: Flushing ${pendingEvents.size} pending call events")
-            while (true) {
+        fun flushPendingEvents() {
+            while (pendingEvents.isNotEmpty()) {
                 val call = pendingEvents.poll() ?: break
-                emitAcceptEvent(call)
+                Log.i("SYNKING_DEBUG", "🔄 [BRIDGE] Flushing queued call event: ${call.callId}")
+                sendAcceptDirect(call)
+            }
+        }
+
+        fun onReactContextReady(ctx: ReactContext) {
+            reactContextInstance = ctx
+            Log.d("SYNKING_DEBUG", "[BRIDGE] onReactContextReady: ReactContext initialized")
+            if (isJSBridgeReady.get()) {
+                flushPendingEvents()
             }
         }
     }

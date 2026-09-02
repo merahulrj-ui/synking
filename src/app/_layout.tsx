@@ -1,5 +1,6 @@
+import '../services/telecomBridge';
 import React, { useEffect } from 'react';
-import { View, StyleSheet, Platform, Alert } from 'react-native';
+import { View, StyleSheet, Platform, Alert, NativeModules } from 'react-native';
 import { Stack } from 'expo-router';
 import { StatusBar } from 'expo-status-bar';
 import * as Updates from 'expo-updates';
@@ -52,7 +53,7 @@ setTimeout(async () => {
             pending.callId,
             true // autoAccept = true!
           );
-          await WebRTCService.acceptCall();
+          await WebRTCService.acceptCall(pending.callId);
           if (Platform.OS === 'android' && NativeModules.TelecomModule?.notifyBridgedToJs) {
             NativeModules.TelecomModule.notifyBridgedToJs(pending.callId).catch(() => {});
           }
@@ -71,56 +72,13 @@ function GlobalCallOverlay() {
   const { sendMessage, currentUser } = useApp();
 
   React.useEffect(() => {
+    // Pure UI Observer: listens to WebRTC session state changes
     const unsubscribe = WebRTCService.subscribe(session => {
       setActiveCall(session);
     });
-    
-    // Listen for Native UI (Lockscreen) Answer Event
-    let nativeSub: any = null;
-    if (Platform.OS === 'android' && NativeModules.TelecomModule) {
-      const { NativeEventEmitter } = require('react-native');
-      const emitter = new NativeEventEmitter(NativeModules.TelecomModule);
-      const sub1 = emitter.addListener('onTelecomCallAnswered', async (data?: any) => {
-        WebRTCService.log('📞 Native Android UI accepted the call: ' + JSON.stringify(data));
-        // Auto-initialize session if not present in JS yet
-        if (data && data.callId && (!WebRTCService.currentSession || WebRTCService.currentSession.id !== data.callId)) {
-          WebRTCService.receiveIncomingCall(
-            {
-              id: data.callerId || 'caller',
-              name: data.callerName || 'Caller',
-              age: 22,
-              gender: 'other',
-              avatar: data.callerPhoto || '',
-            },
-            data.callType || 'audio',
-            data.callId,
-            true
-          );
-        }
-        await WebRTCService.acceptCall();
-        if (data && data.callId && NativeModules.TelecomModule?.notifyBridgedToJs) {
-          NativeModules.TelecomModule.notifyBridgedToJs(data.callId).catch(() => {});
-        }
-      });
-      const sub2 = emitter.addListener('onTelecomCallDeclined', (data?: any) => {
-        WebRTCService.log('📞 Native Android UI declined the call: ' + JSON.stringify(data));
-        WebRTCService.rejectCall();
-      });
-      const sub3 = emitter.addListener('onTelecomMuteToggled', (isMuted) => {
-        WebRTCService.toggleMute();
-      });
-      const sub4 = emitter.addListener('onTelecomSpeakerToggled', (isSpeakerOn) => {
-        WebRTCService.toggleSpeaker();
-      });
-      const sub5 = emitter.addListener('onTelecomEndCall', () => {
-        WebRTCService.endCall();
-      });
-      nativeSub = { remove: () => { sub1.remove(); sub2.remove(); sub3.remove(); sub4.remove(); sub5.remove(); } };
-    }
 
     return () => {
       unsubscribe();
-      if (nativeSub) nativeSub.remove();
     };
   }, []);
 

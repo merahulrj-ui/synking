@@ -1,11 +1,14 @@
 package com.synking
 
 import android.content.Context
+import android.media.AudioAttributes
 import android.media.AudioDeviceInfo
+import android.media.AudioFocusRequest
 import android.media.AudioManager
 import android.os.Build
 import android.os.Handler
 import android.os.Looper
+import android.util.Log
 import com.facebook.react.bridge.ReactApplicationContext
 import com.facebook.react.bridge.ReactContextBaseJavaModule
 import com.facebook.react.bridge.ReactMethod
@@ -14,6 +17,7 @@ import com.facebook.react.bridge.Promise
 class AudioRouteModule(private val reactContext: ReactApplicationContext) : ReactContextBaseJavaModule(reactContext) {
     private val audioManager: AudioManager = reactContext.getSystemService(Context.AUDIO_SERVICE) as AudioManager
     private val mainHandler = Handler(Looper.getMainLooper())
+    private var audioFocusRequest: AudioFocusRequest? = null
 
     override fun getName(): String {
         return "AudioRouteModule"
@@ -22,6 +26,28 @@ class AudioRouteModule(private val reactContext: ReactApplicationContext) : Reac
     private fun applyAudioRoute(on: Boolean) {
         try {
             audioManager.mode = AudioManager.MODE_IN_COMMUNICATION
+            
+            // Request AudioFocus for Voice Communication on Android 8.0+ / Android 14/15
+            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
+                if (audioFocusRequest == null) {
+                    val playbackAttributes = AudioAttributes.Builder()
+                        .setUsage(AudioAttributes.USAGE_VOICE_COMMUNICATION)
+                        .setContentType(AudioAttributes.CONTENT_TYPE_SPEECH)
+                        .build()
+                    audioFocusRequest = AudioFocusRequest.Builder(AudioManager.AUDIOFOCUS_GAIN_TRANSIENT)
+                        .setAudioAttributes(playbackAttributes)
+                        .setAcceptsDelayedFocusGain(true)
+                        .setOnAudioFocusChangeListener { focusChange ->
+                            Log.d("SYNKING_AUDIO", "AudioFocus changed: $focusChange")
+                        }
+                        .build()
+                }
+                audioFocusRequest?.let { audioManager.requestAudioFocus(it) }
+            } else {
+                @Suppress("DEPRECATION")
+                audioManager.requestAudioFocus(null, AudioManager.STREAM_VOICE_CALL, AudioManager.AUDIOFOCUS_GAIN_TRANSIENT)
+            }
+
             audioManager.isSpeakerphoneOn = on
             if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
                 val targetDevice = audioManager.availableCommunicationDevices.find { 
@@ -43,7 +69,9 @@ class AudioRouteModule(private val reactContext: ReactApplicationContext) : Reac
                 audioManager.setStreamVolume(AudioManager.STREAM_SYSTEM, maxSysVol, 0)
             }
             audioManager.isMicrophoneMute = false
-        } catch (e: Exception) {}
+        } catch (e: Exception) {
+            Log.w("SYNKING_AUDIO", "applyAudioRoute notice: ${e.message}")
+        }
     }
 
     @ReactMethod
@@ -88,6 +116,12 @@ class AudioRouteModule(private val reactContext: ReactApplicationContext) : Reac
     fun resetAudioMode(promise: Promise) {
         mainHandler.post {
             try {
+                if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
+                    audioFocusRequest?.let { audioManager.abandonAudioFocusRequest(it) }
+                } else {
+                    @Suppress("DEPRECATION")
+                    audioManager.abandonAudioFocus(null)
+                }
                 if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
                     audioManager.clearCommunicationDevice()
                 }

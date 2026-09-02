@@ -1,0 +1,85 @@
+﻿import { NativeModules, DeviceEventEmitter, Platform } from 'react-native';
+import { WebRTCService } from './webrtcService';
+
+const { TelecomModule } = NativeModules;
+
+let isReady = false;
+
+export function ensureTelecomBridgeReady() {
+  if (isReady || Platform.OS !== 'android') return;
+  isReady = true;
+
+  console.log('[TelecomBridge] Initializing Headless Module-Level Listeners...');
+
+  // 1. Answer Event (Killed-State & In-App Guaranteed)
+  DeviceEventEmitter.addListener('onTelecomCallAnswered', async (data?: any) => {
+    try {
+      const callId = data?.callId || '';
+      console.log('[TelecomBridge] 📞 RECEIVED onTelecomCallAnswered for callId:', callId);
+
+      // 🤝 1. ACK back to Kotlin immediately so it stops retry watchdog
+      if (callId && TelecomModule?.acknowledgeEvent) {
+        TelecomModule.acknowledgeEvent(callId, 'ANSWERED');
+      }
+
+      // 🔄 2. Auto-initialize session if not present in JS
+      if (data && callId && (!WebRTCService.currentSession || WebRTCService.currentSession.id !== callId)) {
+        WebRTCService.receiveIncomingCall(
+          {
+            id: data.callerId || 'caller',
+            name: data.callerName || 'Caller',
+            age: 22,
+            gender: 'other',
+            avatar: data.callerPhoto || '',
+          },
+          data.callType || 'audio',
+          callId,
+          true
+        );
+      }
+
+      // 🚀 3. Execute WebRTC accept & broadcast CALL_ACCEPTED
+      await WebRTCService.acceptCall(callId);
+
+      if (callId && TelecomModule?.notifyBridgedToJs) {
+        TelecomModule.notifyBridgedToJs(callId).catch(() => {});
+      }
+    } catch (e) {
+      console.error('[TelecomBridge] Error in onTelecomCallAnswered:', e);
+    }
+  });
+
+  // 2. Decline Event
+  DeviceEventEmitter.addListener('onTelecomCallDeclined', (data?: any) => {
+    const callId = data?.callId || '';
+    console.log('[TelecomBridge] 📞 RECEIVED onTelecomCallDeclined for callId:', callId);
+    if (callId && TelecomModule?.acknowledgeEvent) {
+      TelecomModule.acknowledgeEvent(callId, 'DECLINED');
+    }
+    WebRTCService.rejectCall();
+  });
+
+  // 3. Mute Toggle
+  DeviceEventEmitter.addListener('onTelecomMuteToggled', () => {
+    WebRTCService.toggleMute();
+  });
+
+  // 4. Speaker Toggle
+  DeviceEventEmitter.addListener('onTelecomSpeakerToggled', () => {
+    WebRTCService.toggleSpeaker();
+  });
+
+  // 5. End Call Event
+  DeviceEventEmitter.addListener('onTelecomEndCall', () => {
+    WebRTCService.endCall();
+  });
+
+  // 🤝 6. Signal Kotlin: "JS Bridge is ALIVE, flush pending queue!"
+  if (TelecomModule?.signalJSBridgeReady) {
+    TelecomModule.signalJSBridgeReady();
+    console.log('[TelecomBridge] ✅ JS_BRIDGE_READY signaled to Kotlin native module.');
+  }
+}
+
+// Auto-initialize immediately on module import
+ensureTelecomBridgeReady();
