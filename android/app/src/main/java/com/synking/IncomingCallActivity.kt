@@ -1,4 +1,4 @@
-﻿package com.synking
+package com.synking
 
 import android.app.Activity
 import android.content.BroadcastReceiver
@@ -376,9 +376,8 @@ class IncomingCallActivity : Activity() {
         }
 
         try {
-            finishAndRemoveTask()
+            finish()
         } catch (e: Exception) {}
-        finish()
     }
 
     private fun dismissNotificationBanner() {

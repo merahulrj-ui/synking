@@ -100,6 +100,8 @@ class MyFirebaseMessagingService : FirebaseMessagingService() {
             // 1. Stop native ringtone & vibration instantly!
             IncomingCallActivity.stopRingtoneGlobally()
             CallConnectionManager.endCall()
+            CallState.clear(this@MyFirebaseMessagingService, callId)
+            PendingCallStore.clear(this@MyFirebaseMessagingService)
 
             // 2. Directly dismiss open call activity with zero latency
             TelecomModule.incomingActivityInstance?.let { activity ->
