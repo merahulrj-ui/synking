@@ -468,12 +468,13 @@ class IncomingCallActivity : Activity() {
                 PendingCallStore.clear(this@IncomingCallActivity)
                 CallState.clear(this@IncomingCallActivity, callId)
 
-                val ctx = TelecomModule.reactContext
-                if (ctx != null && ctx.hasActiveCatalystInstance()) {
-                    TelecomModule.emitDeclineEvent(callId)
-                } else {
-                    NativeCallSignaling.sendDeclineNatively(this@IncomingCallActivity, callId)
-                }
+                val finalCallId = if (callId.isNotEmpty()) callId else (intent.getStringExtra("callId") ?: "")
+                val finalCallerId = if (callerId.isNotEmpty()) callerId else (intent.getStringExtra("callerId") ?: "")
+
+                // 🚀 Direct Native HTTP Signal to Server (Immediate 0ms Laptop Ring Cancel)
+                NativeCallSignaling.sendDeclineNatively(finalCallId, finalCallerId)
+
+                TelecomModule.emitDeclineEvent(finalCallId)
 
                 try {
                     finishAndRemoveTask()
@@ -537,6 +538,12 @@ class IncomingCallActivity : Activity() {
             layoutParams = LinearLayout.LayoutParams(size, size)
             background = GradientDrawable().apply { shape = GradientDrawable.OVAL; setColor(Color.parseColor("#EF4444")) }
             setOnClickListener {
+                val finalCallId = if (callId.isNotEmpty()) callId else (intent.getStringExtra("callId") ?: "")
+                val finalCallerId = if (callerId.isNotEmpty()) callerId else (intent.getStringExtra("callerId") ?: "")
+
+                // 🚀 Direct Native HTTP Signal to Server
+                NativeCallSignaling.sendEndCallNatively(finalCallId, finalCallerId)
+
                 TelecomModule.emitEndCallEvent()
                 CallConnectionManager.endCall()
                 try {
@@ -605,31 +612,14 @@ class IncomingCallActivity : Activity() {
             callType = finalCallType
         )
 
-        val ctx = TelecomModule.reactContext
-        if (ctx != null && ctx.hasActiveCatalystInstance()) {
-            TelecomModule.emitAcceptEvent(call)
-        } else {
-            Log.d("SYNKING_DEBUG", "[UI] Cold-boot accept: Saving PendingCall and launching MainActivity via standard Android Intent...")
-            PendingCallStore.save(this, call)
-            try {
-                val launchIntent = packageManager.getLaunchIntentForPackage(packageName)?.apply {
-                    flags = Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_SINGLE_TOP
-                    putExtra("SYNKING_INCOMING_CALL", true)
-                    putExtra("AUTO_ACCEPT", true)
-                    putExtra("CALL_ID", call.callId)
-                    putExtra("callId", call.callId)
-                    putExtra("callerId", call.callerId)
-                    putExtra("callerName", call.callerName)
-                    putExtra("callType", call.callType)
-                    putExtra("autoAccept", true)
-                }
-                if (launchIntent != null) {
-                    startActivity(launchIntent)
-                }
-            } catch (e: Exception) {
-                Log.e("SYNKING_DEBUG", "[UI] Cold-boot launch error: ${e.message}")
-            }
-        }
+        // 🚀 1. DIRECT NATIVE HTTP SIGNAL (Immediate 0ms Laptop Handshake!)
+        NativeCallSignaling.sendAcceptNatively(finalCallId, finalCallerId, finalCallType)
+
+        // 🚀 2. React Native Event Bridge
+        TelecomModule.emitAcceptEvent(call)
+
+        // 🚀 3. Save pending call for JS cold-boot recovery
+        PendingCallStore.save(this, call)
 
         if (finalCallType == "video") {
             incomingActionsRow?.visibility = View.GONE

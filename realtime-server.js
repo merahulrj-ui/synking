@@ -1304,6 +1304,72 @@ const server = http.createServer((req, res) => {
     return;
   }
 
+  // 10. POST /api/call-signal (Direct Native Android Kotlin VoIP Signaling Relay)
+  if (req.method === 'POST' && pathname === '/api/call-signal') {
+    let body = '';
+    req.on('data', chunk => { body += chunk; });
+    req.on('end', () => {
+      try {
+        const parsed = JSON.parse(body);
+        const signalType = parsed.type; // CALL_ACCEPTED, CALL_REJECTED, CALL_ENDED
+        const callId = parsed.callId || `call_${Date.now()}`;
+        const targetUserId = parsed.targetUserId || parsed.callerId || parsed.receiverId;
+        const senderId = parsed.senderId || parsed.userId || 'native_phone';
+
+        console.log(`📡 [NATIVE_CALL_SIGNAL_RECEIVED] type=${signalType} callId=${callId} target=${targetUserId} from=${senderId}`);
+
+        // Construct targeted WebSocket packet for Laptop/Peer
+        const wsMessage = {
+          type: signalType,
+          targetUserId: targetUserId,
+          senderId: senderId,
+          payload: {
+            callId: callId,
+            callerId: targetUserId,
+            receiverId: senderId,
+            type: parsed.callType || 'audio'
+          }
+        };
+
+        const jsonStr = JSON.stringify(wsMessage);
+        const frame = encodeWebSocketFrame(jsonStr);
+        let delivered = false;
+
+        for (const client of clients) {
+          if (client.writable && (!targetUserId || client.userId === targetUserId)) {
+            try {
+              client.write(frame);
+              delivered = true;
+            } catch(e) {
+              clients.delete(client);
+            }
+          }
+        }
+
+        if (!delivered) {
+          broadcastToWebSockets(wsMessage, null);
+        }
+
+        console.log(`✅ [NATIVE_CALL_SIGNAL_RELAYED] ${signalType} delivered to WebSocket clients (delivered=${delivered})`);
+
+        // If CALL_REJECTED or CALL_ENDED, also send silent push to cancel any ringing
+        if (signalType === 'CALL_REJECTED' || signalType === 'CALL_ENDED') {
+          if (targetUserId) {
+            sendCallPushNotification(targetUserId, { callId, callerId: targetUserId }, true);
+          }
+        }
+
+        res.writeHead(200, { 'Content-Type': 'application/json' });
+        res.end(JSON.stringify({ success: true, delivered, signalType, callId }));
+      } catch(e) {
+        console.error('[NATIVE_CALL_SIGNAL_ERR]', e.message);
+        res.writeHead(400, { 'Content-Type': 'application/json' });
+        res.end(JSON.stringify({ success: false, error: e.message }));
+      }
+    });
+    return;
+  }
+
   res.writeHead(404);
   res.end('Not Found');
 });
