@@ -1,4 +1,4 @@
-﻿package com.synking
+package com.synking
 
 import android.content.Intent
 import android.util.Log
@@ -172,7 +172,7 @@ class TelecomModule(reactContext: ReactApplicationContext) : ReactContextBaseJav
         fun emitAcceptEvent(call: PendingCall) {
             val ctx = reactContext
             if (ctx == null || !ctx.hasActiveCatalystInstance()) {
-                Log.d("SYNKING_DEBUG", "[BRIDGE] reactContext inactive, queuing pending call: ")
+                Log.d("SYNKING_DEBUG", "[BRIDGE] reactContext inactive, queuing pending call: ${call.callId}")
                 pendingEvents.add(call)
                 return
             }
@@ -183,7 +183,7 @@ class TelecomModule(reactContext: ReactApplicationContext) : ReactContextBaseJav
                 putString("callerPhoto", call.callerPhoto ?: "")
                 putString("callType", call.callType)
             }
-            Log.d("SYNKING_DEBUG", "[BRIDGE] emitAcceptEvent -> onTelecomCallAnswered: callId=, caller=, type=")
+            Log.d("SYNKING_DEBUG", "[BRIDGE] emitAcceptEvent -> onTelecomCallAnswered: callId=${call.callId}, caller=${call.callerName}, type=${call.callType}")
             ctx.getJSModule(DeviceEventManagerModule.RCTDeviceEventEmitter::class.java)
                 .emit("onTelecomCallAnswered", params)
         }
@@ -227,7 +227,7 @@ class TelecomModule(reactContext: ReactApplicationContext) : ReactContextBaseJav
 
         fun onReactContextReady(ctx: ReactContext) {
             reactContext = ctx
-            Log.d("SYNKING_DEBUG", "[BRIDGE] onReactContextReady: Flushing  pending call events")
+            Log.d("SYNKING_DEBUG", "[BRIDGE] onReactContextReady: Flushing ${pendingEvents.size} pending call events")
             while (true) {
                 val call = pendingEvents.poll() ?: break
                 emitAcceptEvent(call)

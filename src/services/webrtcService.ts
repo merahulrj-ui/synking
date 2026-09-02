@@ -258,7 +258,6 @@ class WebRTCManager {
 
     if (autoAccept) {
       // Native lockscreen already accepted it, skip ringtone and timer!
-      this.initLocalStream(type === 'video');
       this.startTimer();
     } else {
       // Normal React Native incoming call flow
@@ -269,36 +268,49 @@ class WebRTCManager {
     return incomingSession;
   }
 
+  private isAccepting = false;
+
   // 3. Accept Incoming Call
   public async acceptCall() {
     if (!this.currentSession) return;
-    this.cleanupTimers();
-    RingtoneService.stop();
-    const isVideo = this.currentSession?.type === 'video';
-    // Initialize Local Media First (This grabs the microphone and resets audio route)
-    await this.initLocalStream(isVideo);
+    if (this.isAccepting) {
+      this.log('⚠️ acceptCall: already in progress, skipping duplicate.');
+      return;
+    }
+    this.isAccepting = true;
+    try {
+      this.cleanupTimers();
+      RingtoneService.stop();
+      const isVideo = this.currentSession?.type === 'video';
+      
+      if (!this.localStream) {
+        await this.initLocalStream(isVideo);
+      }
 
-    // FIX: Set speaker ON only AFTER WebRTC initializes the mic!
-    setTimeout(() => {
+      // FIX: Set speaker ON only AFTER WebRTC initializes the mic!
+      setTimeout(() => {
         AudioRouteService.setSpeakerOn(true).catch(() => {});
-    }, 500);
+      }, 500);
 
-    this.currentSession.status = 'connected';
-    this.notify();
-    this.startTimer();
+      this.currentSession.status = 'connected';
+      this.notify();
+      this.startTimer();
 
-    const peerId = this.getPeerUserId();
-    this.log(`🚀 Broadcasting CALL_ACCEPTED for callId=${this.currentSession.id} to peerId=${peerId || 'ALL'}`);
-    RealtimeBridge.broadcast(
-      'CALL_ACCEPTED',
-      {
-        callId: this.currentSession.id,
-      },
-      peerId || undefined
-    );
+      const peerId = this.getPeerUserId();
+      this.log(`🚀 Broadcasting CALL_ACCEPTED for callId=${this.currentSession.id} to peerId=${peerId || 'ALL'}`);
+      RealtimeBridge.broadcast(
+        'CALL_ACCEPTED',
+        {
+          callId: this.currentSession.id,
+        },
+        peerId || undefined
+      );
 
-    if (this.pendingOffer) {
-      await this.handleIncomingOffer(this.pendingOffer);
+      if (this.pendingOffer) {
+        await this.handleIncomingOffer(this.pendingOffer);
+      }
+    } finally {
+      this.isAccepting = false;
     }
   }
 

@@ -188,9 +188,20 @@ class IncomingCallActivity : Activity() {
     fun attachRemoteVideo(streamUrl: String) {
         val ctx = TelecomModule.globalReactContext ?: return
         if (remoteWebRTCView == null) {
-            remoteWebRTCView = WebRTCView(ctx)
+            remoteWebRTCView = WebRTCView(ctx).apply {
+                layoutParams = FrameLayout.LayoutParams(
+                    FrameLayout.LayoutParams.MATCH_PARENT,
+                    FrameLayout.LayoutParams.MATCH_PARENT
+                )
+            }
             remoteVideoContainer?.addView(remoteWebRTCView)
         }
+
+        try {
+            val methodFit = remoteWebRTCView!!.javaClass.getDeclaredMethod("setObjectFit", String::class.java)
+            methodFit.isAccessible = true
+            methodFit.invoke(remoteWebRTCView, "cover")
+        } catch (e: Exception) {}
 
         try {
             val method = remoteWebRTCView!!.javaClass.getDeclaredMethod("setStreamURL", String::class.java)
@@ -212,10 +223,21 @@ class IncomingCallActivity : Activity() {
     fun attachLocalVideo(streamUrl: String) {
         val ctx = TelecomModule.globalReactContext ?: return
         if (localWebRTCView == null) {
-            localWebRTCView = WebRTCView(ctx)
-            localWebRTCView?.setMirror(true)
+            localWebRTCView = WebRTCView(ctx).apply {
+                layoutParams = FrameLayout.LayoutParams(
+                    FrameLayout.LayoutParams.MATCH_PARENT,
+                    FrameLayout.LayoutParams.MATCH_PARENT
+                )
+                setMirror(true)
+            }
             localVideoContainer?.addView(localWebRTCView)
         }
+
+        try {
+            val methodFit = localWebRTCView!!.javaClass.getDeclaredMethod("setObjectFit", String::class.java)
+            methodFit.isAccessible = true
+            methodFit.invoke(localWebRTCView, "cover")
+        } catch (e: Exception) {}
 
         try {
             val method = localWebRTCView!!.javaClass.getDeclaredMethod("setStreamURL", String::class.java)
@@ -515,16 +537,21 @@ class IncomingCallActivity : Activity() {
     }
 
     private fun handleAccept() {
-        Log.d("SYNKING_DEBUG", "[UI] ACCEPT_BUTTON_TAPPED: callId=$callId callerId=$callerId callerName=$callerName type=$callType")
+        val finalCallId = if (callId.isNotEmpty()) callId else (intent.getStringExtra("callId") ?: "")
+        val finalCallerId = if (callerId.isNotEmpty()) callerId else (intent.getStringExtra("callerId") ?: "")
+        val finalCallerName = if (callerName.isNotEmpty()) callerName else (intent.getStringExtra("callerName") ?: "Unknown")
+        val finalCallType = if (callType.isNotEmpty()) callType else (intent.getStringExtra("callType") ?: "audio")
+
+        Log.d("SYNKING_DEBUG", "[UI] ACCEPT_BUTTON_TAPPED: callId=$finalCallId callerId=$finalCallerId callerName=$finalCallerName type=$finalCallType")
         stopRingtoneAndVibration()
         CallConnectionManager.answerCall()
 
         val call = PendingCall(
-            callId = callId,
-            callerId = callerId,
-            callerName = callerName,
+            callId = finalCallId,
+            callerId = finalCallerId,
+            callerName = finalCallerName,
             callerPhoto = null,
-            callType = callType
+            callType = finalCallType
         )
 
         val ctx = TelecomModule.reactContext
@@ -557,7 +584,7 @@ class IncomingCallActivity : Activity() {
             }
         }
 
-        if (callType == "video") {
+        if (finalCallType == "video") {
             incomingActionsRow?.visibility = View.GONE
             activeActionsRow?.visibility = View.VISIBLE
             subtitleView?.text = "Connecting video..."
