@@ -37,6 +37,12 @@ class TelecomModule(reactContext: ReactApplicationContext) : ReactContextBaseJav
         }
     }
 
+    override fun onCatalystInstanceDestroy() {
+        super.onCatalystInstanceDestroy()
+        isJSBridgeReady.set(false)
+        Log.w("SYNKING_DEBUG", "⚠️ CatalystInstance destroyed — JS bridge marked NOT ready")
+    }
+
     @ReactMethod
     fun acknowledgeEvent(callId: String, action: String, promise: Promise) {
         try {
