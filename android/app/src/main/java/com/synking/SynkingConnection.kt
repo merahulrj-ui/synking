@@ -27,14 +27,16 @@ class SynkingConnection(
 
     override fun onShowIncomingCallUi() {
         super.onShowIncomingCallUi()
-        Log.d("SYNKING_TELECOM", "[UI] INCOMING_CALL_SHOWN: Showing custom IncomingCallActivity for $callId ($callerId)")
+        Log.d("SYNKING_TELECOM", "[UI] INCOMING_CALL_SHOWN: Launching MainActivity directly as Single Unified CallModal Dialer for $callId ($callerId)")
 
-        val fullScreenIntent = Intent(context, IncomingCallActivity::class.java).apply {
+        val fullScreenIntent = Intent(context, MainActivity::class.java).apply {
             flags = Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_SINGLE_TOP or Intent.FLAG_ACTIVITY_REORDER_TO_FRONT
+            putExtra("SYNKING_INCOMING_CALL", true)
             putExtra("callId", callId)
             putExtra("callerId", callerId)
             putExtra("callerName", callerName)
             putExtra("callType", callType)
+            putExtra("autoAccept", false)
         }
 
         val piFlags = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.M) {
@@ -57,8 +59,8 @@ class SynkingConnection(
             ).apply {
                 lockscreenVisibility = NotificationCompat.VISIBILITY_PUBLIC
                 setBypassDnd(true)
-                setSound(null, null) // Ringtone plays in IncomingCallActivity
-                enableVibration(false) // Single source of vibration in IncomingCallActivity
+                setSound(null, null)
+                enableVibration(false)
             }
             nm.createNotificationChannel(channel)
         }
@@ -72,8 +74,9 @@ class SynkingConnection(
         )
 
         // ── Accept Action ──
-        val acceptIntent = Intent(context, IncomingCallActivity::class.java).apply {
+        val acceptIntent = Intent(context, MainActivity::class.java).apply {
             flags = Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_SINGLE_TOP
+            putExtra("SYNKING_INCOMING_CALL", true)
             putExtra("callId", callId)
             putExtra("callerId", callerId)
             putExtra("callerName", callerName)

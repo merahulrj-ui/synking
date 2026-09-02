@@ -41,6 +41,7 @@ setTimeout(async () => {
 
         if (pending && pending.callId) {
           WebRTCService.log("[HEADLESS_BOOT] WOKE UP FOR CALL: " + pending.callId);
+          const shouldAutoAccept = !!(pending as any).autoAccept;
           WebRTCService.receiveIncomingCall(
             {
               id: pending.callerId || 'caller',
@@ -60,9 +61,11 @@ setTimeout(async () => {
             },
             (pending.callType || 'audio') as any,
             pending.callId,
-            true // autoAccept = true!
+            shouldAutoAccept
           );
-          await WebRTCService.acceptCall(pending.callId);
+          if (shouldAutoAccept) {
+            await WebRTCService.acceptCall(pending.callId);
+          }
           if (Platform.OS === 'android' && NativeModules.TelecomModule?.notifyBridgedToJs) {
             NativeModules.TelecomModule.notifyBridgedToJs(pending.callId).catch(() => {});
           }
@@ -95,26 +98,11 @@ function GlobalCallOverlay() {
   const isIncoming = activeCall ? activeCall.callerId !== currentUser?.id : false;
 
   React.useEffect(() => {
-    if (Platform.OS === 'android' && isIncoming && isIncomingRinging && activeCall) {
-      const { AppState, NativeModules } = require('react-native');
-      if (AppState.currentState === 'active' && NativeModules.TelecomModule?.launchIncomingCallActivity) {
-        NativeModules.TelecomModule.launchIncomingCallActivity(
-          activeCall.id,
-          activeCall.callerName || 'Unknown',
-          activeCall.type || 'video'
-        ).catch(() => {});
-      }
-    }
+    // Single Unified Dialer: CallModal handles both in-app and lockscreen calls.
+    // No more launching IncomingCallActivity!
   }, [isIncoming, isIncomingRinging, activeCall?.id]);
 
   if (!activeCall) return null;
-
-  if (Platform.OS === 'android' && isIncoming) {
-
-    // Both Audio and Video Incoming Calls are now handled 100% natively by IncomingCallActivity.
-    // JS runs purely headless to manage WebRTC state.
-    return null; 
-  }
 
   const handleEndCall = () => {
     const result = WebRTCService.endCall();
@@ -128,11 +116,10 @@ function GlobalCallOverlay() {
             : `📞 Voice Call · ${session.durationSeconds > 0 ? durationFormatted : 'Missed'}`;
         sendMessage(targetId, callLogText, 'text');
       }
-
-      // If this was an incoming call, auto-minimize to mimic WhatsApp's behavior
-      if (session.callerId !== currentUser.id && Platform.OS === 'android') {
-        NativeModules.TelecomModule?.minimizeApp?.();
-      }
+    }
+    // Always notify native TelecomModule to end call & finish lockscreen task if needed
+    if (Platform.OS === 'android' && NativeModules.TelecomModule?.endCall) {
+      NativeModules.TelecomModule.endCall().catch(() => {});
     }
   };
 

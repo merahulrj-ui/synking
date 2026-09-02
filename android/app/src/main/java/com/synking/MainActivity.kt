@@ -10,10 +10,36 @@ import com.facebook.react.defaults.DefaultNewArchitectureEntryPoint.fabricEnable
 import com.facebook.react.defaults.DefaultReactActivityDelegate
 
 import expo.modules.ReactActivityDelegateWrapper
+import android.content.BroadcastReceiver
+import android.content.Context
+import android.content.IntentFilter
 
 class MainActivity : ReactActivity() {
 
+  companion object {
+    @Volatile var isLockscreenCall = false
+  }
+
   private var pendingIncomingCallIntent: Intent? = null
+
+  private val callEndedReceiver = object : BroadcastReceiver() {
+    override fun onReceive(context: Context?, intent: Intent?) {
+      if (isLockscreenCall) {
+        android.util.Log.d("SYNKING_DEBUG", "MainActivity: CALL_ENDED received for lockscreen call — auto-dismissing to lockscreen")
+        isLockscreenCall = false
+        runOnUiThread {
+          try {
+            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O_MR1) {
+              setShowWhenLocked(false)
+            }
+            finishAndRemoveTask()
+          } catch (e: Exception) {
+            finish()
+          }
+        }
+      }
+    }
+  }
 
   override fun onCreate(savedInstanceState: Bundle?) {
     // Set the theme to AppTheme BEFORE onCreate to support
@@ -50,9 +76,23 @@ class MainActivity : ReactActivity() {
       android.util.Log.w("SYNKING_NATIVE", "NotificationChannel warning: ${e.message}")
     }
 
-    // 2. Main dating app is secure behind phone lock screen (only IncomingCallActivity displays over lock screen)
+    // 2. Register CALL_ENDED_FROM_JS receiver for 0ms lockscreen auto-dismiss
+    try {
+      val filter = IntentFilter("com.synking.CALL_ENDED_FROM_JS")
+      if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
+        registerReceiver(callEndedReceiver, filter, Context.RECEIVER_NOT_EXPORTED)
+      } else {
+        registerReceiver(callEndedReceiver, filter)
+      }
+    } catch (e: Exception) {}
+  }
 
-    // 3. VoIP Telecom is registered natively via SynkingConnectionService
+  override fun onDestroy() {
+    super.onDestroy()
+    try {
+      unregisterReceiver(callEndedReceiver)
+    } catch (e: Exception) {}
+    isLockscreenCall = false
   }
 
   /**
@@ -108,6 +148,8 @@ class MainActivity : ReactActivity() {
         return
     }
 
+    isLockscreenCall = true
+
     if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O_MR1) {
         setShowWhenLocked(true)
         setTurnScreenOn(true)
@@ -124,6 +166,7 @@ class MainActivity : ReactActivity() {
     val callerName = intent.getStringExtra("callerName") ?: "Someone"
     val callType = intent.getStringExtra("callType") ?: "audio"
     val callerPhoto = intent.getStringExtra("callerPhoto")
+    val autoAccept = intent.getBooleanExtra("autoAccept", false)
 
     CallIntentModule.pendingCallId = callId
     CallIntentModule.pendingCallerId = callerId
@@ -131,10 +174,18 @@ class MainActivity : ReactActivity() {
     CallIntentModule.pendingCallType = callType
     CallIntentModule.pendingCallerPhoto = callerPhoto
 
+    if (callId.isNotEmpty()) {
+      val pending = PendingCall(callId, callerId, callerName, callerPhoto, callType, autoAccept)
+      PendingCallStore.save(this, pending)
+      if (autoAccept) {
+        TelecomModule.emitAcceptEvent(pending)
+      }
+    }
+
     android.util.Log.d(
         "SYNKING_FCM",
-        "[SYNKING_CALL_DEBUG] [OK] MAIN_ACTIVITY_HANDOFF " +
-        "callId=$callId caller=$callerName type=$callType"
+        "[SYNKING_CALL_DEBUG] [OK] MAIN_ACTIVITY_INCOMING_CALL " +
+        "callId=$callId caller=$callerName type=$callType autoAccept=$autoAccept"
     )
   }
 }

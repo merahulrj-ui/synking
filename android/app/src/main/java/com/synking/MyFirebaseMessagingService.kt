@@ -270,13 +270,15 @@ class MyFirebaseMessagingService : FirebaseMessagingService() {
             PendingIntent.FLAG_UPDATE_CURRENT
         }
 
-        val fullScreenIntent = Intent(this, IncomingCallActivity::class.java).apply {
+        val fullScreenIntent = Intent(this, MainActivity::class.java).apply {
             flags = Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_SINGLE_TOP or Intent.FLAG_ACTIVITY_REORDER_TO_FRONT
+            putExtra("SYNKING_INCOMING_CALL", true)
             putExtra("callId", callId)
             putExtra("callerId", callerId)
             putExtra("callerName", callerName)
             putExtra("callerPhoto", callerPhoto)
             putExtra("callType", callType)
+            putExtra("autoAccept", false)
         }
         val fullScreenPendingIntent = PendingIntent.getActivity(this, callId.hashCode(), fullScreenIntent, piFlags)
 
@@ -308,8 +310,9 @@ class MyFirebaseMessagingService : FirebaseMessagingService() {
             val declinePendingIntent = PendingIntent.getBroadcast(this, callId.hashCode() + 1, declineIntent, piFlags)
             
             // ACCEPT ACTION
-            val acceptIntent = Intent(this, IncomingCallActivity::class.java).apply {
+            val acceptIntent = Intent(this, MainActivity::class.java).apply {
                 flags = Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_SINGLE_TOP
+                putExtra("SYNKING_INCOMING_CALL", true)
                 putExtra("callId", callId)
                 putExtra("callerName", callerName)
                 putExtra("callerPhoto", callerPhoto)
@@ -343,14 +346,14 @@ class MyFirebaseMessagingService : FirebaseMessagingService() {
         try {
             Log.d(
                 "SYNKING_FCM",
-                "DIRECT_START_ACTIVITY: attempting IncomingCallActivity; appState=background/service"
+                "DIRECT_START_ACTIVITY: attempting MainActivity; appState=background/service"
             )
             startActivity(fullScreenIntent)
             Log.d(
                 "SYNKING_FCM",
                 "DIRECT_START_ACTIVITY: SUCCESS"
             )
-            debug("DIRECT_ACTIVITY_LAUNCH", "OK", "Forced IncomingCallActivity to front.")
+            debug("DIRECT_ACTIVITY_LAUNCH", "OK", "Forced MainActivity to front.")
         } catch (e: Exception) {
             Log.e(
                 "SYNKING_FCM",

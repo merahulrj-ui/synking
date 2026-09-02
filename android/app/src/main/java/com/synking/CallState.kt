@@ -31,10 +31,10 @@ object CallState {
     }
 
     fun clear(context: Context, callId: String? = null) {
-        if (callId == null || activeCallId == callId) {
-            activeCallId = null
+        activeCallId = null
+        try {
             context.getSharedPreferences(PREFS, Context.MODE_PRIVATE)
                 .edit().remove(KEY_ACTIVE_ID).remove(KEY_TS).apply()
-        }
+        } catch (e: Exception) {}
     }
 }

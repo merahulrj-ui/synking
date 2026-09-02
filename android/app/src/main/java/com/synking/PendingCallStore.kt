@@ -1,4 +1,4 @@
-﻿package com.synking
+package com.synking
 
 import android.content.Context
 import org.json.JSONObject
@@ -8,7 +8,8 @@ data class PendingCall(
     val callerId: String,
     val callerName: String,
     val callerPhoto: String?,
-    val callType: String
+    val callType: String,
+    val autoAccept: Boolean = false
 )
 
 object PendingCallStore {
@@ -22,6 +23,7 @@ object PendingCallStore {
             put("callerName", call.callerName)
             put("callerPhoto", call.callerPhoto ?: "")
             put("callType", call.callType)
+            put("autoAccept", call.autoAccept)
         }
         context.getSharedPreferences(PREFS, Context.MODE_PRIVATE)
             .edit().putString(KEY_CALL, json.toString()).commit()
@@ -37,7 +39,8 @@ object PendingCallStore {
                 callerId = json.getString("callerId"),
                 callerName = json.optString("callerName"),
                 callerPhoto = json.optString("callerPhoto").ifEmpty { null },
-                callType = json.getString("callType")
+                callType = json.getString("callType"),
+                autoAccept = json.optBoolean("autoAccept", false)
             )
         } catch (e: Exception) {
             clear(context)

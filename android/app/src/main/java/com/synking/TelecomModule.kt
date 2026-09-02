@@ -67,6 +67,7 @@ class TelecomModule(reactContext: ReactApplicationContext) : ReactContextBaseJav
                     putString("callerName", call.callerName)
                     putString("callerPhoto", call.callerPhoto ?: "")
                     putString("callType", call.callType)
+                    putBoolean("autoAccept", call.autoAccept)
                 }
                 promise.resolve(map)
             } else {
@@ -120,8 +121,9 @@ class TelecomModule(reactContext: ReactApplicationContext) : ReactContextBaseJav
     fun launchIncomingCallActivity(callId: String, callerName: String, callType: String, promise: Promise) {
         try {
             val ctx = reactApplicationContext
-            val intent = Intent(ctx, IncomingCallActivity::class.java).apply {
+            val intent = Intent(ctx, MainActivity::class.java).apply {
                 flags = Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_SINGLE_TOP
+                putExtra("SYNKING_INCOMING_CALL", true)
                 putExtra("callId", callId)
                 putExtra("callerName", callerName)
                 putExtra("callType", callType)
@@ -166,19 +168,31 @@ class TelecomModule(reactContext: ReactApplicationContext) : ReactContextBaseJav
     @ReactMethod
     fun endCall(promise: Promise) {
         try {
+            CallState.clear(reactApplicationContext)
+            PendingCallStore.clear(reactApplicationContext)
             CallConnectionManager.endCall()
             IncomingCallActivity.stopRingtoneGlobally()
-            incomingActivityInstance?.let { activity ->
-                activity.runOnUiThread {
-                    try {
-                        activity.finishAndRemoveTask()
-                    } catch (e: Exception) {}
-                    activity.finish()
-                }
-            }
+
             val intent = Intent("com.synking.CALL_ENDED_FROM_JS")
             reactContextInstance?.sendBroadcast(intent)
-            Log.d("SYNKING_TELECOM", "[TELECOM] CALL_ENDED: Connection destroyed from React Native")
+            Log.d("SYNKING_TELECOM", "[TELECOM] CALL_ENDED: Broadcast sent from React Native")
+
+            // Only auto-dismiss and finish task if this was an incoming call over the lockscreen!
+            if (MainActivity.isLockscreenCall) {
+                MainActivity.isLockscreenCall = false
+                reactApplicationContext.currentActivity?.let { act ->
+                    act.runOnUiThread {
+                        try {
+                            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O_MR1) {
+                                act.setShowWhenLocked(false)
+                            }
+                            act.finishAndRemoveTask()
+                        } catch (e: Exception) {
+                            act.finish()
+                        }
+                    }
+                }
+            }
             promise.resolve(true)
         } catch (e: Exception) {
             promise.reject("TELECOM_ERROR", e.message)
