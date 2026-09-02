@@ -480,12 +480,11 @@ Remote Video Tracks (${remoteVideo.length}): ${JSON.stringify(remoteVideo)}
     setTimeout(() => setCopied(false), 3000);
   };
 
-  return (
-    <Modal visible={!!session} animationType="fade" transparent>
-      <View style={styles.modalOverlay}>
-        <LinearGradient
-          colors={['#0F172A', '#05060A', '#020617']}
-          style={styles.callingCard}
+  const callContent = (
+    <View style={styles.modalOverlay}>
+      <LinearGradient
+        colors={['#0F172A', '#05060A', '#020617']}
+        style={styles.callingCard}
         >
           {/* 1. CONNECTED VIDEO CALL: Fullscreen Remote Video + Draggable Self PiP */}
           {isConnected && (session.type === 'video' || session.isVideoEnabled) && (
@@ -725,6 +724,19 @@ Remote Video Tracks (${remoteVideo.length}): ${JSON.stringify(remoteVideo)}
           )}
         </LinearGradient>
       </View>
+  );
+
+  if (Platform.OS === 'android') {
+    return (
+      <View style={[StyleSheet.absoluteFill, { zIndex: 999999, elevation: 999999 }]}>
+        {callContent}
+      </View>
+    );
+  }
+
+  return (
+    <Modal visible={!!session} animationType="fade" transparent>
+      {callContent}
     </Modal>
   );
 };

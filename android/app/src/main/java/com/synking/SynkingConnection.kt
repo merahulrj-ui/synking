@@ -27,10 +27,10 @@ class SynkingConnection(
 
     override fun onShowIncomingCallUi() {
         super.onShowIncomingCallUi()
-        Log.d("SYNKING_TELECOM", "[UI] INCOMING_CALL_SHOWN: Launching MainActivity directly as Single Unified CallModal Dialer for $callId ($callerId)")
+        Log.d("SYNKING_TELECOM", "[UI] INCOMING_CALL_SHOWN: Launching CallActivity directly as Single Unified CallModal Dialer for $callId ($callerId)")
 
-        val fullScreenIntent = Intent(context, MainActivity::class.java).apply {
-            flags = Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_SINGLE_TOP or Intent.FLAG_ACTIVITY_REORDER_TO_FRONT
+        val fullScreenIntent = Intent(context, CallActivity::class.java).apply {
+            flags = Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_SINGLE_TOP
             putExtra("SYNKING_INCOMING_CALL", true)
             putExtra("callId", callId)
             putExtra("callerId", callerId)
@@ -74,7 +74,7 @@ class SynkingConnection(
         )
 
         // ── Accept Action ──
-        val acceptIntent = Intent(context, MainActivity::class.java).apply {
+        val acceptIntent = Intent(context, CallActivity::class.java).apply {
             flags = Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_SINGLE_TOP
             putExtra("SYNKING_INCOMING_CALL", true)
             putExtra("callId", callId)

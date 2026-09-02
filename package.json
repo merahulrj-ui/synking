@@ -1,6 +1,6 @@
 {
   "name": "synking",
-  "main": "expo-router/entry",
+  "main": "index.js",
   "version": "1.0.4",
   "scripts": {
     "start": "expo start",

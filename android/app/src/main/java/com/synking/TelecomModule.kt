@@ -178,19 +178,16 @@ class TelecomModule(reactContext: ReactApplicationContext) : ReactContextBaseJav
             reactContextInstance?.sendBroadcast(intent)
             Log.d("SYNKING_TELECOM", "[TELECOM] CALL_ENDED: Broadcast sent from React Native")
 
-            // Only auto-dismiss and finish task if this was an incoming call over the lockscreen!
-            if (MainActivity.isLockscreenCall) {
-                MainActivity.isLockscreenCall = false
-                reactApplicationContext.currentActivity?.let { act ->
-                    act.runOnUiThread {
-                        try {
-                            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O_MR1) {
-                                act.setShowWhenLocked(false)
-                            }
-                            act.finishAndRemoveTask()
-                        } catch (e: Exception) {
-                            act.finish()
+            // Dismiss CallActivity on call end (returns directly to Lock Screen)
+            CallActivity.currentCallActivity?.let { act ->
+                act.runOnUiThread {
+                    try {
+                        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O_MR1) {
+                            act.setShowWhenLocked(false)
                         }
+                        act.finishAndRemoveTask()
+                    } catch (e: Exception) {
+                        act.finish()
                     }
                 }
             }
@@ -213,6 +210,23 @@ class TelecomModule(reactContext: ReactApplicationContext) : ReactContextBaseJav
         private val handler = Handler(Looper.getMainLooper())
         private const val RETRY_DELAY_MS = 500L
         private const val MAX_RETRIES = 20
+
+        fun emitIncomingCallEvent(call: PendingCall) {
+            val ctx = reactContext ?: return
+            if (!ctx.hasActiveCatalystInstance()) return
+
+            val params = Arguments.createMap().apply {
+                putString("callId", call.callId)
+                putString("callerId", call.callerId)
+                putString("callerName", call.callerName)
+                putString("callerPhoto", call.callerPhoto ?: "")
+                putString("callType", call.callType)
+            }
+
+            Log.d("SYNKING_DEBUG", "📤 [BRIDGE] emitIncomingCallEvent -> onTelecomIncomingCall: callId=${call.callId}")
+            ctx.getJSModule(DeviceEventManagerModule.RCTDeviceEventEmitter::class.java)
+                .emit("onTelecomIncomingCall", params)
+        }
 
         fun emitAcceptEvent(call: PendingCall) {
             if (isJSBridgeReady.get() && reactContext?.hasActiveCatalystInstance() == true) {

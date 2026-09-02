@@ -233,7 +233,7 @@ class WebRTCManager {
       return this.currentSession;
     }
 
-    this.cleanup();
+    this.cleanupPeerConnectionOnly();
 
     const incomingSession: CallSession = {
       id: callId || `incoming_${Date.now()}_${Math.random().toString(36).substring(2, 7)}`,
@@ -817,6 +817,32 @@ class WebRTCManager {
   }
 
   private isCleaningUp = false;
+
+  private cleanupPeerConnectionOnly() {
+    try {
+      this.cleanupTimers();
+      RingtoneService.stop();
+      this.iceStatus = 'disconnected';
+      this.pendingOffer = null;
+      this.iceCandidateQueue = [];
+      this.remoteVideoFrame = null;
+
+      if (this.localStream) {
+        try {
+          this.localStream.getTracks().forEach((track: any) => track.stop());
+        } catch (e) {}
+        this.localStream = null;
+      }
+
+      const pc = this.peerConnection;
+      this.peerConnection = null;
+      if (pc) {
+        try {
+          pc.close();
+        } catch (e) {}
+      }
+    } catch (e) {}
+  }
 
   private cleanup() {
     if (this.isCleaningUp) return;

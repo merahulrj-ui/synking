@@ -270,8 +270,8 @@ class MyFirebaseMessagingService : FirebaseMessagingService() {
             PendingIntent.FLAG_UPDATE_CURRENT
         }
 
-        val fullScreenIntent = Intent(this, MainActivity::class.java).apply {
-            flags = Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_SINGLE_TOP or Intent.FLAG_ACTIVITY_REORDER_TO_FRONT
+        val fullScreenIntent = Intent(this, CallActivity::class.java).apply {
+            flags = Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_SINGLE_TOP
             putExtra("SYNKING_INCOMING_CALL", true)
             putExtra("callId", callId)
             putExtra("callerId", callerId)
@@ -310,7 +310,7 @@ class MyFirebaseMessagingService : FirebaseMessagingService() {
             val declinePendingIntent = PendingIntent.getBroadcast(this, callId.hashCode() + 1, declineIntent, piFlags)
             
             // ACCEPT ACTION
-            val acceptIntent = Intent(this, MainActivity::class.java).apply {
+            val acceptIntent = Intent(this, CallActivity::class.java).apply {
                 flags = Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_SINGLE_TOP
                 putExtra("SYNKING_INCOMING_CALL", true)
                 putExtra("callId", callId)
