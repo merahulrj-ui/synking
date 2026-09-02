@@ -355,6 +355,9 @@ class IncomingCallActivity : Activity() {
             setOnClickListener {
                 stopRingtoneAndVibration()
                 CallConnectionManager.rejectCall()
+                try {
+                    finishAndRemoveTask()
+                } catch (e: Exception) {}
                 finish()
             }
         }
@@ -416,6 +419,9 @@ class IncomingCallActivity : Activity() {
             setOnClickListener {
                 TelecomModule.emitEndCallEvent()
                 CallConnectionManager.endCall()
+                try {
+                    finishAndRemoveTask()
+                } catch (e: Exception) {}
                 finish()
             }
         }
