@@ -1,4 +1,4 @@
-﻿import { NativeModules, DeviceEventEmitter, Platform } from 'react-native';
+import { NativeModules, DeviceEventEmitter, Platform } from 'react-native';
 import { WebRTCService } from './webrtcService';
 
 const { TelecomModule } = NativeModules;
@@ -23,14 +23,24 @@ export function ensureTelecomBridgeReady() {
       }
 
       // 🔄 2. Auto-initialize session if not present in JS
-      if (data && callId && (!WebRTCService.currentSession || WebRTCService.currentSession.id !== callId)) {
+      const cur = WebRTCService.getCurrentSession();
+      if (data && callId && (!cur || cur.id !== callId)) {
         WebRTCService.receiveIncomingCall(
           {
             id: data.callerId || 'caller',
             name: data.callerName || 'Caller',
             age: 22,
             gender: 'other',
-            avatar: data.callerPhoto || '',
+            occupation: '',
+            location: '',
+            distance: '',
+            bio: '',
+            photo: data.callerPhoto || '',
+            photos: [],
+            interests: [],
+            compatibility: 100,
+            isVerified: true,
+            isVip: false,
           },
           data.callType || 'audio',
           callId,

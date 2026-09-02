@@ -29,6 +29,10 @@ class RealtimeBridgeManager {
     this.connectWebSocket();
   }
 
+  public get myUserId(): string | null {
+    return this.registeredUserId;
+  }
+
   public registerUser(userId: string) {
     this.registeredUserId = userId;
     if (this.socket && this.socket.readyState === WebSocket.OPEN && userId) {

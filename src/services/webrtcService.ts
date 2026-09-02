@@ -33,6 +33,10 @@ type FrameListener = (frame: string | null) => void;
 
 class WebRTCManager {
   private currentSession: CallSession | null = null;
+
+  public getCurrentSession(): CallSession | null {
+    return this.currentSession;
+  }
   private listeners: Set<CallStateListener> = new Set();
   private logListeners: Set<(msg: string) => void> = new Set();
   private frameListeners: Set<FrameListener> = new Set();

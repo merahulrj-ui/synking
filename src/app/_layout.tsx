@@ -47,7 +47,16 @@ setTimeout(async () => {
               name: pending.callerName || 'Caller',
               age: 22,
               gender: 'other',
-              avatar: pending.callerPhoto || 'https://via.placeholder.com/150'
+              occupation: '',
+              location: '',
+              distance: '',
+              bio: '',
+              photo: pending.callerPhoto || 'https://via.placeholder.com/150',
+              photos: [],
+              interests: [],
+              compatibility: 100,
+              isVerified: true,
+              isVip: false,
             },
             (pending.callType || 'audio') as any,
             pending.callId,
@@ -138,9 +147,6 @@ function GlobalCallOverlay() {
     />
   );
 }
-
-
-import { NativeModules } from 'react-native';
 
 export default function RootLayout() {
   useEffect(() => {

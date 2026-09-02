@@ -172,9 +172,12 @@ class NotificationServiceClass {
     if (Platform.OS === 'android') {
       try {
         // Try firebase/messaging first (most reliable native FCM token)
-        const { getMessaging, getToken } = await import('@react-native-firebase/messaging').catch(() => ({ getMessaging: null, getToken: null }));
-        if (getMessaging && getToken) {
-          const nativeToken = await getToken(getMessaging()).catch(() => null);
+        let fbMessaging: any = null;
+        try {
+          fbMessaging = require('@react-native-firebase/messaging');
+        } catch (e) {}
+        if (fbMessaging && fbMessaging.default) {
+          const nativeToken = await fbMessaging.default().getToken().catch(() => null);
           if (nativeToken) {
             fcmPushToken = nativeToken;
             CallDebugger.logStage('FCM TOKEN (native)', 'OK', { token: nativeToken.substring(0, 20) + '...' });

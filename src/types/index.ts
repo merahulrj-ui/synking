@@ -113,6 +113,7 @@ export interface ChatMessage {
     callStatus?: 'completed' | 'missed' | 'declined';
     audioUrl?: string;
     audioDuration?: number;
+    reaction?: string;
   };
 }
 
