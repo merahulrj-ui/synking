@@ -48,37 +48,7 @@ class MainActivity : ReactActivity() {
 
     // 2. Main dating app is secure behind phone lock screen (only IncomingCallActivity displays over lock screen)
 
-    // 3. Automated WhatsApp-style VoIP Call Permissions Prompt
-    requestEssentialCallPermissions()
-  }
-
-  private fun requestEssentialCallPermissions() {
-    try {
-      val pkg = packageName
-      // 1. Battery Optimization (Bypass Doze mode for instant lockscreen call arrival)
-      if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.M) {
-        val pm = getSystemService(android.content.Context.POWER_SERVICE) as? android.os.PowerManager
-        if (pm != null && !pm.isIgnoringBatteryOptimizations(pkg)) {
-          val intent = Intent(android.provider.Settings.ACTION_REQUEST_IGNORE_BATTERY_OPTIMIZATIONS).apply {
-            data = android.net.Uri.parse("package:$pkg")
-          }
-          startActivity(intent)
-        }
-      }
-
-      // 2. Full Screen Intent for Lockscreen Calls (Android 14+ / API 34+)
-      if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.UPSIDE_DOWN_CAKE) {
-        val nm = getSystemService(android.content.Context.NOTIFICATION_SERVICE) as? android.app.NotificationManager
-        if (nm != null && !nm.canUseFullScreenIntent()) {
-          val intent = Intent(android.provider.Settings.ACTION_MANAGE_APP_USE_FULL_SCREEN_INTENT).apply {
-            data = android.net.Uri.parse("package:$pkg")
-          }
-          startActivity(intent)
-        }
-      }
-    } catch (e: Exception) {
-      android.util.Log.w("SYNKING_NATIVE", "Error requesting VoIP permissions: ${e.message}")
-    }
+    // 3. VoIP Telecom is registered natively via SynkingConnectionService
   }
 
   /**
