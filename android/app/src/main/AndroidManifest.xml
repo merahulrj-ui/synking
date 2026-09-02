@@ -72,10 +72,6 @@
       android:launchMode="singleTask" 
       android:windowSoftInputMode="adjustResize" 
       android:theme="@style/Theme.App.SplashScreen" 
-      android:showWhenLocked="true"
-      android:turnScreenOn="true"
-      android:showForAllUsers="true"
-      android:inheritShowWhenLocked="true"
       android:exported="true">
       <intent-filter>
         <action android:name="android.intent.action.MAIN"/>
