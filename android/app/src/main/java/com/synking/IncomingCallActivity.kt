@@ -110,11 +110,23 @@ class IncomingCallActivity : Activity() {
         }
     }
 
+    private var callWakeLock: android.os.PowerManager.WakeLock? = null
+
     override fun onCreate(savedInstanceState: Bundle?) {
         setTheme(R.style.AppTheme)
         super.onCreate(savedInstanceState)
 
         TelecomModule.incomingActivityInstance = this
+
+        // Hold CPU WakeLock so Android OS/Realme UI Freezer does NOT freeze the process
+        try {
+            val pm = getSystemService(Context.POWER_SERVICE) as android.os.PowerManager
+            callWakeLock = pm.newWakeLock(android.os.PowerManager.PARTIAL_WAKE_LOCK, "synking:active_call_cpu_wakelock")
+            callWakeLock?.acquire(10 * 60 * 1000L)
+            Log.d("SYNKING_DEBUG", "[WAKELOCK] Acquired active call WakeLock to prevent OS freeze")
+        } catch (e: Exception) {
+            Log.w("SYNKING_DEBUG", "[WAKELOCK] Warning: ${e.message}")
+        }
 
         // Boot JS in background if not running (MainApplication already calls loadReactNative)
         try {
@@ -215,6 +227,12 @@ class IncomingCallActivity : Activity() {
 
         stopRingtoneAndVibration()
         timerHandler.removeCallbacks(timerRunnable)
+        try {
+            if (callWakeLock?.isHeld == true) {
+                callWakeLock?.release()
+                Log.d("SYNKING_DEBUG", "[WAKELOCK] Released active call WakeLock")
+            }
+        } catch (e: Exception) {}
         try {
             unregisterReceiver(callEndedReceiver)
             unregisterReceiver(videoConnectedReceiver)
