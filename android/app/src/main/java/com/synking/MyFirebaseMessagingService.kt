@@ -231,6 +231,7 @@ class MyFirebaseMessagingService : FirebaseMessagingService() {
 
             val extrasBundle = Bundle().apply {
                 putString("callId", callId)
+                putString("callerId", callerId)
                 putString("callerName", callerName)
                 putString("callType", callType)
             }
