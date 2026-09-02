@@ -79,19 +79,13 @@ class TelecomModule(reactContext: ReactApplicationContext) : ReactContextBaseJav
 
     @ReactMethod
     fun updateDebugStatus(stage: String, status: String, promise: Promise) {
-        try {
-            incomingActivityInstance?.updateDebugStage(stage, status)
-            promise.resolve(true)
-        } catch (e: Exception) {
-            promise.resolve(false)
-        }
+        promise.resolve(true)
     }
 
     @ReactMethod
     fun notifyBridgedToJs(callId: String, promise: Promise) {
         try {
             Log.d("SYNKING_DEBUG", "[BRIDGE] notifyBridgedToJs confirmed for callId=$callId")
-            incomingActivityInstance?.onJsBridgeConfirmed()
             PendingCallStore.clear(reactApplicationContext)
             promise.resolve(true)
         } catch (e: Exception) {
@@ -149,38 +143,12 @@ class TelecomModule(reactContext: ReactApplicationContext) : ReactContextBaseJav
 
     @ReactMethod
     fun attachRemoteVideo(streamUrl: String, promise: Promise) {
-        try {
-            val activity = incomingActivityInstance
-            if (activity != null) {
-                activity.runOnUiThread {
-                    activity.attachRemoteVideo(streamUrl)
-                }
-                promise.resolve(true)
-            } else {
-                Log.w("SYNKING_TELECOM", "[VIDEO] attachRemoteVideo: incomingActivityInstance is null")
-                promise.resolve(false)
-            }
-        } catch (e: Exception) {
-            promise.reject("ERR", e.message)
-        }
+        promise.resolve(true)
     }
 
     @ReactMethod
     fun attachLocalVideo(streamUrl: String, promise: Promise) {
-        try {
-            val activity = incomingActivityInstance
-            if (activity != null) {
-                activity.runOnUiThread {
-                    activity.attachLocalVideo(streamUrl)
-                }
-                promise.resolve(true)
-            } else {
-                Log.w("SYNKING_TELECOM", "[VIDEO] attachLocalVideo: incomingActivityInstance is null")
-                promise.resolve(false)
-            }
-        } catch (e: Exception) {
-            promise.reject("ERR", e.message)
-        }
+        promise.resolve(true)
     }
 
     @ReactMethod
