@@ -10,6 +10,7 @@ class RealtimeBridgeManager {
   private isConnected = false;
   private registeredUserId: string | null = null;
   private pingInterval: any = null;
+  private pendingQueue: any[] = [];
 
   constructor() {
     // 1. Local Browser BroadcastChannel (0ms intra-device sync)
@@ -50,6 +51,15 @@ class RealtimeBridgeManager {
         console.log('[WEBSOCKET_CONNECTED] Live Cloud Realtime Signaling Engine Active');
         if (this.registeredUserId) {
           this.registerUser(this.registeredUserId);
+        }
+
+        // Flush queued signaling messages immediately (zero packet loss)
+        while (this.pendingQueue.length > 0) {
+          const item = this.pendingQueue.shift();
+          try {
+            this.socket?.send(JSON.stringify(item));
+            console.log(`[WS_QUEUE_FLUSHED] Sent queued ${item?.type} to ${item?.targetUserId || 'ALL'}`);
+          } catch (e) {}
         }
 
         // Heartbeat Ping every 15s to keep WebSocket alive in background
@@ -147,6 +157,12 @@ class RealtimeBridgeManager {
       try {
         this.socket.send(JSON.stringify(data));
       } catch (e) {}
+    } else {
+      this.pendingQueue.push(data);
+      console.log(`[WS_QUEUED] Queued ${type} while socket reconnecting...`);
+      if (!this.socket || this.socket.readyState === WebSocket.CLOSED) {
+        this.connectWebSocket();
+      }
     }
   }
 }

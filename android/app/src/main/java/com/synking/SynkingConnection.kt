@@ -58,8 +58,7 @@ class SynkingConnection(
                 lockscreenVisibility = NotificationCompat.VISIBILITY_PUBLIC
                 setBypassDnd(true)
                 setSound(null, null) // Ringtone plays in IncomingCallActivity
-                enableVibration(true)
-                vibrationPattern = longArrayOf(0, 1000, 1000, 1000, 1000)
+                enableVibration(false) // Single source of vibration in IncomingCallActivity
             }
             nm.createNotificationChannel(channel)
         }

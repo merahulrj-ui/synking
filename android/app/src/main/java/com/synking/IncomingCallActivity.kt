@@ -37,7 +37,7 @@ class IncomingCallActivity : Activity() {
         var activeRingtone: Ringtone? = null
         var activeVibrator: Vibrator? = null
 
-        fun stopRingtoneGlobally() {
+        fun stopRingtoneGlobally(context: Context? = null) {
             try {
                 activeRingtone?.stop()
                 activeRingtone = null
@@ -45,6 +45,13 @@ class IncomingCallActivity : Activity() {
             try {
                 activeVibrator?.cancel()
                 activeVibrator = null
+            } catch (e: Exception) {}
+            try {
+                val ctx = context ?: TelecomModule.globalReactContext
+                ctx?.let {
+                    val v = it.getSystemService(Context.VIBRATOR_SERVICE) as? Vibrator
+                    v?.cancel()
+                }
             } catch (e: Exception) {}
         }
     }

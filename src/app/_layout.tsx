@@ -79,7 +79,7 @@ function GlobalCallOverlay() {
             },
             data.callType || 'audio',
             data.callId,
-            false
+            true
           );
         }
         await WebRTCService.acceptCall();
