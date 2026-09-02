@@ -302,13 +302,14 @@ class IncomingCallActivity : Activity() {
         }
         root.addView(remoteVideoContainer)
 
+        // 🌌 Deep Midnight OLED Canvas
         uiLayer = LinearLayout(this).apply {
             orientation = LinearLayout.VERTICAL
             gravity = Gravity.CENTER_HORIZONTAL
-            setPadding(dpToPx(24), dpToPx(72), dpToPx(24), dpToPx(56))
+            setPadding(dpToPx(24), dpToPx(64), dpToPx(24), dpToPx(56))
             background = GradientDrawable(
-                GradientDrawable.Orientation.TL_BR,
-                intArrayOf(Color.parseColor("#0F172A"), Color.parseColor("#020617"))
+                GradientDrawable.Orientation.TOP_BOTTOM,
+                intArrayOf(Color.parseColor("#060813"), Color.parseColor("#0B1120"))
             )
             layoutParams = LinearLayout.LayoutParams(
                 LinearLayout.LayoutParams.MATCH_PARENT,
@@ -316,7 +317,7 @@ class IncomingCallActivity : Activity() {
             )
         }
 
-        // Caller Info Container (easily hidden during video call)
+        // Caller Info Container
         callerInfoLayout = LinearLayout(this).apply {
             orientation = LinearLayout.VERTICAL
             gravity = Gravity.CENTER_HORIZONTAL
@@ -326,88 +327,48 @@ class IncomingCallActivity : Activity() {
             )
         }
 
-        // Brand Header Pill
+        // 🔒 Frosted Glass Header Security Pill
         val brandHeader = LinearLayout(this).apply {
             orientation = LinearLayout.HORIZONTAL
             gravity = Gravity.CENTER
             setPadding(dpToPx(20), dpToPx(8), dpToPx(20), dpToPx(8))
-            background = GradientDrawable(
-                GradientDrawable.Orientation.LEFT_RIGHT,
-                intArrayOf(Color.parseColor("#33FD3A73"), Color.parseColor("#339D00FF"))
-            ).apply {
+            background = GradientDrawable().apply {
+                setColor(Color.parseColor("#1F1E293B"))
                 cornerRadius = dpToPx(30).toFloat()
-                setStroke(dpToPx(1), Color.parseColor("#80FD3A73"))
+                setStroke(dpToPx(1), Color.parseColor("#4D38BDF8"))
             }
         }
         val brandText = TextView(this).apply {
-            text = "SECURE P2P WEBRTC • DEBUG HUD"
-            textSize = 11f
-            setTextColor(Color.WHITE)
+            text = "\uD83D\uDD12 End-to-End Encrypted HD"
+            textSize = 12f
+            setTextColor(Color.parseColor("#E2E8F0"))
             typeface = android.graphics.Typeface.DEFAULT_BOLD
-            letterSpacing = 0.1f
+            letterSpacing = 0.05f
         }
         brandHeader.addView(brandText)
         callerInfoLayout?.addView(brandHeader)
 
-        // Live Debug Status Card (Read-Only Observer for live device verification)
-        val debugCard = LinearLayout(this).apply {
-            orientation = LinearLayout.VERTICAL
-            setPadding(dpToPx(12), dpToPx(8), dpToPx(12), dpToPx(8))
-            background = GradientDrawable().apply {
-                setColor(Color.parseColor("#E6050B14"))
-                cornerRadius = dpToPx(12).toFloat()
-                setStroke(dpToPx(1), Color.parseColor("#3300E5FF"))
-            }
-            layoutParams = LinearLayout.LayoutParams(
-                LinearLayout.LayoutParams.MATCH_PARENT,
-                LinearLayout.LayoutParams.WRAP_CONTENT
-            ).apply { setMargins(dpToPx(16), dpToPx(10), dpToPx(16), 0) }
-        }
+        callerInfoLayout?.addView(View(this).apply { layoutParams = LinearLayout.LayoutParams(1, dpToPx(36)) })
 
-        val debugHeaderRow = LinearLayout(this).apply {
-            orientation = LinearLayout.HORIZONTAL
-            gravity = Gravity.CENTER_VERTICAL
-        }
-        val debugTitle = TextView(this).apply {
-            text = "⚡ REAL-TIME CALL PIPELINE"
-            textSize = 10f
-            setTextColor(Color.parseColor("#00E5FF"))
-            typeface = android.graphics.Typeface.MONOSPACE
-            layoutParams = LinearLayout.LayoutParams(0, LinearLayout.LayoutParams.WRAP_CONTENT, 1.0f)
-        }
-        debugHeaderRow.addView(debugTitle)
-        debugCard.addView(debugHeaderRow)
-
-        debugTextView = TextView(this).apply {
-            text = "• FCM: RECEIVED\n• TELECOM: ACTIVE\n• RN HERMES: CONNECTING..."
-            textSize = 10f
-            setTextColor(Color.parseColor("#94A3B8"))
-            typeface = android.graphics.Typeface.MONOSPACE
-            setPadding(0, dpToPx(4), 0, 0)
-        }
-        debugCard.addView(debugTextView!!)
-        callerInfoLayout?.addView(debugCard)
-
-        callerInfoLayout?.addView(View(this).apply { layoutParams = LinearLayout.LayoutParams(1, dpToPx(24)) })
-
+        // 🪞 Holographic Iridescent Avatar Container
         val avatarContainer = FrameLayout(this).apply {
-            val size = dpToPx(140)
+            val size = dpToPx(148)
             layoutParams = LinearLayout.LayoutParams(size, size).apply { gravity = Gravity.CENTER_HORIZONTAL }
             background = GradientDrawable(
-                GradientDrawable.Orientation.TR_BL,
-                intArrayOf(Color.parseColor("#FD3A73"), Color.parseColor("#00E5FF"))
+                GradientDrawable.Orientation.TL_BR,
+                intArrayOf(Color.parseColor("#A855F7"), Color.parseColor("#38BDF8"))
             ).apply { shape = GradientDrawable.OVAL }
-            setPadding(dpToPx(4), dpToPx(4), dpToPx(4), dpToPx(4))
+            setPadding(dpToPx(3), dpToPx(3), dpToPx(3), dpToPx(3))
         }
 
         val avatarInner = FrameLayout(this).apply {
             layoutParams = FrameLayout.LayoutParams(FrameLayout.LayoutParams.MATCH_PARENT, FrameLayout.LayoutParams.MATCH_PARENT)
-            background = GradientDrawable().apply { shape = GradientDrawable.OVAL; setColor(Color.parseColor("#11121A")) }
+            background = GradientDrawable().apply { shape = GradientDrawable.OVAL; setColor(Color.parseColor("#0F172A")) }
         }
 
         val avatarInitial = TextView(this).apply {
             text = if (callerName.isNotBlank()) callerName.take(1).uppercase() else "S"
-            textSize = 56f
+            textSize = 58f
             setTextColor(Color.WHITE)
             gravity = Gravity.CENTER
             typeface = android.graphics.Typeface.DEFAULT_BOLD
@@ -419,17 +380,17 @@ class IncomingCallActivity : Activity() {
 
         val nameView = TextView(this).apply {
             text = callerName
-            textSize = 32f
+            textSize = 30f
             setTextColor(Color.WHITE)
             gravity = Gravity.CENTER
             typeface = android.graphics.Typeface.DEFAULT_BOLD
-            setPadding(0, dpToPx(28), 0, dpToPx(8))
+            setPadding(0, dpToPx(24), 0, dpToPx(6))
         }
         callerInfoLayout?.addView(nameView)
 
         subtitleView = TextView(this).apply {
-            text = "Incoming ${if (callType == "video") "Video Call..." else "Voice Call..."}"
-            textSize = 16f
+            text = "Incoming Encrypted ${if (callType == "video") "HD Video Call" else "HD Voice Call"}"
+            textSize = 15f
             setTextColor(Color.parseColor("#94A3B8"))
             gravity = Gravity.CENTER
         }
@@ -439,9 +400,10 @@ class IncomingCallActivity : Activity() {
 
         timerTextView = TextView(this).apply {
             text = "00:00"
-            textSize = 20f
-            setTextColor(Color.parseColor("#22C55E"))
+            textSize = 22f
+            setTextColor(Color.parseColor("#10B981"))
             gravity = Gravity.CENTER
+            typeface = android.graphics.Typeface.MONOSPACE
             visibility = View.GONE
             setPadding(0, dpToPx(16), 0, dpToPx(8))
         }
@@ -457,11 +419,16 @@ class IncomingCallActivity : Activity() {
             layoutParams = LinearLayout.LayoutParams(LinearLayout.LayoutParams.MATCH_PARENT, LinearLayout.LayoutParams.WRAP_CONTENT)
         }
 
+        // 🔴 Deep Crimson Frosted Glass Decline Pod
         val declineCol = LinearLayout(this).apply { orientation = LinearLayout.VERTICAL; gravity = Gravity.CENTER }
         val declineBtn = FrameLayout(this).apply {
-            val size = dpToPx(76)
+            val size = dpToPx(80)
             layoutParams = LinearLayout.LayoutParams(size, size)
-            background = GradientDrawable().apply { shape = GradientDrawable.OVAL; setColor(Color.parseColor("#1E1E28")) }
+            background = GradientDrawable().apply {
+                shape = GradientDrawable.OVAL
+                setColor(Color.parseColor("#1F1315"))
+                setStroke(dpToPx(2), Color.parseColor("#EF4444"))
+            }
             setOnClickListener {
                 stopRingtoneAndVibration()
                 CallConnectionManager.rejectCall()
@@ -482,29 +449,33 @@ class IncomingCallActivity : Activity() {
                 finish()
             }
         }
-        declineBtn.addView(TextView(this).apply { text = "\u2715"; textSize = 30f; setTextColor(Color.parseColor("#EF4444")); gravity = Gravity.CENTER })
+        declineBtn.addView(TextView(this).apply { text = "✕"; textSize = 28f; setTextColor(Color.parseColor("#EF4444")); gravity = Gravity.CENTER })
         declineCol.addView(declineBtn)
-        declineCol.addView(TextView(this).apply { text = "Decline"; textSize = 14f; setTextColor(Color.parseColor("#94A3B8")); setPadding(0, dpToPx(12), 0, 0) })
+        declineCol.addView(TextView(this).apply { text = "Decline"; textSize = 13f; setTextColor(Color.parseColor("#94A3B8")); setPadding(0, dpToPx(10), 0, 0) })
 
+        // 🟢 Luxury Emerald Gradient Accept Pod
         val acceptCol = LinearLayout(this).apply { orientation = LinearLayout.VERTICAL; gravity = Gravity.CENTER }
         val acceptBtn = FrameLayout(this).apply {
-            val size = dpToPx(76)
+            val size = dpToPx(80)
             layoutParams = LinearLayout.LayoutParams(size, size)
-            background = GradientDrawable(GradientDrawable.Orientation.TL_BR, intArrayOf(Color.parseColor("#00E5FF"), Color.parseColor("#22C55E"))).apply { shape = GradientDrawable.OVAL }
+            background = GradientDrawable(
+                GradientDrawable.Orientation.TL_BR,
+                intArrayOf(Color.parseColor("#10B981"), Color.parseColor("#059669"))
+            ).apply { shape = GradientDrawable.OVAL }
             setOnClickListener {
                 handleAccept()
             }
         }
-        acceptBtn.addView(TextView(this).apply { text = "\uD83D\uDCDE"; textSize = 32f; setTextColor(Color.WHITE); gravity = Gravity.CENTER })
-        val acceptPulse = ScaleAnimation(1.0f, 1.15f, 1.0f, 1.15f, Animation.RELATIVE_TO_SELF, 0.5f, Animation.RELATIVE_TO_SELF, 0.5f).apply {
-            duration = 500; repeatCount = Animation.INFINITE; repeatMode = Animation.REVERSE
+        acceptBtn.addView(TextView(this).apply { text = "✔"; textSize = 28f; setTextColor(Color.WHITE); gravity = Gravity.CENTER })
+        val acceptPulse = ScaleAnimation(1.0f, 1.10f, 1.0f, 1.10f, Animation.RELATIVE_TO_SELF, 0.5f, Animation.RELATIVE_TO_SELF, 0.5f).apply {
+            duration = 600; repeatCount = Animation.INFINITE; repeatMode = Animation.REVERSE
         }
         acceptBtn.startAnimation(acceptPulse)
         acceptCol.addView(acceptBtn)
-        acceptCol.addView(TextView(this).apply { text = "Accept"; textSize = 14f; setTextColor(Color.WHITE); typeface = android.graphics.Typeface.DEFAULT_BOLD; setPadding(0, dpToPx(12), 0, 0) })
+        acceptCol.addView(TextView(this).apply { text = "Accept"; textSize = 13f; setTextColor(Color.parseColor("#10B981")); typeface = android.graphics.Typeface.DEFAULT_BOLD; setPadding(0, dpToPx(10), 0, 0) })
 
         incomingActionsRow?.addView(declineCol)
-        incomingActionsRow?.addView(View(this).apply { layoutParams = LinearLayout.LayoutParams(dpToPx(70), 1) })
+        incomingActionsRow?.addView(View(this).apply { layoutParams = LinearLayout.LayoutParams(dpToPx(72), 1) })
         incomingActionsRow?.addView(acceptCol)
         uiLayer.addView(incomingActionsRow!!)
 
@@ -519,7 +490,7 @@ class IncomingCallActivity : Activity() {
         val muteBtn = createControlButton("\uD83C\uDF99\uFE0F", "Mute") { btn, label ->
             isMuted = !isMuted
             val bg = btn.background as GradientDrawable
-            bg.setColor(Color.parseColor(if (isMuted) "#EF4444" else "#1E1E28"))
+            bg.setColor(Color.parseColor(if (isMuted) "#EF4444" else "#1E293B"))
             label.text = if (isMuted) "Unmute" else "Mute"
             TelecomModule.emitMuteToggled(isMuted)
         }
@@ -527,7 +498,7 @@ class IncomingCallActivity : Activity() {
         val speakerBtn = createControlButton("\uD83D\uDD0A", "Speaker") { btn, label ->
             isSpeakerOn = !isSpeakerOn
             val bg = btn.background as GradientDrawable
-            bg.setColor(Color.parseColor(if (isSpeakerOn) "#3B82F6" else "#1E1E28"))
+            bg.setColor(Color.parseColor(if (isSpeakerOn) "#38BDF8" else "#1E293B"))
             label.text = if (isSpeakerOn) "Speaker Off" else "Speaker On"
             TelecomModule.emitSpeakerToggled(isSpeakerOn)
         }
@@ -554,12 +525,12 @@ class IncomingCallActivity : Activity() {
         }
         endBtn.addView(TextView(this).apply { text = "\uD83D\uDCDE"; textSize = 30f; setTextColor(Color.WHITE); gravity = Gravity.CENTER; rotation = 135f })
         endBtnCol.addView(endBtn)
-        endBtnCol.addView(TextView(this).apply { text = "End"; textSize = 14f; setTextColor(Color.parseColor("#94A3B8")); setPadding(0, dpToPx(12), 0, 0) })
+        endBtnCol.addView(TextView(this).apply { text = "End"; textSize = 13f; setTextColor(Color.parseColor("#EF4444")); setPadding(0, dpToPx(10), 0, 0) })
 
         activeActionsRow?.addView(muteBtn)
-        activeActionsRow?.addView(View(this).apply { layoutParams = LinearLayout.LayoutParams(dpToPx(30), 1) })
+        activeActionsRow?.addView(View(this).apply { layoutParams = LinearLayout.LayoutParams(dpToPx(28), 1) })
         activeActionsRow?.addView(speakerBtn)
-        activeActionsRow?.addView(View(this).apply { layoutParams = LinearLayout.LayoutParams(dpToPx(30), 1) })
+        activeActionsRow?.addView(View(this).apply { layoutParams = LinearLayout.LayoutParams(dpToPx(28), 1) })
         activeActionsRow?.addView(endBtnCol)
 
         uiLayer.addView(activeActionsRow!!)
@@ -584,9 +555,13 @@ class IncomingCallActivity : Activity() {
         val btn = FrameLayout(this).apply {
             val size = dpToPx(60)
             layoutParams = LinearLayout.LayoutParams(size, size)
-            background = GradientDrawable().apply { shape = GradientDrawable.OVAL; setColor(Color.parseColor("#1E1E28")) }
+            background = GradientDrawable().apply {
+                shape = GradientDrawable.OVAL
+                setColor(Color.parseColor("#1E293B"))
+                setStroke(dpToPx(1), Color.parseColor("#334155"))
+            }
         }
-        btn.addView(TextView(this).apply { text = iconText; textSize = 24f; setTextColor(Color.WHITE); gravity = Gravity.CENTER })
+        btn.addView(TextView(this).apply { text = iconText; textSize = 22f; setTextColor(Color.WHITE); gravity = Gravity.CENTER })
         val label = TextView(this).apply { text = labelText; textSize = 12f; setTextColor(Color.parseColor("#94A3B8")); setPadding(0, dpToPx(8), 0, 0) }
         btn.setOnClickListener { onClick(btn, label) }
         col.addView(btn)
