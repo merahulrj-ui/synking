@@ -472,6 +472,9 @@ class WebRTCManager {
           return;
         }
         this.log(`🔌 Connection state: ${pc.connectionState}`);
+        if (Platform.OS === 'android' && NativeModules.TelecomModule?.updateDebugStatus) {
+          NativeModules.TelecomModule.updateDebugStatus('WEBRTC', pc.connectionState.toUpperCase()).catch(() => {});
+        }
         if (pc.connectionState === 'disconnected' || pc.connectionState === 'failed' || pc.connectionState === 'closed') {
           this.log('🛑 Remote peer disconnected. Auto cleaning up...');
           this.cleanup();
@@ -492,6 +495,9 @@ class WebRTCManager {
         if (this.peerConnection) {
           this.iceStatus = this.peerConnection.iceConnectionState;
           this.log(`🌐 ICE RELAY STATE: ${this.iceStatus}`);
+          if (Platform.OS === 'android' && NativeModules.TelecomModule?.updateDebugStatus) {
+            NativeModules.TelecomModule.updateDebugStatus('ICE RELAY', this.iceStatus.toUpperCase()).catch(() => {});
+          }
           if (this.iceStatus === 'disconnected' || this.iceStatus === 'failed' || this.iceStatus === 'closed') {
             this.log('🛑 Remote ICE closed. Auto cleaning up...');
             this.cleanup();

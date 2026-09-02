@@ -46,9 +46,19 @@ class TelecomModule(reactContext: ReactApplicationContext) : ReactContextBaseJav
     }
 
     @ReactMethod
+    fun updateDebugStatus(stage: String, status: String, promise: Promise) {
+        try {
+            incomingActivityInstance?.updateDebugStage(stage, status)
+            promise.resolve(true)
+        } catch (e: Exception) {
+            promise.resolve(false)
+        }
+    }
+
+    @ReactMethod
     fun notifyBridgedToJs(callId: String, promise: Promise) {
         try {
-            Log.d("SYNKING_DEBUG", "[BRIDGE] notifyBridgedToJs confirmed for callId=")
+            Log.d("SYNKING_DEBUG", "[BRIDGE] notifyBridgedToJs confirmed for callId=$callId")
             incomingActivityInstance?.onJsBridgeConfirmed()
             PendingCallStore.clear(reactApplicationContext)
             promise.resolve(true)

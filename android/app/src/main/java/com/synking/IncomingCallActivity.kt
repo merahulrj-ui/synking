@@ -81,6 +81,7 @@ class IncomingCallActivity : Activity() {
     private var callStartTime = 0L
     private var jsBridgeConfirmed = false
     private val bridgeTimeoutHandler = Handler(Looper.getMainLooper())
+    private var debugTextView: TextView? = null
     private val timerHandler = Handler(Looper.getMainLooper())
     private val timerRunnable = object : Runnable {
         override fun run() {
@@ -251,8 +252,19 @@ class IncomingCallActivity : Activity() {
         localVideoContainer?.bringToFront()
     }
 
+    fun updateDebugStage(stage: String, status: String) {
+        runOnUiThread {
+            try {
+                debugTextView?.let { tv ->
+                    tv.text = "${tv.text}\n• $stage: $status"
+                }
+            } catch (e: Exception) {}
+        }
+    }
+
     fun onJsBridgeConfirmed() {
         jsBridgeConfirmed = true
+        updateDebugStage("RN BRIDGED", "CONFIRMED ✅")
         bridgeTimeoutHandler.removeCallbacksAndMessages(null)
         PendingCallStore.clear(this)
         CallState.clear(this, callId)
@@ -328,7 +340,7 @@ class IncomingCallActivity : Activity() {
             }
         }
         val brandText = TextView(this).apply {
-            text = "SECURE P2P WEBRTC"
+            text = "SECURE P2P WEBRTC • DEBUG HUD"
             textSize = 11f
             setTextColor(Color.WHITE)
             typeface = android.graphics.Typeface.DEFAULT_BOLD
@@ -337,7 +349,46 @@ class IncomingCallActivity : Activity() {
         brandHeader.addView(brandText)
         callerInfoLayout?.addView(brandHeader)
 
-        callerInfoLayout?.addView(View(this).apply { layoutParams = LinearLayout.LayoutParams(1, dpToPx(36)) })
+        // Live Debug Status Card (Read-Only Observer for live device verification)
+        val debugCard = LinearLayout(this).apply {
+            orientation = LinearLayout.VERTICAL
+            setPadding(dpToPx(12), dpToPx(8), dpToPx(12), dpToPx(8))
+            background = GradientDrawable().apply {
+                setColor(Color.parseColor("#E6050B14"))
+                cornerRadius = dpToPx(12).toFloat()
+                setStroke(dpToPx(1), Color.parseColor("#3300E5FF"))
+            }
+            layoutParams = LinearLayout.LayoutParams(
+                LinearLayout.LayoutParams.MATCH_PARENT,
+                LinearLayout.LayoutParams.WRAP_CONTENT
+            ).apply { setMargins(dpToPx(16), dpToPx(10), dpToPx(16), 0) }
+        }
+
+        val debugHeaderRow = LinearLayout(this).apply {
+            orientation = LinearLayout.HORIZONTAL
+            gravity = Gravity.CENTER_VERTICAL
+        }
+        val debugTitle = TextView(this).apply {
+            text = "⚡ REAL-TIME CALL PIPELINE"
+            textSize = 10f
+            setTextColor(Color.parseColor("#00E5FF"))
+            typeface = android.graphics.Typeface.MONOSPACE
+            layoutParams = LinearLayout.LayoutParams(0, LinearLayout.LayoutParams.WRAP_CONTENT, 1.0f)
+        }
+        debugHeaderRow.addView(debugTitle)
+        debugCard.addView(debugHeaderRow)
+
+        debugTextView = TextView(this).apply {
+            text = "• FCM: RECEIVED\n• TELECOM: ACTIVE\n• RN HERMES: CONNECTING..."
+            textSize = 10f
+            setTextColor(Color.parseColor("#94A3B8"))
+            typeface = android.graphics.Typeface.MONOSPACE
+            setPadding(0, dpToPx(4), 0, 0)
+        }
+        debugCard.addView(debugTextView!!)
+        callerInfoLayout?.addView(debugCard)
+
+        callerInfoLayout?.addView(View(this).apply { layoutParams = LinearLayout.LayoutParams(1, dpToPx(24)) })
 
         val avatarContainer = FrameLayout(this).apply {
             val size = dpToPx(140)
