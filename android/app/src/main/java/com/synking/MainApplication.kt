@@ -14,6 +14,9 @@ import com.facebook.react.defaults.DefaultNewArchitectureEntryPoint
 import expo.modules.ApplicationLifecycleDispatcher
 import expo.modules.ExpoReactHostFactory
 
+import com.facebook.react.ReactInstanceEventListener
+import com.facebook.react.bridge.ReactContext
+
 class MainApplication : Application(), ReactApplication {
 
   override val reactHost: ReactHost by lazy {
@@ -29,6 +32,8 @@ class MainApplication : Application(), ReactApplication {
 
   override fun onCreate() {
     super.onCreate()
+    CallState.init(applicationContext)
+
     DefaultNewArchitectureEntryPoint.releaseLevel = try {
       ReleaseLevel.valueOf(BuildConfig.REACT_NATIVE_RELEASE_LEVEL.uppercase())
     } catch (e: IllegalArgumentException) {
@@ -36,6 +41,14 @@ class MainApplication : Application(), ReactApplication {
     }
     loadReactNative(this)
     ApplicationLifecycleDispatcher.onApplicationCreate(this)
+
+    try {
+      reactHost.addReactInstanceEventListener(object : ReactInstanceEventListener {
+        override fun onReactContextInitialized(context: ReactContext) {
+          TelecomModule.onReactContextReady(context)
+        }
+      })
+    } catch (e: Exception) {}
   }
 
   override fun onConfigurationChanged(newConfig: Configuration) {

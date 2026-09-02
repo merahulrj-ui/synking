@@ -101,12 +101,10 @@ class WebRTCManager {
           this.log('❌ Call rejected by peer.');
           this.cleanup();
         }
-      } else if (type === 'CALL_ENDED' && payload) {
-        if (this.currentSession && this.currentSession.id === payload.callId) {
-          CallDebugger.logStage('CALL_ENDED', 'INFO', { callId: payload.callId });
-          this.log('🛑 Call ended by peer.');
-          this.cleanup();
-        }
+      } else if (type === 'CALL_ENDED') {
+        CallDebugger.logStage('CALL_ENDED', 'INFO', { callId: payload?.callId });
+        this.log('🛑 Call ended by peer.');
+        this.cleanup();
       } else if (type === 'CALL_UPGRADED_TO_VIDEO' && payload) {
         if (this.currentSession && this.currentSession.id === payload.callId) {
           this.log('📹 Peer upgraded the call to Live Video!');
@@ -457,6 +455,10 @@ class WebRTCManager {
           return;
         }
         this.log(`🔌 Connection state: ${pc.connectionState}`);
+        if (pc.connectionState === 'disconnected' || pc.connectionState === 'failed' || pc.connectionState === 'closed') {
+          this.log('🛑 Remote peer disconnected. Auto cleaning up...');
+          this.cleanup();
+        }
       };
 
       this.peerConnection.onicecandidate = (event: any) => {
@@ -473,6 +475,10 @@ class WebRTCManager {
         if (this.peerConnection) {
           this.iceStatus = this.peerConnection.iceConnectionState;
           this.log(`🌐 ICE RELAY STATE: ${this.iceStatus}`);
+          if (this.iceStatus === 'disconnected' || this.iceStatus === 'failed' || this.iceStatus === 'closed') {
+            this.log('🛑 Remote ICE closed. Auto cleaning up...');
+            this.cleanup();
+          }
           this.notify();
         }
       };

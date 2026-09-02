@@ -182,6 +182,16 @@ class MyFirebaseMessagingService : FirebaseMessagingService() {
             "callId=$callId caller=$callerName type=$callType"
         )
 
+        // Duplicate & busy protection
+        if (CallState.isDuplicate(callId)) {
+            debug("CALL_DUPLICATE_IGNORED", "OK", "Silently ignoring duplicate push for callId=$callId")
+            return
+        }
+        if (!CallState.start(applicationContext, callId)) {
+            debug("CALL_BUSY_IGNORED", "OK", "Another call is currently active")
+            return
+        }
+
         // 1. Wake screen instantly with PowerManager WakeLock
         try {
             val pm = getSystemService(Context.POWER_SERVICE) as PowerManager

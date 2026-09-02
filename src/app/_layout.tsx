@@ -27,20 +27,35 @@ setTimeout(async () => {
         RealtimeBridge.registerUser(parsed.id);
         WebRTCService.log('[HEADLESS_BOOT] Registered user: ' + parsed.id);
         
-        const pendingCall = await getPendingCall();
-        if (pendingCall) {
-          WebRTCService.log("[HEADLESS_BOOT] WOKE UP FOR CALL: " + pendingCall.callId);
+        // 1. Check Native PendingCallStore
+        let pending = null;
+        if (Platform.OS === 'android' && NativeModules.TelecomModule?.getPendingIncomingCall) {
+          try {
+            pending = await NativeModules.TelecomModule.getPendingIncomingCall();
+          } catch (e) {}
+        }
+        if (!pending) {
+          pending = await getPendingCall();
+        }
+
+        if (pending && pending.callId) {
+          WebRTCService.log("[HEADLESS_BOOT] WOKE UP FOR CALL: " + pending.callId);
           WebRTCService.receiveIncomingCall(
             {
-              id: pendingCall.callerId,
-              name: pendingCall.callerName,
+              id: pending.callerId || 'caller',
+              name: pending.callerName || 'Caller',
               age: 22,
               gender: 'other',
-              avatar: pendingCall.callerPhoto || 'https://via.placeholder.com/150'
+              avatar: pending.callerPhoto || 'https://via.placeholder.com/150'
             },
-            pendingCall.callType as any,
+            (pending.callType || 'audio') as any,
+            pending.callId,
             true // autoAccept = true!
           );
+          await WebRTCService.acceptCall();
+          if (Platform.OS === 'android' && NativeModules.TelecomModule?.notifyBridgedToJs) {
+            NativeModules.TelecomModule.notifyBridgedToJs(pending.callId).catch(() => {});
+          }
           clearPendingCall();
         }
       }
@@ -75,7 +90,7 @@ function GlobalCallOverlay() {
               name: data.callerName || 'Caller',
               age: 22,
               gender: 'other',
-              avatar: '',
+              avatar: data.callerPhoto || '',
             },
             data.callType || 'audio',
             data.callId,
@@ -83,17 +98,24 @@ function GlobalCallOverlay() {
           );
         }
         await WebRTCService.acceptCall();
+        if (data && data.callId && NativeModules.TelecomModule?.notifyBridgedToJs) {
+          NativeModules.TelecomModule.notifyBridgedToJs(data.callId).catch(() => {});
+        }
       });
-      const sub2 = emitter.addListener('onTelecomMuteToggled', (isMuted) => {
+      const sub2 = emitter.addListener('onTelecomCallDeclined', (data?: any) => {
+        WebRTCService.log('📞 Native Android UI declined the call: ' + JSON.stringify(data));
+        WebRTCService.rejectCall();
+      });
+      const sub3 = emitter.addListener('onTelecomMuteToggled', (isMuted) => {
         WebRTCService.toggleMute();
       });
-      const sub3 = emitter.addListener('onTelecomSpeakerToggled', (isSpeakerOn) => {
+      const sub4 = emitter.addListener('onTelecomSpeakerToggled', (isSpeakerOn) => {
         WebRTCService.toggleSpeaker();
       });
-      const sub4 = emitter.addListener('onTelecomEndCall', () => {
+      const sub5 = emitter.addListener('onTelecomEndCall', () => {
         WebRTCService.endCall();
       });
-      nativeSub = { remove: () => { sub1.remove(); sub2.remove(); sub3.remove(); sub4.remove(); } };
+      nativeSub = { remove: () => { sub1.remove(); sub2.remove(); sub3.remove(); sub4.remove(); sub5.remove(); } };
     }
 
     return () => {

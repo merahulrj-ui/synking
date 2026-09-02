@@ -79,6 +79,8 @@ class IncomingCallActivity : Activity() {
     private var localWebRTCView: WebRTCView? = null
 
     private var callStartTime = 0L
+    private var jsBridgeConfirmed = false
+    private val bridgeTimeoutHandler = Handler(Looper.getMainLooper())
     private val timerHandler = Handler(Looper.getMainLooper())
     private val timerRunnable = object : Runnable {
         override fun run() {
@@ -227,10 +229,20 @@ class IncomingCallActivity : Activity() {
         localVideoContainer?.bringToFront()
     }
 
+    fun onJsBridgeConfirmed() {
+        jsBridgeConfirmed = true
+        bridgeTimeoutHandler.removeCallbacksAndMessages(null)
+        PendingCallStore.clear(this)
+        CallState.clear(this, callId)
+        Log.d("SYNKING_DEBUG", "[UI] onJsBridgeConfirmed: JS bridge active and confirmed")
+    }
+
     override fun onDestroy() {
         super.onDestroy()
 
         TelecomModule.incomingActivityInstance = null
+        bridgeTimeoutHandler.removeCallbacksAndMessages(null)
+        CallState.clear(this, callId)
 
         stopRingtoneAndVibration()
         timerHandler.removeCallbacks(timerRunnable)
@@ -380,6 +392,16 @@ class IncomingCallActivity : Activity() {
             setOnClickListener {
                 stopRingtoneAndVibration()
                 CallConnectionManager.rejectCall()
+                PendingCallStore.clear(this@IncomingCallActivity)
+                CallState.clear(this@IncomingCallActivity, callId)
+
+                val ctx = TelecomModule.reactContext
+                if (ctx != null && ctx.hasActiveCatalystInstance()) {
+                    TelecomModule.emitDeclineEvent(callId)
+                } else {
+                    NativeCallSignaling.sendDeclineNatively(this@IncomingCallActivity, callId)
+                }
+
                 try {
                     finishAndRemoveTask()
                 } catch (e: Exception) {}
@@ -496,7 +518,44 @@ class IncomingCallActivity : Activity() {
         Log.d("SYNKING_DEBUG", "[UI] ACCEPT_BUTTON_TAPPED: callId=$callId callerId=$callerId callerName=$callerName type=$callType")
         stopRingtoneAndVibration()
         CallConnectionManager.answerCall()
-        TelecomModule.emitAcceptEvent(callId, callerId, callerName, callType)
+
+        val call = PendingCall(
+            callId = callId,
+            callerId = callerId,
+            callerName = callerName,
+            callerPhoto = null,
+            callType = callType
+        )
+
+        val ctx = TelecomModule.reactContext
+        if (ctx != null && ctx.hasActiveCatalystInstance()) {
+            TelecomModule.emitAcceptEvent(call)
+        } else {
+            Log.d("SYNKING_DEBUG", "[UI] Cold-boot accept: Saving PendingCall and launching MainActivity...")
+            PendingCallStore.save(this, call)
+            try {
+                val app = application as? MainApplication
+                app?.reactHost?.start()
+            } catch (e: Throwable) {}
+            try {
+                val launchIntent = packageManager.getLaunchIntentForPackage(packageName)?.apply {
+                    flags = Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_SINGLE_TOP
+                    putExtra("SYNKING_INCOMING_CALL", true)
+                    putExtra("AUTO_ACCEPT", true)
+                    putExtra("CALL_ID", call.callId)
+                    putExtra("callId", call.callId)
+                    putExtra("callerId", call.callerId)
+                    putExtra("callerName", call.callerName)
+                    putExtra("callType", call.callType)
+                    putExtra("autoAccept", true)
+                }
+                if (launchIntent != null) {
+                    startActivity(launchIntent)
+                }
+            } catch (e: Exception) {
+                Log.e("SYNKING_DEBUG", "[UI] Cold-boot launch error: ${e.message}")
+            }
+        }
 
         if (callType == "video") {
             incomingActionsRow?.visibility = View.GONE

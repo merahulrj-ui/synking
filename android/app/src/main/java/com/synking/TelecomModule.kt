@@ -1,22 +1,60 @@
-package com.synking
+﻿package com.synking
 
 import android.content.Intent
 import android.util.Log
+import com.facebook.react.bridge.Arguments
 import com.facebook.react.bridge.Promise
 import com.facebook.react.bridge.ReactApplicationContext
+import com.facebook.react.bridge.ReactContext
 import com.facebook.react.bridge.ReactContextBaseJavaModule
 import com.facebook.react.bridge.ReactMethod
+import com.facebook.react.bridge.WritableNativeMap
 import com.facebook.react.modules.core.DeviceEventManagerModule
+import java.util.concurrent.ConcurrentLinkedQueue
 
 class TelecomModule(reactContext: ReactApplicationContext) : ReactContextBaseJavaModule(reactContext) {
 
     init {
         TelecomModule.reactContext = reactContext
         globalReactContext = reactContext
+        onReactContextReady(reactContext)
     }
 
     override fun getName(): String {
         return "TelecomModule"
+    }
+
+    @ReactMethod
+    fun getPendingIncomingCall(promise: Promise) {
+        try {
+            val call = PendingCallStore.get(reactApplicationContext)
+            if (call != null) {
+                val map = WritableNativeMap().apply {
+                    putString("callId", call.callId)
+                    putString("callerId", call.callerId)
+                    putString("callerName", call.callerName)
+                    putString("callerPhoto", call.callerPhoto ?: "")
+                    putString("callType", call.callType)
+                }
+                promise.resolve(map)
+            } else {
+                promise.resolve(null)
+            }
+        } catch (e: Exception) {
+            promise.resolve(null)
+        }
+    }
+
+    @ReactMethod
+    fun notifyBridgedToJs(callId: String, promise: Promise) {
+        try {
+            Log.d("SYNKING_DEBUG", "[BRIDGE] notifyBridgedToJs confirmed for callId=")
+            incomingActivityInstance?.onJsBridgeConfirmed()
+            PendingCallStore.clear(reactApplicationContext)
+            promise.resolve(true)
+        } catch (e: Exception) {
+            promise.resolve(false)
+        }
     }
 
     @ReactMethod
@@ -50,33 +88,7 @@ class TelecomModule(reactContext: ReactApplicationContext) : ReactContextBaseJav
     @ReactMethod
     fun requestVoipPermissions(promise: Promise) {
         try {
-            val ctx = reactApplicationContext
-            val pkg = ctx.packageName
-
-            // 1. Battery Optimization (Bypass Doze for instant call wakeups)
-            if (android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.M) {
-                val pm = ctx.getSystemService(android.content.Context.POWER_SERVICE) as? android.os.PowerManager
-                if (pm != null && !pm.isIgnoringBatteryOptimizations(pkg)) {
-                    val intent = Intent(android.provider.Settings.ACTION_REQUEST_IGNORE_BATTERY_OPTIMIZATIONS).apply {
-                        data = android.net.Uri.parse("package:$pkg")
-                        flags = Intent.FLAG_ACTIVITY_NEW_TASK
-                    }
-                    ctx.startActivity(intent)
-                }
-            }
-
-            // 2. Full Screen Intent (Android 14+ / API 34+ for lock screen calls)
-            if (android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.UPSIDE_DOWN_CAKE) {
-                val nm = ctx.getSystemService(android.content.Context.NOTIFICATION_SERVICE) as? android.app.NotificationManager
-                if (nm != null && !nm.canUseFullScreenIntent()) {
-                    val intent = Intent(android.provider.Settings.ACTION_MANAGE_APP_USE_FULL_SCREEN_INTENT).apply {
-                        data = android.net.Uri.parse("package:$pkg")
-                        flags = Intent.FLAG_ACTIVITY_NEW_TASK
-                    }
-                    ctx.startActivity(intent)
-                }
-            }
-
+            CallReliabilityHelper.runOnboardingReliabilityCheck(reactApplicationContext)
             promise.resolve(true)
         } catch (e: Exception) {
             promise.reject("PERM_ERR", e.message)
@@ -154,7 +166,27 @@ class TelecomModule(reactContext: ReactApplicationContext) : ReactContextBaseJav
     companion object {
         var incomingActivityInstance: IncomingCallActivity? = null
         var globalReactContext: ReactApplicationContext? = null
-        private var reactContext: ReactApplicationContext? = null
+        var reactContext: ReactContext? = null
+        private val pendingEvents = ConcurrentLinkedQueue<PendingCall>()
+
+        fun emitAcceptEvent(call: PendingCall) {
+            val ctx = reactContext
+            if (ctx == null || !ctx.hasActiveCatalystInstance()) {
+                Log.d("SYNKING_DEBUG", "[BRIDGE] reactContext inactive, queuing pending call: ")
+                pendingEvents.add(call)
+                return
+            }
+            val params = Arguments.createMap().apply {
+                putString("callId", call.callId)
+                putString("callerId", call.callerId)
+                putString("callerName", call.callerName)
+                putString("callerPhoto", call.callerPhoto ?: "")
+                putString("callType", call.callType)
+            }
+            Log.d("SYNKING_DEBUG", "[BRIDGE] emitAcceptEvent -> onTelecomCallAnswered: callId=, caller=, type=")
+            ctx.getJSModule(DeviceEventManagerModule.RCTDeviceEventEmitter::class.java)
+                .emit("onTelecomCallAnswered", params)
+        }
 
         fun emitAcceptEvent(
             callId: String = "",
@@ -162,24 +194,20 @@ class TelecomModule(reactContext: ReactApplicationContext) : ReactContextBaseJav
             callerName: String = "",
             callType: String = ""
         ) {
-            try {
-                val finalCallId = if (callId.isNotEmpty()) callId else (incomingActivityInstance?.callId ?: "")
-                val finalCallerId = if (callerId.isNotEmpty()) callerId else (incomingActivityInstance?.callerId ?: "")
-                val finalCallerName = if (callerName.isNotEmpty()) callerName else (incomingActivityInstance?.callerName ?: "")
-                val finalCallType = if (callType.isNotEmpty()) callType else (incomingActivityInstance?.callType ?: "audio")
+            val finalCallId = if (callId.isNotEmpty()) callId else (incomingActivityInstance?.callId ?: "")
+            val finalCallerId = if (callerId.isNotEmpty()) callerId else (incomingActivityInstance?.callerId ?: "")
+            val finalCallerName = if (callerName.isNotEmpty()) callerName else (incomingActivityInstance?.callerName ?: "")
+            val finalCallType = if (callType.isNotEmpty()) callType else (incomingActivityInstance?.callType ?: "audio")
 
-                val map = com.facebook.react.bridge.Arguments.createMap().apply {
-                    putString("callId", finalCallId)
-                    putString("callerId", finalCallerId)
-                    putString("callerName", finalCallerName)
-                    putString("callType", finalCallType)
-                }
-                Log.d("SYNKING_DEBUG", "[BRIDGE] emitAcceptEvent -> onTelecomCallAnswered: callId=$finalCallId, caller=$finalCallerName, type=$finalCallType")
-                reactContext?.getJSModule(DeviceEventManagerModule.RCTDeviceEventEmitter::class.java)
-                    ?.emit("onTelecomCallAnswered", map)
-            } catch (e: Exception) {
-                Log.e("SYNKING_DEBUG", "[BRIDGE] emitAcceptEvent_ERROR: ${e.message}")
-            }
+            val call = PendingCall(finalCallId, finalCallerId, finalCallerName, null, finalCallType)
+            emitAcceptEvent(call)
+        }
+
+        fun emitDeclineEvent(callId: String) {
+            val ctx = reactContext ?: return
+            val params = Arguments.createMap().apply { putString("callId", callId) }
+            ctx.getJSModule(DeviceEventManagerModule.RCTDeviceEventEmitter::class.java)
+                .emit("onTelecomCallDeclined", params)
         }
 
         fun emitMuteToggled(isMuted: Boolean) {
@@ -195,6 +223,15 @@ class TelecomModule(reactContext: ReactApplicationContext) : ReactContextBaseJav
         fun emitEndCallEvent() {
             reactContext?.getJSModule(DeviceEventManagerModule.RCTDeviceEventEmitter::class.java)
                 ?.emit("onTelecomEndCall", null)
+        }
+
+        fun onReactContextReady(ctx: ReactContext) {
+            reactContext = ctx
+            Log.d("SYNKING_DEBUG", "[BRIDGE] onReactContextReady: Flushing  pending call events")
+            while (true) {
+                val call = pendingEvents.poll() ?: break
+                emitAcceptEvent(call)
+            }
         }
     }
 }
