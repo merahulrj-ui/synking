@@ -8,6 +8,46 @@ import android.util.Log
 
 class SynkingConnectionService : ConnectionService() {
 
+    companion object {
+        var instance: SynkingConnectionService? = null
+
+        fun startCallForeground(notification: android.app.Notification) {
+            try {
+                if (android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.Q) {
+                    instance?.startForeground(
+                        MyFirebaseMessagingService.NOTIFICATION_ID,
+                        notification,
+                        android.content.pm.ServiceInfo.FOREGROUND_SERVICE_TYPE_PHONE_CALL or
+                        android.content.pm.ServiceInfo.FOREGROUND_SERVICE_TYPE_MICROPHONE or
+                        android.content.pm.ServiceInfo.FOREGROUND_SERVICE_TYPE_CAMERA
+                    )
+                } else {
+                    instance?.startForeground(MyFirebaseMessagingService.NOTIFICATION_ID, notification)
+                }
+                Log.d("SYNKING_TELECOM", "[FGS] startForeground ACTIVE: Process shielded from OEM Freezer")
+            } catch (e: Exception) {
+                Log.w("SYNKING_TELECOM", "[FGS] startForeground notice: ${e.message}")
+            }
+        }
+
+        fun stopCallForeground() {
+            try {
+                instance?.stopForeground(true)
+                Log.d("SYNKING_TELECOM", "[FGS] stopForeground: Service teardown complete")
+            } catch (e: Exception) {}
+        }
+    }
+
+    override fun onCreate() {
+        super.onCreate()
+        instance = this
+    }
+
+    override fun onDestroy() {
+        super.onDestroy()
+        if (instance == this) instance = null
+    }
+
     override fun onCreateIncomingConnection(
         connectionManagerPhoneAccount: PhoneAccountHandle?,
         request: ConnectionRequest?

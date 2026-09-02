@@ -100,6 +100,7 @@ class SynkingConnection(
             .addAction(android.R.drawable.ic_menu_call, "Accept", acceptPendingIntent)
             .build()
 
+        SynkingConnectionService.startCallForeground(notification)
         nm.notify(MyFirebaseMessagingService.NOTIFICATION_ID, notification)
         Log.d("SYNKING_TELECOM", "[UI] NOTIFICATION_POSTED: with FullScreenIntent for lock screen")
 

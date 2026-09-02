@@ -17,6 +17,7 @@ object CallConnectionManager {
             it.destroy()
             currentConnection = null
         }
+        SynkingConnectionService.stopCallForeground()
     }
 
     fun endCall() {
@@ -25,5 +26,6 @@ object CallConnectionManager {
             it.destroy()
             currentConnection = null
         }
+        SynkingConnectionService.stopCallForeground()
     }
 }
