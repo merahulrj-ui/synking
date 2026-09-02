@@ -268,16 +268,21 @@ class WebRTCManager {
     return incomingSession;
   }
 
-  private isAccepting = false;
+  private acceptingCallId: string | null = null;
 
   // 3. Accept Incoming Call
-  public async acceptCall() {
-    if (!this.currentSession) return;
-    if (this.isAccepting) {
-      this.log('⚠️ acceptCall: already in progress, skipping duplicate.');
+  public async acceptCall(callId?: string) {
+    const targetCallId = callId || this.currentSession?.id;
+    if (!this.currentSession || !targetCallId) return;
+    if (this.currentSession.status === 'connected' && this.currentSession.id === targetCallId && this.peerConnection) {
+      this.log(`⚠️ acceptCall: already connected for callId=${targetCallId}, skipping.`);
       return;
     }
-    this.isAccepting = true;
+    if (this.acceptingCallId === targetCallId) {
+      this.log(`⚠️ acceptCall: already in progress for callId=${targetCallId}, skipping.`);
+      return;
+    }
+    this.acceptingCallId = targetCallId;
     try {
       this.cleanupTimers();
       RingtoneService.stop();
@@ -310,7 +315,7 @@ class WebRTCManager {
         await this.handleIncomingOffer(this.pendingOffer);
       }
     } finally {
-      this.isAccepting = false;
+      this.acceptingCallId = null;
     }
   }
 
@@ -797,40 +802,48 @@ class WebRTCManager {
     }
   }
 
+  private isCleaningUp = false;
+
   private cleanup() {
-    this.cleanupTimers();
-    RingtoneService.stop();
-    AudioRouteService.resetAudioRoute().catch(() => {});
-    
-    // TELL OS THAT CALL IS OVER SO NATIVE DIALER IS UNBLOCKED
-    if (Platform.OS === 'android' && NativeModules.TelecomModule?.endCall) {
-      NativeModules.TelecomModule.endCall().catch(() => {});
+    if (this.isCleaningUp) return;
+    this.isCleaningUp = true;
+    try {
+      this.cleanupTimers();
+      RingtoneService.stop();
+      AudioRouteService.resetAudioRoute().catch(() => {});
+      
+      // TELL OS THAT CALL IS OVER SO NATIVE DIALER IS UNBLOCKED
+      if (Platform.OS === 'android' && NativeModules.TelecomModule?.endCall) {
+        NativeModules.TelecomModule.endCall().catch(() => {});
+      }
+
+      this.iceStatus = 'disconnected';
+      this.pendingOffer = null;
+      this.iceCandidateQueue = [];
+      this.remoteVideoFrame = null;
+
+      if (this.localStream) {
+        try {
+          this.localStream.getTracks().forEach((track: any) => track.stop());
+        } catch (e) {}
+        this.localStream = null;
+      }
+
+      const pc = this.peerConnection;
+      this.peerConnection = null;
+
+      if (pc) {
+        try {
+          pc.close();
+        } catch (e) {}
+      }
+
+      this.remoteStream = null;
+      this.currentSession = null;
+      this.notify();
+    } finally {
+      this.isCleaningUp = false;
     }
-
-    this.iceStatus = 'disconnected';
-    this.pendingOffer = null;
-    this.iceCandidateQueue = [];
-    this.remoteVideoFrame = null;
-
-    if (this.localStream) {
-      try {
-        this.localStream.getTracks().forEach((track: any) => track.stop());
-      } catch (e) {}
-      this.localStream = null;
-    }
-
-    const pc = this.peerConnection;
-    this.peerConnection = null;
-
-    if (pc) {
-      try {
-        pc.close();
-      } catch (e) {}
-    }
-
-    this.remoteStream = null;
-    this.currentSession = null;
-    this.notify();
   }
 }
 

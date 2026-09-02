@@ -21,6 +21,10 @@ class MainActivity : ReactActivity() {
     // This is required for expo-splash-screen.
     setTheme(R.style.AppTheme);
     super.onCreate(null)
+    window.setFlags(
+      android.view.WindowManager.LayoutParams.FLAG_SECURE,
+      android.view.WindowManager.LayoutParams.FLAG_SECURE
+    )
     handleIncomingCallIntent(intent)
 
     // 1. Native High-Priority Incoming Calls Notification Channel for Lock Screen & AOD Wakeup

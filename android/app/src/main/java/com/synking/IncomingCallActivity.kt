@@ -558,12 +558,8 @@ class IncomingCallActivity : Activity() {
         if (ctx != null && ctx.hasActiveCatalystInstance()) {
             TelecomModule.emitAcceptEvent(call)
         } else {
-            Log.d("SYNKING_DEBUG", "[UI] Cold-boot accept: Saving PendingCall and launching MainActivity...")
+            Log.d("SYNKING_DEBUG", "[UI] Cold-boot accept: Saving PendingCall and launching MainActivity via standard Android Intent...")
             PendingCallStore.save(this, call)
-            try {
-                val app = application as? MainApplication
-                app?.reactHost?.start()
-            } catch (e: Throwable) {}
             try {
                 val launchIntent = packageManager.getLaunchIntentForPackage(packageName)?.apply {
                     flags = Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_SINGLE_TOP
