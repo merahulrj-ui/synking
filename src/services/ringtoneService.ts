@@ -10,7 +10,7 @@ try {
   ExpoAudioModule = require('expo-audio');
 } catch (e) {}
 
-const INCOMING_RINGTONE_URL = 'https://assets.mixkit.co/active_storage/sfx/2869/2869-preview.mp3';
+const INCOMING_RINGTONE_URL = 'https://raw.githubusercontent.com/pikirahulkumar-eng/synking/main/assets/sounds/synk_signature.mp3';
 const OUTGOING_RINGTONE_URL = 'https://assets.mixkit.co/active_storage/sfx/1360/1360-preview.mp3';
 
 class RingtoneServiceClass {
@@ -159,65 +159,18 @@ class RingtoneServiceClass {
     // Web HTML5 Audio playback for Synk Signature
     if (Platform.OS === 'web' && typeof window !== 'undefined' && typeof window.Audio !== 'undefined') {
       try {
-        let audioUrl = '/synk_signature.mp3';
-        try {
-          const req = require('../../assets/sounds/synk_signature.mp3');
-          audioUrl = req?.default || req || audioUrl;
-        } catch(e) {}
-        
-        const webPlayer = new window.Audio(audioUrl);
+        const webPlayer = new window.Audio(INCOMING_RINGTONE_URL);
         webPlayer.loop = true;
         webPlayer.volume = 1.0;
         this.webAudio = webPlayer;
         webPlayer.play().catch(err => {
           console.warn('[WEB_AUDIO_AUTOPLAY_BLOCKED]', err);
-          playMelody();
         });
         return;
       } catch (e) {
         console.warn('[WEB_AUDIO_INIT_ERR]', e);
       }
     }
-
-    // Melodic Synth Chime for Web (Fallback if audio file fails)
-    const playMelody = () => {
-      if (!this.isPlaying || this.currentMode !== 'incoming') return;
-      const ctx = this.getAudioContext();
-      if (!ctx) return;
-
-      try {
-        const now = ctx.currentTime;
-        const notes = [
-          { freq: 659.25, time: 0.00, dur: 0.22 },
-          { freq: 830.61, time: 0.16, dur: 0.22 },
-          { freq: 987.77, time: 0.32, dur: 0.22 },
-          { freq: 1318.51, time: 0.48, dur: 0.35 },
-          { freq: 987.77, time: 0.72, dur: 0.22 },
-          { freq: 1318.51, time: 0.88, dur: 0.45 },
-        ];
-
-        notes.forEach(({ freq, time, dur }) => {
-          const noteStart = now + time;
-          const noteEnd = noteStart + dur;
-          const gain = ctx.createGain();
-          gain.gain.setValueAtTime(0, noteStart);
-          gain.gain.linearRampToValueAtTime(0.18, noteStart + 0.02);
-          gain.gain.exponentialRampToValueAtTime(0.001, noteEnd);
-          gain.connect(ctx.destination);
-
-          const osc = ctx.createOscillator();
-          osc.type = 'triangle';
-          osc.frequency.setValueAtTime(freq, noteStart);
-          osc.connect(gain);
-
-          osc.start(noteStart);
-          osc.stop(noteEnd);
-        });
-      } catch (e) {}
-    };
-
-    playMelody();
-    (globalThis as any).__SYNKING_RINGTONE_INTERVAL__ = setInterval(playMelody, 2600);
   }
 
   // 3. STOP RINGTONE INSTANTLY & CANCEL VIBRATION
