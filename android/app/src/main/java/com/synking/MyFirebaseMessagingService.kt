@@ -189,6 +189,7 @@ class MyFirebaseMessagingService : FirebaseMessagingService() {
         if (data["type"] == "message" || data["type"] == "chat" || data["type"] == "NEW_MESSAGE") {
             val title = data["title"] ?: data["senderName"] ?: "New Message"
             val body = data["body"] ?: data["text"] ?: "You received a message"
+            val senderId = data["senderId"] ?: data["fromUserId"] ?: ""
             val msgChannelId = "synking_messages"
 
             val nm = getSystemService(Context.NOTIFICATION_SERVICE) as NotificationManager
@@ -205,10 +206,18 @@ class MyFirebaseMessagingService : FirebaseMessagingService() {
             } else {
                 PendingIntent.FLAG_UPDATE_CURRENT
             }
-            val intent = Intent(this, MainActivity::class.java).apply {
+            val intent = Intent(Intent.ACTION_VIEW).apply {
+                setClass(this@MyFirebaseMessagingService, MainActivity::class.java)
                 flags = Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_CLEAR_TOP
+                if (senderId.isNotEmpty()) {
+                    data = android.net.Uri.parse("synking://chat/$senderId")
+                    putExtra("route", "/chat/$senderId")
+                    putExtra("senderId", senderId)
+                    putExtra("chatPartnerId", senderId)
+                }
             }
-            val pendingIntent = PendingIntent.getActivity(this, System.currentTimeMillis().toInt(), intent, piFlags)
+            val notifId = if (senderId.isNotEmpty()) senderId.hashCode() else System.currentTimeMillis().toInt()
+            val pendingIntent = PendingIntent.getActivity(this, notifId, intent, piFlags)
 
             val notification = NotificationCompat.Builder(this, msgChannelId)
                 .setSmallIcon(R.mipmap.ic_launcher)
@@ -219,7 +228,7 @@ class MyFirebaseMessagingService : FirebaseMessagingService() {
                 .setContentIntent(pendingIntent)
                 .build()
 
-            nm.notify(System.currentTimeMillis().toInt(), notification)
+            nm.notify(notifId, notification)
             return
         }
 

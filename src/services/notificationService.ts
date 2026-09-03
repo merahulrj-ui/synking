@@ -76,6 +76,15 @@ class NotificationServiceClass {
         const callData = response.notification?.request?.content?.data;
         CallDebugger.logStage('NOTIFICATION ACTION', 'OK', { actionId, callId: callData?.callId });
 
+        // Direct tap on Chat Notification opens that specific chat
+        if (callData?.type === 'NEW_MESSAGE' && callData?.senderId) {
+          try {
+            const { router } = require('expo-router');
+            router.push(`/chat/${callData.senderId}`);
+          } catch (e) {}
+          return;
+        }
+
         if (actionId === 'ACCEPT_CALL' || actionId === Notifications.DEFAULT_ACTION_IDENTIFIER) {
           this.dismissCallNotification(callData?.callId);
           try {

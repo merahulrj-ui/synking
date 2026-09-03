@@ -1562,8 +1562,18 @@ async function sendCallPushNotification(targetUserId, callPayload, isEndCall = f
   }
 }
 
+const recentMsgPushes = new Set();
+
 async function sendMessagePushNotification(targetUserId, msgPayload) {
   try {
+    const dedupeKey = `${msgPayload.id || ''}_${msgPayload.senderId || ''}_${targetUserId}`;
+    if (recentMsgPushes.has(dedupeKey)) {
+      console.log(`[MSG_PUSH_DEDUPE] Skipping duplicate push for ${dedupeKey}`);
+      return;
+    }
+    recentMsgPushes.add(dedupeKey);
+    setTimeout(() => recentMsgPushes.delete(dedupeKey), 10000);
+
     let pushToken = db.pushTokens?.[targetUserId] || db.profiles?.[targetUserId]?.pushToken;
     let nativeFcmToken = db.fcmTokens?.[targetUserId] || db.profiles?.[targetUserId]?.fcmPushToken;
 
