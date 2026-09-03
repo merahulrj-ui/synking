@@ -205,7 +205,8 @@ class WebRTCManager {
 
     // FIX: Delay speaker activation to ensure OS doesn't override it!
     setTimeout(() => {
-        AudioRouteService.setSpeakerOn(true).catch(() => {});
+        const isVideo = params.type === 'video';
+        AudioRouteService.setSpeakerOn(isVideo).catch(() => {});
     }, 500);
 
     // Send Targeted INCOMING_CALL to recipient device
@@ -245,7 +246,7 @@ class WebRTCManager {
       status: autoAccept ? 'connected' : 'ringing', // Bypass ringing if coming from native accept!
       durationSeconds: 0,
       isMuted: false,
-      isSpeakerOn: true, // Forcing loudspeaker for testing
+      isSpeakerOn: type === 'video',
       isVideoEnabled: type === 'video',
     };
 
@@ -298,7 +299,7 @@ class WebRTCManager {
 
       // FIX: Set speaker ON only AFTER WebRTC initializes the mic!
       setTimeout(() => {
-        AudioRouteService.setSpeakerOn(true).catch(() => {});
+        AudioRouteService.setSpeakerOn(isVideo).catch(() => {});
       }, 500);
 
       this.currentSession.status = 'connected';
