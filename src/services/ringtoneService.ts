@@ -18,6 +18,7 @@ class RingtoneServiceClass {
   private isPlaying: boolean = false;
   private currentMode: 'incoming' | 'outgoing' | null = null;
   private nativePlayer: any = null;
+  private webAudio: any = null;
 
   private getAudioContext(): any {
     if (typeof window === 'undefined') return null;
@@ -155,7 +156,30 @@ class RingtoneServiceClass {
       }
     }
 
-    // Melodic Synth Chime for Web
+    // Web HTML5 Audio playback for Synk Signature
+    if (Platform.OS === 'web' && typeof window !== 'undefined' && typeof window.Audio !== 'undefined') {
+      try {
+        let audioUrl = '/synk_signature.mp3';
+        try {
+          const req = require('../../assets/sounds/synk_signature.mp3');
+          audioUrl = req?.default || req || audioUrl;
+        } catch(e) {}
+        
+        const webPlayer = new window.Audio(audioUrl);
+        webPlayer.loop = true;
+        webPlayer.volume = 1.0;
+        this.webAudio = webPlayer;
+        webPlayer.play().catch(err => {
+          console.warn('[WEB_AUDIO_AUTOPLAY_BLOCKED]', err);
+          playMelody();
+        });
+        return;
+      } catch (e) {
+        console.warn('[WEB_AUDIO_INIT_ERR]', e);
+      }
+    }
+
+    // Melodic Synth Chime for Web (Fallback if audio file fails)
     const playMelody = () => {
       if (!this.isPlaying || this.currentMode !== 'incoming') return;
       const ctx = this.getAudioContext();
@@ -225,6 +249,14 @@ class RingtoneServiceClass {
           NativeModules.AudioRouteModule.stopIncomingRingtone();
         }
       } catch (e) {}
+    }
+
+    if (this.webAudio) {
+      try {
+        this.webAudio.pause();
+        this.webAudio.currentTime = 0;
+      } catch (e) {}
+      this.webAudio = null;
     }
 
     if (this.nativePlayer) {

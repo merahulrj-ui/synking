@@ -625,6 +625,20 @@ const server = http.createServer((req, res) => {
     return;
   }
 
+  // 0.05 GET /synk_signature.mp3 (Official Synk Signature Ringtone Stream)
+  if (req.method === 'GET' && (pathname === '/synk_signature.mp3' || pathname === '/sounds/synk_signature.mp3')) {
+    const soundPath = path.join(__dirname, 'assets', 'sounds', 'synk_signature.mp3');
+    if (fs.existsSync(soundPath)) {
+      res.writeHead(200, {
+        'Content-Type': 'audio/mpeg',
+        'Access-Control-Allow-Origin': '*',
+        'Cache-Control': 'public, max-age=86400',
+      });
+      fs.createReadStream(soundPath).pipe(res);
+      return;
+    }
+  }
+
   // 0.1 GET /admin (Password Protected Private Admin Console)
   if (req.method === 'GET' && pathname === '/admin') {
     const adminKey = url.searchParams.get('key');
