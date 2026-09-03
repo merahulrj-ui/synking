@@ -51,6 +51,10 @@ class MainActivity : ReactActivity() {
       android.view.WindowManager.LayoutParams.FLAG_SECURE,
       android.view.WindowManager.LayoutParams.FLAG_SECURE
     )
+    // 🔒 Lock orientation strictly to Portrait (no rotation)
+    try {
+      requestedOrientation = android.content.pm.ActivityInfo.SCREEN_ORIENTATION_PORTRAIT
+    } catch (e: Exception) {}
     handleIncomingCallIntent(intent)
 
     // 1. Native High-Priority Incoming Calls Notification Channel for Lock Screen & AOD Wakeup

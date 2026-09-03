@@ -60,6 +60,7 @@
     <activity
         android:name=".IncomingCallActivity"
         android:exported="true"
+        android:screenOrientation="portrait"
         android:showWhenLocked="true"
         android:turnScreenOn="true"
         android:showForAllUsers="true"
@@ -70,6 +71,7 @@
 
     <activity
         android:name=".CallActivity"
+        android:screenOrientation="portrait"
         android:configChanges="keyboard|keyboardHidden|orientation|screenSize|screenLayout|uiMode|smallestScreenSize|assetsPaths"
         android:exported="true"
         android:showWhenLocked="true"
@@ -81,6 +83,7 @@
 
     <activity 
       android:name=".MainActivity" 
+      android:screenOrientation="portrait"
       android:configChanges="keyboard|keyboardHidden|orientation|screenSize|screenLayout|uiMode|smallestScreenSize|assetsPaths" 
       android:launchMode="singleTask" 
       android:windowSoftInputMode="adjustResize" 

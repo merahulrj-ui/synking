@@ -52,6 +52,11 @@ class CallActivity : ReactActivity() {
             WindowManager.LayoutParams.FLAG_SECURE
         )
 
+        // 🔒 Lock orientation strictly to Portrait (no rotation during calls)
+        try {
+            requestedOrientation = android.content.pm.ActivityInfo.SCREEN_ORIENTATION_PORTRAIT
+        } catch (e: Exception) {}
+
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O_MR1) {
             setShowWhenLocked(true)
             setTurnScreenOn(true)
