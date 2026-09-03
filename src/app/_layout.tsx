@@ -14,11 +14,10 @@ import { CallSession } from '../types';
 
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { RealtimeBridge } from '../services/realtimeBridge';
-import { getPendingCall, clearPendingCall } from '../services/CallIntentService';
 
 
-// --- HEADLESS BOOTER FOR KILLED STATE WAKEUP ---
-// This runs immediately when JS boots (even in background without UI)
+// --- USER REGISTRATION ON BOOT ---
+// Ensures user is registered with RealtimeBridge for live chat and notifications
 setTimeout(async () => {
   try {
     const stored = await AsyncStorage.getItem('synking_my_user');
@@ -26,57 +25,13 @@ setTimeout(async () => {
       const parsed = JSON.parse(stored);
       if (parsed && parsed.id) {
         RealtimeBridge.registerUser(parsed.id);
-        WebRTCService.log('[HEADLESS_BOOT] Registered user: ' + parsed.id);
-        
-        // 1. Check Native PendingCallStore
-        let pending = null;
-        if (Platform.OS === 'android' && NativeModules.TelecomModule?.getPendingIncomingCall) {
-          try {
-            pending = await NativeModules.TelecomModule.getPendingIncomingCall();
-          } catch (e) {}
-        }
-        if (!pending) {
-          pending = await getPendingCall();
-        }
-
-        if (pending && pending.callId) {
-          WebRTCService.log("[HEADLESS_BOOT] WOKE UP FOR CALL: " + pending.callId);
-          const shouldAutoAccept = !!(pending as any).autoAccept;
-          WebRTCService.receiveIncomingCall(
-            {
-              id: pending.callerId || 'caller',
-              name: pending.callerName || 'Caller',
-              age: 22,
-              gender: 'other',
-              occupation: '',
-              location: '',
-              distance: '',
-              bio: '',
-              photo: pending.callerPhoto || 'https://via.placeholder.com/150',
-              photos: [],
-              interests: [],
-              compatibility: 100,
-              isVerified: true,
-              isVip: false,
-            },
-            (pending.callType || 'audio') as any,
-            pending.callId,
-            shouldAutoAccept
-          );
-          if (shouldAutoAccept) {
-            await WebRTCService.acceptCall(pending.callId);
-          }
-          if (Platform.OS === 'android' && NativeModules.TelecomModule?.notifyBridgedToJs) {
-            NativeModules.TelecomModule.notifyBridgedToJs(pending.callId).catch(() => {});
-          }
-          clearPendingCall();
-        }
+        WebRTCService.log('[BOOT] Registered user: ' + parsed.id);
       }
     }
   } catch (e) {
-    console.warn('Headless boot error:', e);
+    console.warn('User registration boot error:', e);
   }
-}, 500); // Slight delay to let WebRTCService initialize fully
+}, 500);
 
 
 function GlobalCallOverlay() {

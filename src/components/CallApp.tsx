@@ -15,6 +15,35 @@ export default function CallApp() {
   const hadSessionRef = React.useRef(false);
 
   useEffect(() => {
+    // 🚀 Cold-boot recovery: If React opens before bridge emits, query native module directly
+    if (!WebRTCService.getCurrentSession() && Platform.OS === 'android' && NativeModules.CallIntentModule?.getPendingCall) {
+      NativeModules.CallIntentModule.getPendingCall().then((pending: any) => {
+        if (pending && pending.callId && !WebRTCService.getCurrentSession()) {
+          WebRTCService.receiveIncomingCall(
+            {
+              id: pending.callerId || 'caller',
+              name: pending.callerName || 'Caller',
+              age: 22,
+              gender: 'other',
+              occupation: '',
+              location: '',
+              distance: '',
+              bio: '',
+              photo: pending.callerPhoto || '',
+              photos: [],
+              interests: [],
+              compatibility: 100,
+              isVerified: true,
+              isVip: false,
+            },
+            (pending.callType || 'audio') as 'audio' | 'video',
+            pending.callId,
+            false
+          );
+        }
+      }).catch(() => {});
+    }
+
     const unsubscribe = WebRTCService.subscribe((newSession) => {
       if (newSession) {
         hadSessionRef.current = true;
@@ -40,6 +69,9 @@ export default function CallApp() {
 
   const handleAcceptCall = () => {
     WebRTCService.acceptCall();
+    if (Platform.OS === 'android' && NativeModules.TelecomModule?.dismissIncomingNotification) {
+      NativeModules.TelecomModule.dismissIncomingNotification().catch(() => {});
+    }
   };
 
   if (!session) {

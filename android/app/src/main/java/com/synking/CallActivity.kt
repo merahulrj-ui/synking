@@ -30,6 +30,8 @@ class CallActivity : ReactActivity() {
     private val callEndedReceiver = object : BroadcastReceiver() {
         override fun onReceive(context: Context?, intent: Intent?) {
             Log.d("SYNKING_DEBUG", "CallActivity: CALL_ENDED received — dismissing CallActivity immediately")
+            CallIntentModule.clearPendingCall()
+            context?.let { PendingCallStore.clear(it) }
             runOnUiThread {
                 try {
                     if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O_MR1) {
@@ -70,13 +72,6 @@ class CallActivity : ReactActivity() {
                 WindowManager.LayoutParams.FLAG_TURN_SCREEN_ON
             )
         }
-
-        // 🧹 Force remove incoming notification banner from notification panel immediately
-        SynkingConnectionService.stopCallForeground()
-        try {
-            val nm = getSystemService(Context.NOTIFICATION_SERVICE) as NotificationManager
-            nm.cancel(MyFirebaseMessagingService.NOTIFICATION_ID)
-        } catch (e: Exception) {}
 
         handleIncomingCallIntent(intent)
 
@@ -133,6 +128,10 @@ class CallActivity : ReactActivity() {
     override fun onDestroy() {
         super.onDestroy()
         currentCallActivity = null
+        try {
+            CallIntentModule.clearPendingCall()
+            PendingCallStore.clear(this)
+        } catch (e: Exception) {}
         try {
             unregisterReceiver(callEndedReceiver)
         } catch (e: Exception) {}
