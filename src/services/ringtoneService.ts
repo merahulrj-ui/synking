@@ -11,7 +11,7 @@ try {
 } catch (e) {}
 
 const INCOMING_RINGTONE_URL = 'https://assets.mixkit.co/active_storage/sfx/2869/2869-preview.mp3';
-const OUTGOING_RINGTONE_URL = 'https://assets.mixkit.co/active_storage/sfx/1360/1360-preview.mp3';
+const OUTGOING_RINGTONE_URL = 'https://www.myinstants.com/media/sounds/telephone-ring-03a.mp3';
 
 class RingtoneServiceClass {
   private audioCtx: any = null;

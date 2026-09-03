@@ -185,6 +185,44 @@ class MyFirebaseMessagingService : FirebaseMessagingService() {
             return
         }
 
+        if (data["type"] == "message" || data["type"] == "chat" || data["type"] == "NEW_MESSAGE") {
+            val title = data["title"] ?: data["senderName"] ?: "New Message"
+            val body = data["body"] ?: data["text"] ?: "You received a message"
+            val channelId = "synking_messages"
+
+            val nm = getSystemService(Context.NOTIFICATION_SERVICE) as NotificationManager
+            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
+                val channel = NotificationChannel(channelId, "Messages", NotificationManager.IMPORTANCE_HIGH).apply {
+                    enableVibration(true)
+                    enableLights(true)
+                }
+                nm.createNotificationChannel(channel)
+            }
+
+            val piFlags = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.M) {
+                PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE
+            } else {
+                PendingIntent.FLAG_UPDATE_CURRENT
+            }
+            
+            val intent = Intent(this, MainActivity::class.java).apply {
+                flags = Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_CLEAR_TOP
+            }
+            val pendingIntent = PendingIntent.getActivity(this, System.currentTimeMillis().toInt(), intent, piFlags)
+
+            val notification = NotificationCompat.Builder(this, channelId)
+                .setSmallIcon(R.mipmap.ic_launcher)
+                .setContentTitle(title)
+                .setContentText(body)
+                .setPriority(NotificationCompat.PRIORITY_HIGH)
+                .setAutoCancel(true)
+                .setContentIntent(pendingIntent)
+                .build()
+
+            nm.notify(System.currentTimeMillis().toInt(), notification)
+            return
+        }
+
         if (data["type"] != "INCOMING_CALL") {
             debug(
                 "FCM_IGNORED",
