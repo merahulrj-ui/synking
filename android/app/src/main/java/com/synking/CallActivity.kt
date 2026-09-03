@@ -30,7 +30,7 @@ class CallActivity : ReactActivity() {
     private val callEndedReceiver = object : BroadcastReceiver() {
         override fun onReceive(context: Context?, intent: Intent?) {
             Log.d("SYNKING_DEBUG", "CallActivity: CALL_ENDED received — dismissing CallActivity immediately")
-            CallIntentModule.clearPendingCall()
+            CallIntentModule.clear()
             context?.let { PendingCallStore.clear(it) }
             runOnUiThread {
                 try {
@@ -129,7 +129,7 @@ class CallActivity : ReactActivity() {
         super.onDestroy()
         currentCallActivity = null
         try {
-            CallIntentModule.clearPendingCall()
+            CallIntentModule.clear()
             PendingCallStore.clear(this)
         } catch (e: Exception) {}
         try {

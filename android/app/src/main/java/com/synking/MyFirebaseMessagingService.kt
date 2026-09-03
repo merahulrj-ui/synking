@@ -124,7 +124,7 @@ class MyFirebaseMessagingService : FirebaseMessagingService() {
             if (wasAnswered) {
                 CallState.clear(this@MyFirebaseMessagingService, callId)
                 PendingCallStore.clear(this@MyFirebaseMessagingService)
-                CallIntentModule.clearPendingCall()
+                CallIntentModule.clear()
                 debug("FCM_CALL_ENDED", "OK", "Call was previously answered and connected. Missed call notification suppressed.")
                 return
             }
@@ -142,7 +142,7 @@ class MyFirebaseMessagingService : FirebaseMessagingService() {
 
             CallState.clear(this@MyFirebaseMessagingService, callId)
             PendingCallStore.clear(this@MyFirebaseMessagingService)
-            CallIntentModule.clearPendingCall()
+            CallIntentModule.clear()
 
             // 7. Create dedicated Missed Call Notification Channel (standard notification sound, no looping ringtone)
             val missedChannelId = "synking_missed_calls_channel"
