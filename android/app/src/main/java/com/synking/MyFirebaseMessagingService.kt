@@ -214,15 +214,19 @@ class MyFirebaseMessagingService : FirebaseMessagingService() {
             return
         }
 
-        // 1. Wake screen instantly with PowerManager WakeLock
+        // 0. Save PendingCall to store immediately so callerName is available even if unaccepted
+        val pending = PendingCall(callId, callerId, callerName, callerPhoto, callType)
+        PendingCallStore.save(this, pending)
+
+        // 1. Wake screen instantly with PowerManager WakeLock + CPU PARTIAL_WAKE_LOCK
         try {
             val pm = getSystemService(Context.POWER_SERVICE) as PowerManager
             val wl = pm.newWakeLock(
-                PowerManager.SCREEN_BRIGHT_WAKE_LOCK or PowerManager.ACQUIRE_CAUSES_WAKEUP or PowerManager.ON_AFTER_RELEASE,
-                "synking:fcm_call_wakeup"
+                PowerManager.PARTIAL_WAKE_LOCK or PowerManager.ACQUIRE_CAUSES_WAKEUP or PowerManager.ON_AFTER_RELEASE,
+                "synking:fcm_call_cpu_wakeup"
             )
-            wl.acquire(30_000L)
-            debug("WAKELOCK_ACQUIRED", "OK", "30s screen wake active")
+            wl.acquire(35_000L)
+            debug("WAKELOCK_ACQUIRED", "OK", "35s CPU and screen wake active")
         } catch (e: Exception) {
             debug("WAKELOCK_ACQUIRED", "FAIL", e.message ?: "")
         }

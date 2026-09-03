@@ -166,6 +166,7 @@ class TelecomModule(reactContext: ReactApplicationContext) : ReactContextBaseJav
     @ReactMethod
     fun dismissIncomingNotification(promise: Promise) {
         try {
+            SynkingConnectionService.stopCallForeground()
             val nm = reactApplicationContext.getSystemService(Context.NOTIFICATION_SERVICE) as NotificationManager
             nm.cancel(MyFirebaseMessagingService.NOTIFICATION_ID)
             CallState.markAnswered(reactApplicationContext)
@@ -245,6 +246,7 @@ class TelecomModule(reactContext: ReactApplicationContext) : ReactContextBaseJav
         fun emitAcceptEvent(call: PendingCall) {
             reactContext?.let { ctx ->
                 CallState.markAnswered(ctx)
+                SynkingConnectionService.stopCallForeground()
                 try {
                     val nm = ctx.getSystemService(Context.NOTIFICATION_SERVICE) as NotificationManager
                     nm.cancel(MyFirebaseMessagingService.NOTIFICATION_ID)

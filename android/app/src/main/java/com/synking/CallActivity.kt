@@ -58,16 +58,25 @@ class CallActivity : ReactActivity() {
             requestedOrientation = android.content.pm.ActivityInfo.SCREEN_ORIENTATION_PORTRAIT
         } catch (e: Exception) {}
 
+        // 💡 Keep screen and CPU awake during call to prevent OEM battery freezing
+        window.addFlags(WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON)
+
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O_MR1) {
             setShowWhenLocked(true)
             setTurnScreenOn(true)
         } else {
             window.addFlags(
                 WindowManager.LayoutParams.FLAG_SHOW_WHEN_LOCKED or
-                WindowManager.LayoutParams.FLAG_TURN_SCREEN_ON or
-                WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON
+                WindowManager.LayoutParams.FLAG_TURN_SCREEN_ON
             )
         }
+
+        // 🧹 Force remove incoming notification banner from notification panel immediately
+        SynkingConnectionService.stopCallForeground()
+        try {
+            val nm = getSystemService(Context.NOTIFICATION_SERVICE) as NotificationManager
+            nm.cancel(MyFirebaseMessagingService.NOTIFICATION_ID)
+        } catch (e: Exception) {}
 
         handleIncomingCallIntent(intent)
 
@@ -107,8 +116,9 @@ class CallActivity : ReactActivity() {
             PendingCallStore.save(this, pending)
             if (autoAccept) {
                 CallState.markAnswered(this)
+                SynkingConnectionService.stopCallForeground()
                 try {
-                    val nm = getSystemService(Context.NOTIFICATION_SERVICE) as android.app.NotificationManager
+                    val nm = getSystemService(Context.NOTIFICATION_SERVICE) as NotificationManager
                     nm.cancel(MyFirebaseMessagingService.NOTIFICATION_ID)
                 } catch (e: Exception) {}
                 TelecomModule.emitAcceptEvent(pending)

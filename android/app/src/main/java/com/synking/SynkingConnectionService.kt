@@ -32,9 +32,20 @@ class SynkingConnectionService : ConnectionService() {
 
         fun stopCallForeground() {
             try {
-                instance?.stopForeground(true)
-                Log.d("SYNKING_TELECOM", "[FGS] stopForeground: Service teardown complete")
-            } catch (e: Exception) {}
+                if (android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.N) {
+                    instance?.stopForeground(STOP_FOREGROUND_REMOVE)
+                } else {
+                    @Suppress("DEPRECATION")
+                    instance?.stopForeground(true)
+                }
+                instance?.let { s ->
+                    val nm = s.getSystemService(android.content.Context.NOTIFICATION_SERVICE) as? android.app.NotificationManager
+                    nm?.cancel(MyFirebaseMessagingService.NOTIFICATION_ID)
+                }
+                Log.d("SYNKING_TELECOM", "[FGS] stopCallForeground: Notification completely removed")
+            } catch (e: Exception) {
+                Log.e("SYNKING_TELECOM", "[FGS] stopCallForeground error: ${e.message}")
+            }
         }
     }
 

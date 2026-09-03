@@ -12,11 +12,16 @@ import '../services/telecomBridge';
  */
 export default function CallApp() {
   const [session, setSession] = useState<CallSession | null>(() => WebRTCService.getCurrentSession());
+  const hadSessionRef = React.useRef(false);
 
   useEffect(() => {
     const unsubscribe = WebRTCService.subscribe((newSession) => {
+      if (newSession) {
+        hadSessionRef.current = true;
+      }
       setSession(newSession);
-      if (!newSession && Platform.OS === 'android' && NativeModules.TelecomModule?.endCall) {
+      // ONLY dismiss CallActivity if a call was actually active and then ended
+      if (!newSession && hadSessionRef.current && Platform.OS === 'android' && NativeModules.TelecomModule?.endCall) {
         NativeModules.TelecomModule.endCall().catch(() => {});
       }
     });
