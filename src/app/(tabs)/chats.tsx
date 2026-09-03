@@ -5,10 +5,48 @@ import { Ionicons } from '@expo/vector-icons';
 import { useApp } from '../../contexts/AppContext';
 import { Header } from '../../components/Header';
 import { useRouter } from 'expo-router';
+import AsyncStorage from '@react-native-async-storage/async-storage';
+import { fetchChatMessagesFromFirestore } from '../../services/firebase';
+import { ChatMessage } from '../../types';
+
+function formatLastMessageSnippet(msg?: ChatMessage): string {
+  if (!msg || !msg.text) return 'Say hi! Mutual match verified ✨';
+  const raw = msg.text;
+  if (raw.includes('|||AUDIO_DATA::') || raw.startsWith('🎙️') || msg.type === 'voice') {
+    return '🎤 Voice note';
+  }
+  if (raw.includes('Video Call') || raw.startsWith('📹')) {
+    return '📹 Video Call';
+  }
+  if (raw.includes('Voice Call') || raw.startsWith('📞')) {
+    return '📞 Voice Call';
+  }
+  if (raw.startsWith('E2EE::')) {
+    return '🔒 Encrypted message';
+  }
+  return raw;
+}
+
+function formatChatTime(timestamp?: string): string {
+  if (!timestamp) return 'New';
+  try {
+    const d = new Date(timestamp);
+    if (isNaN(d.getTime())) return 'New';
+    const now = new Date();
+    const isToday = d.toDateString() === now.toDateString();
+    if (isToday) {
+      return d.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+    }
+    return d.toLocaleDateString([], { month: 'short', day: 'numeric' });
+  } catch (e) {
+    return 'New';
+  }
+}
 
 export default function ChatsScreen() {
-  const { matches, messages, isDarkMode } = useApp();
+  const { matches, messages, currentUser, isDarkMode } = useApp();
   const router = useRouter();
+  const [recentChatMap, setRecentChatMap] = React.useState<Record<string, ChatMessage>>({});
 
   const bg = isDarkMode ? '#05060A' : '#F9FAFB';
   const textColor = isDarkMode ? '#FFFFFF' : '#111827';
@@ -16,14 +54,66 @@ export default function ChatsScreen() {
   const cardBg = isDarkMode ? '#11121A' : '#FFFFFF';
   const borderColor = isDarkMode ? 'rgba(255, 255, 255, 0.06)' : 'rgba(0, 0, 0, 0.06)';
 
-  // Deduplicate matches by ID to guarantee unique keys
+  // 1. Instant 0ms cached messages load + cloud sync for all matches
+  React.useEffect(() => {
+    if (!matches || matches.length === 0) return;
+    const currentUserId = currentUser?.id;
+
+    matches.forEach(async (m) => {
+      if (!m || !m.id) return;
+      try {
+        // Load from disk cache
+        const cached = await AsyncStorage.getItem(`synking_cached_msgs_${m.id}`);
+        if (cached) {
+          const parsed = JSON.parse(cached);
+          if (Array.isArray(parsed) && parsed.length > 0) {
+            const last = parsed[parsed.length - 1];
+            setRecentChatMap(prev => ({ ...prev, [m.id]: last }));
+          }
+        }
+        // Sync latest from cloud
+        if (currentUserId) {
+          const cloudMsgs = await fetchChatMessagesFromFirestore(currentUserId, m.id);
+          if (Array.isArray(cloudMsgs) && cloudMsgs.length > 0) {
+            const last = cloudMsgs[cloudMsgs.length - 1];
+            setRecentChatMap(prev => ({ ...prev, [m.id]: last }));
+            AsyncStorage.setItem(`synking_cached_msgs_${m.id}`, JSON.stringify(cloudMsgs)).catch(() => {});
+          }
+        }
+      } catch (e) {}
+    });
+  }, [matches, currentUser?.id]);
+
+  // 2. React to live messages coming through AppContext
+  React.useEffect(() => {
+    Object.entries(messages).forEach(([partnerId, thread]) => {
+      if (Array.isArray(thread) && thread.length > 0) {
+        const last = thread[thread.length - 1];
+        setRecentChatMap(prev => ({ ...prev, [partnerId]: last }));
+      }
+    });
+  }, [messages]);
+
+  // Deduplicate and SORT matches by latest message activity (WhatsApp/Tinder style: latest conversation on top)
   const uniqueMatches = React.useMemo(() => {
     const map = new Map<string, any>();
     matches.filter(Boolean).forEach(m => {
       if (m && m.id) map.set(m.id, m);
     });
-    return Array.from(map.values());
-  }, [matches]);
+    const list = Array.from(map.values());
+
+    return list.sort((a, b) => {
+      const threadA = messages[a.id] || [];
+      const threadB = messages[b.id] || [];
+      const lastA = recentChatMap[a.id] || threadA[threadA.length - 1];
+      const lastB = recentChatMap[b.id] || threadB[threadB.length - 1];
+
+      const timeA = lastA?.timestamp ? new Date(lastA.timestamp).getTime() : 0;
+      const timeB = lastB?.timestamp ? new Date(lastB.timestamp).getTime() : 0;
+
+      return timeB - timeA;
+    });
+  }, [matches, messages, recentChatMap]);
 
   return (
     <SafeAreaView style={[styles.safeArea, { backgroundColor: bg }]}>
@@ -64,13 +154,9 @@ export default function ChatsScreen() {
             contentContainerStyle={{ paddingBottom: 20 }}
             renderItem={({ item }) => {
               const thread = messages[item.id] || [];
-              const lastMsg = thread[thread.length - 1];
-              const displayLastText = lastMsg
-                ? lastMsg.text
-                : 'Say hi! Mutual match verified ✨';
-              const timeDisplay = lastMsg
-                ? new Date(lastMsg.timestamp).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })
-                : 'New';
+              const lastMsg = recentChatMap[item.id] || thread[thread.length - 1];
+              const displayLastText = formatLastMessageSnippet(lastMsg);
+              const timeDisplay = formatChatTime(lastMsg?.timestamp);
 
               return (
                 <TouchableOpacity

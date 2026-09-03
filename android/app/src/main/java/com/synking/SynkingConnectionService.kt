@@ -30,6 +30,50 @@ class SynkingConnectionService : ConnectionService() {
             }
         }
 
+        fun updateOngoingCallForeground(callerName: String) {
+            val service = instance ?: return
+            try {
+                val nm = service.getSystemService(android.content.Context.NOTIFICATION_SERVICE) as? android.app.NotificationManager
+                val channelId = "synking_ongoing_call"
+                if (android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.O) {
+                    val channel = android.app.NotificationChannel(
+                        channelId,
+                        "Active Call",
+                        android.app.NotificationManager.IMPORTANCE_LOW
+                    ).apply {
+                        setSound(null, null)
+                        enableVibration(false)
+                    }
+                    nm?.createNotificationChannel(channel)
+                }
+
+                val tapIntent = android.content.Intent(service, MainActivity::class.java).apply {
+                    flags = android.content.Intent.FLAG_ACTIVITY_NEW_TASK or android.content.Intent.FLAG_ACTIVITY_SINGLE_TOP
+                }
+                val piFlags = if (android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.M) {
+                    android.app.PendingIntent.FLAG_UPDATE_CURRENT or android.app.PendingIntent.FLAG_IMMUTABLE
+                } else {
+                    android.app.PendingIntent.FLAG_UPDATE_CURRENT
+                }
+                val tapPendingIntent = android.app.PendingIntent.getActivity(service, 1122, tapIntent, piFlags)
+
+                val displayName = if (callerName.isNotBlank()) callerName else "SYNKING Call"
+                val notification = androidx.core.app.NotificationCompat.Builder(service, channelId)
+                    .setSmallIcon(R.mipmap.ic_launcher)
+                    .setContentTitle(displayName)
+                    .setContentText("Call in progress • Tap to return")
+                    .setOngoing(true)
+                    .setContentIntent(tapPendingIntent)
+                    .setPriority(androidx.core.app.NotificationCompat.PRIORITY_LOW)
+                    .build()
+
+                startCallForeground(notification)
+                Log.d("SYNKING_TELECOM", "[FGS] Ongoing call foreground updated: $displayName")
+            } catch (e: Exception) {
+                Log.e("SYNKING_TELECOM", "[FGS] updateOngoingCallForeground error: ${e.message}")
+            }
+        }
+
         fun stopCallForeground() {
             try {
                 if (android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.N) {

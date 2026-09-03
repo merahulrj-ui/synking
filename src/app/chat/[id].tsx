@@ -1083,40 +1083,53 @@ export default function ChatScreen() {
               );
             }
 
-            // WhatsApp Style Call Log Bubble
+            // WhatsApp / Instagram Style Sleek Centered Call Pill
             if (isCallLog) {
+              const isVideo = item.text.includes('Video') || item.text.startsWith('📹');
+              const isMissed = item.text.toLowerCase().includes('missed') || item.text.toLowerCase().includes('declined');
+              
+              // Extract duration cleanly whether delimited by '·' or '-'
+              let duration = '';
+              const parts = item.text.split(/[·\-]/);
+              if (parts.length > 1) {
+                const possible = parts[parts.length - 1].trim();
+                if (possible && !possible.toLowerCase().includes('call')) {
+                  duration = possible;
+                }
+              }
+
+              const label = isMissed ? (isVideo ? 'Missed Video Call' : 'Missed Call') : (isVideo ? 'Video Call' : 'Voice Call');
+
               return (
-                <View style={[
-                  styles.callLogBubble,
-                  {
-                    backgroundColor: cardBg,
-                    borderColor: isDarkMode ? 'rgba(253, 58, 115, 0.35)' : borderCol,
-                    shadowColor: isDarkMode ? '#FD3A73' : 'transparent',
-                    shadowOffset: { width: 0, height: 2 },
-                    shadowOpacity: isDarkMode ? 0.3 : 0,
-                    shadowRadius: 6,
-                    elevation: isDarkMode ? 3 : 0,
-                  }
-                ]}>
-                  <View style={styles.callLogIconCircle}>
-                    <Ionicons
-                      name={item.text.startsWith('📹') ? 'videocam' : 'call'}
-                      size={18}
-                      color="#FD3A73"
-                    />
-                  </View>
-                  <View style={{ flex: 1 }}>
-                    <Text style={[styles.callLogTitle, { color: textColor }]}>{item.text}</Text>
-                    <Text style={[styles.callLogSub, { color: subText }]}>{formatWhatsAppTime(item.timestamp)} · P2P WebRTC</Text>
-                  </View>
-                  <TouchableOpacity
-                    style={styles.callBackBtn}
-                    onPress={() => handleStartCall(item.text.startsWith('📹') ? 'video' : 'audio')}
-                    activeOpacity={0.8}
-                  >
-                    <Text style={styles.callBackText}>Call Back</Text>
-                  </TouchableOpacity>
-                </View>
+                <TouchableOpacity
+                  style={[
+                    styles.callPill,
+                    {
+                      backgroundColor: isDarkMode ? 'rgba(26, 29, 41, 0.85)' : 'rgba(240, 242, 245, 0.95)',
+                      borderColor: isMissed ? 'rgba(239, 68, 68, 0.35)' : 'rgba(253, 58, 115, 0.25)',
+                    }
+                  ]}
+                  onPress={() => handleStartCall(isVideo ? 'video' : 'audio')}
+                  activeOpacity={0.75}
+                >
+                  <Ionicons
+                    name={isVideo ? 'videocam' : 'call'}
+                    size={13}
+                    color={isMissed ? '#EF4444' : '#FD3A73'}
+                  />
+                  <Text style={[styles.callPillText, { color: isDarkMode ? '#E2E8F0' : '#1E293B' }]}>
+                    {label}{duration ? ` · ${duration}` : ''}
+                  </Text>
+                  <Text style={[styles.callPillTime, { color: subText }]}>
+                    · {formatWhatsAppTime(item.timestamp)}
+                  </Text>
+                  <Ionicons
+                    name="arrow-redo-outline"
+                    size={12}
+                    color={isMissed ? '#EF4444' : '#FD3A73'}
+                    style={{ marginLeft: 2, opacity: 0.8 }}
+                  />
+                </TouchableOpacity>
               );
             }
 
@@ -1334,7 +1347,7 @@ export default function ChatScreen() {
 
         {/* 6. BOTTOM INPUT BAR (WHATSAPP STYLE RECORDING / SUSPENSION LOCK) */}
         {isSuspended ? (
-          <View style={[styles.inputBar, { backgroundColor: isDarkMode ? '#200D11' : '#FEE2E2', borderTopColor: '#EF4444', paddingVertical: 14, paddingHorizontal: 16, alignItems: 'center', justifyContent: 'center', gap: 4, paddingBottom: isKeyboardOpen ? 14 : Math.max(14, insets.bottom) }]}>
+          <View style={[styles.inputBar, { backgroundColor: isDarkMode ? '#200D11' : '#FEE2E2', borderTopColor: '#EF4444', paddingVertical: 14, paddingHorizontal: 16, alignItems: 'center', justifyContent: 'center', gap: 4, paddingBottom: isKeyboardOpen ? 14 : Math.max(Platform.OS === 'android' ? 20 : 14, insets.bottom + 6) }]}>
             <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
               <Ionicons name="lock-closed" size={18} color="#EF4444" />
               <Text style={{ color: '#EF4444', fontWeight: '900', fontSize: 13, letterSpacing: 0.3 }}>
@@ -1346,7 +1359,7 @@ export default function ChatScreen() {
             </Text>
           </View>
         ) : isRecording ? (
-          <View style={[styles.inputBar, { backgroundColor: isDarkMode ? '#1E1218' : '#FFF1F2', borderTopColor: '#FECDD3', paddingHorizontal: 16, paddingBottom: isKeyboardOpen ? 8 : Math.max(8, insets.bottom) }]}>
+          <View style={[styles.inputBar, { backgroundColor: isDarkMode ? '#1E1218' : '#FFF1F2', borderTopColor: '#FECDD3', paddingHorizontal: 16, paddingBottom: isKeyboardOpen ? 8 : Math.max(Platform.OS === 'android' ? 18 : 10, insets.bottom + 4) }]}>
             {/* Pulsing Recording Indicator */}
             <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8, flex: 1 }}>
               <View style={{ width: 10, height: 10, borderRadius: 5, backgroundColor: '#EF4444' }} />
@@ -1381,7 +1394,7 @@ export default function ChatScreen() {
             </TouchableOpacity>
           </View>
         ) : (
-          <View style={[styles.inputBar, { backgroundColor: inputBg, borderTopColor: borderCol, paddingBottom: isKeyboardOpen ? 8 : Math.max(8, insets.bottom) }]}>
+          <View style={[styles.inputBar, { backgroundColor: inputBg, borderTopColor: borderCol, paddingBottom: isKeyboardOpen ? 8 : Math.max(Platform.OS === 'android' ? 18 : 10, insets.bottom + 4) }]}>
             {/* Plan Date Quick Icon */}
             <TouchableOpacity
               style={styles.actionIconBtn}
@@ -1834,43 +1847,30 @@ const styles = StyleSheet.create({
     fontSize: 10,
     fontWeight: '500',
   },
-  callLogBubble: {
+  callPill: {
     flexDirection: 'row',
     alignItems: 'center',
-    padding: 12,
-    borderRadius: 16,
-    borderWidth: 1,
     alignSelf: 'center',
-    width: '92%',
-    gap: 10,
+    paddingVertical: 5,
+    paddingHorizontal: 12,
+    borderRadius: 20,
+    borderWidth: 1,
+    gap: 6,
     marginVertical: 4,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 1 },
+    shadowOpacity: 0.12,
+    shadowRadius: 3,
+    elevation: 1,
   },
-  callLogIconCircle: {
-    width: 36,
-    height: 36,
-    borderRadius: 18,
-    backgroundColor: 'rgba(253, 58, 115, 0.1)',
-    alignItems: 'center',
-    justifyContent: 'center',
+  callPillText: {
+    fontSize: 11.5,
+    fontWeight: '600',
+    letterSpacing: 0.1,
   },
-  callLogTitle: {
-    fontSize: 13,
-    fontWeight: '800',
-  },
-  callLogSub: {
-    fontSize: 10.5,
-    marginTop: 2,
-  },
-  callBackBtn: {
-    backgroundColor: 'rgba(253, 58, 115, 0.1)',
-    paddingHorizontal: 10,
-    paddingVertical: 6,
-    borderRadius: 10,
-  },
-  callBackText: {
-    color: '#FD3A73',
-    fontSize: 11,
-    fontWeight: '800',
+  callPillTime: {
+    fontSize: 10,
+    fontWeight: '400',
   },
   typingRow: {
     flexDirection: 'row',

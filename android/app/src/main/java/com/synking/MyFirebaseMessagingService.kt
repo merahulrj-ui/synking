@@ -210,7 +210,7 @@ class MyFirebaseMessagingService : FirebaseMessagingService() {
                 setClass(this@MyFirebaseMessagingService, MainActivity::class.java)
                 flags = Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_CLEAR_TOP
                 if (senderId.isNotEmpty()) {
-                    data = android.net.Uri.parse("synking://chat/$senderId")
+                    setData(android.net.Uri.parse("synking://chat/$senderId"))
                     putExtra("route", "/chat/$senderId")
                     putExtra("senderId", senderId)
                     putExtra("chatPartnerId", senderId)

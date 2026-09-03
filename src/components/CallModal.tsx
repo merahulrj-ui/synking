@@ -178,9 +178,10 @@ interface Props {
   onToggleMute?: () => boolean;
   onToggleVideo?: () => boolean | Promise<boolean>;
   onToggleSpeaker?: () => boolean | Promise<boolean>;
+  onMinimize?: () => void;
 }
 
-export const CallModal: React.FC<Props> = ({ session, onEndCall, onAcceptCall }) => {
+export const CallModal: React.FC<Props> = ({ session, onEndCall, onAcceptCall, onMinimize }) => {
   if (!session) return null;
 
   useEffect(() => {
@@ -564,6 +565,18 @@ Remote Video Tracks (${remoteVideo.length}): ${JSON.stringify(remoteVideo)}
             </TouchableOpacity>
           )}
 
+          {/* Top Left: Chat / Minimize Circular Button (Matches Flip Button on Right) */}
+          {onMinimize && isConnected && (
+            <TouchableOpacity
+              style={styles.chatMinimizeBtn}
+              onPress={onMinimize}
+              activeOpacity={0.7}
+              hitSlop={{ top: 20, bottom: 20, left: 20, right: 20 }}
+            >
+              <Ionicons name="chatbubble-ellipses" size={22} color="#FFFFFF" />
+            </TouchableOpacity>
+          )}
+
           {/* 1. TOP STATUS HEADER (ALWAYS AT TOP) */}
           <View style={[styles.topHeader, (session.type === 'video' || session.isVideoEnabled) && styles.topHeaderFloating]}>
             <View style={styles.e2eeBadge}>
@@ -746,6 +759,25 @@ const styles = StyleSheet.create({
     justifyContent: 'space-between',
     alignItems: 'center',
     position: 'relative',
+  },
+  chatMinimizeBtn: {
+    position: 'absolute',
+    top: Platform.OS === 'web' ? 24 : 54,
+    left: 20,
+    width: 48,
+    height: 48,
+    borderRadius: 24,
+    backgroundColor: 'rgba(10, 14, 23, 0.72)',
+    borderWidth: 1,
+    borderColor: 'rgba(255, 255, 255, 0.2)',
+    alignItems: 'center',
+    justifyContent: 'center',
+    zIndex: 999999,
+    elevation: 999999,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.45,
+    shadowRadius: 10,
   },
   topHeader: {
     alignItems: 'center',

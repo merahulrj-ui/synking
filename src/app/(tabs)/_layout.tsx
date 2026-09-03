@@ -1,7 +1,8 @@
 import React from 'react';
 import { Tabs } from 'expo-router';
-import { View, Text, StyleSheet, Image } from 'react-native';
+import { View, Text, StyleSheet, Image, Platform } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useApp } from '../../contexts/AppContext';
 
 import { MatchCelebrationModal } from '../../components/MatchCelebrationModal';
@@ -11,6 +12,8 @@ import { RealtimeBridge } from '../../services/realtimeBridge';
 import { CallSession } from '../../types';
 
 export default function TabsLayout() {
+  const insets = useSafeAreaInsets();
+  const safeBottom = Math.max(insets.bottom, Platform.OS === 'android' ? 14 : 10);
   const { isDarkMode, incomingRequests, currentUser, acceptedMatchAlert, clearAcceptedMatchAlert, isSuspended, suspendedUntil } = useApp();
   const [activeCall, setActiveCall] = React.useState<CallSession | null>(null);
   const [timeLeft, setTimeLeft] = React.useState<string>('');
@@ -87,6 +90,8 @@ export default function TabsLayout() {
             {
               backgroundColor: tabBarBg,
               borderTopColor: isDarkMode ? 'rgba(253, 58, 115, 0.18)' : borderCol,
+              height: 56 + safeBottom,
+              paddingBottom: safeBottom,
               ...(isDarkMode ? {
                 shadowColor: '#FD3A73',
                 shadowOffset: { width: 0, height: -4 },
@@ -205,9 +210,7 @@ export default function TabsLayout() {
 
 const styles = StyleSheet.create({
   tabBar: {
-    height: 72,
-    paddingTop: 8,
-    paddingBottom: 14,
+    paddingTop: 6,
     borderTopWidth: 1,
   },
   tabItem: {
