@@ -549,29 +549,19 @@ Remote Video Tracks (${remoteVideo.length}): ${JSON.stringify(remoteVideo)}
           {!isConnected && !isIncomingRinging && (session.type === 'video' || session.isVideoEnabled) && (
             <View style={styles.videoSurfaceContainer}>
               <LiveSelfVideo isPip={false} />
-              
-              {/* Flip Camera Button for Caller Preview */}
-              <TouchableOpacity 
-                style={{
-                  position: 'absolute',
-                  top: 60,
-                  right: 20,
-                  backgroundColor: 'rgba(0, 0, 0, 0.65)',
-                  width: 44,
-                  height: 44,
-                  borderRadius: 22,
-                  alignItems: 'center',
-                  justifyContent: 'center',
-                  borderWidth: 1.5,
-                  borderColor: 'rgba(0, 229, 255, 0.4)',
-                  zIndex: 100,
-                }}
-                onPress={() => WebRTCService.switchCamera()}
-                activeOpacity={0.7}
-              >
-                <Ionicons name="camera-reverse" size={22} color="#00E5FF" />
-              </TouchableOpacity>
             </View>
+          )}
+
+          {/* Universal 1-Click Guaranteed Flip Camera Button (Always on top during Video) */}
+          {(session.type === 'video' || session.isVideoEnabled) && (
+            <TouchableOpacity 
+              style={styles.floatingFlipBtn}
+              onPress={() => WebRTCService.switchCamera()}
+              activeOpacity={0.7}
+              hitSlop={{ top: 20, bottom: 20, left: 20, right: 20 }}
+            >
+              <Ionicons name="camera-reverse" size={24} color="#FFFFFF" />
+            </TouchableOpacity>
           )}
 
           {/* 1. TOP STATUS HEADER (ALWAYS AT TOP) */}
@@ -668,57 +658,58 @@ Remote Video Tracks (${remoteVideo.length}): ${JSON.stringify(remoteVideo)}
               </TouchableOpacity>
             </View>
           ) : (
-            // ACTIVE / OUTGOING CALL CONTROLS
+            // ACTIVE / OUTGOING CALL CONTROLS (LUXURY OBSIDIAN & PEARL WHITE)
             <View style={styles.controlBar}>
               {/* Mute Button */}
               <TouchableOpacity
-                style={[styles.controlBtn, session.isMuted && styles.controlBtnActive]}
+                style={[styles.controlBtn, session.isMuted && styles.controlBtnMuted]}
                 onPress={() => WebRTCService.toggleMute()}
-                activeOpacity={0.7}
+                activeOpacity={0.75}
+                hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
               >
                 <Ionicons
                   name={session.isMuted ? 'mic-off' : 'mic'}
-                  size={20}
+                  size={22}
                   color={session.isMuted ? '#EF4444' : '#FFFFFF'}
                 />
-                <Text style={styles.controlLabel}>{session.isMuted ? 'Unmute' : 'Mute'}</Text>
               </TouchableOpacity>
 
-              {/* Speaker Button */}
+              {/* Speaker Button (Pearl White Active / Frosted Glass Inactive) */}
               <TouchableOpacity
                 style={[styles.controlBtn, session.isSpeakerOn && styles.controlBtnActive]}
                 onPress={() => WebRTCService.toggleSpeaker()}
-                activeOpacity={0.7}
+                activeOpacity={0.75}
+                hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
               >
                 <Ionicons
                   name={session.isSpeakerOn ? 'volume-high' : 'volume-mute'}
-                  size={20}
-                  color={session.isSpeakerOn ? '#38BDF8' : '#FFFFFF'}
+                  size={22}
+                  color={session.isSpeakerOn ? '#0A0E17' : '#FFFFFF'}
                 />
-                <Text style={styles.controlLabel}>{session.isSpeakerOn ? 'Speaker' : 'Earpiece'}</Text>
               </TouchableOpacity>
 
-              {/* Video Toggle */}
+              {/* Video Toggle (Pearl White Active / Frosted Glass Inactive) */}
               <TouchableOpacity
                 style={[styles.controlBtn, session.isVideoEnabled && styles.controlBtnActive]}
                 onPress={() => WebRTCService.toggleVideo()}
-                activeOpacity={0.7}
+                activeOpacity={0.75}
+                hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
               >
                 <Ionicons
                   name={session.isVideoEnabled ? 'videocam' : 'videocam-off'}
-                  size={20}
-                  color={session.isVideoEnabled ? '#A855F7' : '#FFFFFF'}
+                  size={22}
+                  color={session.isVideoEnabled ? '#0A0E17' : '#FFFFFF'}
                 />
-                <Text style={styles.controlLabel}>Camera</Text>
               </TouchableOpacity>
 
-              {/* End Call Button */}
+              {/* End Call Button (Apple Signature Crimson with Ambient Glow) */}
               <TouchableOpacity
                 style={styles.endCallBtn}
                 onPress={onEndCall}
                 activeOpacity={0.8}
+                hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
               >
-                <Ionicons name="call" size={24} color="#FFFFFF" style={{ transform: [{ rotate: '135deg' }] }} />
+                <Ionicons name="call" size={26} color="#FFFFFF" style={{ transform: [{ rotate: '135deg' }] }} />
               </TouchableOpacity>
             </View>
           )}
@@ -879,19 +870,19 @@ const styles = StyleSheet.create({
     top: Platform.OS === 'web' ? 18 : 48,
     alignSelf: 'center',
     minWidth: 210,
-    backgroundColor: 'rgba(15, 23, 42, 0.85)',
+    backgroundColor: 'rgba(10, 14, 23, 0.72)',
     paddingHorizontal: 20,
     paddingVertical: 10,
     borderRadius: 28,
     borderWidth: 1,
-    borderColor: 'rgba(255, 255, 255, 0.18)',
+    borderColor: 'rgba(255, 255, 255, 0.12)',
     zIndex: 20,
     alignItems: 'center',
     gap: 4,
     shadowColor: '#000',
     shadowOffset: { width: 0, height: 4 },
-    shadowOpacity: 0.4,
-    shadowRadius: 8,
+    shadowOpacity: 0.45,
+    shadowRadius: 12,
     elevation: 8,
   },
   videoSurfaceContainer: {
@@ -979,6 +970,25 @@ const styles = StyleSheet.create({
     fontSize: 11,
     fontWeight: '800',
   },
+  floatingFlipBtn: {
+    position: 'absolute',
+    top: Platform.OS === 'web' ? 24 : 54,
+    right: 20,
+    width: 48,
+    height: 48,
+    borderRadius: 24,
+    backgroundColor: 'rgba(10, 14, 23, 0.72)',
+    borderWidth: 1,
+    borderColor: 'rgba(255, 255, 255, 0.2)',
+    alignItems: 'center',
+    justifyContent: 'center',
+    zIndex: 999999,
+    elevation: 999999,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.45,
+    shadowRadius: 10,
+  },
   controlBar: {
     position: 'absolute',
     bottom: 36,
@@ -987,33 +997,41 @@ const styles = StyleSheet.create({
     gap: 16,
     alignItems: 'center',
     justifyContent: 'center',
-    backgroundColor: 'rgba(30, 41, 59, 0.85)',
-    paddingHorizontal: 20,
-    paddingVertical: 12,
-    borderRadius: 36,
+    backgroundColor: 'rgba(10, 14, 23, 0.72)',
+    paddingHorizontal: 22,
+    paddingVertical: 14,
+    borderRadius: 44,
     borderWidth: 1,
-    borderColor: 'rgba(255, 255, 255, 0.15)',
+    borderColor: 'rgba(255, 255, 255, 0.12)',
     zIndex: 9999,
     elevation: 9999,
     shadowColor: '#000',
-    shadowOffset: { width: 0, height: 6 },
-    shadowOpacity: 0.4,
-    shadowRadius: 10,
+    shadowOffset: { width: 0, height: 12 },
+    shadowOpacity: 0.55,
+    shadowRadius: 24,
   },
   controlBtn: {
     alignItems: 'center',
     justifyContent: 'center',
-    width: 52,
-    height: 52,
-    borderRadius: 26,
-    backgroundColor: '#1E293B',
+    width: 54,
+    height: 54,
+    borderRadius: 27,
+    backgroundColor: 'rgba(255, 255, 255, 0.12)',
     borderWidth: 1,
-    borderColor: '#334155',
-    gap: 2,
+    borderColor: 'rgba(255, 255, 255, 0.08)',
   },
   controlBtnActive: {
-    backgroundColor: '#0284C7',
-    borderColor: '#38BDF8',
+    backgroundColor: '#FFFFFF',
+    borderColor: '#FFFFFF',
+    shadowColor: '#FFFFFF',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.35,
+    shadowRadius: 12,
+    elevation: 8,
+  },
+  controlBtnMuted: {
+    backgroundColor: 'rgba(239, 68, 68, 0.22)',
+    borderColor: '#EF4444',
   },
   controlLabel: {
     color: '#94A3B8',
@@ -1022,18 +1040,18 @@ const styles = StyleSheet.create({
     display: 'none',
   },
   endCallBtn: {
-    width: 56,
-    height: 56,
-    borderRadius: 28,
-    backgroundColor: '#EF4444',
+    width: 58,
+    height: 58,
+    borderRadius: 29,
+    backgroundColor: '#FF3B30',
     alignItems: 'center',
     justifyContent: 'center',
     marginLeft: 4,
-    shadowColor: '#EF4444',
+    shadowColor: '#FF3B30',
     shadowOffset: { width: 0, height: 4 },
-    shadowOpacity: 0.4,
-    shadowRadius: 8,
-    elevation: 8,
+    shadowOpacity: 0.55,
+    shadowRadius: 14,
+    elevation: 10,
   },
   unmuteFloatingBtn: {
     flexDirection: 'row',

@@ -50,6 +50,7 @@ class WebRTCManager {
   private iceCandidateQueue: any[] = [];
   public localVideoElementRef: any = null;
   public iceStatus: string = 'disconnected';
+  private isSwitchingCamera: boolean = false;
 
   constructor() {
     // Listen for Targeted Real-Time Call Signaling from peer
@@ -680,75 +681,87 @@ class WebRTCManager {
   public async switchCamera(): Promise<void> {
     if (!this.currentSession || !this.localStream) return;
     
-    // Default to front camera initially if undefined
-    if (this.currentSession.isFrontCamera === undefined) {
-      this.currentSession.isFrontCamera = true;
+    if (this.isSwitchingCamera) {
+      this.log('⏳ CAMERA SWITCH: Switch already in progress, debouncing duplicate tap.');
+      return;
     }
+    this.isSwitchingCamera = true;
 
-    const nextIsFront = !this.currentSession.isFrontCamera;
-    const targetFacingMode = nextIsFront ? 'user' : 'environment';
-
-    const videoTracks = this.localStream.getVideoTracks();
-    if (videoTracks && videoTracks.length > 0) {
-      const videoTrack = videoTracks[0];
-
-      // Method 1: Try Native react-native-webrtc _switchCamera method
-      if (typeof videoTrack._switchCamera === 'function') {
-        try {
-          const res = videoTrack._switchCamera();
-          if (res instanceof Promise) {
-            await res;
-          }
-          this.currentSession.isFrontCamera = nextIsFront;
-          this.log(`🔄 CAMERA SWITCHED (Native): Now using ${nextIsFront ? 'Front' : 'Back'} camera.`);
-          this.notify();
-          return;
-        } catch (nativeErr) {
-          this.log(`⚠️ Native _switchCamera error: ${nativeErr}, attempting re-capture fallback...`);
-        }
+    try {
+      // Default to front camera initially if undefined
+      if (this.currentSession.isFrontCamera === undefined) {
+        this.currentSession.isFrontCamera = true;
       }
 
-      // Method 2: Universal Fallback for Browsers & Multi-Lens Android Devices
-      try {
-        if (MediaDevices && MediaDevices.getUserMedia) {
-          this.log(`🔄 Re-capturing camera stream with facingMode='${targetFacingMode}'...`);
-          
-          let newVideoStream: any = null;
+      const nextIsFront = !this.currentSession.isFrontCamera;
+      const targetFacingMode = nextIsFront ? 'user' : 'environment';
+
+      const videoTracks = this.localStream.getVideoTracks();
+      if (videoTracks && videoTracks.length > 0) {
+        const videoTrack = videoTracks[0];
+
+        // Method 1: Try Native react-native-webrtc _switchCamera method
+        if (typeof videoTrack._switchCamera === 'function') {
           try {
-            newVideoStream = await MediaDevices.getUserMedia({
-              video: { facingMode: targetFacingMode, width: { ideal: 640 }, height: { ideal: 480 } },
-              audio: false,
-            });
-          } catch (facingErr) {
-            newVideoStream = await MediaDevices.getUserMedia({
-              video: { facingMode: targetFacingMode },
-              audio: false,
-            });
+            const res = videoTrack._switchCamera();
+            if (res instanceof Promise) {
+              await res;
+            }
+            this.currentSession.isFrontCamera = nextIsFront;
+            this.log(`🔄 CAMERA SWITCHED (Native): Now using ${nextIsFront ? 'Front' : 'Back'} camera.`);
+            this.notify();
+            return;
+          } catch (nativeErr) {
+            this.log(`⚠️ Native _switchCamera error: ${nativeErr}, attempting re-capture fallback...`);
           }
+        }
 
-          const newVideoTrack = newVideoStream?.getVideoTracks()?.[0];
-          if (newVideoTrack) {
-            videoTrack.stop();
-            this.localStream.removeTrack(videoTrack);
-            this.localStream.addTrack(newVideoTrack);
-
-            if (this.peerConnection) {
-              const senders = this.peerConnection.getSenders ? this.peerConnection.getSenders() : [];
-              const videoSender = senders.find((s: any) => s.track && s.track.kind === 'video');
-              if (videoSender && typeof videoSender.replaceTrack === 'function') {
-                await videoSender.replaceTrack(newVideoTrack);
-                this.log('✅ Replaced video track on RTCRtpSender successfully.');
-              }
+        // Method 2: Universal Fallback for Browsers & Multi-Lens Android Devices
+        try {
+          if (MediaDevices && MediaDevices.getUserMedia) {
+            this.log(`🔄 Re-capturing camera stream with facingMode='${targetFacingMode}'...`);
+            
+            let newVideoStream: any = null;
+            try {
+              newVideoStream = await MediaDevices.getUserMedia({
+                video: { facingMode: targetFacingMode, width: { ideal: 640 }, height: { ideal: 480 } },
+                audio: false,
+              });
+            } catch (facingErr) {
+              newVideoStream = await MediaDevices.getUserMedia({
+                video: { facingMode: targetFacingMode },
+                audio: false,
+              });
             }
 
-            this.currentSession.isFrontCamera = nextIsFront;
-            this.log(`🔄 CAMERA SWITCHED (Fallback): Now using ${nextIsFront ? 'Front' : 'Back'} camera.`);
-            this.notify();
+            const newVideoTrack = newVideoStream?.getVideoTracks()?.[0];
+            if (newVideoTrack) {
+              videoTrack.stop();
+              this.localStream.removeTrack(videoTrack);
+              this.localStream.addTrack(newVideoTrack);
+
+              if (this.peerConnection) {
+                const senders = this.peerConnection.getSenders ? this.peerConnection.getSenders() : [];
+                const videoSender = senders.find((s: any) => s.track && s.track.kind === 'video');
+                if (videoSender && typeof videoSender.replaceTrack === 'function') {
+                  await videoSender.replaceTrack(newVideoTrack);
+                  this.log('✅ Replaced video track on RTCRtpSender successfully.');
+                }
+              }
+
+              this.currentSession.isFrontCamera = nextIsFront;
+              this.log(`🔄 CAMERA SWITCHED (Fallback): Now using ${nextIsFront ? 'Front' : 'Back'} camera.`);
+              this.notify();
+            }
           }
+        } catch (err) {
+          this.log(`❌ Failed to switch camera: ${err}`);
         }
-      } catch (err) {
-        this.log(`❌ Failed to switch camera: ${err}`);
       }
+    } finally {
+      setTimeout(() => {
+        this.isSwitchingCamera = false;
+      }, 500);
     }
   }
 
