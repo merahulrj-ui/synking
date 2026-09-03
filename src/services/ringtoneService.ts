@@ -38,7 +38,7 @@ class RingtoneServiceClass {
     return null;
   }
 
-  // 1. OUTGOING CALL: Modern Dial Tone ("Tring... Tring...")
+  // 1. OUTGOING CALL: Pleasant Ringback Tone (looping "Tuuu... Tuuu...")
   public async playOutgoingRing() {
     if ((globalThis as any).__SYNKING_RINGTONE_PLAYING__ && (globalThis as any).__SYNKING_RINGTONE_MODE__ === 'outgoing') {
       return;
@@ -50,7 +50,18 @@ class RingtoneServiceClass {
     (globalThis as any).__SYNKING_RINGTONE_MODE__ = 'outgoing';
     CallDebugger.logStage('RINGTONE', 'OK', { mode: 'outgoing' });
 
-    // Native expo-audio playback
+    // Use native Android ToneGenerator for reliable ringback
+    if (Platform.OS === 'android') {
+      try {
+        const { NativeModules } = require('react-native');
+        if (NativeModules.AudioRouteModule?.startRingbackTone) {
+          NativeModules.AudioRouteModule.startRingbackTone();
+          return;
+        }
+      } catch (e) {}
+    }
+
+    // Fallback: expo-audio for iOS
     if (Platform.OS !== 'web' && ExpoAudioModule && typeof ExpoAudioModule.createAudioPlayer === 'function') {
       try {
         const player = ExpoAudioModule.createAudioPlayer({ uri: OUTGOING_RINGTONE_URL });
@@ -189,6 +200,16 @@ class RingtoneServiceClass {
     if (Platform.OS !== 'web') {
       try {
         Vibration.cancel();
+      } catch (e) {}
+    }
+
+    // Stop native Android ringback tone
+    if (Platform.OS === 'android') {
+      try {
+        const { NativeModules } = require('react-native');
+        if (NativeModules.AudioRouteModule?.stopRingbackTone) {
+          NativeModules.AudioRouteModule.stopRingbackTone();
+        }
       } catch (e) {}
     }
 

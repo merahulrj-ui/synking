@@ -5,6 +5,7 @@ import android.media.AudioAttributes
 import android.media.AudioDeviceInfo
 import android.media.AudioFocusRequest
 import android.media.AudioManager
+import android.media.ToneGenerator
 import android.os.Build
 import android.os.Handler
 import android.os.Looper
@@ -161,5 +162,52 @@ class AudioRouteModule(private val reactContext: ReactApplicationContext) : Reac
             }
         }
     }
-}
 
+    private var toneGenerator: ToneGenerator? = null
+    private var ringbackRunnable: Runnable? = null
+
+    @ReactMethod
+    fun startRingbackTone(promise: Promise) {
+        mainHandler.post {
+            try {
+                stopRingbackInternal()
+                toneGenerator = ToneGenerator(AudioManager.STREAM_VOICE_CALL, 80)
+                val playTone = object : Runnable {
+                    override fun run() {
+                        try {
+                            toneGenerator?.startTone(ToneGenerator.TONE_SUP_RINGTONE, 1000)
+                            mainHandler.postDelayed(this, 3000)
+                        } catch (e: Exception) {
+                            Log.w("SYNKING_AUDIO", "Ringback tone error: ${e.message}")
+                        }
+                    }
+                }
+                ringbackRunnable = playTone
+                playTone.run()
+                promise.resolve(true)
+            } catch (e: Exception) {
+                promise.reject("RINGBACK_ERROR", e.message)
+            }
+        }
+    }
+
+    @ReactMethod
+    fun stopRingbackTone(promise: Promise) {
+        mainHandler.post {
+            stopRingbackInternal()
+            promise.resolve(true)
+        }
+    }
+
+    private fun stopRingbackInternal() {
+        try {
+            ringbackRunnable?.let { mainHandler.removeCallbacks(it) }
+            ringbackRunnable = null
+            toneGenerator?.stopTone()
+            toneGenerator?.release()
+            toneGenerator = null
+        } catch (e: Exception) {
+            Log.w("SYNKING_AUDIO", "stopRingback error: ${e.message}")
+        }
+    }
+}
