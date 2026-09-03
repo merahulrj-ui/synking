@@ -43,8 +43,48 @@ function formatChatTime(timestamp?: string): string {
   }
 }
 
+function getLastMessageForUser(
+  user: any,
+  messagesObj: Record<string, ChatMessage[]>,
+  chatMap: Record<string, ChatMessage>
+): ChatMessage | undefined {
+  if (!user) return undefined;
+  const uid = String(user.id || '');
+  const uPhone = String(user.phoneNumber || '').replace(/\D/g, '').slice(-10);
+
+  // 1. Direct match by user.id
+  if (chatMap[uid]) return chatMap[uid];
+  if (messagesObj[uid] && messagesObj[uid].length > 0) {
+    return messagesObj[uid][messagesObj[uid].length - 1];
+  }
+
+  // 2. Direct match by user.phoneNumber
+  if (user.phoneNumber) {
+    if (chatMap[user.phoneNumber]) return chatMap[user.phoneNumber];
+    if (messagesObj[user.phoneNumber] && messagesObj[user.phoneNumber].length > 0) {
+      return messagesObj[user.phoneNumber][messagesObj[user.phoneNumber].length - 1];
+    }
+  }
+
+  // 3. Normalized 10-digit phone match
+  if (uPhone) {
+    for (const [key, msg] of Object.entries(chatMap)) {
+      const kDigits = key.replace(/\D/g, '').slice(-10);
+      if (kDigits && kDigits === uPhone) return msg;
+    }
+    for (const [key, thread] of Object.entries(messagesObj)) {
+      const kDigits = key.replace(/\D/g, '').slice(-10);
+      if (kDigits && kDigits === uPhone && Array.isArray(thread) && thread.length > 0) {
+        return thread[thread.length - 1];
+      }
+    }
+  }
+
+  return undefined;
+}
+
 export default function ChatsScreen() {
-  const { matches, messages, currentUser, isDarkMode } = useApp();
+  const { matches, profiles, messages, currentUser, isDarkMode } = useApp();
   const router = useRouter();
   const [recentChatMap, setRecentChatMap] = React.useState<Record<string, ChatMessage>>({});
 
@@ -94,26 +134,66 @@ export default function ChatsScreen() {
     });
   }, [messages]);
 
+  // 3. Fast 3s Live Background Sync: Ensures newly received voice notes & messages refresh automatically
+  React.useEffect(() => {
+    if (!matches || matches.length === 0 || !currentUser?.id) return;
+    const interval = setInterval(() => {
+      matches.forEach(async (m) => {
+        if (!m || !m.id) return;
+        try {
+          const cloudMsgs = await fetchChatMessagesFromFirestore(currentUser.id, m.id);
+          if (Array.isArray(cloudMsgs) && cloudMsgs.length > 0) {
+            const last = cloudMsgs[cloudMsgs.length - 1];
+            setRecentChatMap(prev => {
+              if (prev[m.id]?.id === last.id) return prev;
+              return { ...prev, [m.id]: last };
+            });
+          }
+        } catch (e) {}
+      });
+    }, 3000);
+    return () => clearInterval(interval);
+  }, [matches, currentUser?.id]);
+
   // Deduplicate and SORT matches by latest message activity (WhatsApp/Tinder style: latest conversation on top)
   const uniqueMatches = React.useMemo(() => {
     const map = new Map<string, any>();
     matches.filter(Boolean).forEach(m => {
       if (m && m.id) map.set(m.id, m);
     });
+
+    // Also include any active chat partner from messages or recentChatMap
+    const allChatPartnerKeys = new Set([...Object.keys(messages), ...Object.keys(recentChatMap)]);
+    allChatPartnerKeys.forEach(partnerKey => {
+      if (!partnerKey) return;
+      const cleanKeyDigits = partnerKey.replace(/\D/g, '').slice(-10);
+      const alreadyIn = Array.from(map.values()).some(m => 
+        m.id === partnerKey || 
+        (cleanKeyDigits && (m.phoneNumber || '').replace(/\D/g, '').slice(-10) === cleanKeyDigits)
+      );
+      if (!alreadyIn) {
+        const found = profiles.find(p => 
+          p.id === partnerKey || 
+          (cleanKeyDigits && (p.phoneNumber || '').replace(/\D/g, '').slice(-10) === cleanKeyDigits)
+        );
+        if (found) {
+          map.set(found.id, found);
+        }
+      }
+    });
+
     const list = Array.from(map.values());
 
     return list.sort((a, b) => {
-      const threadA = messages[a.id] || [];
-      const threadB = messages[b.id] || [];
-      const lastA = recentChatMap[a.id] || threadA[threadA.length - 1];
-      const lastB = recentChatMap[b.id] || threadB[threadB.length - 1];
+      const lastA = getLastMessageForUser(a, messages, recentChatMap);
+      const lastB = getLastMessageForUser(b, messages, recentChatMap);
 
       const timeA = lastA?.timestamp ? new Date(lastA.timestamp).getTime() : 0;
       const timeB = lastB?.timestamp ? new Date(lastB.timestamp).getTime() : 0;
 
       return timeB - timeA;
     });
-  }, [matches, messages, recentChatMap]);
+  }, [matches, profiles, messages, recentChatMap]);
 
   return (
     <SafeAreaView style={[styles.safeArea, { backgroundColor: bg }]}>
@@ -153,8 +233,7 @@ export default function ChatsScreen() {
             showsVerticalScrollIndicator={false}
             contentContainerStyle={{ paddingBottom: 20 }}
             renderItem={({ item }) => {
-              const thread = messages[item.id] || [];
-              const lastMsg = recentChatMap[item.id] || thread[thread.length - 1];
+              const lastMsg = getLastMessageForUser(item, messages, recentChatMap);
               const displayLastText = formatLastMessageSnippet(lastMsg);
               const timeDisplay = formatChatTime(lastMsg?.timestamp);
 

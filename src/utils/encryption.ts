@@ -28,6 +28,18 @@ async function getSafeHash(key: string): Promise<string> {
 // Simple & fast reversible XOR cipher with SHA-256 hash stream for zero-dependency E2EE
 export async function encryptE2EEMessage(plainText: string, senderId: string, receiverId: string): Promise<{ ciphertext: string; hash: string }> {
   try {
+    if (!plainText) return { ciphertext: '', hash: 'empty' };
+
+    // Fast-path for Voice Notes: Encrypt the metadata label instantly without running 50,000-char CPU loop on raw audio base64!
+    if (plainText.includes('|||AUDIO_DATA::')) {
+      const parts = plainText.split('|||AUDIO_DATA::');
+      const labelEnc = await encryptE2EEMessage(parts[0], senderId, receiverId);
+      return {
+        ciphertext: `${labelEnc.ciphertext}|||AUDIO_DATA::${parts[1]}`,
+        hash: labelEnc.hash,
+      };
+    }
+
     const sessionKey = getChatSessionKey(senderId, receiverId);
     const keyHash = await getSafeHash(sessionKey);
 
@@ -55,7 +67,16 @@ export async function encryptE2EEMessage(plainText: string, senderId: string, re
 // Decrypts ciphertext back to human-readable plain text on-device
 export async function decryptE2EEMessage(cipherText: string, senderId: string, receiverId: string): Promise<string> {
   try {
-    if (!cipherText || !cipherText.startsWith('E2EE::')) {
+    if (!cipherText) return '';
+
+    // Fast-path for Voice Notes: Decrypt label instantly and preserve audio base64
+    if (cipherText.includes('|||AUDIO_DATA::')) {
+      const parts = cipherText.split('|||AUDIO_DATA::');
+      const labelDec = await decryptE2EEMessage(parts[0], senderId, receiverId);
+      return `${labelDec}|||AUDIO_DATA::${parts[1]}`;
+    }
+
+    if (!cipherText.startsWith('E2EE::')) {
       return cipherText; // Not encrypted / legacy
     }
 

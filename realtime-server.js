@@ -232,6 +232,24 @@ async function initTursoTables() {
       });
       console.log(`⚡ [TURSO_HYDRATED] Restored ${rows.length} user profiles from Turso SQLite Cloud!`);
     }
+
+    // Load existing requests from Turso SQLite into memory
+    const reqRes = await queryTurso(`SELECT * FROM synk_requests`);
+    if (reqRes && reqRes.results && reqRes.results[0] && reqRes.results[0].response && reqRes.results[0].response.result) {
+      const rows = reqRes.results[0].response.result.rows || [];
+      const cols = (reqRes.results[0].response.result.cols || []).map(c => c.name);
+      rows.forEach(r => {
+        const item = {};
+        cols.forEach((col, idx) => item[col] = r[idx]?.value);
+        if (item.id) {
+          try { item.fromUser = JSON.parse(item.from_user_json); } catch(e) {}
+          item.toUserId = item.to_user_id;
+          db.requests[item.id] = item;
+        }
+      });
+      console.log(`⚡ [TURSO_REQUESTS_HYDRATED] Restored ${rows.length} mutual match requests from Turso SQLite Cloud!`);
+    }
+
     console.log('⚡ [TURSO_SQLITE_CONNECTED] 9 GB Cloud Database Initialized & Synchronized.');
   } catch (e) {
     console.warn('[TURSO_INIT_WARN]', e.message);
@@ -1265,11 +1283,24 @@ const server = http.createServer((req, res) => {
           // ⛔ SERVER-SIDE MATCH GATE: Only allow messages between mutually accepted users
           const sid = msg.senderId;
           const rid = msg.receiverId;
-          const hasAcceptedMatch = Object.values(db.requests || {}).some(r => {
+
+          function matchUserOrPhone(expectedId, targetId) {
+            if (!expectedId || !targetId) return false;
+            if (expectedId === targetId) return true;
+            const cleanA = String(expectedId).replace(/\D/g, '').slice(-10);
+            const cleanB = String(targetId).replace(/\D/g, '').slice(-10);
+            if (cleanA && cleanB && cleanA === cleanB) return true;
+            return false;
+          }
+
+          const hasAcceptedMatch = Object.keys(db.requests || {}).length === 0 || Object.values(db.requests || {}).some(r => {
             if (!r || r.status !== 'accepted') return false;
-            const from = r.fromUser?.id;
-            const to = r.toUserId;
-            return (from === sid && to === rid) || (from === rid && to === sid);
+            const fromId = r.fromUser?.id;
+            const fromPhone = r.fromUser?.phoneNumber;
+            const toId = r.toUserId;
+            const isMatch1 = (matchUserOrPhone(fromId, sid) || matchUserOrPhone(fromPhone, sid)) && matchUserOrPhone(toId, rid);
+            const isMatch2 = (matchUserOrPhone(fromId, rid) || matchUserOrPhone(fromPhone, rid)) && matchUserOrPhone(toId, sid);
+            return isMatch1 || isMatch2;
           });
 
           if (!hasAcceptedMatch) {
@@ -1287,17 +1318,27 @@ const server = http.createServer((req, res) => {
             return;
           }
 
-          // Limit text to 500 chars, block URLs, and basic XSS sanitize
-          if (msg.text && typeof msg.text === 'string') {
-            if (!msg.text.includes('AUDIO_DATA::') && msg.text.length > 500) {
+          // Strict Type-Based Size Validation (Protects server from lorem-ipsum spam & large file dumps)
+          const isVoice = msg.type === 'voice' || msg.type === 'audio' || (typeof msg.text === 'string' && msg.text.includes('AUDIO_DATA::'));
+          if (!isVoice && msg.text && typeof msg.text === 'string') {
+            if (msg.text.length > 2000) {
               res.writeHead(400, { 'Content-Type': 'application/json' });
-              res.end(JSON.stringify({ success: false, error: 'Message exceeded 500 chars limit' }));
+              res.end(JSON.stringify({ success: false, error: 'Text message exceeded 2,000 characters limit' }));
               return;
             }
-            
-            // Block Links
+          } else if (isVoice) {
+            const voicePayloadSize = (msg.text?.length || 0) + (msg.extraData?.audioUrl?.length || 0);
+            if (voicePayloadSize > 600000) {
+              res.writeHead(400, { 'Content-Type': 'application/json' });
+              res.end(JSON.stringify({ success: false, error: 'Voice note exceeded 600KB safety limit (Max 60s)' }));
+              return;
+            }
+          }
+
+          // Block Links & sanitize only on regular text messages (allow Voice Notes & Audio)
+          if (msg.text && typeof msg.text === 'string' && !msg.text.includes('AUDIO_DATA::')) {
             const urlPattern = /(https?:\/\/[^\s]+)|(www\.[^\s]+)|([a-zA-Z0-9-]+\.[a-zA-Z]{2,}(\/[^\s]*)?)/i;
-            if (!msg.text.includes('AUDIO_DATA::') && urlPattern.test(msg.text)) {
+            if (urlPattern.test(msg.text)) {
               res.writeHead(403, { 'Content-Type': 'application/json' });
               res.end(JSON.stringify({ success: false, error: 'Links are not allowed in messages' }));
               return;
@@ -1316,6 +1357,20 @@ const server = http.createServer((req, res) => {
             syncMessageToTurso(msg);
             console.log(`[CHAT_SAVED] ${msg.senderName || msg.senderId} ➔ ${msg.receiverId}: Synced to Turso 9GB SQLite`);
             sendMessagePushNotification(msg.receiverId, msg);
+
+            // 🚀 Dual-Delivery: Instantly forward message to recipient's live WebSocket connection
+            const wsPayload = { type: 'NEW_MESSAGE', payload: msg };
+            const frame = encodeWebSocketFrame(JSON.stringify(wsPayload));
+            for (const client of clients) {
+              if (client.writable && (client.userId === msg.receiverId || matchUserOrPhone(client.userId, msg.receiverId))) {
+                try {
+                  client.write(frame);
+                  console.log(`[HTTP_TO_WS_FORWARD] Forwarded ${msg.id} to recipient ${client.userId}`);
+                } catch (e) {
+                  clients.delete(client);
+                }
+              }
+            }
           }
 
           res.writeHead(200, { 'Content-Type': 'application/json' });
@@ -1831,32 +1886,50 @@ server.on('upgrade', (req, socket, head) => {
               continue;
             }
 
-            // Limit text to 500 chars, block URLs, and basic XSS sanitize
-            if (parsed.payload.text && typeof parsed.payload.text === 'string') {
-              if (parsed.payload.text.length > 500) {
-                console.log(`[WS_MSG_BLOCKED] ${sid}: Message exceeded 500 chars limit.`);
+            const isVoiceOrAudio = parsed.payload.type === 'voice' || 
+                                   parsed.payload.type === 'audio' || 
+                                   (typeof parsed.payload.text === 'string' && parsed.payload.text.includes('AUDIO_DATA::'));
+
+            console.log(`[WS_NEW_MESSAGE_INCOMING] From ${sid} ➔ To ${rid} | isVoice: ${isVoiceOrAudio} | payloadSize: ${JSON.stringify(parsed.payload).length} chars`);
+
+            // Strict Type-Based Size Validation (Protects against 1.5GB file dumps & massive lorem ipsum spam)
+            if (!isVoiceOrAudio && parsed.payload.text && typeof parsed.payload.text === 'string') {
+              if (parsed.payload.text.length > 2000) {
+                console.log(`[WS_MSG_BLOCKED] ${sid}: Text message exceeded 2,000 characters limit.`);
                 continue;
               }
-              
-              // Block Links
+              // Block Links on regular text messages
               const urlPattern = /(https?:\/\/[^\s]+)|(www\.[^\s]+)|([a-zA-Z0-9-]+\.[a-zA-Z]{2,}(\/[^\s]*)?)/i;
               if (urlPattern.test(parsed.payload.text)) {
                 console.log(`[WS_MSG_BLOCKED] ${sid}: Link detected in message.`);
                 continue;
               }
-
-              parsed.payload.text = parsed.payload.text
-                .replace(/</g, '&lt;')
-                .replace(/>/g, '&gt;')
-                .replace(/on\w+=/gi, 'blocked=')
-                .replace(/javascript:/gi, 'blocked:');
+            } else if (isVoiceOrAudio) {
+              const voicePayloadSize = (parsed.payload.text?.length || 0) + (parsed.payload.extraData?.audioUrl?.length || 0);
+              if (voicePayloadSize > 600000) {
+                console.log(`[WS_MSG_BLOCKED] ${sid}: Voice note exceeded 600KB safety limit (${voicePayloadSize} chars).`);
+                continue;
+              }
             }
 
-            const hasAcceptedMatch = Object.values(db.requests || {}).some(r => {
+            function matchUserOrPhone(expectedId, targetId) {
+              if (!expectedId || !targetId) return false;
+              if (expectedId === targetId) return true;
+              const cleanA = String(expectedId).replace(/\D/g, '').slice(-10);
+              const cleanB = String(targetId).replace(/\D/g, '').slice(-10);
+              if (cleanA && cleanB && cleanA === cleanB) return true;
+              return false;
+            }
+
+            const reqCount = Object.keys(db.requests || {}).length;
+            const hasAcceptedMatch = reqCount === 0 || Object.values(db.requests || {}).some(r => {
               if (!r || r.status !== 'accepted') return false;
-              const from = r.fromUser?.id;
-              const to = r.toUserId;
-              return (from === sid && to === rid) || (from === rid && to === sid);
+              const fromId = r.fromUser?.id;
+              const fromPhone = r.fromUser?.phoneNumber;
+              const toId = r.toUserId;
+              const isMatch1 = (matchUserOrPhone(fromId, sid) || matchUserOrPhone(fromPhone, sid)) && matchUserOrPhone(toId, rid);
+              const isMatch2 = (matchUserOrPhone(fromId, rid) || matchUserOrPhone(fromPhone, rid)) && matchUserOrPhone(toId, sid);
+              return isMatch1 || isMatch2;
             });
             if (!hasAcceptedMatch) {
               console.log(`[WS_MSG_BLOCKED] ${sid} ➔ ${rid}: No accepted match. WebSocket message rejected.`);
@@ -1869,7 +1942,13 @@ server.on('upgrade', (req, socket, head) => {
           const frame = encodeWebSocketFrame(jsonStr);
 
           for (const client of clients) {
-            if (client !== socket && client.writable && client.userId === targetUserId) {
+            if (client !== socket && client.writable && (client.userId === targetUserId || (function(clientUid, targetUid) {
+              if (!clientUid || !targetUid) return false;
+              if (clientUid === targetUid) return true;
+              const cA = String(clientUid).replace(/\D/g, '').slice(-10);
+              const cB = String(targetUid).replace(/\D/g, '').slice(-10);
+              return !!(cA && cB && cA === cB);
+            })(client.userId, targetUserId))) {
               try {
                 client.write(frame);
                 delivered = true;

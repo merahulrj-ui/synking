@@ -301,12 +301,23 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     const unsubscribe = RealtimeBridge.subscribe(({ type, payload }) => {
       if (type === 'NEW_MESSAGE' && payload) {
         const msg = payload as ChatMessage;
-        const myId = currentUser?.id;
-        // ⛔ Only accept messages where current user is sender or receiver
-        if (myId && (msg.senderId === myId || msg.receiverId === myId)) {
-          
+        
+        function isMe(targetId?: string) {
+          if (!targetId || !currentUser) return false;
+          if (currentUser.id === targetId) return true;
+          const myPhone = (currentUser.phoneNumber || '').replace(/\D/g, '').slice(-10);
+          const tPhone = String(targetId).replace(/\D/g, '').slice(-10);
+          if (myPhone && tPhone && myPhone === tPhone) return true;
+          return false;
+        }
+
+        const isIncoming = isMe(msg.receiverId) && !isMe(msg.senderId);
+        const isOutgoing = isMe(msg.senderId);
+
+        // Accept message if user is either receiver or sender
+        if (isIncoming || isOutgoing) {
           // Play Incoming Message Sound/Haptic if we are receiving it from someone else
-          if (msg.receiverId === myId && msg.senderId !== myId) {
+          if (isIncoming) {
             try {
               if (Platform.OS !== 'web') {
                 const Haptics = require('expo-haptics');
@@ -317,7 +328,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
 
               // Post notification banner on Web/iOS (Android is handled natively by MyFirebaseMessagingService to prevent duplicates)
               if (Platform.OS !== 'android') {
-                const sender = profiles.find(p => p.id === msg.senderId);
+                const sender = profiles.find(p => p.id === msg.senderId || (p.phoneNumber && (p.phoneNumber.replace(/\D/g, '').slice(-10) === msg.senderId.replace(/\D/g, '').slice(-10))));
                 const senderTitle = sender?.name || 'New Message';
                 let bodyText = msg.text || 'Sent you a message';
                 if (bodyText.includes('|||AUDIO_DATA::')) {
@@ -328,11 +339,11 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
             } catch(e) {}
           }
 
-          const threadKey = msg.senderId === myId ? msg.receiverId : msg.senderId;
+          const partnerId = isIncoming ? msg.senderId : msg.receiverId;
           setMessages(prev => {
-            const list = prev[threadKey] || [];
+            const list = prev[partnerId] || [];
             if (list.some(m => m.id === msg.id)) return prev;
-            return { ...prev, [threadKey]: [...list, msg] };
+            return { ...prev, [partnerId]: [...list, msg] };
           });
         }
       } else if (type === 'DELETE_MESSAGE' && payload) {

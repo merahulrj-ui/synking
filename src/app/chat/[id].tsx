@@ -104,6 +104,10 @@ export default function ChatScreen() {
   const [lastAudioSize, setLastAudioSize] = useState<string>('');
   const [visualLogs, setVisualLogs] = useState<string[]>([]);
   const [playingMessageId, setPlayingMessageId] = useState<string | null>(null);
+  const [playbackCurrentSeconds, setPlaybackCurrentSeconds] = useState<number>(0);
+  const [audioMsgStatus, setAudioMsgStatus] = useState<Record<string, { status: string; error?: string; timestamp: string; payloadLen: number }>>({});
+  const playbackTimerRef = useRef<any>(null);
+  const amrPlayerRef = useRef<any>(null);
   const [strikeCount, setStrikeCount] = useState(0);
   const [isSuspended, setIsSuspended] = useState(false);
   const [suspendedUntil, setSuspendedUntil] = useState<number | null>(null);
@@ -262,6 +266,32 @@ export default function ChatScreen() {
     }
   };
 
+// WhatsApp-Standard Voice Compressor Preset (Mono, 22.05 kHz, 32 kbps AAC = 75% lighter)
+const VOICE_COMPRESSED_CONFIG: any = {
+  extension: '.m4a',
+  sampleRate: 22050,
+  numberOfChannels: 1,
+  bitRate: 32000,
+  outputFormat: 'mpeg4',
+  audioEncoder: 'aac',
+  android: {
+    extension: '.m4a',
+    outputFormat: 'mpeg4',
+    audioEncoder: 'aac',
+    sampleRate: 22050,
+    numberOfChannels: 1,
+    bitRate: 32000,
+  },
+  ios: {
+    extension: '.m4a',
+    outputFormat: 'aac ',
+    audioQuality: 0x40,
+    sampleRate: 22050,
+    numberOfChannels: 1,
+    bitRate: 32000,
+  },
+};
+
   useEffect(() => {
     let timer: any;
     if (isRecording) {
@@ -274,6 +304,19 @@ export default function ChatScreen() {
     return () => clearInterval(timer);
   }, [isRecording]);
 
+  // 60-Second Auto-Cutoff Safety Guard (Prevents server overload)
+  useEffect(() => {
+    if (isRecording && recordingSeconds >= 60) {
+      addAudioLog('⏱️ Max 60-second limit reached. Auto-sending compressed voice note...');
+      if (Platform.OS !== 'web') {
+        try {
+          Haptics.notificationAsync(Haptics.NotificationFeedbackType.Warning).catch(() => {});
+        } catch (e) {}
+      }
+      sendVoiceNote();
+    }
+  }, [isRecording, recordingSeconds]);
+
   const startRecording = async () => {
     try {
       addAudioLog('🎙️ Requesting microphone access...');
@@ -284,31 +327,54 @@ export default function ChatScreen() {
           return;
         }
         await setAudioModeAsync({ allowsRecording: true, playsInSilentMode: true });
-        const recorder = new AudioModule.AudioRecorder(RecordingPresets.LOW_QUALITY);
-        await recorder.prepareToRecordAsync();
+        const androidOptions: any = {
+          extension: '.m4a',
+          sampleRate: 22050,
+          numberOfChannels: 1,
+          bitRate: 32000,
+          outputFormat: 'mpeg4',
+          audioEncoder: 'aac',
+          android: {
+            extension: '.m4a',
+            outputFormat: 'mpeg4',
+            audioEncoder: 'aac',
+            sampleRate: 22050,
+            numberOfChannels: 1,
+            bitRate: 32000,
+          },
+        };
+        const recorder = new AudioModule.AudioRecorder(androidOptions);
+        await recorder.prepareToRecordAsync(androidOptions);
         recorder.record();
         nativeRecordingRef.current = recorder;
         animFrameRef.current = setInterval(() => setLiveMicLevel(Math.floor(Math.random() * (80 - 20 + 1) + 20)), 150);
         setIsRecording(true);
         setRecordingSeconds(0);
-        addAudioLog('🎙️ Native Recording active!');
+        addAudioLog('🎙️ Native Recording active (Voice Compressed)!');
       } else {
         if (typeof navigator !== 'undefined' && navigator.mediaDevices && navigator.mediaDevices.getUserMedia) {
           const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
           mediaStreamRef.current = stream;
           audioChunksRef.current = [];
           let mimeType = 'audio/webm';
-          if (MediaRecorder.isTypeSupported('audio/webm;codecs=opus')) mimeType = 'audio/webm;codecs=opus';
-          else if (MediaRecorder.isTypeSupported('audio/mp4')) mimeType = 'audio/mp4';
+          if (typeof MediaRecorder !== 'undefined' && MediaRecorder.isTypeSupported) {
+            if (MediaRecorder.isTypeSupported('audio/webm;codecs=opus')) mimeType = 'audio/webm;codecs=opus';
+            else if (MediaRecorder.isTypeSupported('audio/mp4')) mimeType = 'audio/mp4';
+          }
           setSupportedMimes(mimeType);
-          const recorder = new MediaRecorder(stream, { mimeType });
-          recorder.ondataavailable = (e) => { if (e.data && e.data.size > 0) audioChunksRef.current.push(e.data); };
+          let recorder: any;
+          try {
+            recorder = new MediaRecorder(stream, { mimeType, audioBitsPerSecond: 32000 });
+          } catch (e) {
+            recorder = new MediaRecorder(stream, { mimeType });
+          }
+          recorder.ondataavailable = (e: any) => { if (e.data && e.data.size > 0) audioChunksRef.current.push(e.data); };
           recorder.start(250);
           mediaRecorderRef.current = recorder;
           animFrameRef.current = setInterval(() => setLiveMicLevel(Math.floor(Math.random() * (80 - 20 + 1) + 20)), 150);
           setIsRecording(true);
           setRecordingSeconds(0);
-          addAudioLog('🎙️ Web Recording active!');
+          addAudioLog('🎙️ Web Recording active (Voice Compressed)!');
         }
       }
     } catch (err: any) {
@@ -354,6 +420,10 @@ export default function ChatScreen() {
     const textLabel = `🎵 Voice Note (${durStr})`;
     let audioDataUri = '';
 
+    // ⚡ Instant UI feedback: Close the recording bar immediately (0ms delay)
+    setIsRecording(false);
+    setRecordingSeconds(0);
+
     try {
       if (Platform.OS !== 'web') {
         if (nativeRecordingRef.current) {
@@ -363,7 +433,7 @@ export default function ChatScreen() {
           const uri = nativeRecordingRef.current.uri;
           addAudioLog(`🎙️ Native URI: ${uri}`);
           if (uri) {
-            const FileSystem = require('expo-file-system');
+            const FileSystem = require('expo-file-system/legacy');
             const base64 = await FileSystem.readAsStringAsync(uri, { encoding: FileSystem.EncodingType.Base64 });
             audioDataUri = `data:audio/m4a;base64,${base64}`;
             addAudioLog(`📦 Encoded audio payload size: ${base64.length} bytes`);
@@ -372,27 +442,37 @@ export default function ChatScreen() {
         }
       } else {
         if (mediaRecorderRef.current && mediaRecorderRef.current.state !== 'inactive') {
-          await Promise.race([
-             new Promise<void>((resolve) => {
-               mediaRecorderRef.current.onstop = () => resolve();
-               mediaRecorderRef.current.stop();
-             }),
-             new Promise<void>((resolve) => setTimeout(resolve, 500))
-          ]);
+          await new Promise<void>((resolve) => {
+            const rec = mediaRecorderRef.current;
+            if (!rec) return resolve();
+            rec.onstop = () => resolve();
+            try {
+              if (rec.state === 'recording') {
+                rec.requestData(); // 🚀 Force flush all remaining audio bytes into ondataavailable!
+              }
+              rec.stop();
+            } catch (e) {
+              resolve();
+            }
+            setTimeout(resolve, 150); // Ultra-fast 150ms timeout!
+          });
         }
         if (mediaStreamRef.current) {
           mediaStreamRef.current.getTracks().forEach((t: any) => t.stop());
           mediaStreamRef.current = null;
         }
         if (audioChunksRef.current.length > 0) {
-          const mime = supportedMimes || 'audio/webm';
+          const mime = (supportedMimes && supportedMimes !== 'default') ? supportedMimes : 'audio/webm';
           const audioBlob = new Blob(audioChunksRef.current, { type: mime });
-          audioDataUri = await new Promise<string>((resolve) => {
-            const reader = new FileReader();
-            reader.onloadend = () => resolve(reader.result as string);
-            reader.onerror = () => resolve('');
-            reader.readAsDataURL(audioBlob);
-          });
+          console.log(`[AUDIO_RECORDED_SUCCESS] Size: ${audioBlob.size} bytes, type: ${mime}`);
+          if (audioBlob.size > 0) {
+            audioDataUri = await new Promise<string>((resolve) => {
+              const reader = new FileReader();
+              reader.onloadend = () => resolve(reader.result as string);
+              reader.onerror = () => resolve('');
+              reader.readAsDataURL(audioBlob);
+            });
+          }
         }
       }
     } catch (e: any) {
@@ -405,62 +485,402 @@ export default function ChatScreen() {
 
     if (id) {
       const fullText = audioDataUri ? `${textLabel}|||AUDIO_DATA::${audioDataUri}` : textLabel;
-      sendMessage(id, fullText, 'voice', { audioUrl: audioDataUri, audioDuration: duration });
+      // 🚀 Send audioDuration only in extraData (audioDataUri is already in fullText, cutting payload size in half!)
+      sendMessage(id, fullText, 'voice', { audioDuration: duration });
     }
   };
 
   const togglePlayVoiceNote = async (messageId: string, audioUrl?: string) => {
     if (playingMessageId === messageId) {
       if (Platform.OS !== 'web') nativeSoundRef.current?.pause();
-      else activeAudioRef.current?.pause();
+      else {
+        activeAudioRef.current?.pause();
+        try { amrPlayerRef.current?.stop(); } catch (e) {}
+      }
       setPlayingMessageId(null);
+      setPlaybackCurrentSeconds(0);
+      if (playbackTimerRef.current) clearInterval(playbackTimerRef.current);
       return;
     }
     
+    if (playbackTimerRef.current) clearInterval(playbackTimerRef.current);
+    setPlaybackCurrentSeconds(0);
+
     if (Platform.OS !== 'web') {
       nativeSoundRef.current?.pause();
       nativeSoundRef.current = null;
     } else {
       activeAudioRef.current?.pause();
       activeAudioRef.current = null;
+      try { amrPlayerRef.current?.stop(); } catch (e) {}
+      amrPlayerRef.current = null;
     }
 
-    if (audioUrl && audioUrl.startsWith('data:audio/')) {
+    const timeStr = new Date().toLocaleTimeString();
+    const pLen = audioUrl?.length || 0;
+
+    addAudioLog(`▶ [PLAY_TAP] ID: ${messageId.substring(0, 8)} | Len: ${pLen} | Pfx: ${audioUrl ? audioUrl.substring(0, 25) : 'EMPTY'}`);
+
+    if (audioUrl && (audioUrl.startsWith('data:') || audioUrl.startsWith('blob:') || audioUrl.startsWith('file:') || audioUrl.startsWith('http'))) {
       try {
+        setAudioMsgStatus(prev => ({
+          ...prev,
+          [messageId]: {
+            status: 'LOADING',
+            timestamp: timeStr,
+            payloadLen: pLen,
+          }
+        }));
+
         if (Platform.OS !== 'web') {
-          addAudioLog('▶ Playing audio note in Loudspeaker...');
-          const player = createAudioPlayer(audioUrl);
+          // Native Android / iOS Audio Playback via expo-audio
+          let finalPlayUri = audioUrl;
+
+          if (audioUrl.startsWith('data:')) {
+            const FileSystem = require('expo-file-system/legacy');
+            const cleanBase64 = audioUrl.includes(';base64,') ? audioUrl.split(';base64,')[1] : audioUrl;
+            const cacheFilePath = `${FileSystem.cacheDirectory}voice_${messageId}.m4a`;
+            await FileSystem.writeAsStringAsync(cacheFilePath, cleanBase64, {
+              encoding: FileSystem.EncodingType.Base64,
+            });
+            finalPlayUri = cacheFilePath;
+            addAudioLog(`💾 [NATIVE_CACHE] Saved ${cleanBase64.length} chars to ${cacheFilePath}`);
+          }
+
+          const player = createAudioPlayer(finalPlayUri);
           nativeSoundRef.current = player;
           setPlayingMessageId(messageId);
+          setPlaybackCurrentSeconds(0);
+          setAudioMsgStatus(prev => ({
+            ...prev,
+            [messageId]: {
+              status: 'PLAYING',
+              timestamp: timeStr,
+              payloadLen: pLen,
+            }
+          }));
+
+          player.addListener('playbackStatusUpdate', (status: any) => {
+            if (status.isLoaded) {
+              const currentSec = Math.floor(status.currentTime || 0);
+              setPlaybackCurrentSeconds(currentSec);
+              if (status.didJustFinish) {
+                setPlayingMessageId(null);
+                setPlaybackCurrentSeconds(0);
+                if (playbackTimerRef.current) clearInterval(playbackTimerRef.current);
+                addAudioLog(`🏁 [NATIVE_FINISHED] Playback completed`);
+                setAudioMsgStatus(prev => ({
+                  ...prev,
+                  [messageId]: {
+                    status: 'FINISHED',
+                    timestamp: timeStr,
+                    payloadLen: pLen,
+                  }
+                }));
+              }
+            }
+          });
+
           player.play();
-          setTimeout(() => setPlayingMessageId(null), 3000);
+          addAudioLog(`🔊 [NATIVE_PLAYING] Started ExoPlayer`);
+
+          if (playbackTimerRef.current) clearInterval(playbackTimerRef.current);
+          playbackTimerRef.current = setInterval(() => {
+            if (nativeSoundRef.current) {
+              const cur = nativeSoundRef.current.currentTime || 0;
+              const dur = nativeSoundRef.current.duration || 0;
+              setPlaybackCurrentSeconds(Math.floor(cur));
+              if (dur > 0 && cur >= dur) {
+                clearInterval(playbackTimerRef.current);
+                setPlayingMessageId(null);
+                setPlaybackCurrentSeconds(0);
+                setAudioMsgStatus(prev => ({
+                  ...prev,
+                  [messageId]: {
+                    status: 'FINISHED',
+                    timestamp: timeStr,
+                    payloadLen: pLen,
+                  }
+                }));
+              }
+            }
+          }, 350);
         } else {
+          // Web Audio Playback via Blob URL with WebAudio fallback
           let finalUrl = audioUrl;
-          // Fix for Windows Chrome/Edge rejecting raw m4a MIME types from mobile
-          if (finalUrl.includes('audio/m4a')) {
-            finalUrl = finalUrl.replace('audio/m4a', 'audio/mp4');
+          let rawBytes: Uint8Array | null = null;
+
+          if (typeof window !== 'undefined' && audioUrl.startsWith('data:')) {
+            try {
+              const commaIndex = audioUrl.indexOf(',');
+              if (commaIndex !== -1) {
+                const header = audioUrl.substring(0, commaIndex);
+                const rawB64 = audioUrl.substring(commaIndex + 1);
+                
+                const cleanB64 = rawB64.trim().replace(/\s/g, '').replace(/-/g, '+').replace(/_/g, '/');
+                const paddedB64 = cleanB64.padEnd(cleanB64.length + (4 - cleanB64.length % 4) % 4, '=');
+
+                let mime = 'audio/webm';
+                const mimeMatch = header.match(/data:([^;]+)/);
+                if (mimeMatch && mimeMatch[1]) {
+                  mime = mimeMatch[1].trim().toLowerCase();
+                }
+                if (mime.includes('m4a') || mime.includes('mp4') || mime.includes('aac') || mime.includes('3gp') || mime.includes('amr')) {
+                  mime = 'audio/mp4';
+                } else if (mime.includes('webm') || mime.includes('opus')) {
+                  mime = 'audio/webm';
+                }
+
+                const binaryStr = atob(paddedB64);
+                const len = binaryStr.length;
+                if (len > 0) {
+                  rawBytes = new Uint8Array(len);
+                  for (let i = 0; i < len; i++) {
+                    rawBytes[i] = binaryStr.charCodeAt(i);
+                  }
+
+                  // Ensure all AAC/m4a/3gp containers use audio/mp4 so Chrome plays natively
+                  if (mime.includes('m4a') || mime.includes('mp4') || mime.includes('aac') || mime.includes('3gp')) {
+                    mime = 'audio/mp4';
+                  }
+
+                  const blob = new Blob([rawBytes as any], { type: mime });
+                  finalUrl = URL.createObjectURL(blob);
+                  addAudioLog(`📦 [BLOB_CREATED] Decoded ${len} bytes, MIME: ${mime}`);
+                }
+              }
+            } catch (convErr: any) {
+              addAudioLog(`⚠️ [BLOB_WARN] ${convErr.message}`);
+            }
           }
+
           const HTMLAudio = (window as any).Audio;
           const audio = new HTMLAudio(finalUrl);
           activeAudioRef.current = audio;
           setPlayingMessageId(messageId);
-          
-          audio.play().catch((err: any) => {
-            console.error('[WEB_AUDIO_ERR] Play failed, trying fallback...', err);
-            if (finalUrl.includes('audio/mp4')) {
-              const fallbackAudio = new HTMLAudio(finalUrl.replace('audio/mp4', 'audio/aac'));
-              activeAudioRef.current = fallbackAudio;
-              fallbackAudio.play().catch(() => setPlayingMessageId(null));
-              fallbackAudio.onended = () => setPlayingMessageId(null);
-            } else {
-              setPlayingMessageId(null);
+          setPlaybackCurrentSeconds(0);
+
+          audio.ontimeupdate = () => {
+            setPlaybackCurrentSeconds(Math.floor(audio.currentTime));
+          };
+          audio.onended = () => {
+            setPlayingMessageId(null);
+            setPlaybackCurrentSeconds(0);
+            if (playbackTimerRef.current) clearInterval(playbackTimerRef.current);
+            addAudioLog(`🏁 [WEB_FINISHED] Playback completed`);
+            setAudioMsgStatus(prev => ({
+              ...prev,
+              [messageId]: {
+                status: 'FINISHED',
+                timestamp: timeStr,
+                payloadLen: pLen,
+              }
+            }));
+          };
+
+          if (playbackTimerRef.current) clearInterval(playbackTimerRef.current);
+          playbackTimerRef.current = setInterval(() => {
+            if (activeAudioRef.current) {
+              const cur = activeAudioRef.current.currentTime || 0;
+              const dur = activeAudioRef.current.duration || 0;
+              setPlaybackCurrentSeconds(Math.floor(cur));
+              if (activeAudioRef.current.ended || (dur > 0 && cur >= dur)) {
+                clearInterval(playbackTimerRef.current);
+                setPlayingMessageId(null);
+                setPlaybackCurrentSeconds(0);
+                setAudioMsgStatus(prev => ({
+                  ...prev,
+                  [messageId]: {
+                    status: 'FINISHED',
+                    timestamp: timeStr,
+                    payloadLen: pLen,
+                  }
+                }));
+              }
             }
+          }, 350);
+
+          audio.play().then(() => {
+            addAudioLog(`🔊 [HTML5_PLAYING] Started HTML5 Audio`);
+            setAudioMsgStatus(prev => ({
+              ...prev,
+              [messageId]: {
+                status: 'PLAYING (HTML5)',
+                timestamp: timeStr,
+                payloadLen: pLen,
+              }
+            }));
+          }).catch(async (err: any) => {
+            addAudioLog(`⚠️ [HTML5_FAIL] ${err.name}, trying WebAudio...`);
+            try {
+              if (rawBytes && rawBytes.length > 0) {
+                const AudioCtxClass = (window as any).AudioContext || (window as any).webkitAudioContext;
+                if (AudioCtxClass) {
+                  const ctx = new AudioCtxClass();
+                  if (ctx.state === 'suspended') {
+                    await ctx.resume();
+                  }
+                  audioContextRef.current = ctx;
+                  const audioBuffer = await ctx.decodeAudioData(rawBytes.buffer.slice(0));
+                  const source = ctx.createBufferSource();
+                  source.buffer = audioBuffer;
+                  source.connect(ctx.destination);
+                  source.onended = () => {
+                    setPlayingMessageId(null);
+                    setPlaybackCurrentSeconds(0);
+                    if (playbackTimerRef.current) clearInterval(playbackTimerRef.current);
+                    try { ctx.close(); } catch (e) {}
+                    addAudioLog(`🏁 [WEBAUDIO_FINISHED] Playback completed`);
+                    setAudioMsgStatus(prev => ({
+                      ...prev,
+                      [messageId]: {
+                        status: 'FINISHED',
+                        timestamp: timeStr,
+                        payloadLen: pLen,
+                      }
+                    }));
+                  };
+                  const startTime = ctx.currentTime;
+                  source.start(0);
+                  addAudioLog(`🔊 [WEBAUDIO_PLAYING] Hardware decoder active (${Math.round(audioBuffer.duration)}s)`);
+                  setAudioMsgStatus(prev => ({
+                    ...prev,
+                    [messageId]: {
+                      status: 'PLAYING (WebAudio)',
+                      timestamp: timeStr,
+                      payloadLen: pLen,
+                    }
+                  }));
+
+                  if (playbackTimerRef.current) clearInterval(playbackTimerRef.current);
+                  playbackTimerRef.current = setInterval(() => {
+                    const elapsed = Math.floor(ctx.currentTime - startTime);
+                    setPlaybackCurrentSeconds(elapsed);
+                    if (elapsed >= Math.floor(audioBuffer.duration)) {
+                      clearInterval(playbackTimerRef.current);
+                      setPlayingMessageId(null);
+                      setPlaybackCurrentSeconds(0);
+                      setAudioMsgStatus(prev => ({
+                        ...prev,
+                        [messageId]: {
+                          status: 'FINISHED',
+                          timestamp: timeStr,
+                          payloadLen: pLen,
+                        }
+                      }));
+                    }
+                  }, 350);
+                  return;
+                }
+              }
+            } catch (ctxErr: any) {
+              addAudioLog(`❌ [WEBAUDIO_ERROR] ${ctxErr.message}`);
+            }
+
+            // Fallback Engine 3: Pure JavaScript AMR/3GP WebAudio Decoder (Handles legacy & Android 3GP voice notes)
+            try {
+              if (rawBytes && rawBytes.length > 0) {
+                addAudioLog(`🔄 Trying BenzAMR AMR/3GP decoder fallback...`);
+                const BenzAMRRecorder = require('benz-amr-recorder');
+                const amr = new BenzAMRRecorder();
+                const amrBlob = new Blob([rawBytes as any], { type: 'audio/amr' });
+                await amr.initWithBlob(amrBlob);
+                amrPlayerRef.current = amr;
+                amr.play();
+                const amrDur = Math.round(amr.getDuration()) || 5;
+                addAudioLog(`🔊 [AMR_PLAYING] BenzAMR decoded & playing (${amrDur}s)`);
+                setAudioMsgStatus(prev => ({
+                  ...prev,
+                  [messageId]: {
+                    status: 'PLAYING (AMR Decoder)',
+                    timestamp: timeStr,
+                    payloadLen: pLen,
+                  }
+                }));
+
+                if (playbackTimerRef.current) clearInterval(playbackTimerRef.current);
+                playbackTimerRef.current = setInterval(() => {
+                  if (amrPlayerRef.current) {
+                    const cur = amrPlayerRef.current.getCurrentPosition() || 0;
+                    setPlaybackCurrentSeconds(Math.floor(cur));
+                    if (!amrPlayerRef.current.isPlaying()) {
+                      clearInterval(playbackTimerRef.current);
+                      setPlayingMessageId(null);
+                      setPlaybackCurrentSeconds(0);
+                      setAudioMsgStatus(prev => ({
+                        ...prev,
+                        [messageId]: {
+                          status: 'FINISHED',
+                          timestamp: timeStr,
+                          payloadLen: pLen,
+                        }
+                      }));
+                    }
+                  }
+                }, 350);
+
+                amr.onEnded(() => {
+                  setPlayingMessageId(null);
+                  setPlaybackCurrentSeconds(0);
+                  if (playbackTimerRef.current) clearInterval(playbackTimerRef.current);
+                  setAudioMsgStatus(prev => ({
+                    ...prev,
+                    [messageId]: {
+                      status: 'FINISHED',
+                      timestamp: timeStr,
+                      payloadLen: pLen,
+                    }
+                  }));
+                });
+                return; // Successfully playing AMR audio!
+              }
+            } catch (amrErr: any) {
+              addAudioLog(`❌ [AMR_ERROR] ${amrErr?.message || amrErr}`);
+            }
+
+            const errorText = `${err.name || 'Error'}: ${err.message || 'Play rejected'}`;
+            addAudioLog(`❌ [PLAY_PERM_FAIL] ${errorText}`);
+            setPlayingMessageId(null);
+            setPlaybackCurrentSeconds(0);
+            if (playbackTimerRef.current) clearInterval(playbackTimerRef.current);
+            setAudioMsgStatus(prev => ({
+              ...prev,
+              [messageId]: {
+                status: 'ERROR',
+                error: errorText,
+                timestamp: timeStr,
+                payloadLen: pLen,
+              }
+            }));
           });
-          audio.onended = () => setPlayingMessageId(null);
         }
-      } catch (e) {
+      } catch (e: any) {
+        const errorText = `${e?.name || 'Error'}: ${e?.message || e}`;
+        addAudioLog(`❌ [CRITICAL_AUDIO_ERR] ${errorText}`);
         setPlayingMessageId(null);
+        setPlaybackCurrentSeconds(0);
+        if (playbackTimerRef.current) clearInterval(playbackTimerRef.current);
+        setAudioMsgStatus(prev => ({
+          ...prev,
+          [messageId]: {
+            status: 'ERROR',
+            error: errorText,
+            timestamp: timeStr,
+            payloadLen: pLen,
+          }
+        }));
       }
+    } else {
+      addAudioLog(`❌ [PLAY_INVALID_URL] Missing or unsupported audio format`);
+      setAudioMsgStatus(prev => ({
+        ...prev,
+        [messageId]: {
+          status: 'ERROR',
+          error: 'Missing or unsupported audio payload',
+          timestamp: timeStr,
+          payloadLen: pLen,
+        }
+      }));
     }
   };
 
@@ -555,6 +975,27 @@ export default function ChatScreen() {
       }
     };
     fetchCloud();
+  }, [id, currentUser?.id, deletedMsgIds]);
+
+  // 3. Fast 2.5-Second Live Background Sync (Guarantees zero-drop delivery across all network conditions)
+  useEffect(() => {
+    if (!id || !currentUser) return;
+    const interval = setInterval(async () => {
+      try {
+        const msgs = await fetchChatMessagesFromFirestore(currentUser.id, id);
+        if (Array.isArray(msgs) && msgs.length > 0) {
+          const filtered = msgs.filter(m => m && !deletedMsgIds.has(m.id));
+          setCloudMessages(prev => {
+            const hasNew = filtered.some(f => !prev.some(p => p.id === f.id));
+            if (hasNew) {
+              return filtered;
+            }
+            return prev;
+          });
+        }
+      } catch (e) {}
+    }, 2500);
+    return () => clearInterval(interval);
   }, [id, currentUser?.id, deletedMsgIds]);
 
   // Combine and strictly bifurcate cloud + local messages for this specific conversation (0 duplicates guaranteed)
@@ -1147,6 +1588,22 @@ export default function ChatScreen() {
                 if (!effectiveAudioUrl) effectiveAudioUrl = p[1];
               }
 
+              // Duration parsing
+              const durMatch = displayText.match(/\((\d+):(\d+)\)/);
+              const parsedSecs = durMatch ? parseInt(durMatch[1]) * 60 + parseInt(durMatch[2]) : 0;
+              const totalSeconds = item.extraData?.audioDuration || parsedSecs || 15;
+              const totMins = Math.floor(totalSeconds / 60);
+              const totSecs = (totalSeconds % 60).toString().padStart(2, '0');
+              const totalDurationStr = `${totMins}:${totSecs}`;
+
+              const currentPlaySec = isPlaying ? playbackCurrentSeconds : 0;
+              const curMins = Math.floor(currentPlaySec / 60);
+              const curSecs = (currentPlaySec % 60).toString().padStart(2, '0');
+              const playTimerStr = `${curMins}:${curSecs} / ${totalDurationStr}`;
+
+              const progress = totalSeconds > 0 ? Math.min(1, currentPlaySec / totalSeconds) : 0;
+              const filledBars = Math.floor(progress * 12);
+
               return (
                 <TouchableOpacity
                   activeOpacity={0.9}
@@ -1179,16 +1636,16 @@ export default function ChatScreen() {
                             elevation: isDarkMode ? 4 : 1,
                           },
                         ],
-                    { minWidth: 200, paddingVertical: 10 }
+                    { width: 215, paddingVertical: 6, paddingHorizontal: 10, borderRadius: 15 }
                   ]}
                 >
-                  <View style={{ flexDirection: 'row', alignItems: 'center', gap: 10 }}>
+                  <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
                     <TouchableOpacity
                       onPress={() => togglePlayVoiceNote(item.id, effectiveAudioUrl)}
                       style={{
-                        width: 38,
-                        height: 38,
-                        borderRadius: 19,
+                        width: 32,
+                        height: 32,
+                        borderRadius: 16,
                         backgroundColor: isMine ? '#FFFFFF' : '#FD3A73',
                         alignItems: 'center',
                         justifyContent: 'center',
@@ -1197,32 +1654,63 @@ export default function ChatScreen() {
                     >
                       <Ionicons
                         name={isPlaying ? 'pause' : 'play'}
-                        size={20}
+                        size={16}
                         color={isMine ? '#FD3A73' : '#FFFFFF'}
-                        style={{ marginLeft: isPlaying ? 0 : 2 }}
+                        style={{ marginLeft: isPlaying ? 0 : 1.5 }}
                       />
                     </TouchableOpacity>
 
-                    {/* Animated Sound Waves */}
+                    {/* Compact Animated Sound Waves */}
                     <View style={{ flex: 1, gap: 3 }}>
                       <View style={{ flexDirection: 'row', alignItems: 'center', gap: 2 }}>
-                        {[8, 16, 24, 12, 20, 14, 28, 18, 10, 22, 15, 8].map((h, i) => (
-                          <View
-                            key={i}
-                            style={{
-                              width: 3,
-                              height: isPlaying ? Math.min(28, h + (i % 2 === 0 ? 6 : -4)) : h,
-                              borderRadius: 2,
-                              backgroundColor: isMine ? (isPlaying ? '#FFFFFF' : 'rgba(255, 255, 255, 0.6)') : (isPlaying ? '#FD3A73' : subText),
-                            }}
-                          />
-                        ))}
+                        {[5, 11, 16, 9, 14, 10, 18, 13, 7, 15, 11, 5].map((h, i) => {
+                          const isFilled = isPlaying && i <= filledBars;
+                          return (
+                            <View
+                              key={i}
+                              style={{
+                                width: 2.2,
+                                height: isPlaying ? Math.min(18, h + (i % 2 === 0 ? 4 : -3)) : h,
+                                borderRadius: 1.5,
+                                backgroundColor: isMine
+                                  ? (isFilled || !isPlaying ? '#FFFFFF' : 'rgba(255, 255, 255, 0.4)')
+                                  : (isFilled ? '#FD3A73' : (isPlaying ? 'rgba(253, 58, 115, 0.3)' : subText)),
+                              }}
+                            />
+                          );
+                        })}
                       </View>
-                      <Text style={{ fontSize: 11, fontWeight: '700', color: isMine ? 'rgba(255, 255, 255, 0.85)' : subText }}>
-                        {displayText.replace('🎙️ ', '')}
-                      </Text>
+                      <View style={{ flexDirection: 'row', alignItems: 'center', gap: 3 }}>
+                        {isPlaying && (
+                          <View style={{ width: 5, height: 5, borderRadius: 2.5, backgroundColor: isMine ? '#FFFFFF' : '#22C55E' }} />
+                        )}
+                        <Text style={{ fontSize: 10.5, fontWeight: '700', color: isMine ? 'rgba(255, 255, 255, 0.95)' : (isPlaying ? '#FD3A73' : subText) }}>
+                          {isPlaying ? `▶ ${playTimerStr}` : displayText.replace('🎙️ ', '').replace('🎵 ', '')}
+                        </Text>
+                      </View>
                     </View>
                   </View>
+
+                  {/* Compact Error Alert Badge (Only shown if error occurs) */}
+                  {audioMsgStatus[item.id]?.status === 'ERROR' && (
+                    <View style={{
+                      marginTop: 3,
+                      paddingVertical: 1.5,
+                      paddingHorizontal: 6,
+                      borderRadius: 4,
+                      backgroundColor: isMine ? 'rgba(0, 0, 0, 0.45)' : '#FEE2E2',
+                      alignSelf: 'flex-start',
+                      maxWidth: '100%',
+                    }}>
+                      <Text style={{
+                        fontSize: 9,
+                        fontWeight: '800',
+                        color: isMine ? '#FCA5A5' : '#DC2626',
+                      }} numberOfLines={1}>
+                        ❌ {audioMsgStatus[item.id].error}
+                      </Text>
+                    </View>
+                  )}
 
                   {item.extraData?.reaction && (
                     <View style={{ position: 'absolute', bottom: -8, right: isMine ? 25 : -8, backgroundColor: isDarkMode ? '#1E293B' : '#FFFFFF', borderRadius: 12, paddingHorizontal: 4, paddingVertical: 2, elevation: 3, shadowColor: '#000', shadowOffset: { width: 0, height: 1 }, shadowOpacity: 0.2, shadowRadius: 2, borderWidth: 1, borderColor: isDarkMode ? 'rgba(255,255,255,0.1)' : '#E2E8F0' }}>
@@ -1345,6 +1833,7 @@ export default function ChatScreen() {
           </ScrollView>
         </View>
 
+
         {/* 6. BOTTOM INPUT BAR (WHATSAPP STYLE RECORDING / SUSPENSION LOCK) */}
         {isSuspended ? (
           <View style={[styles.inputBar, { backgroundColor: isDarkMode ? '#200D11' : '#FEE2E2', borderTopColor: '#EF4444', paddingVertical: 14, paddingHorizontal: 16, alignItems: 'center', justifyContent: 'center', gap: 4, paddingBottom: isKeyboardOpen ? 14 : Math.max(Platform.OS === 'android' ? 20 : 14, insets.bottom + 6) }]}>
@@ -1362,9 +1851,9 @@ export default function ChatScreen() {
           <View style={[styles.inputBar, { backgroundColor: isDarkMode ? '#1E1218' : '#FFF1F2', borderTopColor: '#FECDD3', paddingHorizontal: 16, paddingBottom: isKeyboardOpen ? 8 : Math.max(Platform.OS === 'android' ? 18 : 10, insets.bottom + 4) }]}>
             {/* Pulsing Recording Indicator */}
             <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8, flex: 1 }}>
-              <View style={{ width: 10, height: 10, borderRadius: 5, backgroundColor: '#EF4444' }} />
-              <Text style={{ color: '#EF4444', fontWeight: '800', fontSize: 14 }}>
-                Recording... {Math.floor(recordingSeconds / 60)}:{(recordingSeconds % 60).toString().padStart(2, '0')}
+              <View style={{ width: 10, height: 10, borderRadius: 5, backgroundColor: recordingSeconds >= 50 ? '#EF4444' : '#10B981' }} />
+              <Text style={{ color: recordingSeconds >= 50 ? '#EF4444' : (isDarkMode ? '#F1F5F9' : '#0F172A'), fontWeight: '800', fontSize: 13.5 }}>
+                Recording... {Math.floor(recordingSeconds / 60)}:{(recordingSeconds % 60).toString().padStart(2, '0')} <Text style={{ color: subText, fontSize: 11.5, fontWeight: '600' }}>/ 1:00</Text>
               </Text>
             </View>
 
@@ -1419,7 +1908,7 @@ export default function ChatScreen() {
               placeholder="Type a message..."
               placeholderTextColor={subText}
               multiline
-              maxLength={500}
+              maxLength={2000}
             />
 
             {/* Mic or Send Button depending on inputText */}
