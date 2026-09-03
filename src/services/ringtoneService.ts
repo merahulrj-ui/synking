@@ -130,6 +130,17 @@ class RingtoneServiceClass {
       } catch (e) {}
     }
 
+    // Native Android custom ringtone ("Synk Signature") via MediaPlayer
+    if (Platform.OS === 'android') {
+      try {
+        const { NativeModules } = require('react-native');
+        if (NativeModules.AudioRouteModule?.startIncomingRingtone) {
+          NativeModules.AudioRouteModule.startIncomingRingtone();
+          return;
+        }
+      } catch (e) {}
+    }
+
     // Native expo-audio playback
     if (Platform.OS !== 'web' && ExpoAudioModule && typeof ExpoAudioModule.createAudioPlayer === 'function') {
       try {
@@ -203,12 +214,15 @@ class RingtoneServiceClass {
       } catch (e) {}
     }
 
-    // Stop native Android ringback tone
+    // Stop native Android ringtone & ringback tone
     if (Platform.OS === 'android') {
       try {
         const { NativeModules } = require('react-native');
         if (NativeModules.AudioRouteModule?.stopRingbackTone) {
           NativeModules.AudioRouteModule.stopRingbackTone();
+        }
+        if (NativeModules.AudioRouteModule?.stopIncomingRingtone) {
+          NativeModules.AudioRouteModule.stopIncomingRingtone();
         }
       } catch (e) {}
     }

@@ -1301,6 +1301,7 @@ const server = http.createServer((req, res) => {
             saveDb();
             syncMessageToTurso(msg);
             console.log(`[CHAT_SAVED] ${msg.senderName || msg.senderId} ➔ ${msg.receiverId}: Synced to Turso 9GB SQLite`);
+            sendMessagePushNotification(msg.receiverId, msg);
           }
 
           res.writeHead(200, { 'Content-Type': 'application/json' });
@@ -1547,6 +1548,100 @@ async function sendCallPushNotification(targetUserId, callPayload, isEndCall = f
   }
 }
 
+async function sendMessagePushNotification(targetUserId, msgPayload) {
+  try {
+    let pushToken = db.pushTokens?.[targetUserId] || db.profiles?.[targetUserId]?.pushToken;
+    let nativeFcmToken = db.fcmTokens?.[targetUserId] || db.profiles?.[targetUserId]?.fcmPushToken;
+
+    if (!pushToken && !nativeFcmToken) {
+      try {
+        const tokenQuery = await queryTurso('SELECT * FROM push_tokens WHERE user_id = ?', [{ type: 'text', value: String(targetUserId) }]);
+        const rows = tokenQuery?.results?.[0]?.response?.result?.rows;
+        const cols = tokenQuery?.results?.[0]?.response?.result?.cols?.map(c => (typeof c === 'object' && c.name) ? c.name : String(c));
+        if (Array.isArray(rows) && rows.length > 0 && Array.isArray(cols)) {
+          const item = {};
+          cols.forEach((col, idx) => {
+            const rawVal = rows[0][idx]?.value !== undefined ? rows[0][idx].value : rows[0][idx];
+            item[col] = extractPlain(rawVal);
+          });
+          if (item.fcm_token) {
+            nativeFcmToken = item.fcm_token;
+            if (!db.fcmTokens) db.fcmTokens = {};
+            db.fcmTokens[targetUserId] = nativeFcmToken;
+          }
+          if (item.push_token) {
+            pushToken = item.push_token;
+            if (!db.pushTokens) db.pushTokens = {};
+            db.pushTokens[targetUserId] = pushToken;
+          }
+        }
+      } catch (tursoErr) {}
+    }
+
+    if (!pushToken && !nativeFcmToken) {
+      console.log(`[MSG_PUSH_SKIP] No push token registered for target ${targetUserId}`);
+      return;
+    }
+
+    const senderName = msgPayload.senderName || db.profiles?.[msgPayload.senderId]?.name || 'Someone';
+    let text = msgPayload.plainText || msgPayload.text || 'Sent you a message';
+    if (typeof text === 'string' && text.includes('|||AUDIO_DATA::')) {
+      text = '🎤 Voice note';
+    } else if (typeof text === 'string' && text.startsWith('E2EE::')) {
+      text = 'New message';
+    }
+
+    const dataPayload = {
+      type: 'NEW_MESSAGE',
+      title: String(senderName),
+      body: String(text),
+      senderId: String(msgPayload.senderId || ''),
+      messageId: String(msgPayload.id || Date.now()),
+      timestamp: String(Date.now()),
+    };
+
+    if (fcmMessaging && nativeFcmToken) {
+      try {
+        const response = await fcmMessaging.send({
+          token: nativeFcmToken,
+          data: dataPayload,
+          android: { priority: 'high' }
+        });
+        console.log(`✅ [FCM_CHAT_PUSH_SUCCESS] ID: ${response} to ${targetUserId}`);
+        return;
+      } catch (fcmErr) {
+        console.error(`❌ [FCM_CHAT_PUSH_ERROR]`, fcmErr.message);
+      }
+    }
+
+    // Fallback to Expo Push
+    if (pushToken) {
+      const pushBody = JSON.stringify({
+        to: pushToken,
+        title: senderName,
+        body: text,
+        data: dataPayload,
+        priority: 'high',
+        channelId: 'synking_messages',
+        sound: 'default'
+      });
+
+      const req = https.request('https://exp.host/--/api/v2/push/send', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Content-Length': Buffer.byteLength(pushBody),
+        },
+      }, (res) => {});
+      req.on('error', () => {});
+      req.write(pushBody);
+      req.end();
+    }
+  } catch (err) {
+    console.error('[PUSH_MSG_EXCEPTION]', err.message);
+  }
+}
+
 // WebSocket Protocol Handshake
 server.on('upgrade', (req, socket, head) => {
   const key = req.headers['sec-websocket-key'];
@@ -1786,6 +1881,8 @@ server.on('upgrade', (req, socket, head) => {
           } else if ((parsed.type === 'END_CALL' || parsed.type === 'CALL_DECLINED' || parsed.type === 'CALL_ENDED' || parsed.type === 'CALL_REJECTED') && parsed.payload) {
             // Send a Missed Call push to clear the native ringing state!
             sendCallPushNotification(targetUserId, parsed.payload, true);
+          } else if (parsed.type === 'NEW_MESSAGE' && parsed.payload) {
+            sendMessagePushNotification(targetUserId, parsed.payload);
           }
           continue;
         }

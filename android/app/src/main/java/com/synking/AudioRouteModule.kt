@@ -6,6 +6,7 @@ import android.media.AudioDeviceInfo
 import android.media.AudioFocusRequest
 import android.media.AudioManager
 import android.media.ToneGenerator
+import android.media.MediaPlayer
 import android.os.Build
 import android.os.Handler
 import android.os.Looper
@@ -209,5 +210,73 @@ class AudioRouteModule(private val reactContext: ReactApplicationContext) : Reac
         } catch (e: Exception) {
             Log.w("SYNKING_AUDIO", "stopRingback error: ${e.message}")
         }
+    }
+
+    private var incomingMediaPlayer: MediaPlayer? = null
+
+    @ReactMethod
+    fun startIncomingRingtone(promise: Promise) {
+        mainHandler.post {
+            try {
+                stopIncomingRingtoneInternal()
+                val resId = reactContext.resources.getIdentifier("synk_signature", "raw", reactContext.packageName)
+                if (resId != 0) {
+                    incomingMediaPlayer = MediaPlayer.create(reactContext, resId)?.apply {
+                        isLooping = true
+                        setAudioAttributes(
+                            AudioAttributes.Builder()
+                                .setUsage(AudioAttributes.USAGE_NOTIFICATION_RINGTONE)
+                                .setContentType(AudioAttributes.CONTENT_TYPE_MUSIC)
+                                .build()
+                        )
+                        start()
+                    }
+                    Log.i("SYNKING_AUDIO", "✅ Synk Signature incoming ringtone started playing")
+                } else {
+                    Log.w("SYNKING_AUDIO", "⚠️ synk_signature raw resource not found")
+                }
+                promise.resolve(true)
+            } catch (e: Exception) {
+                Log.e("SYNKING_AUDIO", "startIncomingRingtone error: ${e.message}")
+                promise.resolve(false)
+            }
+        }
+    }
+
+    @ReactMethod
+    fun stopIncomingRingtone(promise: Promise) {
+        mainHandler.post {
+            stopIncomingRingtoneInternal()
+            promise.resolve(true)
+        }
+    }
+
+    private fun stopIncomingRingtoneInternal() {
+        try {
+            incomingMediaPlayer?.let {
+                if (it.isPlaying) {
+                    it.stop()
+                }
+                it.release()
+            }
+            incomingMediaPlayer = null
+        } catch (e: Exception) {
+            Log.w("SYNKING_AUDIO", "stopIncomingRingtone error: ${e.message}")
+        }
+    }
+
+    companion object {
+        private var instance: AudioRouteModule? = null
+
+        fun stopAllRingtones() {
+            instance?.mainHandler?.post {
+                instance?.stopIncomingRingtoneInternal()
+                instance?.stopRingbackInternal()
+            }
+        }
+    }
+
+    init {
+        instance = this
     }
 }

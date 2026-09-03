@@ -145,6 +145,24 @@ class NotificationServiceClass {
     }
   }
 
+  public async showMessageNotification(senderName: string, messageText: string, senderId: string) {
+    if (Platform.OS === 'web' || !Notifications) return;
+    try {
+      await this.initialize();
+      await Notifications.scheduleNotificationAsync({
+        identifier: `msg_${Date.now()}`,
+        content: {
+          title: senderName,
+          body: messageText,
+          data: { senderId, type: 'NEW_MESSAGE' },
+          sound: 'default',
+          priority: Notifications.AndroidNotificationPriority.HIGH,
+          channelId: 'synking_messages',
+        },
+        trigger: null,
+      });
+    } catch (e) {}
+  }
 
   public async dismissCallNotification(callId?: string) {
     if (Platform.OS === 'web' || !Notifications) return;

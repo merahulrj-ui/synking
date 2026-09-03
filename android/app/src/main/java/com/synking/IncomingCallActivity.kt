@@ -40,6 +40,9 @@ class IncomingCallActivity : Activity() {
                 activeRingtone = null
             } catch (e: Exception) {}
             try {
+                AudioRouteModule.stopAllRingtones()
+            } catch (e: Exception) {}
+            try {
                 activeVibrator?.cancel()
                 activeVibrator = null
             } catch (e: Exception) {}
@@ -484,8 +487,14 @@ class IncomingCallActivity : Activity() {
     private fun playRingtoneAndVibrate() {
         try {
             Log.d("SYNKING_DEBUG", "[AUDIO] START_RINGTONE_AND_VIBRATION: Initiating audio & haptics")
-            val uri = RingtoneManager.getDefaultUri(RingtoneManager.TYPE_RINGTONE)
-            activeRingtone = RingtoneManager.getRingtone(applicationContext, uri)
+            val resId = resources.getIdentifier("synk_signature", "raw", packageName)
+            if (resId != 0) {
+                val soundUri = android.net.Uri.parse("android.resource://$packageName/$resId")
+                activeRingtone = RingtoneManager.getRingtone(applicationContext, soundUri)
+            } else {
+                val uri = RingtoneManager.getDefaultUri(RingtoneManager.TYPE_RINGTONE)
+                activeRingtone = RingtoneManager.getRingtone(applicationContext, uri)
+            }
             if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.LOLLIPOP) {
                 activeRingtone?.audioAttributes = AudioAttributes.Builder()
                     .setUsage(AudioAttributes.USAGE_NOTIFICATION_RINGTONE)

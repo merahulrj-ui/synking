@@ -314,6 +314,15 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
               }
               const { RingtoneService } = require('../services/ringtoneService');
               if (RingtoneService) RingtoneService.playMessageChime();
+
+              // Post WhatsApp-style notification in phone's top notification panel
+              const sender = profiles.find(p => p.id === msg.senderId);
+              const senderTitle = sender?.name || 'New Message';
+              let bodyText = msg.text || 'Sent you a message';
+              if (bodyText.includes('|||AUDIO_DATA::')) {
+                bodyText = '🎤 Voice note';
+              }
+              NotificationService.showMessageNotification(senderTitle, bodyText, msg.senderId);
             } catch(e) {}
           }
 
