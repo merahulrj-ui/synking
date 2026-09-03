@@ -180,6 +180,38 @@ async function initTursoTables() {
         created_at DATETIME DEFAULT CURRENT_TIMESTAMP
       );
     `);
+    await queryTurso(`
+      CREATE TABLE IF NOT EXISTS push_tokens (
+        user_id TEXT PRIMARY KEY,
+        push_token TEXT,
+        expo_token TEXT,
+        fcm_token TEXT,
+        updated_at DATETIME DEFAULT CURRENT_TIMESTAMP
+      );
+    `);
+    // Hydrate persistent push/FCM tokens into memory
+    try {
+      const tokenRes = await queryTurso(`SELECT * FROM push_tokens`);
+      if (tokenRes && tokenRes.results && tokenRes.results[0] && tokenRes.results[0].response && tokenRes.results[0].response.result) {
+        const rows = tokenRes.results[0].response.result.rows || [];
+        const cols = (tokenRes.results[0].response.result.cols || []).map(c => c.name);
+        rows.forEach(r => {
+          const item = {};
+          cols.forEach((col, idx) => {
+            item[col] = r[idx]?.value;
+          });
+          if (item.user_id) {
+            if (!db.pushTokens) db.pushTokens = {};
+            if (!db.fcmTokens) db.fcmTokens = {};
+            if (item.push_token) db.pushTokens[item.user_id] = item.push_token;
+            if (item.fcm_token) db.fcmTokens[item.user_id] = item.fcm_token;
+          }
+        });
+        console.log(`⚡ [TURSO_TOKENS_HYDRATED] Restored ${rows.length} persistent push/FCM tokens from Turso SQLite Cloud!`);
+      }
+    } catch (tokenErr) {
+      console.warn('[TURSO_TOKEN_HYDRATE_WARN]', tokenErr.message);
+    }
     // Load existing users from Turso SQLite into memory
     const userRes = await queryTurso(`SELECT * FROM users`);
     if (userRes && userRes.results && userRes.results[0] && userRes.results[0].response && userRes.results[0].response.result) {
@@ -808,6 +840,27 @@ const server = http.createServer((req, res) => {
           }
           saveDb();
           console.log(`[PUSH_TOKEN_BOUND] Bound Push Token for User ${userId}: ${resolvedToken.substring(0, 20)}...`);
+
+          // Persist to Turso Cloud SQLite so restarts NEVER wipe tokens!
+          queryTurso(`
+            INSERT INTO push_tokens (user_id, push_token, expo_token, fcm_token, updated_at)
+            VALUES (?, ?, ?, ?, CURRENT_TIMESTAMP)
+            ON CONFLICT(user_id) DO UPDATE SET
+              push_token = excluded.push_token,
+              expo_token = excluded.expo_token,
+              fcm_token = excluded.fcm_token,
+              updated_at = CURRENT_TIMESTAMP
+          `, [
+            { type: 'text', value: String(userId) },
+            { type: 'text', value: String(resolvedToken || '') },
+            { type: 'text', value: String(expoPushToken || '') },
+            { type: 'text', value: String(fcmPushToken || '') }
+          ]).then(() => {
+            console.log(`✅ [TURSO_PUSH_TOKEN_PERSISTED] Persisted FCM/Push token for ${userId} in Turso Cloud SQLite`);
+          }).catch(err => {
+            console.error(`❌ [TURSO_PUSH_TOKEN_SAVE_ERR]`, err.message);
+          });
+
           res.writeHead(200, { 'Content-Type': 'application/json' });
           res.end(JSON.stringify({ success: true }));
           return;
@@ -1376,8 +1429,39 @@ const server = http.createServer((req, res) => {
 
 async function sendCallPushNotification(targetUserId, callPayload, isEndCall = false) {
   try {
-    const pushToken = db.pushTokens?.[targetUserId] || db.profiles[targetUserId]?.pushToken;
-    if (!pushToken && !db.fcmTokens?.[targetUserId]) {
+    let pushToken = db.pushTokens?.[targetUserId] || db.profiles[targetUserId]?.pushToken;
+    let nativeFcmToken = db.fcmTokens?.[targetUserId] || db.profiles?.[targetUserId]?.fcmPushToken;
+
+    // Turso Resilience: If RAM was wiped by Render restart/sleep, recover token from Turso Cloud SQLite!
+    if (!pushToken && !nativeFcmToken) {
+      try {
+        const tokenQuery = await queryTurso('SELECT * FROM push_tokens WHERE user_id = ?', [{ type: 'text', value: String(targetUserId) }]);
+        const rows = tokenQuery?.results?.[0]?.response?.result?.rows;
+        const cols = tokenQuery?.results?.[0]?.response?.result?.cols?.map(c => (typeof c === 'object' && c.name) ? c.name : String(c));
+        if (Array.isArray(rows) && rows.length > 0 && Array.isArray(cols)) {
+          const item = {};
+          cols.forEach((col, idx) => {
+            const rawVal = rows[0][idx]?.value !== undefined ? rows[0][idx].value : rows[0][idx];
+            item[col] = extractPlain(rawVal);
+          });
+          if (item.fcm_token) {
+            nativeFcmToken = item.fcm_token;
+            if (!db.fcmTokens) db.fcmTokens = {};
+            db.fcmTokens[targetUserId] = nativeFcmToken;
+          }
+          if (item.push_token) {
+            pushToken = item.push_token;
+            if (!db.pushTokens) db.pushTokens = {};
+            db.pushTokens[targetUserId] = pushToken;
+          }
+          console.log(`🔄 [TURSO_PUSH_RECOVERED] Successfully recovered persistent FCM token from Turso for ${targetUserId}`);
+        }
+      } catch (tursoErr) {
+        console.error('[TURSO_PUSH_RECOVERY_ERR]', tursoErr.message);
+      }
+    }
+
+    if (!pushToken && !nativeFcmToken) {
       console.log(`[PUSH_SKIP] No push token registered for target ${targetUserId}`);
       return;
     }
@@ -1405,8 +1489,10 @@ async function sendCallPushNotification(targetUserId, callPayload, isEndCall = f
       android: { priority: 'high', ttl: 30000 }
     };
 
-    // 1. DIRECT NATIVE FCM — check db.fcmTokens FIRST (separate from Expo token!)
-    const nativeFcmToken = db.fcmTokens?.[targetUserId] || db.profiles?.[targetUserId]?.fcmPushToken;
+    // 1. DIRECT NATIVE FCM — check nativeFcmToken FIRST (separate from Expo token!)
+    if (!nativeFcmToken) {
+      nativeFcmToken = db.fcmTokens?.[targetUserId] || db.profiles?.[targetUserId]?.fcmPushToken;
+    }
     console.log(`📲 [DISPATCHING_VOIP_PUSH] Target=${targetUserId} NativeFCM=${!!nativeFcmToken} ExpoToken=${pushToken?.slice(0,15)}... Caller=${callerName} (${callType}) IsEndCall=${isEndCall}`);
 
     if (fcmMessaging && nativeFcmToken) {
