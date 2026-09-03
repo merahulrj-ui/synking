@@ -91,17 +91,15 @@ class MyFirebaseMessagingService : FirebaseMessagingService() {
         )
 
         if (data["type"] == "CALL_ENDED") {
-            debug("FCM_CALL_ENDED", "OK", "Stopping ringtone and converting to Missed Call notification")
+            debug("FCM_CALL_ENDED", "OK", "Processing call termination")
             
             val callId = data["callId"] ?: ""
-            val callerName = data["callerName"] ?: "Someone"
-            val callerId = data["callerId"] ?: ""
-            
+            val wasAnswered = CallState.wasCallAnswered(this)
+            val savedPending = PendingCallStore.get(this)
+
             // 1. Stop native ringtone & vibration instantly!
             IncomingCallActivity.stopRingtoneGlobally()
             CallConnectionManager.endCall()
-            CallState.clear(this@MyFirebaseMessagingService, callId)
-            PendingCallStore.clear(this@MyFirebaseMessagingService)
 
             // 2. Directly dismiss open call activity with zero latency
             TelecomModule.incomingActivityInstance?.let { activity ->
@@ -122,7 +120,29 @@ class MyFirebaseMessagingService : FirebaseMessagingService() {
             sendBroadcast(Intent("com.synking.CLOSE_CALL_SCREEN"))
             sendBroadcast(Intent("com.synking.CALL_ENDED_FROM_JS"))
 
-            // 4. Create dedicated Missed Call Notification Channel (standard notification sound, no looping ringtone)
+            // 5. If call was already answered and connected, DO NOT post Missed Call notification!
+            if (wasAnswered) {
+                CallState.clear(this@MyFirebaseMessagingService, callId)
+                PendingCallStore.clear(this@MyFirebaseMessagingService)
+                debug("FCM_CALL_ENDED", "OK", "Call was previously answered and connected. Missed call notification suppressed.")
+                return
+            }
+
+            // 6. Resolve Real Caller Name from PendingCallStore if missing or 'Someone'
+            val rawName = data["callerName"] ?: ""
+            val resolvedCallerName = if (rawName.isNotEmpty() && rawName != "Someone") {
+                rawName
+            } else if (!savedPending?.callerName.isNullOrEmpty() && savedPending?.callerName != "Someone") {
+                savedPending!!.callerName
+            } else {
+                "Someone"
+            }
+            val resolvedCallerId = if (!data["callerId"].isNullOrEmpty()) data["callerId"]!! else (savedPending?.callerId ?: "")
+
+            CallState.clear(this@MyFirebaseMessagingService, callId)
+            PendingCallStore.clear(this@MyFirebaseMessagingService)
+
+            // 7. Create dedicated Missed Call Notification Channel (standard notification sound, no looping ringtone)
             val missedChannelId = "synking_missed_calls_channel"
             if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
                 val channel = NotificationChannel(
@@ -138,10 +158,10 @@ class MyFirebaseMessagingService : FirebaseMessagingService() {
                 notificationManager.createNotificationChannel(channel)
             }
 
-            // 5. Tapping Missed Call opens MainActivity directly
+            // 8. Tapping Missed Call opens MainActivity directly to chat
             val tapIntent = Intent(this, MainActivity::class.java).apply {
                 flags = Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_CLEAR_TOP
-                putExtra("OPEN_CHAT_USER_ID", callerId)
+                putExtra("OPEN_CHAT_USER_ID", resolvedCallerId)
             }
             val piFlags = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.M) {
                 PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE
@@ -153,7 +173,7 @@ class MyFirebaseMessagingService : FirebaseMessagingService() {
             val missedCallNotification = NotificationCompat.Builder(this, missedChannelId)
                 .setSmallIcon(R.mipmap.ic_launcher)
                 .setContentTitle("📞 Missed Call")
-                .setContentText("You missed a call from $callerName")
+                .setContentText("You missed a call from $resolvedCallerName")
                 .setPriority(NotificationCompat.PRIORITY_DEFAULT)
                 .setAutoCancel(true)
                 .setContentIntent(tapPendingIntent)

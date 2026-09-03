@@ -162,6 +162,18 @@ class TelecomModule(reactContext: ReactApplicationContext) : ReactContextBaseJav
     }
 
     @ReactMethod
+    fun dismissIncomingNotification(promise: Promise) {
+        try {
+            val nm = reactApplicationContext.getSystemService(Context.NOTIFICATION_SERVICE) as NotificationManager
+            nm.cancel(MyFirebaseMessagingService.NOTIFICATION_ID)
+            CallState.markAnswered(reactApplicationContext)
+            promise.resolve(true)
+        } catch (e: Exception) {
+            promise.resolve(false)
+        }
+    }
+
+    @ReactMethod
     fun attachLocalVideo(streamUrl: String, promise: Promise) {
         promise.resolve(true)
     }
@@ -229,6 +241,13 @@ class TelecomModule(reactContext: ReactApplicationContext) : ReactContextBaseJav
         }
 
         fun emitAcceptEvent(call: PendingCall) {
+            reactContext?.let { ctx ->
+                CallState.markAnswered(ctx)
+                try {
+                    val nm = ctx.getSystemService(Context.NOTIFICATION_SERVICE) as NotificationManager
+                    nm.cancel(MyFirebaseMessagingService.NOTIFICATION_ID)
+                } catch (e: Exception) {}
+            }
             if (isJSBridgeReady.get() && reactContext?.hasActiveCatalystInstance() == true) {
                 sendAcceptDirect(call)
             } else {

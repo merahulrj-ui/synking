@@ -100,6 +100,11 @@ class CallActivity : ReactActivity() {
             val pending = PendingCall(callId, callerId, callerName, callerPhoto, callType, autoAccept)
             PendingCallStore.save(this, pending)
             if (autoAccept) {
+                CallState.markAnswered(this)
+                try {
+                    val nm = getSystemService(Context.NOTIFICATION_SERVICE) as android.app.NotificationManager
+                    nm.cancel(MyFirebaseMessagingService.NOTIFICATION_ID)
+                } catch (e: Exception) {}
                 TelecomModule.emitAcceptEvent(pending)
             } else {
                 TelecomModule.emitIncomingCallEvent(pending)

@@ -119,6 +119,11 @@ class SynkingConnection(
     override fun onAnswer() {
         super.onAnswer()
         Log.d("SYNKING_TELECOM", "[UI] ANSWER: natively accepted")
+        CallState.markAnswered(context)
+        try {
+            val nm = context.getSystemService(Context.NOTIFICATION_SERVICE) as NotificationManager
+            nm.cancel(MyFirebaseMessagingService.NOTIFICATION_ID)
+        } catch (e: Exception) {}
         setActive()
     }
 

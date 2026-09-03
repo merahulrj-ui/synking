@@ -51,6 +51,7 @@ class WebRTCManager {
   public localVideoElementRef: any = null;
   public iceStatus: string = 'disconnected';
   private isSwitchingCamera: boolean = false;
+  private iceDisconnectTimer: any = null;
 
   constructor() {
     // Listen for Targeted Real-Time Call Signaling from peer
@@ -106,10 +107,12 @@ class WebRTCManager {
           this.log('❌ Call rejected by peer.');
           this.cleanup();
         }
-      } else if (type === 'CALL_ENDED') {
-        CallDebugger.logStage('CALL_ENDED', 'INFO', { callId: payload?.callId });
-        this.log('🛑 Call ended by peer.');
-        this.cleanup();
+      } else if (type === 'CALL_ENDED' && payload) {
+        if (this.currentSession && (!payload.callId || this.currentSession.id === payload.callId)) {
+          CallDebugger.logStage('CALL_ENDED', 'INFO', { callId: payload.callId });
+          this.log('🛑 Call ended by peer.');
+          this.cleanup();
+        }
       } else if (type === 'CALL_UPGRADED_TO_VIDEO' && payload) {
         if (this.currentSession && this.currentSession.id === payload.callId) {
           this.log('📹 Peer upgraded the call to Live Video!');
@@ -292,6 +295,12 @@ class WebRTCManager {
     try {
       this.cleanupTimers();
       RingtoneService.stop();
+
+      // Dismiss heads-up incoming call notification banner immediately
+      if (Platform.OS === 'android' && NativeModules.TelecomModule?.dismissIncomingNotification) {
+        NativeModules.TelecomModule.dismissIncomingNotification().catch(() => {});
+      }
+
       const isVideo = this.currentSession?.type === 'video';
       
       if (!this.localStream) {
@@ -340,10 +349,11 @@ class WebRTCManager {
     const sessionCopy = { ...this.currentSession };
     const durationFormatted = this.formatDuration(sessionCopy.durationSeconds);
     const callId = sessionCopy.id;
+    const callerName = sessionCopy.callerName || '';
     const peerId = this.getPeerUserId();
     this.log(`🛑 Ending ongoing call (${durationFormatted}).`);
     this.cleanup();
-    RealtimeBridge.broadcast('CALL_ENDED', { callId }, peerId);
+    RealtimeBridge.broadcast('CALL_ENDED', { callId, callerName }, peerId);
     return { session: sessionCopy, durationFormatted };
   }
 
@@ -508,9 +518,25 @@ class WebRTCManager {
           if (Platform.OS === 'android' && NativeModules.TelecomModule?.updateDebugStatus) {
             NativeModules.TelecomModule.updateDebugStatus('ICE RELAY', this.iceStatus.toUpperCase()).catch(() => {});
           }
-          if (this.iceStatus === 'disconnected' || this.iceStatus === 'failed' || this.iceStatus === 'closed') {
-            this.log('🛑 Remote ICE closed. Auto cleaning up...');
+          if (this.iceStatus === 'failed' || this.iceStatus === 'closed') {
+            this.log('🛑 Remote ICE closed/failed. Auto cleaning up...');
             this.cleanup();
+          } else if (this.iceStatus === 'disconnected') {
+            this.log('⏳ Remote ICE transient disconnect. Waiting 5s grace period before cleanup...');
+            if (!this.iceDisconnectTimer) {
+              this.iceDisconnectTimer = setTimeout(() => {
+                if (this.iceStatus === 'disconnected' || this.iceStatus === 'failed') {
+                  this.log('🛑 Remote ICE disconnected for >5s. Auto cleaning up...');
+                  this.cleanup();
+                }
+                this.iceDisconnectTimer = null;
+              }, 5000);
+            }
+          } else if (this.iceStatus === 'connected' || this.iceStatus === 'completed') {
+            if (this.iceDisconnectTimer) {
+              clearTimeout(this.iceDisconnectTimer);
+              this.iceDisconnectTimer = null;
+            }
           }
           this.notify();
         }
@@ -827,6 +853,10 @@ class WebRTCManager {
     if (this.ringingTimeoutTimer) {
       clearTimeout(this.ringingTimeoutTimer);
       this.ringingTimeoutTimer = null;
+    }
+    if (this.iceDisconnectTimer) {
+      clearTimeout(this.iceDisconnectTimer);
+      this.iceDisconnectTimer = null;
     }
   }
 

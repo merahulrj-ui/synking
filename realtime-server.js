@@ -1408,7 +1408,8 @@ const server = http.createServer((req, res) => {
         // If CALL_REJECTED or CALL_ENDED, also send silent push to cancel any ringing
         if (signalType === 'CALL_REJECTED' || signalType === 'CALL_ENDED') {
           if (targetUserId) {
-            sendCallPushNotification(targetUserId, { callId, callerId: targetUserId }, true);
+            const callerName = parsed.callerName || (parsed.payload && parsed.payload.callerName) || '';
+            sendCallPushNotification(targetUserId, { callId, callerId: senderId, callerName }, true);
           }
         }
 
