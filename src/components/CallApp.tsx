@@ -74,6 +74,13 @@ export default function CallApp() {
     }
   };
 
+  const handleMinimizeToChat = () => {
+    const partnerId = session?.callerId || session?.receiverId;
+    if (Platform.OS === 'android' && NativeModules.TelecomModule?.openChatFromCall && partnerId) {
+      NativeModules.TelecomModule.openChatFromCall(partnerId).catch(() => {});
+    }
+  };
+
   if (!session) {
     return <View style={styles.container} />;
   }
@@ -85,6 +92,7 @@ export default function CallApp() {
         session={session}
         onEndCall={handleEndCall}
         onAcceptCall={handleAcceptCall}
+        onMinimize={handleMinimizeToChat}
       />
     </View>
   );

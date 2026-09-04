@@ -1,5 +1,5 @@
 import React, { useRef, useEffect, useState } from 'react';
-import { View, Text, StyleSheet, Modal, TouchableOpacity, Image, Platform, ScrollView, Share, Animated, PanResponder, Vibration } from 'react-native';
+import { View, Text, StyleSheet, Modal, TouchableOpacity, Image, Platform, ScrollView, Share, Animated, PanResponder, Vibration, NativeModules } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { LinearGradient } from 'expo-linear-gradient';
 import { CallSession } from '../types';
@@ -293,6 +293,18 @@ export const CallModal: React.FC<Props> = ({ session, onEndCall, onAcceptCall, o
     onEndCall();
   };
 
+  const handleOpenChat = () => {
+    const partnerId = session.callerId || session.receiverId;
+    if (onMinimize) {
+      onMinimize();
+    } else if (Platform.OS === 'web' && partnerId && typeof window !== 'undefined' && window.location) {
+      window.location.href = `/chat/${partnerId}`;
+    }
+    if (Platform.OS === 'android' && NativeModules.TelecomModule?.openChatFromCall && partnerId) {
+      NativeModules.TelecomModule.openChatFromCall(partnerId).catch(() => {});
+    }
+  };
+
   const [copied, setCopied] = useState(false);
   const [debugReportText, setDebugReportText] = useState('');
   const [micLevel, setMicLevel] = useState(0);
@@ -565,11 +577,11 @@ Remote Video Tracks (${remoteVideo.length}): ${JSON.stringify(remoteVideo)}
             </TouchableOpacity>
           )}
 
-          {/* Top Left: Chat / Minimize Circular Button (Matches Flip Button on Right) */}
-          {onMinimize && isConnected && (
+          {/* Top Left: Chat Button (Always at Top-Left on Video Call, or on Audio Call once Connected) */}
+          {((session.type === 'video' || session.isVideoEnabled) || isConnected) && (
             <TouchableOpacity
               style={styles.chatMinimizeBtn}
-              onPress={onMinimize}
+              onPress={handleOpenChat}
               activeOpacity={0.7}
               hitSlop={{ top: 20, bottom: 20, left: 20, right: 20 }}
             >

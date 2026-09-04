@@ -420,6 +420,9 @@ function GlobalCallOverlay() {
   const handleMinimizeToChat = () => {
     if (!activeCall || !currentUser) return;
     const partnerId = activeCall.callerId === currentUser.id ? activeCall.receiverId : activeCall.callerId;
+    if (Platform.OS === 'android' && NativeModules.TelecomModule?.openChatFromCall && partnerId) {
+      NativeModules.TelecomModule.openChatFromCall(partnerId).catch(() => {});
+    }
     setIsMinimized(true);
     if (partnerId) {
       router.push(`/chat/${partnerId}`);

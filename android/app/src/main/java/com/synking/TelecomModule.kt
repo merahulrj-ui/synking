@@ -1,8 +1,10 @@
 package com.synking
 
 import android.app.NotificationManager
+import android.app.KeyguardManager
 import android.content.Context
 import android.content.Intent
+import android.net.Uri
 import android.os.Build
 import android.os.Handler
 import android.os.Looper
@@ -219,6 +221,59 @@ class TelecomModule(reactContext: ReactApplicationContext) : ReactContextBaseJav
             promise.resolve(true)
         } catch (e: Exception) {
             promise.reject("TELECOM_ERROR", e.message)
+        }
+    }
+
+    @ReactMethod
+    fun openChatFromCall(partnerId: String, promise: Promise) {
+        try {
+            val ctx = reactApplicationContext
+            val activity = currentActivity ?: ctx.currentActivity
+            val km = ctx.getSystemService(Context.KEYGUARD_SERVICE) as? KeyguardManager
+
+            val openChatAction: () -> Unit = {
+                val intent = Intent(ctx, MainActivity::class.java).apply {
+                    flags = Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_CLEAR_TOP
+                    data = Uri.parse("synking://chat/$partnerId")
+                    putExtra("route", "/chat/$partnerId")
+                    putExtra("senderId", partnerId)
+                    putExtra("chatPartnerId", partnerId)
+                }
+                ctx.startActivity(intent)
+
+                // If running inside CallActivity on lockscreen, move it to back so chat is displayed
+                CallActivity.currentCallActivity?.let { act ->
+                    act.runOnUiThread {
+                        try {
+                            act.moveTaskToBack(true)
+                        } catch (e: Exception) {}
+                    }
+                }
+            }
+
+            if (km != null && km.isKeyguardLocked && activity != null && Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
+                activity.runOnUiThread {
+                    km.requestDismissKeyguard(activity, object : KeyguardManager.KeyguardDismissCallback() {
+                        override fun onDismissSucceeded() {
+                            Log.d("SYNKING_DEBUG", "Keyguard dismissed successfully - opening chat for $partnerId")
+                            openChatAction()
+                        }
+                        override fun onDismissCancelled() {
+                            Log.d("SYNKING_DEBUG", "Keyguard dismiss cancelled by user")
+                        }
+                        override fun onDismissError() {
+                            Log.e("SYNKING_DEBUG", "Keyguard dismiss error - falling back to direct launch")
+                            openChatAction()
+                        }
+                    })
+                }
+            } else {
+                openChatAction()
+            }
+            promise.resolve(true)
+        } catch (e: Exception) {
+            Log.e("SYNKING_DEBUG", "openChatFromCall error: ${e.message}")
+            promise.resolve(false)
         }
     }
 
