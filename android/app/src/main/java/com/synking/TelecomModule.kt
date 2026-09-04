@@ -1,5 +1,6 @@
 package com.synking
 
+import android.app.Activity
 import android.app.NotificationManager
 import android.app.KeyguardManager
 import android.content.Context
@@ -228,7 +229,7 @@ class TelecomModule(reactContext: ReactApplicationContext) : ReactContextBaseJav
     fun openChatFromCall(partnerId: String, promise: Promise) {
         try {
             val ctx = reactApplicationContext
-            val activity = CallActivity.currentCallActivity ?: ctx.currentActivity
+            val activity: Activity? = CallActivity.currentCallActivity ?: ctx.currentActivity
             val km = ctx.getSystemService(Context.KEYGUARD_SERVICE) as? KeyguardManager
 
             val openChatAction: () -> Unit = {
@@ -251,9 +252,10 @@ class TelecomModule(reactContext: ReactApplicationContext) : ReactContextBaseJav
                 }
             }
 
-            if (km != null && km.isKeyguardLocked && activity != null && Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
-                activity.runOnUiThread {
-                    km.requestDismissKeyguard(activity, object : KeyguardManager.KeyguardDismissCallback() {
+            val currentAct = activity
+            if (km != null && km.isKeyguardLocked && currentAct != null && Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
+                currentAct.runOnUiThread {
+                    km.requestDismissKeyguard(currentAct, object : KeyguardManager.KeyguardDismissCallback() {
                         override fun onDismissSucceeded() {
                             Log.d("SYNKING_DEBUG", "Keyguard dismissed successfully - opening chat for $partnerId")
                             openChatAction()
