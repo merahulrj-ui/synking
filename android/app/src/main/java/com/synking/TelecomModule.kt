@@ -228,7 +228,7 @@ class TelecomModule(reactContext: ReactApplicationContext) : ReactContextBaseJav
     fun openChatFromCall(partnerId: String, promise: Promise) {
         try {
             val ctx = reactApplicationContext
-            val activity = currentActivity ?: ctx.currentActivity
+            val activity = CallActivity.currentCallActivity ?: ctx.currentActivity
             val km = ctx.getSystemService(Context.KEYGUARD_SERVICE) as? KeyguardManager
 
             val openChatAction: () -> Unit = {
