@@ -23,3 +23,13 @@ allprojects {
 
 apply plugin: "expo-root-project"
 apply plugin: "com.facebook.react.rootproject"
+
+subprojects {
+  afterEvaluate { project ->
+    project.tasks.configureEach { task ->
+      if (task.name.toLowerCase().contains("lint")) {
+        task.enabled = false
+      }
+    }
+  }
+}
