@@ -14,6 +14,7 @@ import {
   deleteSynkRequestFromBackend,
   deleteUserProfileFromBackend,
   deleteChatMessageFromBackend,
+  CLOUD_BACKEND_URL,
 } from '../services/firebase';
 import { encryptE2EEMessage } from '../utils/encryption';
 import { RealtimeBridge } from '../services/realtimeBridge';
@@ -22,6 +23,7 @@ import { NotificationService } from '../services/notificationService';
 import * as Location from 'expo-location';
 
 interface AppContextType {
+  vipPlansEnabled: boolean;
   isLoggedIn: boolean;
   isDarkMode: boolean;
   toggleTheme: () => void;
@@ -353,10 +355,33 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
   const [isSuspended, setIsSuspended] = useState(false);
   const [suspendedUntil, setSuspendedUntil] = useState<number | null>(null);
 
+  // Dynamic App Configuration (VIP Plans Master Switch)
+  const [vipPlansEnabled, setVipPlansEnabled] = useState<boolean>(false);
+
+  useEffect(() => {
+    let isMounted = true;
+    const fetchConfig = async () => {
+      try {
+        const res = await fetch(`${CLOUD_BACKEND_URL}/api/config`);
+        if (res.ok) {
+          const data = await res.json();
+          if (isMounted && typeof data?.vipPlansEnabled === 'boolean') {
+            setVipPlansEnabled(data.vipPlansEnabled);
+          }
+        }
+      } catch (e) {}
+    };
+    fetchConfig();
+    return () => { isMounted = false; };
+  }, []);
+
+  // When VIP plans are disabled (launch/free mode), everyone enjoys VIP perks 100% free!
+  const hasVipPerks = !vipPlansEnabled || Boolean(currentUser?.isVip);
+
   // 5 Action Buttons Quotas & Profile Boost Management
-  const [superSynksRemaining, setSuperSynksRemaining] = useState<number>(() => (currentUser?.isVip ? 5 : 1));
-  const [freeRewindsRemaining, setFreeRewindsRemaining] = useState<number>(() => (currentUser?.isVip ? 999 : 1));
-  const [dailySwipesRemaining, setDailySwipesRemaining] = useState<number>(() => (currentUser?.isVip ? 9999 : 20));
+  const [superSynksRemaining, setSuperSynksRemaining] = useState<number>(() => (hasVipPerks ? 5 : 1));
+  const [freeRewindsRemaining, setFreeRewindsRemaining] = useState<number>(() => (hasVipPerks ? 999 : 1));
+  const [dailySwipesRemaining, setDailySwipesRemaining] = useState<number>(() => (hasVipPerks ? 9999 : 20));
   const [boostActiveUntil, setBoostActiveUntil] = useState<number | null>(null);
 
   // Daily Quota Reset (Midnight reset for SuperSynks, Rewinds & 20 Daily Free Swipes)
@@ -372,12 +397,12 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
           if (parsed && parsed.date === todayStr) {
             setSuperSynksRemaining(parsed.count);
           } else {
-            const defaultCount = currentUser?.isVip ? 5 : 1;
+            const defaultCount = hasVipPerks ? 5 : 1;
             setSuperSynksRemaining(defaultCount);
             await AsyncStorage.setItem('synking_supersynks_data', JSON.stringify({ date: todayStr, count: defaultCount }));
           }
         } else {
-          const defaultCount = currentUser?.isVip ? 5 : 1;
+          const defaultCount = hasVipPerks ? 5 : 1;
           setSuperSynksRemaining(defaultCount);
           await AsyncStorage.setItem('synking_supersynks_data', JSON.stringify({ date: todayStr, count: defaultCount }));
         }
@@ -387,14 +412,14 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
         if (storedRewind) {
           const parsed = JSON.parse(storedRewind);
           if (parsed && parsed.date === todayStr) {
-            setFreeRewindsRemaining(currentUser?.isVip ? 999 : parsed.count);
+            setFreeRewindsRemaining(hasVipPerks ? 999 : parsed.count);
           } else {
-            const defaultCount = currentUser?.isVip ? 999 : 1;
+            const defaultCount = hasVipPerks ? 999 : 1;
             setFreeRewindsRemaining(defaultCount);
             await AsyncStorage.setItem('synking_rewinds_data', JSON.stringify({ date: todayStr, count: defaultCount }));
           }
         } else {
-          const defaultCount = currentUser?.isVip ? 999 : 1;
+          const defaultCount = hasVipPerks ? 999 : 1;
           setFreeRewindsRemaining(defaultCount);
           await AsyncStorage.setItem('synking_rewinds_data', JSON.stringify({ date: todayStr, count: defaultCount }));
         }
@@ -404,14 +429,14 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
         if (storedSwipes) {
           const parsed = JSON.parse(storedSwipes);
           if (parsed && parsed.date === todayStr) {
-            setDailySwipesRemaining(currentUser?.isVip ? 9999 : (typeof parsed.count === 'number' ? parsed.count : 20));
+            setDailySwipesRemaining(hasVipPerks ? 9999 : (typeof parsed.count === 'number' ? parsed.count : 20));
           } else {
-            const defaultCount = currentUser?.isVip ? 9999 : 20;
+            const defaultCount = hasVipPerks ? 9999 : 20;
             setDailySwipesRemaining(defaultCount);
             await AsyncStorage.setItem('synking_daily_swipes_data', JSON.stringify({ date: todayStr, count: defaultCount }));
           }
         } else {
-          const defaultCount = currentUser?.isVip ? 9999 : 20;
+          const defaultCount = hasVipPerks ? 9999 : 20;
           setDailySwipesRemaining(defaultCount);
           await AsyncStorage.setItem('synking_daily_swipes_data', JSON.stringify({ date: todayStr, count: defaultCount }));
         }
@@ -430,7 +455,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       } catch (e) {}
     };
     loadQuotas();
-  }, [currentUser?.isVip]);
+  }, [currentUser?.isVip, vipPlansEnabled]);
 
   // Load persistent Global Theme + 2-Strike & 3-Day Suspension Status + Seen Match Alerts
   useEffect(() => {
@@ -1232,6 +1257,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
         },
         loginUser,
         logoutUser,
+        vipPlansEnabled,
         deleteAccount,
         updateCurrentUser,
         updateSafetyContact,

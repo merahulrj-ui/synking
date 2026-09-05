@@ -335,9 +335,6 @@ class MyFirebaseMessagingService : FirebaseMessagingService() {
             Log.d("SYNKING_TELECOM", "[TELECOM] ADD_NEW_INCOMING_CALL: Triggering...")
             telecomManager.addNewIncomingCall(phoneAccountHandle, telecomExtras)
             debug("TELECOM_LAUNCH", "OK", "callId=$callId")
-            
-            // If successful, DO NOT launch the legacy manual UI and Notification!
-            return 
         } catch (e: Exception) {
             Log.e("SYNKING_TELECOM", "[TELECOM] ERROR: ${e.message}", e)
             debug("TELECOM_LAUNCH", "FAIL", e.message ?: "")

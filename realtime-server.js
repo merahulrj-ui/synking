@@ -44,6 +44,16 @@ try {
 } catch (e) {
   console.warn('[FIREBASE_ADMIN_INIT_WARN]', e.message);
 }
+
+// Master Feature Flags & Dynamic Configuration
+let vipPlansEnabled = false;
+
+function broadcastWs(data) {
+  if (typeof broadcastToWebSockets === 'function') {
+    broadcastToWebSockets(data);
+  }
+}
+
 // Turso 9GB Cloud SQLite is 100% Single Source of Truth (No Local JSON)
 
 // 9 GB Turso Cloud SQLite Configuration (AWS Mumbai - 0ms Latency)
@@ -250,6 +260,28 @@ async function initTursoTables() {
       console.log(`⚡ [TURSO_REQUESTS_HYDRATED] Restored ${rows.length} mutual match requests from Turso SQLite Cloud!`);
     }
 
+    // Dynamic Feature Settings Table (VIP plans toggle, etc.)
+    await queryTurso(`
+      CREATE TABLE IF NOT EXISTS app_settings (
+        key TEXT PRIMARY KEY,
+        value TEXT,
+        updated_at DATETIME DEFAULT CURRENT_TIMESTAMP
+      );
+    `);
+    try {
+      const configRes = await queryTurso("SELECT value FROM app_settings WHERE key = 'vip_plans_enabled'");
+      const cfgRow = configRes?.results?.[0]?.response?.result?.rows?.[0];
+      if (cfgRow && cfgRow[0]) {
+        vipPlansEnabled = cfgRow[0].value === 'true';
+      } else {
+        await queryTurso("INSERT OR REPLACE INTO app_settings (key, value) VALUES ('vip_plans_enabled', 'false')");
+        vipPlansEnabled = false;
+      }
+      console.log(`⚡ [VIP_SETTINGS_HYDRATED] VIP Membership Plans Master Switch: ${vipPlansEnabled ? '🟢 ON' : '🔴 OFF'}`);
+    } catch (cfgErr) {
+      console.warn('[TURSO_CONFIG_HYDRATE_WARN]', cfgErr.message);
+    }
+
     console.log('⚡ [TURSO_SQLITE_CONNECTED] 9 GB Cloud Database Initialized & Synchronized.');
   } catch (e) {
     console.warn('[TURSO_INIT_WARN]', e.message);
@@ -437,6 +469,31 @@ async function renderAdminHtml() {
     <div class="badge">● 100% ONLINE (Turso 9GB SQLite)</div>
   </div>
 
+  <!-- VIP Membership & Monetization Master Toggle Card -->
+  <div style="background: linear-gradient(135deg, rgba(251, 191, 36, 0.08), rgba(253, 58, 115, 0.06)); border: 1px solid ${vipPlansEnabled ? 'rgba(34, 197, 94, 0.4)' : 'rgba(251, 191, 36, 0.3)'}; border-radius: 16px; padding: 20px; margin-bottom: 24px; display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 16px;">
+    <div style="display: flex; align-items: center; gap: 16px;">
+      <div style="font-size: 32px; background: rgba(251, 191, 36, 0.12); width: 56px; height: 56px; border-radius: 14px; display: flex; align-items: center; justify-content: center; border: 1px solid rgba(251, 191, 36, 0.25);">👑</div>
+      <div>
+        <div style="display: flex; align-items: center; gap: 10px; flex-wrap: wrap;">
+          <h2 style="font-size: 17px; font-weight: 800; color: #FFF;">VIP Membership Plans Master Switch</h2>
+          <span style="background: ${vipPlansEnabled ? '#059669' : '#DC2626'}; color: #FFF; font-size: 11px; font-weight: 800; padding: 4px 10px; border-radius: 20px; text-transform: uppercase; letter-spacing: 0.5px;">
+            ${vipPlansEnabled ? '● ACTIVE (PAID PLANS LIVE)' : '○ OFF (LAUNCH PERIOD - ALL FEATURES FREE)'}
+          </span>
+        </div>
+        <p style="color: #94A3B8; font-size: 13px; margin-top: 4px;">
+          ${vipPlansEnabled 
+            ? 'VIP subscription plans & paywalls are active in the mobile app.' 
+            : 'VIP plans are currently disabled. All users have unlimited access to swipes, rewinds and calls 100% free!'}
+        </p>
+      </div>
+    </div>
+    <div>
+      <button onclick="toggleVipPlans()" id="vipToggleBtn" style="background: ${vipPlansEnabled ? '#EF4444' : 'linear-gradient(135deg, #FBBF24, #F59E0B)'}; color: ${vipPlansEnabled ? '#FFF' : '#000'}; border: none; padding: 12px 22px; border-radius: 12px; font-weight: 800; cursor: pointer; font-size: 13px; display: flex; align-items: center; gap: 8px; box-shadow: 0 4px 14px ${vipPlansEnabled ? 'rgba(239, 68, 68, 0.3)' : 'rgba(245, 158, 11, 0.3)'};">
+        ${vipPlansEnabled ? '🛑 Turn OFF VIP Plans (Free Access Mode)' : '⚡ Turn ON VIP Plans (Enable Monetization)'}
+      </button>
+    </div>
+  </div>
+
   <div class="stats-grid">
     <div class="stat-card">
       <div class="stat-lbl">Registered Users</div>
@@ -535,6 +592,32 @@ async function renderAdminHtml() {
 
   <script>
     console.log('🚀 [SYNKING ADMIN CONSOLE LOADED]');
+
+    // 0. Toggle VIP Plans Master Switch
+    async function toggleVipPlans() {
+      const btn = document.getElementById('vipToggleBtn');
+      if (btn) {
+        btn.disabled = true;
+        btn.innerText = 'Updating VIP Status... ⏳';
+      }
+      const urlParams = new URLSearchParams(window.location.search);
+      const key = urlParams.get('key') || 'synking_secret_admin_2026';
+      try {
+        const res = await fetch('/api/admin/toggle-vip?key=' + encodeURIComponent(key), {
+          method: 'POST'
+        });
+        const data = await res.json();
+        if (data.success) {
+          location.reload();
+        } else {
+          alert('Failed to toggle VIP: ' + (data.error || 'Unauthorized'));
+          if (btn) btn.disabled = false;
+        }
+      } catch (err) {
+        alert('Network error while toggling VIP: ' + err.message);
+        if (btn) btn.disabled = false;
+      }
+    }
 
     // 1. Delete Single User Profile
     document.addEventListener('click', async function(e) {
@@ -698,6 +781,58 @@ const server = http.createServer((req, res) => {
       res.writeHead(500);
       res.end('Error loading admin dashboard: ' + err);
     });
+    return;
+  }
+
+  // 0.2 GET /api/config (Public App Feature Flags & Configuration)
+  if (req.method === 'GET' && pathname === '/api/config') {
+    res.writeHead(200, {
+      'Content-Type': 'application/json',
+      'Access-Control-Allow-Origin': '*',
+      'Cache-Control': 'no-cache',
+    });
+    res.end(JSON.stringify({
+      success: true,
+      vipPlansEnabled: Boolean(vipPlansEnabled),
+      version: '1.0.0',
+      timestamp: Date.now(),
+    }));
+    return;
+  }
+
+  // 0.3 POST /api/admin/toggle-vip (Admin One-Click VIP Plans Master Toggle)
+  if (req.method === 'POST' && pathname === '/api/admin/toggle-vip') {
+    const adminKey = url.searchParams.get('key');
+    const validKey = process.env.ADMIN_SECRET_KEY || 'synking_secret_admin_2026';
+
+    if (adminKey !== validKey) {
+      res.writeHead(401, { 'Content-Type': 'application/json' });
+      res.end(JSON.stringify({ success: false, error: 'Unauthorized key' }));
+      return;
+    }
+
+    vipPlansEnabled = !vipPlansEnabled;
+    queryTurso(
+      `INSERT OR REPLACE INTO app_settings (key, value) VALUES ('vip_plans_enabled', ?)`,
+      [{ type: 'text', value: String(vipPlansEnabled) }]
+    ).catch(err => console.warn('[VIP_TOGGLE_PERSIST_WARN]', err.message));
+
+    // Broadcast config update to all connected apps in 0ms!
+    broadcastWs({
+      type: 'CONFIG_UPDATED',
+      payload: { vipPlansEnabled }
+    });
+
+    console.log(`👑 [ADMIN_VIP_TOGGLE] VIP Plans Master Switch is now: ${vipPlansEnabled ? '🟢 ON' : '🔴 OFF'}`);
+    res.writeHead(200, {
+      'Content-Type': 'application/json',
+      'Access-Control-Allow-Origin': '*'
+    });
+    res.end(JSON.stringify({
+      success: true,
+      vipPlansEnabled: vipPlansEnabled,
+      message: `VIP Membership Plans are now ${vipPlansEnabled ? 'ACTIVE' : 'OFF (Free Mode)'}`
+    }));
     return;
   }
 
@@ -1601,9 +1736,8 @@ async function sendCallPushNotification(targetUserId, callPayload, isEndCall = f
 
     const pushBody = JSON.stringify({
       to: pushToken,
-      // Restore title and body for Missed Calls ONLY! Incoming calls stay silent to avoid double banners
-      title: isEndCall ? title : undefined,
-      body: isEndCall ? bodyText : undefined,
+      title: title,
+      body: bodyText,
       data: dataPayload,
       priority: 'high',
       channelId: 'incoming_calls',

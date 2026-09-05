@@ -143,7 +143,7 @@ const PERKS_BY_CATEGORY: Record<PlanCategory, { icon: any; title: string; desc: 
 
 export default function VipMembershipScreen() {
   const router = useRouter();
-  const { currentUser, updateCurrentUser, isDarkMode } = useApp();
+  const { currentUser, updateCurrentUser, isDarkMode, vipPlansEnabled } = useApp();
   const [selectedCategory, setSelectedCategory] = useState<PlanCategory>('full_vip');
   const [selectedPlan, setSelectedPlan] = useState('vip_3_months');
 
@@ -152,6 +152,14 @@ export default function VipMembershipScreen() {
   const activePlan = currentPlans.find(p => p.id === selectedPlan) || currentPlans[0];
 
   const handleActivateVip = () => {
+    if (!vipPlansEnabled) {
+      Alert.alert(
+        '🎉 Launch Special Free Access',
+        'VIP plans are currently in free early-access mode! You already have 100% free access to all VIP calling, unlimited rewinds & boosts.',
+        [{ text: 'Enjoy Dating ✨', onPress: () => router.back() }]
+      );
+      return;
+    }
     updateCurrentUser({ isVip: true });
     Alert.alert(
       '👑 Plan Activated!',
@@ -198,11 +206,15 @@ export default function VipMembershipScreen() {
           <Text style={styles.bannerSub}>
             Level up your dating experience with unlimited access, high-priority discovery & exclusive cafe perks.
           </Text>
-          {currentUser?.isVip && (
+          {!vipPlansEnabled ? (
+            <View style={[styles.activePill, { backgroundColor: '#10B981' }]}>
+              <Text style={styles.activePillText}>🎉 LAUNCH SPECIAL: ALL PERKS 100% FREE</Text>
+            </View>
+          ) : currentUser?.isVip ? (
             <View style={styles.activePill}>
               <Text style={styles.activePillText}>✓ CURRENTLY ACTIVE</Text>
             </View>
-          )}
+          ) : null}
         </LinearGradient>
 
         {/* Category Tabs (3 Categories) */}
@@ -306,15 +318,19 @@ export default function VipMembershipScreen() {
             style={styles.subscribeGradient}
           >
             <Text style={styles.subscribeBtnText}>
-              {currentUser?.isVip
-                ? `Renew ${activePlan.duration} Plan (${activePlan.price}) 👑`
-                : `Unlock for ${activePlan.price} (${activePlan.duration}) ✨`}
+              {!vipPlansEnabled
+                ? 'Enjoy Free VIP Perks (Launch Special) ✨'
+                : (currentUser?.isVip
+                  ? `Renew ${activePlan.duration} Plan (${activePlan.price}) 👑`
+                  : `Unlock for ${activePlan.price} (${activePlan.duration}) ✨`)}
             </Text>
           </LinearGradient>
         </TouchableOpacity>
 
         <Text style={styles.termsText}>
-          Instant activation. Cancel anytime in profile settings.
+          {!vipPlansEnabled
+            ? 'Launch Period: Unlimited calls, swipes & perks unlocked for all users.'
+            : 'Instant activation. Cancel anytime in profile settings.'}
         </Text>
       </ScrollView>
     </SafeAreaView>
