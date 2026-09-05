@@ -204,6 +204,33 @@ class TelecomModule(reactContext: ReactApplicationContext) : ReactContextBaseJav
     }
 
     @ReactMethod
+    fun enterPipMode(promise: Promise) {
+        try {
+            val activity = currentActivity
+            if (activity != null && Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
+                activity.runOnUiThread {
+                    try {
+                        val aspectRatio = android.util.Rational(9, 16)
+                        val builder = android.app.PictureInPictureParams.Builder()
+                            .setAspectRatio(aspectRatio)
+                        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
+                            builder.setAutoEnterEnabled(true)
+                        }
+                        val success = activity.enterPictureInPictureMode(builder.build())
+                        promise.resolve(success)
+                    } catch (e: Exception) {
+                        promise.resolve(false)
+                    }
+                }
+            } else {
+                promise.resolve(false)
+            }
+        } catch (e: Exception) {
+            promise.resolve(false)
+        }
+    }
+
+    @ReactMethod
     fun setCurrentUser(userId: String, userName: String, promise: Promise) {
         try {
             val prefs = reactApplicationContext.getSharedPreferences("synking_call_state", Context.MODE_PRIVATE)

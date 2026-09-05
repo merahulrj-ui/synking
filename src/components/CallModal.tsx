@@ -8,6 +8,7 @@ import { WebRTCService } from '../services/webrtcService';
 import { RingtoneService } from '../services/ringtoneService';
 import { NativeRTCView } from '../services/webrtcCore';
 import { AudioRouteService } from '../services/audioRouteService';
+import { DedicatedPipView } from './DedicatedPipView';
 
 // 1. Live Self Video Component (PiP) - Real Hardware Front Camera
 const LiveSelfVideo: React.FC<{ isPip?: boolean }> = ({ isPip = true }) => {
@@ -229,6 +230,10 @@ export const CallModal: React.FC<Props> = ({ session, onEndCall, onAcceptCall, o
     if (Platform.OS !== 'android') return;
     const onBackPress = () => {
       if (session.status === 'connected' || session.status === 'calling') {
+        if (NativeModules.TelecomModule?.enterPipMode) {
+          NativeModules.TelecomModule.enterPipMode().catch(() => {});
+          return true;
+        }
         if (onMinimize) {
           onMinimize();
           return true; // Handled, prevent app close
@@ -539,6 +544,15 @@ Remote Video Tracks (${remoteVideo.length}): ${JSON.stringify(remoteVideo)}
     setCopied(true);
     setTimeout(() => setCopied(false), 3000);
   };
+
+  // 📺 DEDICATED ISOLATED PIP VIEW (Zero buttons, Zero clutter, WhatsApp/Meet style)
+  if (isNativePip) {
+    return (
+      <View style={[StyleSheet.absoluteFill, { zIndex: 999999, elevation: 999999, backgroundColor: '#05060A' }]}>
+        <DedicatedPipView session={session} remoteStream={remoteStream} />
+      </View>
+    );
+  }
 
   const callContent = (
     <View style={styles.modalOverlay}>

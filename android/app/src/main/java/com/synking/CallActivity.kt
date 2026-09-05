@@ -143,10 +143,12 @@ class CallActivity : ReactActivity() {
         try {
             if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
                 val aspectRatio = android.util.Rational(9, 16)
-                val pipParams = android.app.PictureInPictureParams.Builder()
+                val builder = android.app.PictureInPictureParams.Builder()
                     .setAspectRatio(aspectRatio)
-                    .build()
-                enterPictureInPictureMode(pipParams)
+                if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
+                    builder.setAutoEnterEnabled(true)
+                }
+                enterPictureInPictureMode(builder.build())
                 Log.d("SYNKING_PIP", "[CallActivity] Entered native Android Picture-in-Picture mode successfully!")
             }
         } catch (e: Exception) {
