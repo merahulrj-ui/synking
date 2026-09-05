@@ -327,7 +327,7 @@ export default function ProfileScreen() {
         gender: preset.gender || 'female',
         occupation: preset.occupation || 'Member',
         location: preset.location || 'Roorkee',
-        phoneNumber: preset.phoneNumber || '+91 98765 43210',
+        phoneNumber: preset.phoneNumber || currentUser?.phoneNumber || '',
         distance: '0 km',
         bio: preset.bio || 'Coffee, deep conversations & indie vibes ✨',
         photo: preset.photo || 'https://images.unsplash.com/photo-1494790108377-be9c29b29330?w=800',
@@ -357,7 +357,7 @@ export default function ProfileScreen() {
     }
 
     const digits = loginPhone.replace(/\D/g, '') || Date.now().toString().slice(-6);
-    const cleanPhone = loginPhone ? '+91 ' + loginPhone.replace(/\D/g, '') : '+91 98765 43210';
+    const cleanPhone = loginPhone ? '+91 ' + loginPhone.replace(/\D/g, '') : (currentUser?.phoneNumber || '');
     const finalName = loginName.trim() || (loginGender === 'female' ? 'Priya' : 'Rahul');
     const isFem = loginGender === 'female';
 

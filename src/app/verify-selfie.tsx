@@ -209,7 +209,7 @@ export default function VerifySelfieScreen() {
       const realAge = calculatedAge || 24;
       const realName = fullName.trim() || 'Verified Member';
       const userId = currentUser?.id || `user_${Date.now()}`;
-      const userPhone = currentUser?.phoneNumber || '+91 98765 43210';
+      const userPhone = currentUser?.phoneNumber || '';
       const userDob = `${day}/${month}/${year}`;
 
       // Update App Context State

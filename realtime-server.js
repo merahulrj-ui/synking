@@ -205,9 +205,13 @@ async function initTursoTables() {
         gender TEXT,
         preferences TEXT,
         safety_contact TEXT,
+        phone_number TEXT,
         created_at DATETIME DEFAULT CURRENT_TIMESTAMP
       );
     `);
+    try {
+      await queryTurso('ALTER TABLE users ADD COLUMN phone_number TEXT;');
+    } catch (e) {}
     await queryTurso(`
       CREATE TABLE IF NOT EXISTS synk_requests (
         id TEXT PRIMARY KEY,
@@ -288,6 +292,7 @@ async function initTursoTables() {
           try { u.location = JSON.parse(u.location); } catch (e) {}
           try { u.preferences = JSON.parse(u.preferences); } catch (e) {}
           try { u.safetyContact = JSON.parse(u.safety_contact); } catch (e) {}
+          if (u.phone_number) u.phoneNumber = u.phone_number;
           db.profiles[u.id] = { ...db.profiles[u.id], ...u };
         }
       });
@@ -354,7 +359,8 @@ initTursoTables();
 
 function syncUserToTurso(user) {
   if (!user || !user.id) return;
-  const sql = `INSERT OR REPLACE INTO users (id, name, age, bio, photo, photos, location, gender, preferences, safety_contact) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`;
+  const phoneVal = user.phoneNumber || user.phone || user.phone_number || '';
+  const sql = `INSERT OR REPLACE INTO users (id, name, age, bio, photo, photos, location, gender, preferences, safety_contact, phone_number) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`;
   const args = [
     { type: 'text', value: String(user.id) },
     { type: 'text', value: String(user.name || '') },
@@ -365,7 +371,8 @@ function syncUserToTurso(user) {
     { type: 'text', value: JSON.stringify(user.location || {}) },
     { type: 'text', value: String(user.gender || '') },
     { type: 'text', value: JSON.stringify(user.preferences || {}) },
-    { type: 'text', value: JSON.stringify(user.safetyContact || {}) }
+    { type: 'text', value: JSON.stringify(user.safetyContact || {}) },
+    { type: 'text', value: String(phoneVal) }
   ];
   queryTurso(sql, args).catch(() => {});
 }
@@ -464,7 +471,7 @@ async function renderAdminHtml() {
         const occStr = item.occupation || 'Member';
         const bioStr = item.bio || 'Active on Synking ✨';
         const photoStr = item.photo || 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=500';
-        const phoneStr = item.phone_number || '';
+        const phoneStr = item.phone_number || item.phoneNumber || (db.profiles[idStr] && (db.profiles[idStr].phoneNumber || db.profiles[idStr].phone)) || '';
         const genderStr = item.gender || 'male';
 
         return {
@@ -679,7 +686,7 @@ async function renderAdminHtml() {
         ${profileList.length === 0 ? '<tr><td colspan="6" style="color: #94A3B8; text-align: center; padding: 20px;">No registered profiles yet. Create a profile in the app!</td></tr>' : ''}
         ${profileList.map(u => `
           <tr id="card_${u.id}">
-            <td style="font-weight: 700; color: #00E5FF;">${u.phoneNumber || '+91 98765 43210'}</td>
+            <td style="font-weight: 700; color: #00E5FF;">${u.phoneNumber || u.phone || '<span style="color: #64748B; font-weight: 400;">Not Provided</span>'}</td>
             <td style="font-family: monospace; color: #94A3B8;">${u.id}</td>
             <td><strong>${u.name}</strong> ${u.verified ? '✅' : ''}</td>
             <td>${u.age || 21} / ${u.gender || 'male'}</td>

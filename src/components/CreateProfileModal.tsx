@@ -18,7 +18,7 @@ interface Props {
 }
 
 export const CreateProfileModal: React.FC<Props> = ({ visible, onClose }) => {
-  const { loginUser, isDarkMode } = useApp();
+  const { loginUser, currentUser, isDarkMode } = useApp();
   const [name, setName] = useState('');
   const [age, setAge] = useState('22');
   const [gender, setGender] = useState<'male' | 'female' | 'other'>('male');
@@ -48,6 +48,7 @@ export const CreateProfileModal: React.FC<Props> = ({ visible, onClose }) => {
       gender,
       occupation: occupation.trim() || 'Member',
       location: city.trim() || 'Roorkee',
+      phoneNumber: currentUser?.phoneNumber || '',
       distance: '0 km',
       bio: bio.trim() || `Exploring cafes & dates in ${city || 'Roorkee'} ✨`,
       photo: selectedPhoto,
