@@ -206,7 +206,7 @@ class TelecomModule(reactContext: ReactApplicationContext) : ReactContextBaseJav
     @ReactMethod
     fun enterPipMode(promise: Promise) {
         try {
-            val activity = currentActivity
+            val activity: Activity? = CallActivity.currentCallActivity ?: reactApplicationContext.currentActivity
             if (activity != null && Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
                 activity.runOnUiThread {
                     try {
