@@ -219,8 +219,8 @@ const styles = StyleSheet.create({
     alignItems: 'center',
   },
   tabLabel: {
-    fontFamily: 'Poppins_700Bold',
     fontSize: 11,
+    fontWeight: '700',
     marginTop: 2,
   },
   inSynkTabIconWrapper: {
@@ -266,25 +266,29 @@ const styles = StyleSheet.create({
   },
   tabBadgeText: {
     color: '#FFF',
-    fontFamily: 'Poppins_900Black',
     fontSize: 8.5,
+    fontWeight: '900',
   },
   globalSuspensionBanner: {
     backgroundColor: '#DC2626',
-    paddingVertical: 8,
+    paddingVertical: 10,
     paddingHorizontal: 16,
     alignItems: 'center',
+    justifyContent: 'center',
+    borderBottomWidth: 1,
+    borderBottomColor: 'rgba(0, 0, 0, 0.2)',
+    zIndex: 9999,
   },
   suspensionBannerTitle: {
     color: '#FFFFFF',
-    fontFamily: 'Poppins_900Black',
+    fontWeight: '900',
     fontSize: 12.5,
     letterSpacing: 0.5,
   },
   suspensionBannerSub: {
     color: '#FEE2E2',
-    fontFamily: 'Poppins_600SemiBold',
     fontSize: 11,
+    fontWeight: '600',
     marginTop: 2,
     textAlign: 'center',
   },
