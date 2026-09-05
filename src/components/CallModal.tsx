@@ -634,13 +634,18 @@ Remote Video Tracks (${remoteVideo.length}): ${JSON.stringify(remoteVideo)}
                   : session.callerName}
               </Text>
 
-              <Text style={[styles.callStatus, isConnected && styles.callStatusConnected]}>
+              <Text style={[
+                styles.callStatus,
+                isConnected && styles.callStatusConnected,
+                session.status === 'rejected' && styles.callStatusRejected,
+                session.status === 'ended' && styles.callStatusEnded,
+              ]}>
                 {isIncomingRinging && 'Incoming Call...'}
                 {!isIncomingRinging && session.status === 'calling' && 'Calling...'}
                 {!isIncomingRinging && session.status === 'ringing' && 'Ringing...'}
                 {session.status === 'connected' && `Connected • ${durationText}`}
                 {session.status === 'ended' && 'Call Ended'}
-                {session.status === 'rejected' && 'Call Declined'}
+                {session.status === 'rejected' && '❌ Call Declined'}
               </Text>
             </View>
           )}
@@ -650,7 +655,15 @@ Remote Video Tracks (${remoteVideo.length}): ${JSON.stringify(remoteVideo)}
             <View style={styles.centerSection}>
               <View style={styles.avatarContainer}>
                 <LinearGradient
-                  colors={['#A855F7', '#38BDF8']}
+                  colors={
+                    session.status === 'rejected'
+                      ? ['#EF4444', '#B91C1C']
+                      : session.status === 'ended'
+                      ? ['#64748B', '#475569']
+                      : isConnected
+                      ? ['#10B981', '#059669']
+                      : ['#A855F7', '#38BDF8']
+                  }
                   start={{ x: 0, y: 0 }}
                   end={{ x: 1, y: 1 }}
                   style={{
@@ -660,9 +673,9 @@ Remote Video Tracks (${remoteVideo.length}): ${JSON.stringify(remoteVideo)}
                     padding: 3,
                     alignItems: 'center',
                     justifyContent: 'center',
-                    shadowColor: '#38BDF8',
-                    shadowOpacity: 0.5,
-                    shadowRadius: 12,
+                    shadowColor: session.status === 'rejected' ? '#EF4444' : isConnected ? '#10B981' : '#38BDF8',
+                    shadowOpacity: 0.6,
+                    shadowRadius: 14,
                     elevation: 10,
                   }}
                 >
@@ -679,12 +692,21 @@ Remote Video Tracks (${remoteVideo.length}): ${JSON.stringify(remoteVideo)}
               </View>
 
               <Text style={styles.callerName}>{session.callerName}</Text>
-              <Text style={styles.callerSub}>
+              <Text style={[
+                styles.callerSub,
+                session.status === 'rejected' && styles.callerSubRejected,
+                session.status === 'ended' && styles.callerSubEnded,
+                isConnected && styles.callerSubConnected,
+              ]}>
                 {isIncomingRinging
                   ? `Incoming ${session.type === 'video' ? 'Video' : 'Voice'} Call • Tap Accept`
+                  : session.status === 'rejected'
+                  ? 'Call was declined by recipient'
+                  : session.status === 'ended'
+                  ? 'Call has ended'
                   : isConnected
                   ? '🔒 Direct Peer-to-Peer Encrypted'
-                  : 'Connecting safely on SYNKING'}
+                  : 'Connecting safely on Synkin'}
               </Text>
             </View>
           ) : (
@@ -693,7 +715,18 @@ Remote Video Tracks (${remoteVideo.length}): ${JSON.stringify(remoteVideo)}
 
           {/* 3. BOTTOM CONTROL BAR (Hidden in PiP) */}
           {!isNativePip && (
-            isIncomingRinging ? (
+            session.status === 'rejected' || session.status === 'ended' ? (
+              <View style={styles.declinedActionsRow}>
+                <TouchableOpacity
+                  style={styles.declinedDismissBtn}
+                  onPress={onEndCall}
+                  activeOpacity={0.8}
+                >
+                  <Ionicons name="close-circle" size={22} color="#FFFFFF" />
+                  <Text style={styles.declinedDismissText}>Dismiss</Text>
+                </TouchableOpacity>
+              </View>
+            ) : isIncomingRinging ? (
               // INCOMING CALL ACCEPT / DECLINE ACTIONS
               <View style={styles.incomingActionsRow}>
                 {/* Decline Button */}
@@ -846,7 +879,7 @@ const styles = StyleSheet.create({
   e2eeText: {
     color: '#E2E8F0',
     fontSize: 12,
-    fontWeight: '700',
+    fontFamily: 'Poppins_700Bold',
     letterSpacing: 0.5,
     flexShrink: 0,
   },
@@ -856,7 +889,7 @@ const styles = StyleSheet.create({
   debugToggleText: {
     color: '#00E5FF',
     fontSize: 10,
-    fontWeight: '900',
+    fontFamily: 'Poppins_900Black',
   },
   debugPanel: {
     display: 'none',
@@ -864,13 +897,13 @@ const styles = StyleSheet.create({
   debugTitle: {
     color: '#00E5FF',
     fontSize: 10.5,
-    fontWeight: '900',
+    fontFamily: 'Poppins_900Black',
     marginBottom: 4,
   },
   debugLine: {
     color: '#E2E8F0',
     fontSize: 10,
-    fontWeight: '600',
+    fontFamily: 'Poppins_600SemiBold',
     lineHeight: 14,
   },
   testSoundBtn: {
@@ -879,21 +912,44 @@ const styles = StyleSheet.create({
   testSoundText: {
     color: '#FFF',
     fontSize: 10,
-    fontWeight: '800',
+    fontFamily: 'Poppins_800ExtraBold',
   },
   callTypeTitle: {
     color: '#FFFFFF',
     fontSize: 22,
-    fontWeight: '900',
+    fontFamily: 'Poppins_900Black',
     letterSpacing: -0.4,
   },
   callStatus: {
     color: '#94A3B8',
     fontSize: 14,
-    fontWeight: '700',
+    fontFamily: 'Poppins_700Bold',
   },
   callStatusConnected: {
     color: '#10B981',
+    fontFamily: 'Poppins_700Bold',
+  },
+  callStatusRejected: {
+    color: '#EF4444',
+    fontSize: 16,
+    fontFamily: 'Poppins_700Bold',
+  },
+  callStatusEnded: {
+    color: '#94A3B8',
+    fontSize: 15,
+    fontFamily: 'Poppins_600SemiBold',
+  },
+  callerSubRejected: {
+    color: '#F87171',
+    fontFamily: 'Poppins_600SemiBold',
+  },
+  callerSubEnded: {
+    color: '#94A3B8',
+    fontFamily: 'Poppins_500Medium',
+  },
+  callerSubConnected: {
+    color: '#10B981',
+    fontFamily: 'Poppins_600SemiBold',
   },
   centerSection: {
     flex: 1,
@@ -1004,12 +1060,45 @@ const styles = StyleSheet.create({
   callerName: {
     color: '#FFFFFF',
     fontSize: 26,
-    fontWeight: '900',
+    fontFamily: 'Poppins_900Black',
   },
   callerSub: {
     color: '#94A3B8',
     fontSize: 14,
-    fontWeight: '500',
+    fontFamily: 'Poppins_500Medium',
+  },
+  declinedActionsRow: {
+    position: 'absolute',
+    bottom: 40,
+    left: 0,
+    right: 0,
+    alignItems: 'center',
+    justifyContent: 'center',
+    zIndex: 999,
+    elevation: 999,
+  },
+  declinedDismissBtn: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 8,
+    backgroundColor: 'rgba(239, 68, 68, 0.25)',
+    borderWidth: 1.5,
+    borderColor: '#EF4444',
+    paddingVertical: 14,
+    paddingHorizontal: 36,
+    borderRadius: 32,
+    shadowColor: '#EF4444',
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.4,
+    shadowRadius: 10,
+    elevation: 8,
+  },
+  declinedDismissText: {
+    color: '#FFFFFF',
+    fontSize: 16,
+    fontFamily: 'Poppins_700Bold',
+    letterSpacing: 0.3,
   },
   incomingActionsRow: {
     position: 'absolute',
@@ -1047,7 +1136,7 @@ const styles = StyleSheet.create({
   actionBtnLabel: {
     color: '#FFFFFF',
     fontSize: 11,
-    fontWeight: '800',
+    fontFamily: 'Poppins_800ExtraBold',
   },
   floatingFlipBtn: {
     position: 'absolute',
@@ -1115,7 +1204,7 @@ const styles = StyleSheet.create({
   controlLabel: {
     color: '#94A3B8',
     fontSize: 9,
-    fontWeight: '700',
+    fontFamily: 'Poppins_700Bold',
     display: 'none',
   },
   endCallBtn: {
@@ -1148,7 +1237,7 @@ const styles = StyleSheet.create({
   unmuteFloatingText: {
     color: '#FFFFFF',
     fontSize: 11,
-    fontWeight: '800',
+    fontFamily: 'Poppins_800ExtraBold',
   },
   terminalBox: {
     backgroundColor: '#020617',
@@ -1161,7 +1250,7 @@ const styles = StyleSheet.create({
   terminalTitle: {
     color: '#38BDF8',
     fontSize: 9.5,
-    fontWeight: '900',
+    fontFamily: 'Poppins_900Black',
     marginBottom: 4,
     letterSpacing: 0.5,
   },
@@ -1182,7 +1271,7 @@ const styles = StyleSheet.create({
   micLevelLabel: {
     color: '#00E5FF',
     fontSize: 9.5,
-    fontWeight: '900',
+    fontFamily: 'Poppins_900Black',
     marginBottom: 4,
   },
   micLevelTrack: {

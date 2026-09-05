@@ -384,9 +384,11 @@ function GlobalCallOverlay() {
       setActiveCall(session);
       if (!session) {
         setIsMinimized(false);
+      } else if (session.status === 'rejected' || session.status === 'ended') {
+        setIsMinimized(false);
       } else if (session.status === 'connected') {
         if (Platform.OS === 'android' && NativeModules.TelecomModule?.startOngoingCall) {
-          NativeModules.TelecomModule.startOngoingCall(session.callerName || 'SYNKING Call').catch(() => {});
+          NativeModules.TelecomModule.startOngoingCall(session.callerName || 'Synkin Call').catch(() => {});
         }
       }
     });
@@ -406,7 +408,13 @@ function GlobalCallOverlay() {
       const targetId = session.callerId === currentUser.id ? session.receiverId : session.callerId;
       if (targetId) {
         const isConnected = session.status === 'connected' || session.durationSeconds > 0;
-        const durText = session.durationSeconds > 0 ? durationFormatted : (isConnected ? '00:01' : 'Missed');
+        const durText = session.durationSeconds > 0
+          ? durationFormatted
+          : isConnected
+          ? '00:01'
+          : session.status === 'rejected'
+          ? 'Declined'
+          : 'Missed';
         const callLogText =
           session.type === 'video'
             ? `📹 Video Call · ${durText}`

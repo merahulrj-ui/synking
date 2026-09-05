@@ -52,6 +52,7 @@ class WebRTCManager {
   public iceStatus: string = 'disconnected';
   private isSwitchingCamera: boolean = false;
   private iceDisconnectTimer: any = null;
+  private declineDismissTimer: any = null;
 
   constructor() {
     // Listen for Targeted Real-Time Call Signaling from peer
@@ -109,16 +110,16 @@ class WebRTCManager {
           await this.addIceCandidate(payload.candidate);
         }
       } else if (type === 'CALL_REJECTED' && payload) {
-        if (this.currentSession && this.currentSession.id === payload.callId) {
-          CallDebugger.logStage('CALL_REJECTED', 'INFO', { callId: payload.callId });
-          this.log('❌ Call rejected by peer.');
-          this.cleanup();
+        if (this.currentSession && (!payload.callId || this.currentSession.id === payload.callId)) {
+          this.handleCallDeclined();
         }
       } else if (type === 'CALL_ENDED' && payload) {
         if (this.currentSession && (!payload.callId || this.currentSession.id === payload.callId)) {
-          CallDebugger.logStage('CALL_ENDED', 'INFO', { callId: payload.callId });
-          this.log('🛑 Call ended by peer.');
-          this.cleanup();
+          if (this.currentSession.status === 'calling' || this.currentSession.status === 'ringing') {
+            this.handleCallDeclined();
+          } else {
+            this.handleCallEnded();
+          }
         }
       } else if (type === 'CALL_UPGRADED_TO_VIDEO' && payload) {
         if (this.currentSession && this.currentSession.id === payload.callId) {
@@ -357,6 +358,10 @@ class WebRTCManager {
 
   // 5. End Ongoing Call
   public endCall(): { session: CallSession; durationFormatted: string } | null {
+    if (this.declineDismissTimer) {
+      clearTimeout(this.declineDismissTimer);
+      this.declineDismissTimer = null;
+    }
     if (!this.currentSession) { this.cleanup(); return null; }
     const sessionCopy = { ...this.currentSession };
     const durationFormatted = this.formatDuration(sessionCopy.durationSeconds);
@@ -900,7 +905,76 @@ class WebRTCManager {
     } catch (e) {}
   }
 
+  public handleCallDeclined() {
+    if (!this.currentSession) return;
+    this.log('❌ Call was declined by recipient.');
+    CallDebugger.logStage('CALL_DECLINED', 'INFO', { callId: this.currentSession.id });
+
+    // 1. Instantly stop outgoing ringtone, ringback, and any vibrations
+    RingtoneService.stop();
+    try {
+      const { Vibration } = require('react-native');
+      Vibration.cancel();
+      // Distinct double vibration pulse to alert caller of call decline
+      Vibration.vibrate([0, 150, 100, 150]);
+    } catch (e) {}
+
+    // 2. Stop 35s ringing timeout and duration timers
+    this.cleanupTimers();
+
+    // 3. Immediately close peer connection & stop media tracks (turn off mic & camera)
+    this.cleanupPeerConnectionOnly();
+
+    // 4. Update session status to 'rejected' and notify UI components
+    this.currentSession.status = 'rejected';
+    this.notify();
+
+    // 5. Hold visual "Call Declined" screen for 2.5s before graceful auto-dismiss
+    if (this.declineDismissTimer) {
+      clearTimeout(this.declineDismissTimer);
+    }
+    this.declineDismissTimer = setTimeout(() => {
+      this.declineDismissTimer = null;
+      this.cleanup();
+    }, 2500);
+  }
+
+  public handleCallEnded() {
+    if (!this.currentSession) return;
+    this.log('🛑 Call ended by peer.');
+    CallDebugger.logStage('CALL_ENDED', 'INFO', { callId: this.currentSession.id });
+
+    // 1. Instantly stop all audio & ringtones
+    RingtoneService.stop();
+    try {
+      const { Vibration } = require('react-native');
+      Vibration.cancel();
+      Vibration.vibrate(150);
+    } catch (e) {}
+
+    // 2. Stop timers and release peer connection
+    this.cleanupTimers();
+    this.cleanupPeerConnectionOnly();
+
+    // 3. Update session status to 'ended' and notify UI
+    this.currentSession.status = 'ended';
+    this.notify();
+
+    // 4. Hold "Call Ended" state for 1.8s before auto-dismiss
+    if (this.declineDismissTimer) {
+      clearTimeout(this.declineDismissTimer);
+    }
+    this.declineDismissTimer = setTimeout(() => {
+      this.declineDismissTimer = null;
+      this.cleanup();
+    }, 1800);
+  }
+
   private cleanup() {
+    if (this.declineDismissTimer) {
+      clearTimeout(this.declineDismissTimer);
+      this.declineDismissTimer = null;
+    }
     if (this.isCleaningUp) return;
     this.isCleaningUp = true;
     try {

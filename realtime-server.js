@@ -1962,8 +1962,9 @@ const server = http.createServer((req, res) => {
 
         console.log(`✅ [NATIVE_CALL_SIGNAL_RELAYED] ${signalType} delivered to WebSocket clients (delivered=${delivered})`);
 
-        // If CALL_REJECTED or CALL_ENDED, also send silent push to cancel any ringing
-        if (signalType === 'CALL_REJECTED' || signalType === 'CALL_ENDED') {
+        // If CALL_ENDED, send silent push to cancel any ringing or notify missed call
+        // If CALL_REJECTED, caller is actively waiting in real-time WebSocket — suppress unnecessary push
+        if (signalType === 'CALL_ENDED') {
           if (targetUserId) {
             const callerName = parsed.callerName || (parsed.payload && parsed.payload.callerName) || '';
             sendCallPushNotification(targetUserId, { callId, callerId: senderId, callerName }, true);

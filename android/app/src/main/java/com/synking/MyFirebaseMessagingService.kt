@@ -97,11 +97,22 @@ class MyFirebaseMessagingService : FirebaseMessagingService() {
             val wasAnswered = CallState.wasCallAnswered(this, callId)
             val savedPending = PendingCallStore.get(this)
 
-            // 1. Stop native ringtone & vibration instantly!
+            // 1. IF THIS DEVICE WAS NOT RINGING AS RECEIVER (savedPending is null or callId mismatch),
+            // this is an outgoing caller device or unrelated event.
+            // DO NOT kill the caller's call screen (handled gracefully by WebRTC in JS) and DO NOT post Missed Call!
+            if (savedPending == null || savedPending.callId != callId) {
+                CallState.clear(this@MyFirebaseMessagingService, callId)
+                PendingCallStore.clear(this@MyFirebaseMessagingService)
+                CallIntentModule.clear()
+                debug("FCM_CALL_ENDED", "OK", "No pending incoming ringing call for callId=$callId on this device. Suppressing FCM termination and Missed Call notification.")
+                return
+            }
+
+            // 2. Stop native ringtone & vibration instantly for incoming call recipient!
             IncomingCallActivity.stopRingtoneGlobally()
             CallConnectionManager.endCall()
 
-            // 2. Directly dismiss open call activity with zero latency
+            // 3. Directly dismiss open incoming call activity with zero latency
             TelecomModule.incomingActivityInstance?.let { activity ->
                 activity.runOnUiThread {
                     try {
@@ -111,31 +122,21 @@ class MyFirebaseMessagingService : FirebaseMessagingService() {
                 }
             }
 
-            // 3. Cancel the ringing incoming call notification
+            // 4. Cancel the ringing incoming call notification
             val notificationManager = getSystemService(Context.NOTIFICATION_SERVICE) as NotificationManager
             notificationManager.cancel(NOTIFICATION_ID)
             notificationManager.cancelAll()
             
-            // 4. Broadcast to close any open call screen immediately
+            // 5. Broadcast to close ringing incoming call screen
             sendBroadcast(Intent("com.synking.CLOSE_CALL_SCREEN"))
             sendBroadcast(Intent("com.synking.CALL_ENDED_FROM_JS"))
 
-            // 5. If call was already answered and connected, DO NOT post Missed Call notification!
+            // 6. If call was already answered and connected, DO NOT post Missed Call notification!
             if (wasAnswered) {
                 CallState.clear(this@MyFirebaseMessagingService, callId)
                 PendingCallStore.clear(this@MyFirebaseMessagingService)
                 CallIntentModule.clear()
                 debug("FCM_CALL_ENDED", "OK", "Call was previously answered and connected. Missed call notification suppressed.")
-                return
-            }
-
-            // 6. IF THIS DEVICE WAS NOT RINGING AS RECEIVER (savedPending is null or callId mismatch), DO NOT post Missed Call!
-            // Outgoing callers never have a savedPending incoming call.
-            if (savedPending == null || savedPending.callId != callId) {
-                CallState.clear(this@MyFirebaseMessagingService, callId)
-                PendingCallStore.clear(this@MyFirebaseMessagingService)
-                CallIntentModule.clear()
-                debug("FCM_CALL_ENDED", "OK", "No pending incoming ringing call for callId=$callId on this device. Suppressing Missed Call notification.")
                 return
             }
 
