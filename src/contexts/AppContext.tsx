@@ -1,4 +1,4 @@
-import React, { createContext, useContext, useState, useEffect, useRef } from 'react';
+import React, { createContext, useContext, useState, useEffect, useRef, useCallback } from 'react';
 import { Alert, Platform } from 'react-native';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { UserProfile, SynkRequest, Venue, DateBooking, ChatMessage, SafetyContact } from '../types';
@@ -260,7 +260,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     });
   }, []);
 
-  const markChatAsRead = (partnerId: string) => {
+  const markChatAsRead = useCallback((partnerId: string) => {
     if (!partnerId) return;
     const now = Date.now();
     const cleanId = String(partnerId).trim();
@@ -279,7 +279,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       if (cleanDigits) next.delete(cleanDigits);
       return next;
     });
-  };
+  }, []);
 
   // Recalculate unreadChatIds whenever messages or readChatTimestamps change
   useEffect(() => {
@@ -330,9 +330,19 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
           }
         }
       }
+      if (prev.size === combined.size) {
+        let same = true;
+        for (const item of combined) {
+          if (!prev.has(item)) {
+            same = false;
+            break;
+          }
+        }
+        if (same) return prev;
+      }
       return combined;
     });
-  }, [messages, readChatTimestamps, currentUser]);
+  }, [messages, readChatTimestamps, currentUser?.id]);
 
   const [safetyContact, setSafetyContact] = useState<SafetyContact>({
     name: 'Emergency Contact',

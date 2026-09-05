@@ -110,7 +110,7 @@ export default function ChatScreen() {
     if (id) {
       markChatAsRead(id);
     }
-  }, [id, markChatAsRead]);
+  }, [id]);
   const [inputText, setInputText] = useState('');
   const [selectedMsgForAction, setSelectedMsgForAction] = useState<ChatMessage | null>(null);
   const [activeCall, setActiveCall] = useState<CallSession | null>(null);
