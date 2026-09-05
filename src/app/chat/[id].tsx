@@ -1431,13 +1431,105 @@ const VOICE_COMPRESSED_CONFIG: any = {
       return;
     }
 
-    // 🚀 DIRECT CALLING UNLOCKED FOR TESTING:
-    // (Approval window & VIP gating revoked and moved to Coming Soon as requested)
-    WebRTCService.startCall({
+    if (isSuspended && suspendedUntil && Date.now() < suspendedUntil) {
+      const unlockStr = new Date(suspendedUntil).toLocaleString();
+      const msg = `Your ENTIRE account is temporarily suspended for 3 days.\n\n🔒 Voice & Video calls unlock on: \n${unlockStr}`;
+      if (Platform.OS === 'web') {
+        window.alert(`🚫 Calls Disabled\n\n${msg}`);
+      } else {
+        Alert.alert('🚫 Calls Disabled', msg, [{ text: 'OK' }]);
+      }
+      return;
+    }
+
+    // 1. Check if 15-minute calling window is currently active
+    const isWindowActive = callWindowActiveUntil && Date.now() < callWindowActiveUntil;
+
+    if (isWindowActive) {
+      if (isUserCaller) {
+        // Active window & this user is the requester -> Start WebRTC Call immediately!
+        WebRTCService.startCall({
+          callerUser: currentUser,
+          targetUser,
+          type,
+        });
+      } else {
+        // Approver tapped call button during active window:
+        Alert.alert(
+          '⏳ Waiting for Call',
+          `You approved ${targetUser.name}'s call request. Please wait for ${targetUser.name} to initiate the call!`,
+          [{ text: 'OK' }]
+        );
+      }
+      return;
+    }
+
+    // 2. Window is NOT active. Check VIP / Calling Pass.
+    if (!currentUser.isVip) {
+      const title = '👑 VIP Calling Pass Required';
+      const msg = `Direct Voice & Video calling requires a VIP Calling Pass plus mutual approval from ${targetUser.name}.\n\nWould you like to send a Call Request to ${targetUser.name} or view VIP Plans?`;
+      if (Platform.OS === 'web') {
+        const sendReq = window.confirm(`${title}\n\n${msg}\n\nClick OK to send Call Request, or Cancel to check VIP plans.`);
+        if (sendReq) {
+          handleSendCallRequest(type);
+        } else {
+          router.push('/vip-membership');
+        }
+      } else {
+        Alert.alert(title, msg, [
+          { text: 'Cancel', style: 'cancel' },
+          { text: 'Send Request 📩', onPress: () => handleSendCallRequest(type) },
+          { text: 'View VIP Plans 👑', onPress: () => router.push('/vip-membership') }
+        ]);
+      }
+      return;
+    }
+
+    // 3. User is VIP: Send Call Request for mutual approval to open the 15-minute window
+    const title = '📞 Mutual Call Approval';
+    const msg = `To ensure member comfort & privacy, calls open in a dedicated 15-minute window upon ${targetUser.name}'s approval.\n\nSend a ${type === 'video' ? 'Video' : 'Voice'} Call request to ${targetUser.name}?`;
+    if (Platform.OS === 'web') {
+      const proceed = window.confirm(`${title}\n\n${msg}`);
+      if (proceed) handleSendCallRequest(type);
+    } else {
+      Alert.alert(title, msg, [
+        { text: 'Cancel', style: 'cancel' },
+        { text: 'Send Call Request 📞', onPress: () => handleSendCallRequest(type) }
+      ]);
+    }
+  };
+
+  const handleSendCallRequest = (type: 'audio' | 'video' = 'audio') => {
+    if (!currentUser || !id) return;
+    const reqText = `📞 [Call Request: ${type === 'video' ? 'Video Call' : 'Voice Call'}]`;
+    const extra = {
+      requestedBy: currentUser.id,
+      callType: type,
+      timestamp: Date.now(),
+      status: 'pending',
+    };
+
+    setCallRequesterId(currentUser.id);
+    AsyncStorage.setItem(`synking_call_requester_${id}`, currentUser.id).catch(() => {});
+
+    sendMessage(id, reqText, 'call_request', extra);
+
+    RealtimeBridge.broadcast('CALL_REQUEST', {
       callerUser: currentUser,
-      targetUser,
-      type,
-    });
+      partnerId: id,
+      callType: type,
+      requesterId: currentUser.id,
+    }, id);
+
+    if (Platform.OS !== 'web') {
+      Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success).catch(() => {});
+    }
+
+    Alert.alert(
+      '📩 Call Request Sent!',
+      `Call request sent to ${targetUser?.name || 'them'}. A 15-minute calling window will open once approved!`,
+      [{ text: 'OK' }]
+    );
   };
 
   const handleApproveCallRequest = () => {
@@ -1588,6 +1680,11 @@ const VOICE_COMPRESSED_CONFIG: any = {
             activeOpacity={0.75}
           >
             <Ionicons name="videocam" size={20} color="#FD3A73" />
+            {!currentUser?.isVip && (
+              <View style={styles.vipMiniBadge}>
+                <Text style={styles.vipMiniBadgeText}>VIP</Text>
+              </View>
+            )}
           </TouchableOpacity>
 
           {/* Voice Call Icon */}
@@ -1597,6 +1694,11 @@ const VOICE_COMPRESSED_CONFIG: any = {
             activeOpacity={0.75}
           >
             <Ionicons name="call" size={18} color="#FD3A73" />
+            {!currentUser?.isVip && (
+              <View style={styles.vipMiniBadge}>
+                <Text style={styles.vipMiniBadgeText}>VIP</Text>
+              </View>
+            )}
           </TouchableOpacity>
 
           {/* Plan Date Action */}
@@ -1637,6 +1739,39 @@ const VOICE_COMPRESSED_CONFIG: any = {
           </View>
           <Text style={styles.datePassAction}>View 🎟️</Text>
         </TouchableOpacity>
+      )}
+
+      {/* 3.1 ACTIVE 15-MINUTE CALLING WINDOW BANNER */}
+      {callWindowActiveUntil && Date.now() < callWindowActiveUntil && (
+        <View style={styles.activeCallWindowBanner}>
+          <LinearGradient
+            colors={['#059669', '#10B981', '#34D399']}
+            start={{ x: 0, y: 0 }}
+            end={{ x: 1, y: 0 }}
+            style={styles.activeCallWindowGradient}
+          >
+            <Ionicons name="call" size={16} color="#FFFFFF" />
+            <Text style={styles.activeCallWindowText} numberOfLines={1}>
+              🟢 Calling Window: {Math.floor(callWindowRemainingSecs / 60)}:{(callWindowRemainingSecs % 60).toString().padStart(2, '0')}
+            </Text>
+            {isUserCaller ? (
+              <TouchableOpacity
+                style={styles.activeCallNowMiniBtn}
+                onPress={() => handleStartCall('audio')}
+                activeOpacity={0.85}
+              >
+                <Text style={styles.activeCallNowMiniBtnText}>CALL NOW 📞</Text>
+              </TouchableOpacity>
+            ) : (
+              <View style={styles.activeCallWaitingMiniPill}>
+                <Ionicons name="time" size={12} color="#FFFFFF" />
+                <Text style={styles.activeCallWaitingMiniText}>
+                  Waiting for {targetUser?.name || 'them'} ⏳
+                </Text>
+              </View>
+            )}
+          </LinearGradient>
+        </View>
       )}
 
       {/* 4. CHAT THREAD & MATCH HERO */}
@@ -1721,22 +1856,82 @@ const VOICE_COMPRESSED_CONFIG: any = {
             }
 
             if (isCallRequestMsg) {
+              const requestedBy = item.extraData?.requestedBy || (isMine ? currentUser?.id : id);
+              const isITheRequester = currentUser?.id && isSameUser(requestedBy, currentUser.id);
+              const isWindowLive = callWindowActiveUntil && Date.now() < callWindowActiveUntil;
+              const isApproved = item.extraData?.status === 'approved' || isWindowLive;
+
               return (
-                <View style={[styles.callRequestCard, { backgroundColor: isDarkMode ? '#13141F' : '#F1F5F9', borderColor: isDarkMode ? '#334155' : '#CBD5E1', paddingVertical: 12 }]}>
+                <View style={[styles.callRequestCard, { backgroundColor: isDarkMode ? '#13141F' : '#F1F5F9', borderColor: isApproved ? '#10B981' : (isDarkMode ? '#334155' : '#CBD5E1') }]}>
                   <View style={styles.callRequestHeader}>
-                    <Ionicons name="call" size={16} color="#10B981" />
-                    <Text style={[styles.callRequestTitle, { color: '#10B981' }]}>DIRECT CALLING READY 📞</Text>
+                    <Ionicons name="call" size={16} color={isApproved ? '#10B981' : '#6366F1'} />
+                    <Text style={[styles.callRequestTitle, { color: isApproved ? '#10B981' : '#6366F1' }]}>
+                      {isApproved ? '🟢 CALL REQUEST APPROVED' : '📞 1-ON-1 CALL REQUEST'}
+                    </Text>
                   </View>
-                  <Text style={[styles.callRequestBody, { color: textColor, fontSize: 12 }]}>
-                    Approval system moved to Coming Soon. Tap below or use the Call icons in the top bar to connect instantly!
+
+                  <Text style={[styles.callRequestBody, { color: textColor }]}>
+                    {isApproved
+                      ? (isITheRequester
+                          ? `Great news! ${targetUser?.name || 'Partner'} approved your call request. A 15-minute calling window is open!`
+                          : `You approved ${targetUser?.name || 'Partner'}'s call request. Waiting for them to call!`)
+                      : (isITheRequester
+                          ? `You requested a ${item.extraData?.callType === 'video' ? 'Video' : 'Voice'} call with ${targetUser?.name || 'Partner'}. Waiting for mutual approval...`
+                          : `${targetUser?.name || 'Partner'} requested a ${item.extraData?.callType === 'video' ? 'Video' : 'Voice'} call with you. Approve to open a 15-minute private calling window:`)}
                   </Text>
-                  <TouchableOpacity
-                    style={[styles.callNowBtn, { backgroundColor: '#10B981', marginTop: 6 }]}
-                    onPress={() => handleStartCall(item.extraData?.callType || 'audio')}
-                    activeOpacity={0.85}
-                  >
-                    <Text style={styles.callNowBtnText}>Call {targetUser?.name || 'Partner'} Directly 📞</Text>
-                  </TouchableOpacity>
+
+                  {/* Actions depending on state & role */}
+                  {isApproved ? (
+                    isITheRequester ? (
+                      <TouchableOpacity
+                        style={styles.callNowBtn}
+                        onPress={() => handleStartCall(item.extraData?.callType || 'audio')}
+                        activeOpacity={0.85}
+                      >
+                        <Text style={styles.callNowBtnText}>CALL NOW 📞</Text>
+                      </TouchableOpacity>
+                    ) : (
+                      <View style={styles.callWaitingCard}>
+                        <Ionicons name="time" size={16} color="#10B981" />
+                        <Text style={styles.callWaitingCardText}>
+                          Waiting for {targetUser?.name || 'them'} to call... ⏳
+                        </Text>
+                      </View>
+                    )
+                  ) : (
+                    !isITheRequester ? (
+                      <View style={styles.callRequestActions}>
+                        <TouchableOpacity
+                          style={styles.callDeclineBtn}
+                          onPress={handleDeclineCallRequest}
+                          activeOpacity={0.8}
+                        >
+                          <Text style={styles.callDeclineBtnText}>Decline</Text>
+                        </TouchableOpacity>
+                        <TouchableOpacity
+                          style={styles.callApproveBtn}
+                          onPress={handleApproveCallRequest}
+                          activeOpacity={0.85}
+                        >
+                          <LinearGradient
+                            colors={['#059669', '#10B981']}
+                            start={{ x: 0, y: 0 }}
+                            end={{ x: 1, y: 0 }}
+                            style={styles.callApproveGradient}
+                          >
+                            <Text style={styles.callApproveBtnText}>Approve (15-Min Window) 🟢</Text>
+                          </LinearGradient>
+                        </TouchableOpacity>
+                      </View>
+                    ) : (
+                      <View style={styles.callRequestFooter}>
+                        <Ionicons name="time-outline" size={14} color="#6366F1" />
+                        <Text style={[styles.callRequestFooterText, { color: subText }]}>
+                          Pending approval from {targetUser?.name || 'them'} · Calls open for 15 mins
+                        </Text>
+                      </View>
+                    )
+                  )}
                 </View>
               );
             }

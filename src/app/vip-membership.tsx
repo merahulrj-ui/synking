@@ -29,9 +29,9 @@ const CATEGORIES: { id: PlanCategory; label: string; icon: string; subtitle: str
   },
   {
     id: 'calling_only',
-    label: '📞 Calling Pass ⏳',
+    label: '📞 Calling Pass',
     icon: 'call',
-    subtitle: 'Calling passes launching soon! Direct 1-on-1 WebRTC calling is currently unlocked for free testing.',
+    subtitle: '1-on-1 HD Video & Audio Calling with mutual approval · 15-min calling window',
   },
   {
     id: 'boost_only',

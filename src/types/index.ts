@@ -110,7 +110,8 @@ export interface ChatMessage {
     qrCode?: string;
     callType?: 'audio' | 'video';
     callDuration?: string;
-    callStatus?: 'completed' | 'missed' | 'declined';
+    callStatus?: 'completed' | 'missed' | 'declined' | 'pending' | 'approved';
+    status?: 'pending' | 'approved' | 'declined' | string;
     audioUrl?: string;
     audioDuration?: number;
     reaction?: string;
