@@ -470,6 +470,15 @@ export default function ProfileScreen() {
               onPress={() => setAuthModalVisible(true)} 
             />
 
+            <View style={{ alignItems: 'center', justifyContent: 'center', marginTop: 10, gap: 3 }}>
+              <Text style={{ color: subText, fontSize: 9.5, fontFamily: 'Poppins_700Bold', letterSpacing: 1.2, textTransform: 'uppercase' }}>
+                A Product of
+              </Text>
+              <Text style={{ color: textColor, fontSize: 12, fontFamily: 'Poppins_900Black', letterSpacing: 1.2 }}>
+                ⚡ JAYANTI CYBERNETICS ⚡
+              </Text>
+            </View>
+
             <AuthModal 
               visible={authModalVisible}
               onClose={() => setAuthModalVisible(false)}
@@ -945,6 +954,27 @@ export default function ProfileScreen() {
               </View>
               <Text style={{ color: subText, fontSize: 11, fontFamily: 'Poppins_600SemiBold' }}>
                 P2P Ultra-Fast HD Calling Engine 🚀
+              </Text>
+            </View>
+
+            {/* 🛡️ Jayanti Cybernetics Official Signature Badge */}
+            <View style={{ alignItems: 'center', justifyContent: 'center', marginTop: 16, marginBottom: 12, gap: 5 }}>
+              <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6, opacity: 0.85 }}>
+                <Ionicons name="hardware-chip-outline" size={13} color="#00E5FF" />
+                <Text style={{ color: subText, fontSize: 10, fontFamily: 'Poppins_700Bold', letterSpacing: 1.5, textTransform: 'uppercase' }}>
+                  A Signature Innovation By
+                </Text>
+              </View>
+              <Text style={{ 
+                color: textColor, 
+                fontSize: 14, 
+                fontFamily: 'Poppins_900Black', 
+                letterSpacing: 1.5,
+              }}>
+                ⚡ JAYANTI CYBERNETICS ⚡
+              </Text>
+              <Text style={{ color: subText, fontSize: 10.5, fontFamily: 'Poppins_500Medium', letterSpacing: 0.3, opacity: 0.8 }}>
+                Forging Next-Gen High-Frequency Human Connections
               </Text>
             </View>
 

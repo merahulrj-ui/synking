@@ -136,6 +136,8 @@ class CallActivity : ReactActivity() {
         try {
             unregisterReceiver(callEndedReceiver)
         } catch (e: Exception) {}
+    }
+
     override fun onUserLeaveHint() {
         super.onUserLeaveHint()
         try {
