@@ -34,6 +34,8 @@ interface AppContextType {
   sentRequests: SynkRequest[];
   passedProfiles: Set<string>;
   venues: Venue[];
+  wishlistVenueIds: Set<string>;
+  toggleVenueWishlist: (venueId: string) => void;
   activeBookings: DateBooking[];
   messages: Record<string, ChatMessage[]>;
   safetyContact: SafetyContact;
@@ -208,6 +210,35 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
   const [acceptedMatchAlert, setAcceptedMatchAlert] = useState<UserProfile | null>(null);
   const seenMatchAlerts = useRef<Set<string>>(new Set());
   const [venues] = useState<Venue[]>(MOCK_VENUES);
+  const [wishlistVenueIds, setWishlistVenueIds] = useState<Set<string>>(new Set());
+
+  // Load wishlist from AsyncStorage on mount
+  useEffect(() => {
+    AsyncStorage.getItem('synking_venue_wishlist').then(stored => {
+      if (stored) {
+        try {
+          const parsed = JSON.parse(stored);
+          if (Array.isArray(parsed)) {
+            setWishlistVenueIds(new Set(parsed));
+          }
+        } catch (e) {}
+      }
+    });
+  }, []);
+
+  const toggleVenueWishlist = (venueId: string) => {
+    setWishlistVenueIds(prev => {
+      const next = new Set(prev);
+      if (next.has(venueId)) {
+        next.delete(venueId);
+      } else {
+        next.add(venueId);
+      }
+      AsyncStorage.setItem('synking_venue_wishlist', JSON.stringify(Array.from(next))).catch(() => {});
+      return next;
+    });
+  };
+
   const [activeBookings, setActiveBookings] = useState<DateBooking[]>([]);
   const [messages, setMessages] = useState<Record<string, ChatMessage[]>>({});
 
@@ -1069,6 +1100,8 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
         sentRequests,
         passedProfiles,
         venues,
+        wishlistVenueIds,
+        toggleVenueWishlist,
         activeBookings,
         messages,
         safetyContact,

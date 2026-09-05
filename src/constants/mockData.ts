@@ -112,5 +112,48 @@ export const MOCK_VENUES: Venue[] = [
     isVerifiedSafe: true,
     perks: 'Couple Pottery Kit & Aprons Included',
     tag: 'Break the Ice 🎨'
+  },
+  {
+    id: 'venue_6',
+    name: 'Cyber Hub Social & Lounge',
+    category: 'Casual Foodie',
+    rating: 4.9,
+    reviewsCount: 1120,
+    priceForTwo: '₹1,500 for two',
+    address: 'DLF Cyber Hub, Gurugram',
+    distance: '2.4 km',
+    image: 'https://images.unsplash.com/photo-1572116469696-31de0f17cc34?w=800&auto=format&fit=crop&q=80',
+    isVerifiedSafe: true,
+    perks: '15% Off Total Bill + Priority Reserved Seating',
+    tag: 'Buzzing Energy & Bites 🍹'
+  },
+  {
+    id: 'venue_7',
+    name: 'Perch Wine & Coffee Bar',
+    category: 'Rooftop & Cocktails',
+    rating: 4.9,
+    reviewsCount: 680,
+    priceForTwo: '₹2,000 for two',
+    address: 'Khan Market, Mid Circle',
+    distance: '3.1 km',
+    image: 'https://images.unsplash.com/photo-1543007630-9710e4a00a20?w=800&auto=format&fit=crop&q=80',
+    isVerifiedSafe: true,
+    perks: 'Complimentary Glass of Sangria for Both',
+    tag: 'Chic & Intimate Vibe 🍷'
+  },
+  {
+    id: 'venue_8',
+    name: 'Mystery Rooms Escape Lounge',
+    category: 'Activity Date',
+    rating: 4.8,
+    reviewsCount: 390,
+    priceForTwo: '₹1,600 for two',
+    address: 'Connaught Place, M-Block',
+    distance: '1.5 km',
+    image: 'https://images.unsplash.com/photo-1511512578047-dfb367046420?w=800&auto=format&fit=crop&q=80',
+    isVerifiedSafe: true,
+    perks: 'Mission Duo Pass + Free Digital Polaroid Photo',
+    tag: 'Thrilling Teamwork 🗝️'
   }
 ];
+
