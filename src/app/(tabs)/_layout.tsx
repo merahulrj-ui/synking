@@ -14,7 +14,7 @@ import { CallSession } from '../../types';
 export default function TabsLayout() {
   const insets = useSafeAreaInsets();
   const safeBottom = Math.max(insets.bottom, Platform.OS === 'android' ? 14 : 10);
-  const { isDarkMode, incomingRequests, currentUser, acceptedMatchAlert, clearAcceptedMatchAlert, isSuspended, suspendedUntil } = useApp();
+  const { isDarkMode, incomingRequests, currentUser, acceptedMatchAlert, clearAcceptedMatchAlert, isSuspended, suspendedUntil, unreadChatIds } = useApp();
   const [activeCall, setActiveCall] = React.useState<CallSession | null>(null);
   const [timeLeft, setTimeLeft] = React.useState<string>('');
   const [unreadChatCount, setUnreadChatCount] = React.useState<number>(0);
@@ -177,9 +177,9 @@ export default function TabsLayout() {
             tabBarIcon: ({ focused, color }) => (
               <View style={{ position: 'relative' }}>
                 <Ionicons name={focused ? 'chatbubbles' : 'chatbubbles-outline'} size={24} color={color} />
-                {unreadChatCount > 0 && (
+                {(unreadChatCount > 0 || unreadChatIds.size > 0) && (
                   <View style={styles.tabBadge}>
-                    <Text style={styles.tabBadgeText}>{unreadChatCount}</Text>
+                    <Text style={styles.tabBadgeText}>{Math.max(unreadChatCount, unreadChatIds.size)}</Text>
                   </View>
                 )}
               </View>

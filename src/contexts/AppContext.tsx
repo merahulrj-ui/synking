@@ -38,6 +38,8 @@ interface AppContextType {
   toggleVenueWishlist: (venueId: string) => void;
   activeBookings: DateBooking[];
   messages: Record<string, ChatMessage[]>;
+  unreadChatIds: Set<string>;
+  markChatAsRead: (partnerId: string) => void;
   safetyContact: SafetyContact;
   acceptedMatchAlert: UserProfile | null;
   clearAcceptedMatchAlert: () => void;
@@ -241,6 +243,96 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
 
   const [activeBookings, setActiveBookings] = useState<DateBooking[]>([]);
   const [messages, setMessages] = useState<Record<string, ChatMessage[]>>({});
+  const [readChatTimestamps, setReadChatTimestamps] = useState<Record<string, number>>({});
+  const [unreadChatIds, setUnreadChatIds] = useState<Set<string>>(new Set());
+
+  // Load chat read timestamps from AsyncStorage on mount
+  useEffect(() => {
+    AsyncStorage.getItem('synking_chat_read_timestamps').then(stored => {
+      if (stored) {
+        try {
+          const parsed = JSON.parse(stored);
+          if (parsed && typeof parsed === 'object') {
+            setReadChatTimestamps(parsed);
+          }
+        } catch (e) {}
+      }
+    });
+  }, []);
+
+  const markChatAsRead = (partnerId: string) => {
+    if (!partnerId) return;
+    const now = Date.now();
+    const cleanId = String(partnerId).trim();
+    const cleanDigits = cleanId.replace(/\D/g, '').slice(-10);
+
+    setReadChatTimestamps(prev => {
+      const next = { ...prev, [cleanId]: now };
+      if (cleanDigits) next[cleanDigits] = now;
+      AsyncStorage.setItem('synking_chat_read_timestamps', JSON.stringify(next)).catch(() => {});
+      return next;
+    });
+
+    setUnreadChatIds(prev => {
+      const next = new Set(prev);
+      next.delete(cleanId);
+      if (cleanDigits) next.delete(cleanDigits);
+      return next;
+    });
+  };
+
+  // Recalculate unreadChatIds whenever messages or readChatTimestamps change
+  useEffect(() => {
+    if (!currentUser) return;
+    const myId = currentUser.id;
+    const myPhone = (currentUser.phoneNumber || '').replace(/\D/g, '').slice(-10);
+
+    const newUnread = new Set<string>();
+
+    Object.entries(messages).forEach(([partnerId, thread]) => {
+      if (!Array.isArray(thread) || thread.length === 0) return;
+      const last = thread[thread.length - 1];
+      if (!last) return;
+
+      const isFromMe =
+        last.senderId === myId ||
+        (myPhone && last.senderId.replace(/\D/g, '').slice(-10) === myPhone);
+
+      if (!isFromMe) {
+        const pDigits = partnerId.replace(/\D/g, '').slice(-10);
+        const readTime = Math.max(
+          readChatTimestamps[partnerId] || 0,
+          (pDigits ? readChatTimestamps[pDigits] : 0) || 0
+        );
+        const msgTime = last.timestamp ? new Date(last.timestamp).getTime() : 0;
+        if (msgTime > readTime) {
+          newUnread.add(partnerId);
+          if (pDigits) newUnread.add(pDigits);
+        }
+      }
+    });
+
+    setUnreadChatIds(prev => {
+      const combined = new Set([...prev, ...newUnread]);
+      for (const id of combined) {
+        const pDigits = id.replace(/\D/g, '').slice(-10);
+        const readTime = Math.max(
+          readChatTimestamps[id] || 0,
+          (pDigits ? readChatTimestamps[pDigits] : 0) || 0
+        );
+        const thread = messages[id] || (pDigits ? messages[pDigits] : undefined);
+        if (thread && thread.length > 0) {
+          const last = thread[thread.length - 1];
+          const msgTime = last?.timestamp ? new Date(last.timestamp).getTime() : 0;
+          if (readTime >= msgTime) {
+            combined.delete(id);
+            if (pDigits) combined.delete(pDigits);
+          }
+        }
+      }
+      return combined;
+    });
+  }, [messages, readChatTimestamps, currentUser]);
 
   const [safetyContact, setSafetyContact] = useState<SafetyContact>({
     name: 'Emergency Contact',
@@ -441,6 +533,16 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
         if (isIncoming || isOutgoing) {
           // Play Incoming Message Sound/Haptic if we are receiving it from someone else
           if (isIncoming) {
+            // Instantly mark sender as having an unread message
+            const senderKey = String(msg.senderId).trim();
+            setUnreadChatIds(prev => {
+              const next = new Set(prev);
+              next.add(senderKey);
+              const digits = senderKey.replace(/\D/g, '').slice(-10);
+              if (digits) next.add(digits);
+              return next;
+            });
+
             try {
               if (Platform.OS !== 'web') {
                 const Haptics = require('expo-haptics');
@@ -1104,6 +1206,8 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
         toggleVenueWishlist,
         activeBookings,
         messages,
+        unreadChatIds,
+        markChatAsRead,
         safetyContact,
         acceptedMatchAlert,
         clearAcceptedMatchAlert: () => {

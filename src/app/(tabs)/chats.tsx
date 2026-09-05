@@ -84,7 +84,7 @@ function getLastMessageForUser(
 }
 
 export default function ChatsScreen() {
-  const { matches, profiles, messages, currentUser, isDarkMode } = useApp();
+  const { matches, profiles, messages, currentUser, isDarkMode, unreadChatIds, markChatAsRead } = useApp();
   const router = useRouter();
   const [recentChatMap, setRecentChatMap] = React.useState<Record<string, ChatMessage>>({});
 
@@ -237,36 +237,142 @@ export default function ChatsScreen() {
               const displayLastText = formatLastMessageSnippet(lastMsg);
               const timeDisplay = formatChatTime(lastMsg?.timestamp);
 
+              // 1. Detect if this conversation has an unread message
+              const myId = currentUser?.id;
+              const myPhone = (currentUser?.phoneNumber || '').replace(/\D/g, '').slice(-10);
+              const isSentByMe = !!(
+                lastMsg &&
+                (lastMsg.senderId === myId ||
+                  (myPhone && lastMsg.senderId.replace(/\D/g, '').slice(-10) === myPhone))
+              );
+
+              const cleanItemId = String(item.id || '').trim();
+              const cleanItemDigits = String(item.phoneNumber || '').replace(/\D/g, '').slice(-10);
+
+              const isUnread =
+                !isSentByMe &&
+                !!lastMsg &&
+                (unreadChatIds.has(cleanItemId) ||
+                  (cleanItemDigits && unreadChatIds.has(cleanItemDigits)) ||
+                  (lastMsg.senderId && unreadChatIds.has(lastMsg.senderId)) ||
+                  (lastMsg.senderId &&
+                    cleanItemDigits &&
+                    lastMsg.senderId.replace(/\D/g, '').slice(-10) === cleanItemDigits));
+
               return (
                 <TouchableOpacity
-                  style={[styles.chatCard, { backgroundColor: cardBg, borderColor: isDarkMode ? 'rgba(253, 58, 115, 0.22)' : borderColor }]}
-                  onPress={() => router.push(`/chat/${item.id}`)}
+                  style={[
+                    styles.chatCard,
+                    {
+                      backgroundColor: isUnread
+                        ? isDarkMode
+                          ? 'rgba(253, 58, 115, 0.08)'
+                          : '#FFF1F2'
+                        : cardBg,
+                      borderColor: isUnread
+                        ? isDarkMode
+                          ? 'rgba(253, 58, 115, 0.55)'
+                          : '#FD3A73'
+                        : isDarkMode
+                        ? 'rgba(253, 58, 115, 0.22)'
+                        : borderColor,
+                    },
+                    isUnread && {
+                      shadowColor: '#FD3A73',
+                      shadowOffset: { width: 0, height: 4 },
+                      shadowOpacity: 0.35,
+                      shadowRadius: 14,
+                      elevation: 8,
+                    },
+                  ]}
+                  onPress={() => {
+                    markChatAsRead(item.id);
+                    if (item.phoneNumber) markChatAsRead(item.phoneNumber);
+                    router.push(`/chat/${item.id}`);
+                  }}
                   activeOpacity={0.75}
                 >
                   {/* Avatar with Online Indicator */}
                   <View style={styles.avatarWrapper}>
-                    <Image source={{ uri: item.photo }} style={[styles.avatar, { borderColor: isDarkMode ? '#FD3A73' : 'transparent' }]} />
+                    <Image
+                      source={{ uri: item.photo }}
+                      style={[
+                        styles.avatar,
+                        {
+                          borderColor: isUnread
+                            ? '#FD3A73'
+                            : isDarkMode
+                            ? 'rgba(253, 58, 115, 0.4)'
+                            : 'transparent',
+                          borderWidth: isUnread ? 2.5 : 2,
+                        },
+                      ]}
+                    />
                     <View style={styles.onlineDot} />
                   </View>
 
                   {/* Chat Info */}
                   <View style={styles.chatInfo}>
                     <View style={styles.chatTopRow}>
-                      <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
-                        <Text style={[styles.userName, { color: textColor }]}>{item.name}</Text>
+                      <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6, flex: 1 }}>
+                        <Text
+                          style={[
+                            styles.userName,
+                            {
+                              color: isUnread ? (isDarkMode ? '#FFFFFF' : '#0F172A') : textColor,
+                              fontFamily: isUnread ? 'Poppins_900Black' : 'Poppins_700Bold',
+                              fontSize: isUnread ? 16.5 : 16,
+                            },
+                          ]}
+                          numberOfLines={1}
+                        >
+                          {item.name}
+                        </Text>
                         {item.isVerified && (
                           <Ionicons name="shield-checkmark" size={14} color="#00E5FF" />
                         )}
                       </View>
-                      <Text style={[styles.timeText, { color: subText }]}>{timeDisplay}</Text>
+
+                      <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
+                        <Text
+                          style={[
+                            styles.timeText,
+                            {
+                              color: isUnread ? '#FD3A73' : subText,
+                              fontFamily: isUnread ? 'Poppins_700Bold' : 'Poppins_500Medium',
+                            },
+                          ]}
+                        >
+                          {timeDisplay}
+                        </Text>
+                        {isUnread && (
+                          <View style={styles.unreadBadgePill}>
+                            <Text style={styles.unreadBadgePillText}>NEW</Text>
+                          </View>
+                        )}
+                      </View>
                     </View>
 
-                    <Text style={[styles.lastMsgText, { color: subText }]} numberOfLines={1}>
+                    <Text
+                      style={[
+                        styles.lastMsgText,
+                        {
+                          color: isUnread ? (isDarkMode ? '#FFFFFF' : '#0F172A') : subText,
+                          fontFamily: isUnread ? 'Poppins_700Bold' : 'Poppins_400Regular',
+                          fontSize: isUnread ? 13.5 : 13,
+                        },
+                      ]}
+                      numberOfLines={1}
+                    >
                       {displayLastText}
                     </Text>
                   </View>
 
-                  <Ionicons name="chevron-forward" size={16} color={subText} />
+                  <Ionicons
+                    name="chevron-forward"
+                    size={16}
+                    color={isUnread ? '#FD3A73' : subText}
+                  />
                 </TouchableOpacity>
               );
             }}
@@ -369,6 +475,24 @@ const styles = StyleSheet.create({
   lastMsgText: {
     fontFamily: 'Poppins_400Regular',
     fontSize: 13,
+  },
+  unreadBadgePill: {
+    backgroundColor: '#FD3A73',
+    paddingHorizontal: 7,
+    paddingVertical: 2,
+    borderRadius: 8,
+    shadowColor: '#FD3A73',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.5,
+    shadowRadius: 6,
+    elevation: 4,
+  },
+  unreadBadgePillText: {
+    color: '#FFFFFF',
+    fontFamily: 'Poppins_800ExtraBold',
+    fontSize: 9.5,
+    includeFontPadding: false,
+    letterSpacing: 0.5,
   },
   emptyContainer: {
     flex: 1,

@@ -104,7 +104,13 @@ export default function ChatScreen() {
   const insets = useSafeAreaInsets();
   const { id } = useLocalSearchParams<{ id: string }>();
   const router = useRouter();
-  const { matches, profiles, messages, sendMessage, deleteMessage, activeBookings, currentUser, isDarkMode } = useApp();
+  const { matches, profiles, messages, sendMessage, deleteMessage, activeBookings, currentUser, isDarkMode, markChatAsRead } = useApp();
+
+  useEffect(() => {
+    if (id) {
+      markChatAsRead(id);
+    }
+  }, [id, markChatAsRead]);
   const [inputText, setInputText] = useState('');
   const [selectedMsgForAction, setSelectedMsgForAction] = useState<ChatMessage | null>(null);
   const [activeCall, setActiveCall] = useState<CallSession | null>(null);
