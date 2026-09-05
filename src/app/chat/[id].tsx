@@ -1972,35 +1972,37 @@ const VOICE_COMPRESSED_CONFIG: any = {
               const label = isMissed ? (isVideo ? 'Missed Video Call' : 'Missed Call') : (isVideo ? 'Video Call' : 'Voice Call');
 
               return (
-                <TouchableOpacity
-                  style={[
-                    styles.callPill,
-                    {
-                      backgroundColor: isDarkMode ? 'rgba(26, 29, 41, 0.85)' : 'rgba(240, 242, 245, 0.95)',
-                      borderColor: isMissed ? 'rgba(239, 68, 68, 0.35)' : 'rgba(253, 58, 115, 0.25)',
-                    }
-                  ]}
-                  onPress={() => handleStartCall(isVideo ? 'video' : 'audio')}
-                  activeOpacity={0.75}
-                >
-                  <Ionicons
-                    name={isVideo ? 'videocam' : 'call'}
-                    size={13}
-                    color={isMissed ? '#EF4444' : '#FD3A73'}
-                  />
-                  <Text style={[styles.callPillText, { color: isDarkMode ? '#E2E8F0' : '#1E293B' }]}>
-                    {label}{duration ? ` · ${duration}` : ''}
-                  </Text>
-                  <Text style={[styles.callPillTime, { color: subText }]}>
-                    · {formatWhatsAppTime(item.timestamp)}
-                  </Text>
-                  <Ionicons
-                    name="arrow-redo-outline"
-                    size={12}
-                    color={isMissed ? '#EF4444' : '#FD3A73'}
-                    style={{ marginLeft: 2, opacity: 0.8 }}
-                  />
-                </TouchableOpacity>
+                <View style={styles.callPillWrapper}>
+                  <TouchableOpacity
+                    style={[
+                      styles.callPill,
+                      {
+                        backgroundColor: isDarkMode ? 'rgba(30, 41, 59, 0.7)' : 'rgba(241, 245, 249, 0.9)',
+                        borderColor: isMissed ? 'rgba(239, 68, 68, 0.35)' : 'rgba(253, 58, 115, 0.25)',
+                      }
+                    ]}
+                    onPress={() => handleStartCall(isVideo ? 'video' : 'audio')}
+                    activeOpacity={0.75}
+                  >
+                    <Ionicons
+                      name={isVideo ? 'videocam' : 'call'}
+                      size={13}
+                      color={isMissed ? '#EF4444' : '#FD3A73'}
+                    />
+                    <Text style={[styles.callPillText, { color: isDarkMode ? '#E2E8F0' : '#1E293B' }]}>
+                      {label}{duration ? ` · ${duration}` : ''}
+                    </Text>
+                    <Text style={[styles.callPillTime, { color: subText }]}>
+                      · {formatWhatsAppTime(item.timestamp)}
+                    </Text>
+                    <Ionicons
+                      name="arrow-redo-outline"
+                      size={12}
+                      color={isMissed ? '#EF4444' : '#FD3A73'}
+                      style={{ marginLeft: 2, opacity: 0.8 }}
+                    />
+                  </TouchableOpacity>
+                </View>
               );
             }
 
@@ -2799,20 +2801,30 @@ const styles = StyleSheet.create({
     fontFamily: 'Poppins_500Medium',
     fontSize: 10,
   },
+  callPillWrapper: {
+    width: '100%',
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginVertical: 6,
+  },
   callPill: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: 8,
-    marginTop: 4,
+    alignSelf: 'center',
+    gap: 6,
+    paddingVertical: 5,
+    paddingHorizontal: 12,
+    borderRadius: 20,
+    borderWidth: 1,
   },
   callPillText: {
     fontFamily: 'Poppins_600SemiBold',
-    fontSize: 11.5,
+    fontSize: 11,
     letterSpacing: 0.1,
   },
   callPillTime: {
     fontFamily: 'Poppins_400Regular',
-    fontSize: 10,
+    fontSize: 9.5,
   },
   typingRow: {
     flexDirection: 'row',

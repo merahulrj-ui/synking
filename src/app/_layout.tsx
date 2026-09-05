@@ -405,10 +405,12 @@ function GlobalCallOverlay() {
       const { session, durationFormatted } = result;
       const targetId = session.callerId === currentUser.id ? session.receiverId : session.callerId;
       if (targetId) {
+        const isConnected = session.status === 'connected' || session.durationSeconds > 0;
+        const durText = session.durationSeconds > 0 ? durationFormatted : (isConnected ? '00:01' : 'Missed');
         const callLogText =
           session.type === 'video'
-            ? `📹 Video Call · ${session.durationSeconds > 0 ? durationFormatted : 'Missed'}`
-            : `📞 Voice Call · ${session.durationSeconds > 0 ? durationFormatted : 'Missed'}`;
+            ? `📹 Video Call · ${durText}`
+            : `📞 Voice Call · ${durText}`;
         sendMessage(targetId, callLogText, 'text');
       }
     }
@@ -419,13 +421,13 @@ function GlobalCallOverlay() {
   };
 
   const handleMinimizeToChat = () => {
-    if (!activeCall || !currentUser) return;
-    const partnerId = activeCall.callerId === currentUser.id ? activeCall.receiverId : activeCall.callerId;
+    if (!activeCall) return;
+    const partnerId = activeCall.callerId === currentUser?.id ? activeCall.receiverId : activeCall.callerId;
     if (Platform.OS === 'android' && NativeModules.TelecomModule?.openChatFromCall && partnerId) {
       NativeModules.TelecomModule.openChatFromCall(partnerId).catch(() => {});
     }
     setIsMinimized(true);
-    if (partnerId) {
+    if (partnerId && currentUser) {
       router.push(`/chat/${partnerId}`);
     }
   };

@@ -192,5 +192,26 @@ class MainActivity : ReactActivity() {
         "callId=$callId caller=$callerName type=$callType autoAccept=$autoAccept"
     )
   }
+
+  override fun onUserLeaveHint() {
+    super.onUserLeaveHint()
+    try {
+      if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O && CallState.wasCallAnswered(this)) {
+        val aspectRatio = android.util.Rational(9, 16)
+        val pipParams = android.app.PictureInPictureParams.Builder()
+            .setAspectRatio(aspectRatio)
+            .build()
+        enterPictureInPictureMode(pipParams)
+        android.util.Log.d("SYNKING_PIP", "Entered native Android Picture-in-Picture mode successfully!")
+      }
+    } catch (e: Exception) {
+      android.util.Log.w("SYNKING_PIP", "enterPictureInPictureMode hint failed: ${e.message}")
+    }
+  }
+
+  override fun onPictureInPictureModeChanged(isInPictureInPictureMode: Boolean, newConfig: android.content.res.Configuration) {
+    super.onPictureInPictureModeChanged(isInPictureInPictureMode, newConfig)
+    android.util.Log.d("SYNKING_PIP", "onPictureInPictureModeChanged: isInPictureInPictureMode=$isInPictureInPictureMode")
+  }
 }
 

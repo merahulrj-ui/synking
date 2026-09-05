@@ -1,5 +1,5 @@
 import React, { useRef, useEffect, useState } from 'react';
-import { View, Text, StyleSheet, Modal, TouchableOpacity, Image, Platform, ScrollView, Share, Animated, PanResponder, Vibration, NativeModules } from 'react-native';
+import { View, Text, StyleSheet, Modal, TouchableOpacity, Image, Platform, ScrollView, Share, Animated, PanResponder, Vibration, NativeModules, BackHandler } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { LinearGradient } from 'expo-linear-gradient';
 import { CallSession } from '../types';
@@ -195,6 +195,23 @@ export const CallModal: React.FC<Props> = ({ session, onEndCall, onAcceptCall, o
       AudioRouteService.setProximitySensorEnabled(false);
     };
   }, [session.status, session.type, session.isSpeakerOn]);
+
+  // 📱 Android Back Button Minimization Hook (WhatsApp / Meet Style)
+  useEffect(() => {
+    if (Platform.OS !== 'android') return;
+    const onBackPress = () => {
+      if (session.status === 'connected' || session.status === 'calling') {
+        if (onMinimize) {
+          onMinimize();
+          return true; // Handled, prevent app close
+        }
+      }
+      return false;
+    };
+
+    const sub = BackHandler.addEventListener('hardwareBackPress', onBackPress);
+    return () => sub.remove();
+  }, [session.status, onMinimize]);
 
   const pipPan = useRef(new Animated.ValueXY()).current;
   const pipPanResponder = useRef(

@@ -94,7 +94,7 @@ class MyFirebaseMessagingService : FirebaseMessagingService() {
             debug("FCM_CALL_ENDED", "OK", "Processing call termination")
             
             val callId = data["callId"] ?: ""
-            val wasAnswered = CallState.wasCallAnswered(this)
+            val wasAnswered = CallState.wasCallAnswered(this, callId)
             val savedPending = PendingCallStore.get(this)
 
             // 1. Stop native ringtone & vibration instantly!
