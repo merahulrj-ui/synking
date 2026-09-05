@@ -46,6 +46,7 @@ class MainActivity : ReactActivity() {
     // coloring the background, status bar, and navigation bar.
     // This is required for expo-splash-screen.
     setTheme(R.style.AppTheme);
+    super.onCreate(null)
     // Temporarily disabled for screenshots during development/testing:
     // window.setFlags(
     //   android.view.WindowManager.LayoutParams.FLAG_SECURE,
