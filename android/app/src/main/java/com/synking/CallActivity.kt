@@ -50,10 +50,11 @@ class CallActivity : ReactActivity() {
         super.onCreate(null)
         currentCallActivity = this
 
-        window.setFlags(
-            WindowManager.LayoutParams.FLAG_SECURE,
-            WindowManager.LayoutParams.FLAG_SECURE
-        )
+        // Temporarily disabled for screenshots during development/testing:
+        // window.setFlags(
+        //     WindowManager.LayoutParams.FLAG_SECURE,
+        //     WindowManager.LayoutParams.FLAG_SECURE
+        // )
 
         // 🔒 Lock orientation strictly to Portrait (no rotation during calls)
         try {
