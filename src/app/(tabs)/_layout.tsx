@@ -219,9 +219,10 @@ const styles = StyleSheet.create({
     alignItems: 'center',
   },
   tabLabel: {
-    fontSize: 11,
-    fontWeight: '700',
-    marginTop: 2,
+    fontFamily: 'Poppins_600SemiBold',
+    fontSize: 10,
+    marginTop: 1,
+    includeFontPadding: false,
   },
   inSynkTabIconWrapper: {
     width: 28,

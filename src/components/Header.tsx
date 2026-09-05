@@ -112,9 +112,10 @@ const styles = StyleSheet.create({
   },
   logoText: {
     color: '#FFFFFF',
-    fontSize: 18,
-    fontWeight: '900',
-    letterSpacing: 1.2,
+    fontFamily: 'Poppins_900Black',
+    fontSize: 17.5,
+    letterSpacing: 0.8,
+    paddingRight: 6,
   },
   rightActions: {
     flexDirection: 'row',
