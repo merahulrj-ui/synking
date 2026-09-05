@@ -132,6 +132,7 @@ export default function VenuesScreen() {
           placeholderTextColor={isDarkMode ? '#64748B' : '#94A3B8'}
           style={[styles.searchInput, { color: textColor }]}
           clearButtonMode="while-editing"
+          autoCorrect={false}
         />
         {searchQuery.length > 0 && (
           <TouchableOpacity onPress={() => setSearchQuery('')} activeOpacity={0.7}>
@@ -369,7 +370,9 @@ export default function VenuesScreen() {
         renderItem={({ item }) => (
           <VenueCard venue={item} onReserve={handleOpenReserve} />
         )}
-        ListHeaderComponent={renderHeaderComponent}
+        ListHeaderComponent={renderHeaderComponent()}
+        keyboardShouldPersistTaps="handled"
+        keyboardDismissMode="on-drag"
         ListEmptyComponent={
           <View style={styles.emptyContainer}>
             <View
