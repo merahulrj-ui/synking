@@ -1,5 +1,5 @@
 import React, { useRef, useEffect, useState } from 'react';
-import { View, Text, StyleSheet, Modal, TouchableOpacity, Image, Platform, ScrollView, Share, Animated, PanResponder, Vibration, NativeModules, BackHandler, DeviceEventEmitter } from 'react-native';
+import { View, Text, StyleSheet, Modal, TouchableOpacity, Image, Platform, ScrollView, Share, Animated, PanResponder, Vibration, NativeModules, BackHandler, DeviceEventEmitter, Dimensions } from 'react-native';
 import { useKeepAwake } from 'expo-keep-awake';
 import { Ionicons } from '@expo/vector-icons';
 import { LinearGradient } from 'expo-linear-gradient';
@@ -188,14 +188,28 @@ export const CallModal: React.FC<Props> = ({ session, onEndCall, onAcceptCall, o
   // 💡 Keep Screen Awake throughout the entire call (Calling, Ringing, Connected)
   useKeepAwake('synking-call-session');
 
-  const [isNativePip, setIsNativePip] = useState(false);
+  const [isNativePip, setIsNativePip] = useState(() => {
+    if (Platform.OS !== 'android') return false;
+    const { width } = Dimensions.get('window');
+    return width > 0 && width < 300;
+  });
 
-  // 📺 Native Picture-in-Picture mode listener (hides UI buttons in PiP window)
+  // 📺 Native Picture-in-Picture mode listener & Dimension fallback (guaranteed clean PiP window)
   useEffect(() => {
     const sub = DeviceEventEmitter.addListener('onPictureInPictureModeChanged', (event: any) => {
       setIsNativePip(Boolean(event?.isInPictureInPictureMode));
     });
-    return () => sub.remove();
+
+    const dimSub = Dimensions.addEventListener('change', ({ window }) => {
+      if (Platform.OS === 'android') {
+        setIsNativePip(window.width > 0 && window.width < 300);
+      }
+    });
+
+    return () => {
+      sub.remove();
+      dimSub.remove();
+    };
   }, []);
 
   useEffect(() => {
@@ -530,7 +544,7 @@ Remote Video Tracks (${remoteVideo.length}): ${JSON.stringify(remoteVideo)}
     <View style={styles.modalOverlay}>
       <LinearGradient
         colors={['#0F172A', '#05060A', '#020617']}
-        style={styles.callingCard}
+        style={[styles.callingCard, isNativePip && { paddingVertical: 0, paddingHorizontal: 0, justifyContent: 'center' }]}
         >
           {/* 1. CONNECTED VIDEO CALL: Fullscreen Remote Video + Draggable Self PiP */}
           {isConnected && (session.type === 'video' || session.isVideoEnabled) && (
@@ -549,40 +563,42 @@ Remote Video Tracks (${remoteVideo.length}): ${JSON.stringify(remoteVideo)}
                 )}
               </View>
 
-              {/* Draggable Self PiP Overlay */}
-              <Animated.View 
-                style={[styles.pipSelfView, { transform: pipPan.getTranslateTransform(), zIndex: 20 }]}
-                {...pipPanResponder.panHandlers}
-              >
-                <View style={{ flex: 1, width: '100%', height: '100%', overflow: 'hidden', backgroundColor: '#000000' }}>
-                  <LiveSelfVideo isPip={true} />
-                  
-                  {/* 📸 Flip Camera Button Overlay */}
-                  <TouchableOpacity 
-                    style={{
-                      position: 'absolute',
-                      bottom: 10,
-                      right: 10,
-                      backgroundColor: 'rgba(0, 0, 0, 0.6)',
-                      width: 34,
-                      height: 34,
-                      borderRadius: 17,
-                      alignItems: 'center',
-                      justifyContent: 'center',
-                      borderWidth: 1,
-                      borderColor: 'rgba(255, 255, 255, 0.3)',
-                      zIndex: 100,
-                    }}
-                    onPress={(e) => { 
-                      e.stopPropagation(); 
-                      WebRTCService.switchCamera(); 
-                    }}
-                    activeOpacity={0.7}
-                  >
-                    <Ionicons name="camera-reverse" size={18} color="#00E5FF" />
-                  </TouchableOpacity>
-                </View>
-              </Animated.View>
+              {/* Draggable Self PiP Overlay (Hidden in Native PiP) */}
+              {!isNativePip && (
+                <Animated.View 
+                  style={[styles.pipSelfView, { transform: pipPan.getTranslateTransform(), zIndex: 20 }]}
+                  {...pipPanResponder.panHandlers}
+                >
+                  <View style={{ flex: 1, width: '100%', height: '100%', overflow: 'hidden', backgroundColor: '#000000' }}>
+                    <LiveSelfVideo isPip={true} />
+                    
+                    {/* 📸 Flip Camera Button Overlay */}
+                    <TouchableOpacity 
+                      style={{
+                        position: 'absolute',
+                        bottom: 10,
+                        right: 10,
+                        backgroundColor: 'rgba(0, 0, 0, 0.6)',
+                        width: 34,
+                        height: 34,
+                        borderRadius: 17,
+                        alignItems: 'center',
+                        justifyContent: 'center',
+                        borderWidth: 1,
+                        borderColor: 'rgba(255, 255, 255, 0.3)',
+                        zIndex: 100,
+                      }}
+                      onPress={(e) => { 
+                        e.stopPropagation(); 
+                        WebRTCService.switchCamera(); 
+                      }}
+                      activeOpacity={0.7}
+                    >
+                      <Ionicons name="camera-reverse" size={18} color="#00E5FF" />
+                    </TouchableOpacity>
+                  </View>
+                </Animated.View>
+              )}
             </>
           )}
 
@@ -713,6 +729,22 @@ Remote Video Tracks (${remoteVideo.length}): ${JSON.stringify(remoteVideo)}
                   : session.status === 'calling'
                   ? 'Calling...'
                   : 'Connecting safely on Synkin'}
+              </Text>
+            </View>
+          ) : isNativePip && session.type !== 'video' && !session.isVideoEnabled ? (
+            <View style={{ flex: 1, alignItems: 'center', justifyContent: 'center', backgroundColor: '#05060A', width: '100%', height: '100%' }}>
+              <Image
+                source={{ uri: session.callerPhoto }}
+                style={{
+                  width: 72,
+                  height: 72,
+                  borderRadius: 36,
+                  borderWidth: 2,
+                  borderColor: '#10B981',
+                }}
+              />
+              <Text style={{ color: '#FFFFFF', fontSize: 13, fontFamily: 'Poppins_700Bold', marginTop: 8 }} numberOfLines={1}>
+                {session.callerName}
               </Text>
             </View>
           ) : (

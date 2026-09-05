@@ -154,15 +154,24 @@ class CallActivity : ReactActivity() {
         }
     }
 
+    override fun onPictureInPictureModeChanged(isInPictureInPictureMode: Boolean) {
+        super.onPictureInPictureModeChanged(isInPictureInPictureMode)
+        emitPipState(isInPictureInPictureMode)
+    }
+
     override fun onPictureInPictureModeChanged(isInPictureInPictureMode: Boolean, newConfig: android.content.res.Configuration) {
         super.onPictureInPictureModeChanged(isInPictureInPictureMode, newConfig)
+        emitPipState(isInPictureInPictureMode)
+    }
+
+    private fun emitPipState(isInPictureInPictureMode: Boolean) {
         Log.d("SYNKING_PIP", "[CallActivity] onPictureInPictureModeChanged: isInPictureInPictureMode=$isInPictureInPictureMode")
         try {
             val map = com.facebook.react.bridge.Arguments.createMap().apply {
                 putBoolean("isInPictureInPictureMode", isInPictureInPictureMode)
             }
-            reactInstanceManager.currentReactContext
-                ?.getJSModule(com.facebook.react.modules.core.DeviceEventManagerModule.RCTDeviceEventEmitter::class.java)
+            val ctx = TelecomModule.reactContext ?: reactInstanceManager.currentReactContext
+            ctx?.getJSModule(com.facebook.react.modules.core.DeviceEventManagerModule.RCTDeviceEventEmitter::class.java)
                 ?.emit("onPictureInPictureModeChanged", map)
         } catch (e: Exception) {}
     }
