@@ -143,11 +143,24 @@ const PERKS_BY_CATEGORY: Record<PlanCategory, { icon: any; title: string; desc: 
 
 export default function VipMembershipScreen() {
   const router = useRouter();
-  const { currentUser, updateCurrentUser, isDarkMode, vipPlansEnabled } = useApp();
+  const { currentUser, updateCurrentUser, isDarkMode, vipPlansEnabled, vipPlansConfig } = useApp();
   const [selectedCategory, setSelectedCategory] = useState<PlanCategory>('full_vip');
   const [selectedPlan, setSelectedPlan] = useState('vip_3_months');
 
-  const currentPlans = PLANS_BY_CATEGORY[selectedCategory];
+  const rawPlans = PLANS_BY_CATEGORY[selectedCategory];
+  const currentPlans = rawPlans.map(p => {
+    const liveMatch = (vipPlansConfig?.plans || []).find((lp: any) => lp.id === p.id);
+    if (liveMatch) {
+      return {
+        ...p,
+        price: liveMatch.price ? `₹${liveMatch.price}` : p.price,
+        originalPrice: liveMatch.originalPrice ? `₹${liveMatch.originalPrice}` : undefined,
+        discountPercent: liveMatch.discountPercent ? `${liveMatch.discountPercent}% OFF` : undefined,
+        badge: liveMatch.badge || p.badge,
+      };
+    }
+    return p;
+  });
   const currentPerks = PERKS_BY_CATEGORY[selectedCategory];
   const activePlan = currentPlans.find(p => p.id === selectedPlan) || currentPlans[0];
 
@@ -250,9 +263,27 @@ export default function VipMembershipScreen() {
           {CATEGORIES.find(c => c.id === selectedCategory)?.subtitle}
         </Text>
 
+        {/* Live Admin Promotional Discount Banner */}
+        {vipPlansConfig?.discountBanner && (
+          <View style={{
+            backgroundColor: 'rgba(251, 191, 36, 0.1)',
+            borderWidth: 1,
+            borderColor: 'rgba(251, 191, 36, 0.35)',
+            borderRadius: 12,
+            paddingVertical: 10,
+            paddingHorizontal: 14,
+            marginBottom: 16,
+            alignItems: 'center',
+          }}>
+            <Text style={{ color: '#FBBF24', fontSize: 12, fontFamily: 'Poppins_700Bold', textAlign: 'center' }}>
+              {vipPlansConfig.discountBanner}
+            </Text>
+          </View>
+        )}
+
         {/* 3 Plans for Current Category */}
         <View style={styles.plansContainer}>
-          {currentPlans.map((plan) => {
+          {currentPlans.map((plan: any) => {
             const isSelected = selectedPlan === plan.id;
             return (
               <TouchableOpacity
@@ -272,6 +303,18 @@ export default function VipMembershipScreen() {
                 )}
                 <Text style={[styles.planDuration, { color: textColor }]}>{plan.duration}</Text>
                 <Text style={styles.planPrice}>{plan.price}</Text>
+                {plan.originalPrice && (
+                  <View style={{ flexDirection: 'row', alignItems: 'center', gap: 4, marginTop: 2, marginBottom: 2 }}>
+                    <Text style={{ textDecorationLine: 'line-through', color: '#64748B', fontSize: 11, fontFamily: 'Poppins_500Medium' }}>
+                      {plan.originalPrice}
+                    </Text>
+                    {plan.discountPercent && (
+                      <Text style={{ color: '#10B981', fontSize: 10, fontFamily: 'Poppins_700Bold' }}>
+                        {plan.discountPercent}
+                      </Text>
+                    )}
+                  </View>
+                )}
                 <Text style={styles.planPerMonth}>{plan.perDay}</Text>
                 {plan.note && (
                   <View style={styles.planNoteBadge}>

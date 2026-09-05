@@ -24,6 +24,7 @@ import * as Location from 'expo-location';
 
 interface AppContextType {
   vipPlansEnabled: boolean;
+  vipPlansConfig: any;
   isLoggedIn: boolean;
   isDarkMode: boolean;
   toggleTheme: () => void;
@@ -355,8 +356,9 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
   const [isSuspended, setIsSuspended] = useState(false);
   const [suspendedUntil, setSuspendedUntil] = useState<number | null>(null);
 
-  // Dynamic App Configuration (VIP Plans Master Switch)
+  // Dynamic App Configuration (VIP Plans Master Switch & Dynamic Pricing)
   const [vipPlansEnabled, setVipPlansEnabled] = useState<boolean>(false);
+  const [vipPlansConfig, setVipPlansConfig] = useState<any>(null);
 
   useEffect(() => {
     let isMounted = true;
@@ -365,8 +367,13 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
         const res = await fetch(`${CLOUD_BACKEND_URL}/api/config`);
         if (res.ok) {
           const data = await res.json();
-          if (isMounted && typeof data?.vipPlansEnabled === 'boolean') {
-            setVipPlansEnabled(data.vipPlansEnabled);
+          if (isMounted) {
+            if (typeof data?.vipPlansEnabled === 'boolean') {
+              setVipPlansEnabled(data.vipPlansEnabled);
+            }
+            if (data?.vipPlansConfig) {
+              setVipPlansConfig(data.vipPlansConfig);
+            }
           }
         }
       } catch (e) {}
@@ -1258,6 +1265,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
         loginUser,
         logoutUser,
         vipPlansEnabled,
+        vipPlansConfig,
         deleteAccount,
         updateCurrentUser,
         updateSafetyContact,

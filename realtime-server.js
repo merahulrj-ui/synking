@@ -48,6 +48,21 @@ try {
 // Master Feature Flags & Dynamic Configuration
 let vipPlansEnabled = false;
 
+const DEFAULT_VIP_CONFIG = {
+  discountBanner: '⚡ Special Offer • Up to 56% OFF on All VIP Plans & Calling Passes!',
+  plans: [
+    { id: 'vip_1_month', category: 'full_vip', duration: '1 Month', price: 499, originalPrice: 799, discountPercent: 38, badge: 'STANDARD' },
+    { id: 'vip_3_months', category: 'full_vip', duration: '3 Months', price: 999, originalPrice: 1999, discountPercent: 50, badge: 'POPULAR 🔥' },
+    { id: 'vip_12_months', category: 'full_vip', duration: '12 Months', price: 2199, originalPrice: 4999, discountPercent: 56, badge: 'BEST VALUE 💎' },
+    { id: 'call_10_min', category: 'calling_only', duration: '10 Mins Call*', price: 49, originalPrice: 99, discountPercent: 50, badge: '10 MINS ⚡' },
+    { id: 'call_25_min', category: 'calling_only', duration: '25 Mins Call*', price: 99, originalPrice: 199, discountPercent: 50, badge: '25 MINS 🥂' },
+    { id: 'call_1_month', category: 'calling_only', duration: '1 Month Pass*', price: 249, originalPrice: 499, discountPercent: 50, badge: 'BEST VALUE 📞' },
+    { id: 'boost_1_month', category: 'boost_only', duration: '1 Month Booster', price: 349, originalPrice: 699, discountPercent: 50, badge: 'POPULAR 🚀' },
+  ]
+};
+
+let vipPlansConfig = JSON.parse(JSON.stringify(DEFAULT_VIP_CONFIG));
+
 function broadcastWs(data) {
   if (typeof broadcastToWebSockets === 'function') {
     broadcastToWebSockets(data);
@@ -278,6 +293,18 @@ async function initTursoTables() {
         vipPlansEnabled = false;
       }
       console.log(`⚡ [VIP_SETTINGS_HYDRATED] VIP Membership Plans Master Switch: ${vipPlansEnabled ? '🟢 ON' : '🔴 OFF'}`);
+
+      // Hydrate VIP Plans & Pricing Configuration
+      const vipConfigRes = await queryTurso("SELECT value FROM app_settings WHERE key = 'vip_plans_config'");
+      const vipCfgRow = vipConfigRes?.results?.[0]?.response?.result?.rows?.[0];
+      if (vipCfgRow && vipCfgRow[0]) {
+        try {
+          vipPlansConfig = JSON.parse(vipCfgRow[0].value);
+          console.log('⚡ [VIP_CONFIG_HYDRATED] Custom VIP Plans & Pricing Loaded From Turso Cloud!');
+        } catch (pe) {}
+      } else {
+        await queryTurso("INSERT OR REPLACE INTO app_settings (key, value) VALUES ('vip_plans_config', ?)", [{ type: 'text', value: JSON.stringify(DEFAULT_VIP_CONFIG) }]);
+      }
     } catch (cfgErr) {
       console.warn('[TURSO_CONFIG_HYDRATE_WARN]', cfgErr.message);
     }
@@ -494,6 +521,80 @@ async function renderAdminHtml() {
     </div>
   </div>
 
+  <!-- VIP Plans, Pricing & Discounts Management Dashboard -->
+  <div style="background: #13141F; border: 1px solid rgba(251, 191, 36, 0.25); border-radius: 16px; padding: 24px; margin-bottom: 32px;">
+    <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 16px; flex-wrap: wrap; gap: 12px;">
+      <div>
+        <h2 style="font-size: 18px; font-weight: 800; color: #FBBF24; display: flex; align-items: center; gap: 8px;">
+          🏷️ VIP Plans Pricing & Discount Calculator Dashboard
+        </h2>
+        <p style="color: #94A3B8; font-size: 12px; margin-top: 4px;">
+          Yahan se aap kisi bhi VIP plan ki Selling Price, MRP, aur Discount % modify kar sakte hain. App me turant update hoga!
+        </p>
+      </div>
+      <button onclick="saveVipConfig()" id="saveVipCfgBtn" style="background: linear-gradient(135deg, #10B981, #059669); color: white; border: none; padding: 10px 20px; border-radius: 10px; font-weight: 800; cursor: pointer; font-size: 13px; display: flex; align-items: center; gap: 6px; box-shadow: 0 4px 12px rgba(16, 185, 129, 0.3);">
+        💾 Save All Pricing & Discounts
+      </button>
+    </div>
+
+    <!-- Promotional Discount Banner Input -->
+    <div style="margin-bottom: 20px; background: rgba(255,255,255,0.02); padding: 14px; border-radius: 12px; border: 1px solid rgba(255,255,255,0.06);">
+      <label style="color: #00E5FF; font-size: 12px; font-weight: 700; text-transform: uppercase; display: block; margin-bottom: 6px;">
+        📢 In-App Promotional Discount Header (Live Announcement)
+      </label>
+      <input type="text" id="cfgDiscountBanner" value="${vipPlansConfig.discountBanner || '⚡ Special Offer • Up to 56% OFF on All VIP Plans!'}" style="width: 100%; padding: 10px 14px; background: #08090F; border: 1px solid rgba(255,255,255,0.15); border-radius: 8px; color: #FFF; font-size: 13px; outline: none;" placeholder="Enter promotional banner announcement..." />
+    </div>
+
+    <!-- Plans Pricing & Discount Table -->
+    <div class="table-box" style="margin-bottom: 0;">
+      <table>
+        <thead>
+          <tr>
+            <th>Plan Name</th>
+            <th>Category</th>
+            <th>Duration</th>
+            <th>Selling Price (₹)</th>
+            <th>Original MRP (₹)</th>
+            <th>Calculated Discount</th>
+            <th>Highlight Badge</th>
+          </tr>
+        </thead>
+        <tbody id="vipPlansTableBody">
+          ${(vipPlansConfig.plans || []).map(p => {
+            const discPercent = p.discountPercent || (p.originalPrice ? Math.round(((p.originalPrice - p.price) / p.originalPrice) * 100) : 0);
+            return `
+            <tr data-plan-id="${p.id}">
+              <td style="font-weight: 700; color: #FFF;">${p.duration} ${p.category === 'full_vip' ? 'VIP' : (p.category === 'calling_only' ? 'Calling Pass' : 'Booster')}</td>
+              <td><span style="color: #94A3B8; font-size: 11px; text-transform: uppercase;">${p.category}</span></td>
+              <td style="color: #00E5FF; font-weight: 600;">${p.duration}</td>
+              <td>
+                <div style="display: flex; align-items: center; gap: 4px;">
+                  <span style="color: #94A3B8;">₹</span>
+                  <input type="number" class="plan-price-input" value="${p.price}" style="width: 80px; padding: 6px 8px; background: #08090F; border: 1px solid rgba(255,255,255,0.2); border-radius: 6px; color: #FFF; font-weight: 700; font-size: 13px;" oninput="recalcDiscount(this)" />
+                </div>
+              </td>
+              <td>
+                <div style="display: flex; align-items: center; gap: 4px;">
+                  <span style="color: #94A3B8;">₹</span>
+                  <input type="number" class="plan-mrp-input" value="${p.originalPrice || p.price}" style="width: 80px; padding: 6px 8px; background: #08090F; border: 1px solid rgba(255,255,255,0.2); border-radius: 6px; color: #94A3B8; font-size: 13px; text-decoration: line-through;" oninput="recalcDiscount(this)" />
+                </div>
+              </td>
+              <td>
+                <span class="plan-disc-badge" style="background: rgba(16, 185, 129, 0.15); border: 1px solid #10B981; color: #10B981; font-weight: 800; font-size: 11px; padding: 3px 8px; border-radius: 6px;">
+                  ${discPercent}% OFF
+                </span>
+              </td>
+              <td>
+                <input type="text" class="plan-badge-input" value="${p.badge || ''}" style="width: 110px; padding: 6px 8px; background: #08090F; border: 1px solid rgba(255,255,255,0.2); border-radius: 6px; color: #FBBF24; font-weight: 700; font-size: 11px;" placeholder="e.g. POPULAR 🔥" />
+              </td>
+            </tr>
+            `;
+          }).join('')}
+        </tbody>
+      </table>
+    </div>
+  </div>
+
   <div class="stats-grid">
     <div class="stat-card">
       <div class="stat-lbl">Registered Users</div>
@@ -615,6 +716,77 @@ async function renderAdminHtml() {
         }
       } catch (err) {
         alert('Network error while toggling VIP: ' + err.message);
+        if (btn) btn.disabled = false;
+      }
+    }
+
+    // 0.1 Recalculate discount percentage live when admin edits price or MRP
+    function recalcDiscount(inputElem) {
+      const row = inputElem.closest('tr');
+      if (!row) return;
+      const priceInput = row.querySelector('.plan-price-input');
+      const mrpInput = row.querySelector('.plan-mrp-input');
+      const discBadge = row.querySelector('.plan-disc-badge');
+      if (priceInput && mrpInput && discBadge) {
+        const price = parseFloat(priceInput.value) || 0;
+        const mrp = parseFloat(mrpInput.value) || price;
+        const percent = mrp > 0 ? Math.max(0, Math.round(((mrp - price) / mrp) * 100)) : 0;
+        discBadge.innerText = percent + '% OFF';
+      }
+    }
+
+    // 0.2 Save VIP Pricing & Discounts to Turso Cloud SQLite
+    async function saveVipConfig() {
+      const btn = document.getElementById('saveVipCfgBtn');
+      if (btn) {
+        btn.disabled = true;
+        btn.innerText = 'Saving Pricing... ⏳';
+      }
+      const banner = document.getElementById('cfgDiscountBanner')?.value || '';
+      const rows = document.querySelectorAll('#vipPlansTableBody tr');
+      const updatedPlans = [];
+      const basePlans = ${JSON.stringify(vipPlansConfig.plans || [])};
+
+      rows.forEach(row => {
+        const id = row.getAttribute('data-plan-id');
+        const price = parseFloat(row.querySelector('.plan-price-input')?.value) || 0;
+        const originalPrice = parseFloat(row.querySelector('.plan-mrp-input')?.value) || price;
+        const badge = row.querySelector('.plan-badge-input')?.value || '';
+        const discPercent = originalPrice > 0 ? Math.max(0, Math.round(((originalPrice - price) / originalPrice) * 100)) : 0;
+
+        const existing = basePlans.find(p => p.id === id) || {};
+        updatedPlans.push({
+          ...existing,
+          id,
+          price,
+          originalPrice,
+          discountPercent: discPercent,
+          badge,
+        });
+      });
+
+      const urlParams = new URLSearchParams(window.location.search);
+      const key = urlParams.get('key') || 'synking_secret_admin_2026';
+
+      try {
+        const res = await fetch('/api/admin/update-vip-config?key=' + encodeURIComponent(key), {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            discountBanner: banner,
+            plans: updatedPlans
+          })
+        });
+        const data = await res.json();
+        if (data.success) {
+          alert('✅ VIP Pricing & Discount configuration successfully saved to Turso Cloud SQLite!');
+          location.reload();
+        } else {
+          alert('Failed to save: ' + (data.error || 'Unknown error'));
+          if (btn) btn.disabled = false;
+        }
+      } catch (err) {
+        alert('Network Error: ' + err.message);
         if (btn) btn.disabled = false;
       }
     }
@@ -784,7 +956,7 @@ const server = http.createServer((req, res) => {
     return;
   }
 
-  // 0.2 GET /api/config (Public App Feature Flags & Configuration)
+  // 0.2 GET /api/config (Public App Feature Flags & Dynamic VIP Plans/Discounts)
   if (req.method === 'GET' && pathname === '/api/config') {
     res.writeHead(200, {
       'Content-Type': 'application/json',
@@ -794,6 +966,7 @@ const server = http.createServer((req, res) => {
     res.end(JSON.stringify({
       success: true,
       vipPlansEnabled: Boolean(vipPlansEnabled),
+      vipPlansConfig: vipPlansConfig,
       version: '1.0.0',
       timestamp: Date.now(),
     }));
@@ -820,7 +993,7 @@ const server = http.createServer((req, res) => {
     // Broadcast config update to all connected apps in 0ms!
     broadcastWs({
       type: 'CONFIG_UPDATED',
-      payload: { vipPlansEnabled }
+      payload: { vipPlansEnabled, vipPlansConfig }
     });
 
     console.log(`👑 [ADMIN_VIP_TOGGLE] VIP Plans Master Switch is now: ${vipPlansEnabled ? '🟢 ON' : '🔴 OFF'}`);
@@ -833,6 +1006,50 @@ const server = http.createServer((req, res) => {
       vipPlansEnabled: vipPlansEnabled,
       message: `VIP Membership Plans are now ${vipPlansEnabled ? 'ACTIVE' : 'OFF (Free Mode)'}`
     }));
+    return;
+  }
+
+  // 0.4 POST /api/admin/update-vip-config (Admin Live Pricing, Plans & Discount Management)
+  if (req.method === 'POST' && pathname === '/api/admin/update-vip-config') {
+    const adminKey = url.searchParams.get('key');
+    const validKey = process.env.ADMIN_SECRET_KEY || 'synking_secret_admin_2026';
+
+    if (adminKey !== validKey) {
+      res.writeHead(401, { 'Content-Type': 'application/json' });
+      res.end(JSON.stringify({ success: false, error: 'Unauthorized key' }));
+      return;
+    }
+
+    let body = '';
+    req.on('data', chunk => { body += chunk; });
+    req.on('end', async () => {
+      try {
+        const payload = JSON.parse(body);
+        if (payload && (payload.plans || payload.discountBanner)) {
+          vipPlansConfig = {
+            ...vipPlansConfig,
+            ...payload,
+          };
+          await queryTurso(
+            "INSERT OR REPLACE INTO app_settings (key, value) VALUES ('vip_plans_config', ?)",
+            [{ type: 'text', value: JSON.stringify(vipPlansConfig) }]
+          );
+          broadcastWs({
+            type: 'CONFIG_UPDATED',
+            payload: { vipPlansEnabled, vipPlansConfig }
+          });
+          console.log('⚡ [VIP_CONFIG_UPDATED] VIP Pricing & Discounts Saved to Turso Cloud!');
+          res.writeHead(200, { 'Content-Type': 'application/json', 'Access-Control-Allow-Origin': '*' });
+          res.end(JSON.stringify({ success: true, vipPlansConfig }));
+          return;
+        }
+        res.writeHead(400, { 'Content-Type': 'application/json' });
+        res.end(JSON.stringify({ success: false, error: 'Invalid payload' }));
+      } catch (err) {
+        res.writeHead(500, { 'Content-Type': 'application/json' });
+        res.end(JSON.stringify({ success: false, error: err.message }));
+      }
+    });
     return;
   }
 

@@ -104,7 +104,7 @@ export default function ChatScreen() {
   const insets = useSafeAreaInsets();
   const { id } = useLocalSearchParams<{ id: string }>();
   const router = useRouter();
-  const { matches, profiles, messages, sendMessage, deleteMessage, activeBookings, currentUser, isDarkMode, markChatAsRead } = useApp();
+  const { matches, profiles, messages, sendMessage, deleteMessage, activeBookings, currentUser, isDarkMode, markChatAsRead, vipPlansEnabled } = useApp();
 
   useEffect(() => {
     if (id) {
@@ -385,8 +385,8 @@ const VOICE_COMPRESSED_CONFIG: any = {
   }, [isRecording, recordingSeconds]);
 
   const startRecording = async () => {
-    // 👑 VIP ONLY: Voice notes & audio are strictly for SYNKING Black VIP members to prevent safety violations & number sharing!
-    if (!currentUser?.isVip) {
+    // 👑 VIP ONLY: Gated only when VIP Plans are enabled by admin
+    if (vipPlansEnabled && !currentUser?.isVip) {
       const title = '✨ 👑 VIP Exclusive Feature 👑 ✨';
       const msg = `⭐ Voice Notes & Audio Messages are reserved exclusively for SYNKING Black VIP members.\n\n🔒 For member safety and anti-fraud protection, audio messages are locked on standard accounts.\n\n✨ Upgrade to VIP to unlock unlimited voice notes & private calling!`;
       if (Platform.OS === 'web') {
@@ -1404,7 +1404,7 @@ const VOICE_COMPRESSED_CONFIG: any = {
   };
 
   const handleVoiceNote = () => {
-    if (!currentUser?.isVip) {
+    if (vipPlansEnabled && !currentUser?.isVip) {
       const title = '✨ 👑 VIP Exclusive Feature 👑 ✨';
       const msg = `⭐ Voice Notes & Audio Messages are reserved exclusively for SYNKING Black VIP members.\n\n✨ Upgrade to VIP to unlock unlimited voice notes & private calling!`;
       if (Platform.OS === 'web') {
@@ -1448,6 +1448,18 @@ const VOICE_COMPRESSED_CONFIG: any = {
       return;
     }
 
+    // ⚡ DIRECT 1-TAP CALLING (When VIP Plans Toggle is OFF in Admin Panel)
+    // No call request, no mutual approval wait, no 15-minute window required!
+    if (!vipPlansEnabled) {
+      WebRTCService.startCall({
+        callerUser: currentUser,
+        targetUser,
+        type,
+      });
+      return;
+    }
+
+    // 🔒 MONETIZATION FLOW (When VIP Plans Toggle is ON in Admin Panel)
     // 1. Check if 15-minute calling window is currently active
     const isWindowActive = callWindowActiveUntil && Date.now() < callWindowActiveUntil;
 
@@ -1686,7 +1698,7 @@ const VOICE_COMPRESSED_CONFIG: any = {
             activeOpacity={0.75}
           >
             <Ionicons name="videocam" size={20} color="#FD3A73" />
-            {!currentUser?.isVip && (
+            {vipPlansEnabled && !currentUser?.isVip && (
               <View style={styles.vipMiniBadge}>
                 <Text style={styles.vipMiniBadgeText}>VIP</Text>
               </View>
@@ -1700,7 +1712,7 @@ const VOICE_COMPRESSED_CONFIG: any = {
             activeOpacity={0.75}
           >
             <Ionicons name="call" size={18} color="#FD3A73" />
-            {!currentUser?.isVip && (
+            {vipPlansEnabled && !currentUser?.isVip && (
               <View style={styles.vipMiniBadge}>
                 <Text style={styles.vipMiniBadgeText}>VIP</Text>
               </View>
