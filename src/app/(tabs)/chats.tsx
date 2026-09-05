@@ -249,15 +249,16 @@ export default function ChatsScreen() {
               const cleanItemId = String(item.id || '').trim();
               const cleanItemDigits = String(item.phoneNumber || '').replace(/\D/g, '').slice(-10);
 
-              const isUnread =
+              const isUnread = Boolean(
                 !isSentByMe &&
                 !!lastMsg &&
                 (unreadChatIds.has(cleanItemId) ||
-                  (cleanItemDigits && unreadChatIds.has(cleanItemDigits)) ||
-                  (lastMsg.senderId && unreadChatIds.has(lastMsg.senderId)) ||
-                  (lastMsg.senderId &&
-                    cleanItemDigits &&
-                    lastMsg.senderId.replace(/\D/g, '').slice(-10) === cleanItemDigits));
+                  (cleanItemDigits ? unreadChatIds.has(cleanItemDigits) : false) ||
+                  (lastMsg.senderId ? unreadChatIds.has(lastMsg.senderId) : false) ||
+                  (lastMsg.senderId && cleanItemDigits
+                    ? lastMsg.senderId.replace(/\D/g, '').slice(-10) === cleanItemDigits
+                    : false))
+              );
 
               return (
                 <TouchableOpacity
@@ -328,7 +329,7 @@ export default function ChatsScreen() {
                         >
                           {item.name}
                         </Text>
-                        {item.isVerified && (
+                        {Boolean(item.isVerified) && (
                           <Ionicons name="shield-checkmark" size={14} color="#00E5FF" />
                         )}
                       </View>
