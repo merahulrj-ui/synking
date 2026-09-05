@@ -4,7 +4,12 @@ import { Ionicons, MaterialCommunityIcons } from '@expo/vector-icons';
 import { useRouter } from 'expo-router';
 import { useApp } from '../contexts/AppContext';
 
-export const Header: React.FC = () => {
+interface HeaderProps {
+  onOpenFilter?: () => void;
+  hasActiveFilters?: boolean;
+}
+
+export const Header: React.FC<HeaderProps> = ({ onOpenFilter, hasActiveFilters }) => {
   const router = useRouter();
   const { currentLocation, refreshLocation, isDarkMode } = useApp();
 
@@ -42,23 +47,44 @@ export const Header: React.FC = () => {
         <Text style={[styles.logoText, { color: logoTextColor }]}>SYNKING</Text>
       </View>
 
-      {/* Right: VIP Crown Membership Action */}
-      <TouchableOpacity
-        style={[
-          styles.vipBtn,
-          isDarkMode && {
-            shadowColor: '#FBBF24',
-            shadowOffset: { width: 0, height: 0 },
-            shadowOpacity: 0.5,
-            shadowRadius: 8,
-            elevation: 5,
-          }
-        ]}
-        activeOpacity={0.7}
-        onPress={() => router.push('/vip-membership')}
-      >
-        <MaterialCommunityIcons name="crown" size={17} color="#FBBF24" />
-      </TouchableOpacity>
+      {/* Right: Discovery Filter + VIP Crown Actions */}
+      <View style={styles.rightActions}>
+        {onOpenFilter && (
+          <TouchableOpacity
+            style={[
+              styles.iconBtn,
+              hasActiveFilters && styles.filterBtnActive,
+              { borderColor: hasActiveFilters ? '#FD3A73' : (isDarkMode ? 'rgba(255, 255, 255, 0.12)' : 'rgba(0, 0, 0, 0.1)') }
+            ]}
+            activeOpacity={0.7}
+            onPress={onOpenFilter}
+          >
+            <Ionicons
+              name="options-outline"
+              size={18}
+              color={hasActiveFilters ? '#FD3A73' : (isDarkMode ? '#FFFFFF' : '#0F172A')}
+            />
+            {hasActiveFilters && <View style={styles.filterActiveDot} />}
+          </TouchableOpacity>
+        )}
+
+        <TouchableOpacity
+          style={[
+            styles.vipBtn,
+            isDarkMode && {
+              shadowColor: '#FBBF24',
+              shadowOffset: { width: 0, height: 0 },
+              shadowOpacity: 0.5,
+              shadowRadius: 8,
+              elevation: 5,
+            }
+          ]}
+          activeOpacity={0.7}
+          onPress={() => router.push('/vip-membership')}
+        >
+          <MaterialCommunityIcons name="crown" size={17} color="#FBBF24" />
+        </TouchableOpacity>
+      </View>
     </View>
   );
 };
@@ -86,9 +112,38 @@ const styles = StyleSheet.create({
   },
   logoText: {
     color: '#FFFFFF',
+    fontFamily: 'Poppins_900Black',
     fontSize: 18,
-    fontWeight: '900',
     letterSpacing: 1.5,
+  },
+  rightActions: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 10,
+  },
+  iconBtn: {
+    width: 32,
+    height: 32,
+    borderRadius: 16,
+    backgroundColor: 'rgba(255, 255, 255, 0.05)',
+    borderWidth: 1,
+    borderColor: 'rgba(255, 255, 255, 0.1)',
+    alignItems: 'center',
+    justifyContent: 'center',
+    position: 'relative',
+  },
+  filterBtnActive: {
+    backgroundColor: 'rgba(253, 58, 115, 0.15)',
+    borderColor: '#FD3A73',
+  },
+  filterActiveDot: {
+    position: 'absolute',
+    top: 5,
+    right: 5,
+    width: 6,
+    height: 6,
+    borderRadius: 3,
+    backgroundColor: '#FD3A73',
   },
   vipBtn: {
     width: 32,

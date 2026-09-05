@@ -11,6 +11,7 @@ import {
   fetchIncomingRequestsFromFirestore,
   fetchSentRequestsFromFirestore,
   updateRequestStatusInFirestore,
+  deleteSynkRequestFromBackend,
   deleteUserProfileFromBackend,
   deleteChatMessageFromBackend,
 } from '../services/firebase';
@@ -46,11 +47,20 @@ interface AppContextType {
   swipeProfile: (profileId: string, action: 'like' | 'pass' | 'supersynk') => { success: boolean; requestSent?: boolean; profile?: UserProfile };
   acceptRequest: (requestId: string) => UserProfile | null;
   declineRequest: (requestId: string) => void;
+  deleteSentRequest: (requestId: string) => void;
   bookDate: (params: { targetUser: UserProfile; venue: Venue; dateTime: string; splitType: 'split_50_50' | 'i_treat' | 'they_treat' }) => DateBooking;
-  sendMessage: (receiverId: string, text: string, type?: 'text' | 'voice', extraData?: ChatMessage['extraData']) => void;
+  sendMessage: (receiverId: string, text: string, type?: 'text' | 'voice' | 'call_request' | 'date_invite', extraData?: ChatMessage['extraData']) => void;
   deleteMessage: (partnerId: string, messageId: string, deleteForEveryone?: boolean) => void;
   submitFeedback: (bookingId: string, feedback: { matched: boolean; respectful: boolean; safe: boolean; notes: string }) => void;
   refreshDiscoverFeed: () => Promise<void>;
+  resetPassedProfiles: () => void;
+  undoLastSwipe: () => UserProfile | null;
+  superSynksRemaining: number;
+  freeRewindsRemaining: number;
+  boostActiveUntil: number | null;
+  useSuperSynk: () => boolean;
+  useRewind: () => boolean;
+  activateBoost: (durationMinutes?: number) => void;
   isSuspended: boolean;
   suspendedUntil: number | null;
   strikeCount: number;
@@ -87,7 +97,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     });
   };
 
-  // Zero Fake Users: Start with stored user or null
+  // Zero Fake Users - Forced Reload: Start with stored user or null
   const [currentUser, setCurrentUser] = useState<UserProfile | null>(() => {
     if (typeof window !== 'undefined' && window.localStorage) {
       const stored = window.localStorage.getItem('synking_my_user');
@@ -192,6 +202,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
   const [incomingRequests, setIncomingRequests] = useState<SynkRequest[]>([]);
   const [sentRequests, setSentRequests] = useState<SynkRequest[]>([]);
   const [passedProfiles, setPassedProfiles] = useState<Set<string>>(new Set());
+  const swipeHistory = useRef<{ user: UserProfile; action: 'like' | 'pass' | 'supersynk'; requestId?: string }[]>([]);
   const [acceptedMatchAlert, setAcceptedMatchAlert] = useState<UserProfile | null>(null);
   const seenMatchAlerts = useRef<Set<string>>(new Set());
   const [venues] = useState<Venue[]>(MOCK_VENUES);
@@ -206,6 +217,67 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
   const [strikeCount, setStrikeCount] = useState(0);
   const [isSuspended, setIsSuspended] = useState(false);
   const [suspendedUntil, setSuspendedUntil] = useState<number | null>(null);
+
+  // 5 Action Buttons Quotas & Profile Boost Management
+  const [superSynksRemaining, setSuperSynksRemaining] = useState<number>(() => (currentUser?.isVip ? 5 : 1));
+  const [freeRewindsRemaining, setFreeRewindsRemaining] = useState<number>(() => (currentUser?.isVip ? 999 : 1));
+  const [boostActiveUntil, setBoostActiveUntil] = useState<number | null>(null);
+
+  // Daily Quota Reset (Midnight reset for SuperSynks & Rewinds)
+  useEffect(() => {
+    const loadQuotas = async () => {
+      try {
+        const todayStr = new Date().toISOString().split('T')[0];
+
+        // 1. SuperSynks Quota
+        const storedSS = await AsyncStorage.getItem('synking_supersynks_data');
+        if (storedSS) {
+          const parsed = JSON.parse(storedSS);
+          if (parsed && parsed.date === todayStr) {
+            setSuperSynksRemaining(parsed.count);
+          } else {
+            const defaultCount = currentUser?.isVip ? 5 : 1;
+            setSuperSynksRemaining(defaultCount);
+            await AsyncStorage.setItem('synking_supersynks_data', JSON.stringify({ date: todayStr, count: defaultCount }));
+          }
+        } else {
+          const defaultCount = currentUser?.isVip ? 5 : 1;
+          setSuperSynksRemaining(defaultCount);
+          await AsyncStorage.setItem('synking_supersynks_data', JSON.stringify({ date: todayStr, count: defaultCount }));
+        }
+
+        // 2. Free Rewinds Quota
+        const storedRewind = await AsyncStorage.getItem('synking_rewinds_data');
+        if (storedRewind) {
+          const parsed = JSON.parse(storedRewind);
+          if (parsed && parsed.date === todayStr) {
+            setFreeRewindsRemaining(currentUser?.isVip ? 999 : parsed.count);
+          } else {
+            const defaultCount = currentUser?.isVip ? 999 : 1;
+            setFreeRewindsRemaining(defaultCount);
+            await AsyncStorage.setItem('synking_rewinds_data', JSON.stringify({ date: todayStr, count: defaultCount }));
+          }
+        } else {
+          const defaultCount = currentUser?.isVip ? 999 : 1;
+          setFreeRewindsRemaining(defaultCount);
+          await AsyncStorage.setItem('synking_rewinds_data', JSON.stringify({ date: todayStr, count: defaultCount }));
+        }
+
+        // 3. Boost Active Status
+        const storedBoost = await AsyncStorage.getItem('synking_boost_active_until');
+        if (storedBoost) {
+          const boostUntil = parseInt(storedBoost, 10);
+          if (boostUntil && Date.now() < boostUntil) {
+            setBoostActiveUntil(boostUntil);
+          } else {
+            setBoostActiveUntil(null);
+            await AsyncStorage.removeItem('synking_boost_active_until');
+          }
+        }
+      } catch (e) {}
+    };
+    loadQuotas();
+  }, [currentUser?.isVip]);
 
   // Load persistent Global Theme + 2-Strike & 3-Day Suspension Status + Seen Match Alerts
   useEffect(() => {
@@ -446,17 +518,38 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       }
     });
 
-    if (currentUser?.id) {
-      combinedProfiles = combinedProfiles.filter(u => u && u.id !== currentUser.id);
+    if (currentUser) {
+      const myId = currentUser.id;
+      const myPhone = (currentUser.phoneNumber || '').replace(/\D/g, '').slice(-10);
+      const myName = (currentUser.name || '').trim().toLowerCase();
+      combinedProfiles = combinedProfiles.filter(u => {
+        if (!u || !u.id) return false;
+        if (u.id === myId) return false;
+        const uPhone = (u.phoneNumber || '').replace(/\D/g, '').slice(-10);
+        if (myPhone && uPhone && myPhone === uPhone) return false;
+        if (myName && u.name && u.name.trim().toLowerCase() === myName) return false;
+        return true;
+      });
     }
     setProfiles(combinedProfiles);
 
     if (!currentUser) return; // Only stop here for requests/matches which require auth
 
+    const myPhone = (currentUser.phoneNumber || '').replace(/\D/g, '').slice(-10);
+    const myName = (currentUser.name || '').trim().toLowerCase();
+
     // 2. Fetch Incoming Synk Requests sent to this user (filtered by pending)
     const cloudRequests = await fetchIncomingRequestsFromFirestore(currentUser.id);
     if (Array.isArray(cloudRequests)) {
-      const pendingOnly = cloudRequests.filter(r => r && r.status === 'pending' && r.fromUser);
+      const pendingOnly = cloudRequests.filter(r => {
+        if (!r || r.status !== 'pending' || !r.fromUser) return false;
+        // Never allow requests from oneself
+        if (r.fromUser.id === currentUser.id) return false;
+        const fromPhone = (r.fromUser.phoneNumber || '').replace(/\D/g, '').slice(-10);
+        if (myPhone && fromPhone && myPhone === fromPhone) return false;
+        if (myName && r.fromUser.name && r.fromUser.name.trim().toLowerCase() === myName) return false;
+        return true;
+      });
       
       // Deduplicate by sender ID just in case
       const seenSenders = new Set();
@@ -472,10 +565,16 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       // Add accepted incoming requests to matches
       cloudRequests.forEach(req => {
         if (req && req.status === 'accepted' && req.fromUser) {
-          setMatches(prev => {
-            if (prev.some(m => m && m.id === req.fromUser!.id)) return prev;
-            return [req.fromUser!, ...prev.filter(Boolean)];
-          });
+          const fromPhone = (req.fromUser.phoneNumber || '').replace(/\D/g, '').slice(-10);
+          const isMe = req.fromUser.id === currentUser.id ||
+            (myPhone && fromPhone && myPhone === fromPhone) ||
+            (myName && req.fromUser.name && req.fromUser.name.trim().toLowerCase() === myName);
+          if (!isMe) {
+            setMatches(prev => {
+              if (prev.some(m => m && m.id === req.fromUser!.id)) return prev;
+              return [req.fromUser!, ...prev.filter(Boolean)];
+            });
+          }
         }
       });
     }
@@ -488,13 +587,18 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
         if (sentReq && sentReq.status === 'accepted') {
           // Find user profile of the person who accepted
           const partner = realUsers.find(u => u && (u.id === sentReq.toUserId || u.name === sentReq.toUserName));
-          if (partner && partner.id) {
-            setMatches(prev => {
-              if (prev.some(m => m && m.id === partner.id)) return prev;
-              return [partner, ...prev.filter(Boolean)];
-            });
-            // Mark partner as seen so it never re-triggers popups
-            seenMatchAlerts.current.add(partner.id);
+          if (partner && partner.id && partner.id !== currentUser.id) {
+            const partnerPhone = (partner.phoneNumber || '').replace(/\D/g, '').slice(-10);
+            const isMe = (myPhone && partnerPhone && myPhone === partnerPhone) ||
+              (myName && partner.name && partner.name.trim().toLowerCase() === myName);
+            if (!isMe) {
+              setMatches(prev => {
+                if (prev.some(m => m && m.id === partner.id)) return prev;
+                return [partner, ...prev.filter(Boolean)];
+              });
+              // Mark partner as seen so it never re-triggers popups
+              seenMatchAlerts.current.add(partner.id);
+            }
           }
         }
       });
@@ -604,6 +708,9 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     setProfiles(prev => prev.filter(p => p.id !== profileId));
 
     if (action === 'pass') {
+      if (swipedUser) {
+        swipeHistory.current.push({ user: swipedUser, action: 'pass' });
+      }
       setPassedProfiles(prev => {
         const newSet = new Set(prev);
         newSet.add(profileId);
@@ -613,9 +720,17 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     }
 
     if (action === 'like' || action === 'supersynk') {
-      // NEVER allow matching or sending request to yourself
-      if (swipedUser && currentUser && swipedUser.id !== currentUser.id) {
-        
+      // NEVER allow matching or sending request to yourself (ID, phone, or name)
+      const myPhone = (currentUser?.phoneNumber || '').replace(/\D/g, '').slice(-10);
+      const swipedPhone = (swipedUser?.phoneNumber || '').replace(/\D/g, '').slice(-10);
+      const isSelf =
+        !swipedUser ||
+        !currentUser ||
+        swipedUser.id === currentUser.id ||
+        (myPhone && swipedPhone && myPhone === swipedPhone) ||
+        (currentUser.name && swipedUser.name && currentUser.name.trim().toLowerCase() === swipedUser.name.trim().toLowerCase());
+
+      if (!isSelf && swipedUser && currentUser) {
         // Block multi-tap rapid duplicate requests
         const alreadySent = sentRequests.some(r => r.toUserId === swipedUser.id && r.status === 'pending');
         if (alreadySent) return { success: false, requestSent: false };
@@ -628,6 +743,8 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
           timestamp: 'Just now',
           status: 'pending'
         };
+
+        swipeHistory.current.push({ user: swipedUser, action, requestId: newReq.id });
 
         setSentRequests(prev => {
           if (prev.some(r => r.toUserId === swipedUser.id)) return prev;
@@ -688,6 +805,25 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     updateRequestStatusInFirestore(requestId, 'declined');
   };
 
+  const deleteSentRequest = (requestId: string) => {
+    const deletedReq = sentRequests.find(r => r.id === requestId);
+    const targetUserId = deletedReq?.toUserId;
+    
+    setSentRequests(prev => prev.filter(r => r.id !== requestId));
+    if (targetUserId) {
+      setPassedProfiles(prev => {
+        const next = new Set(prev);
+        next.delete(targetUserId);
+        return next;
+      });
+    }
+
+    // Central Cloud Delete
+    deleteSynkRequestFromBackend(requestId).then(() => {
+      syncCloudState();
+    }).catch(() => {});
+  };
+
   const bookDate = ({
     targetUser,
     venue,
@@ -740,7 +876,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
   };
 
   // Send Message: Instant 0ms Broadcast + Fast Firestore Stream
-  const sendMessage = async (receiverId: string, text: string, type: 'text' | 'voice' = 'text', extraData?: ChatMessage['extraData']) => {
+  const sendMessage = async (receiverId: string, text: string, type: 'text' | 'voice' | 'call_request' | 'date_invite' = 'text', extraData?: ChatMessage['extraData']) => {
     if (isSuspended && suspendedUntil && Date.now() < suspendedUntil) {
       const unlockStr = new Date(suspendedUntil).toLocaleString();
       const msg = `Your ENTIRE account is temporarily suspended for 3 days.\n\n🔒 Messaging unlocks on: ${unlockStr}`;
@@ -824,6 +960,68 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     console.log('Feedback submitted anonymously for booking:', bookingId, feedback);
   };
 
+  const resetPassedProfiles = () => {
+    swipeHistory.current = [];
+    setPassedProfiles(new Set());
+    syncCloudState();
+  };
+
+  const undoLastSwipe = (): UserProfile | null => {
+    const last = swipeHistory.current.pop();
+    if (!last || !last.user) return null;
+
+    // 1. Re-insert user at the beginning of profiles
+    setProfiles(prev => [last.user, ...prev.filter(p => p.id !== last.user.id)]);
+
+    // 2. If it was a pass, remove from passedProfiles
+    if (last.action === 'pass') {
+      setPassedProfiles(prev => {
+        const next = new Set(prev);
+        next.delete(last.user.id);
+        return next;
+      });
+    }
+
+    // 3. If it was a like/supersynk, retract sent request
+    if (last.action === 'like' || last.action === 'supersynk') {
+      setSentRequests(prev => prev.filter(r => r.toUserId !== last.user.id));
+      if (last.requestId) {
+        deleteSynkRequestFromBackend(last.requestId).catch(() => {});
+      }
+    }
+
+    return last.user;
+  };
+
+  const useSuperSynk = (): boolean => {
+    if (superSynksRemaining > 0) {
+      const next = superSynksRemaining - 1;
+      setSuperSynksRemaining(next);
+      const todayStr = new Date().toISOString().split('T')[0];
+      AsyncStorage.setItem('synking_supersynks_data', JSON.stringify({ date: todayStr, count: next })).catch(() => {});
+      return true;
+    }
+    return false;
+  };
+
+  const useRewind = (): boolean => {
+    if (currentUser?.isVip) return true;
+    if (freeRewindsRemaining > 0) {
+      const next = freeRewindsRemaining - 1;
+      setFreeRewindsRemaining(next);
+      const todayStr = new Date().toISOString().split('T')[0];
+      AsyncStorage.setItem('synking_rewinds_data', JSON.stringify({ date: todayStr, count: next })).catch(() => {});
+      return true;
+    }
+    return false;
+  };
+
+  const activateBoost = (durationMinutes = 30) => {
+    const until = Date.now() + durationMinutes * 60 * 1000;
+    setBoostActiveUntil(until);
+    AsyncStorage.setItem('synking_boost_active_until', until.toString()).catch(() => {});
+  };
+
   return (
     <AppContext.Provider
       value={{
@@ -844,7 +1042,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
         safetyContact,
         acceptedMatchAlert,
         clearAcceptedMatchAlert: () => {
-          if (acceptedMatchAlert) {
+          if (acceptedMatchAlert?.id) {
             seenMatchAlerts.current.add(acceptedMatchAlert.id);
             AsyncStorage.setItem(
               'synking_seen_match_alerts',
@@ -861,11 +1059,20 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
         swipeProfile,
         acceptRequest,
         declineRequest,
+        deleteSentRequest,
         bookDate,
         sendMessage,
         deleteMessage,
         submitFeedback,
         refreshDiscoverFeed: syncCloudState,
+        resetPassedProfiles,
+        undoLastSwipe,
+        superSynksRemaining,
+        freeRewindsRemaining,
+        boostActiveUntil,
+        useSuperSynk,
+        useRewind,
+        activateBoost,
         isSuspended,
         suspendedUntil,
         strikeCount,

@@ -7,6 +7,7 @@ import { Ionicons } from '@expo/vector-icons';
 import * as Updates from 'expo-updates';
 import { AppProvider, useApp } from '../contexts/AppContext';
 import { Colors } from '../constants/theme';
+import { useFonts, Poppins_400Regular, Poppins_500Medium, Poppins_600SemiBold, Poppins_700Bold, Poppins_800ExtraBold, Poppins_900Black } from '@expo-google-fonts/poppins';
 
 import { CallModal } from '../components/CallModal';
 import { InAppNotificationBanner } from '../components/InAppNotificationBanner';
@@ -69,13 +70,13 @@ const floatingPillStyles = StyleSheet.create({
   },
   nameText: {
     color: '#FFFFFF',
-    fontWeight: '700',
+    fontFamily: 'Poppins_700Bold',
     fontSize: 12.5,
     maxWidth: 90,
   },
   timeText: {
     color: '#86EFAC',
-    fontWeight: '600',
+    fontFamily: 'Poppins_600SemiBold',
     fontSize: 12,
   },
   tapText: {
@@ -181,7 +182,7 @@ const pipStyles = StyleSheet.create({
   timerText: {
     color: '#FFFFFF',
     fontSize: 10.5,
-    fontWeight: '800',
+    fontFamily: 'Poppins_800ExtraBold',
   },
 });
 
@@ -463,6 +464,15 @@ function GlobalCallOverlay() {
 }
 
 export default function RootLayout() {
+  const [fontsLoaded] = useFonts({
+    Poppins_400Regular,
+    Poppins_500Medium,
+    Poppins_600SemiBold,
+    Poppins_700Bold,
+    Poppins_800ExtraBold,
+    Poppins_900Black,
+  });
+
   useEffect(() => {
     // 1. Register Telecom Phone Account for Lockscreen / VoIP & Request VoIP Permissions
     if (Platform.OS === 'android') {
@@ -488,7 +498,17 @@ export default function RootLayout() {
     }
     checkOTA();
 
-    
+    // Web Font Injection: Ensure Poppins is immediately active across all web browsers
+    if (Platform.OS === 'web' && typeof document !== 'undefined') {
+      const fontId = 'poppins-web-font';
+      if (!document.getElementById(fontId)) {
+        const link = document.createElement('link');
+        link.id = fontId;
+        link.href = 'https://fonts.googleapis.com/css2?family=Poppins:ital,wght@0,300;0,400;0,500;0,600;0,700;0,800;0,900&display=swap';
+        link.rel = 'stylesheet';
+        document.head.appendChild(link);
+      }
+    }
   }, []);
 
   return (

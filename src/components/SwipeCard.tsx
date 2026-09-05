@@ -3,40 +3,60 @@ import { View, Text, StyleSheet, Dimensions, Animated, PanResponder, TouchableOp
 import { Image } from 'expo-image';
 import { LinearGradient } from 'expo-linear-gradient';
 import { Ionicons, Feather, MaterialCommunityIcons } from '@expo/vector-icons';
+import * as Haptics from 'expo-haptics';
 import { UserProfile } from '../types';
 import { Colors } from '../constants/theme';
 
 const { width: SCREEN_WIDTH, height: SCREEN_HEIGHT } = Dimensions.get('window');
 const CARD_WIDTH = Math.min(SCREEN_WIDTH - 8, 440);
 const CARD_HEIGHT = Math.min(SCREEN_HEIGHT * 0.74, 700);
-const SWIPE_THRESHOLD = CARD_WIDTH * 0.28;
+// Reduced threshold so it's much easier to physically swipe without it bouncing back
+const SWIPE_THRESHOLD = CARD_WIDTH * 0.15;
 
 interface Props {
   profile: UserProfile;
   isFirst?: boolean;
-  onSwipe?: (action: 'like' | 'pass' | 'supersynk') => void;
+  onSwipe?: (action: 'like' | 'pass' | 'supersynk', profileId?: string) => void;
+  onShowProfile?: () => void;
 }
 
-export const SwipeCard: React.FC<Props> = ({ profile, isFirst = true, onSwipe }) => {
+export interface SwipeCardHandle {
+  triggerSwipe: (action: 'like' | 'pass' | 'supersynk') => void;
+}
+
+export const SwipeCard = React.forwardRef(({ profile, isFirst = true, onSwipe, onShowProfile }: Props, ref: React.Ref<SwipeCardHandle>) => {
   const [photoIndex, setPhotoIndex] = useState(0);
   const photos = (profile.photos && profile.photos.length > 0) ? profile.photos : [profile.photo];
   const position = useRef(new Animated.ValueXY()).current;
 
+  // Reset position and photo when profile changes
+  React.useEffect(() => {
+    position.setValue({ x: 0, y: 0 });
+    setPhotoIndex(0);
+  }, [profile.id, position]);
+
+  const isFirstRef = useRef(isFirst);
+  isFirstRef.current = isFirst;
+  const profileIdRef = useRef(profile.id);
+  profileIdRef.current = profile.id;
+  const onSwipeRef = useRef(onSwipe);
+  onSwipeRef.current = onSwipe;
+
   // Touch gesture physics
   const panResponder = useRef(
     PanResponder.create({
-      onStartShouldSetPanResponder: () => isFirst,
-      onMoveShouldSetPanResponder: (_, gesture) => isFirst && (Math.abs(gesture.dx) > 6 || Math.abs(gesture.dy) > 6),
+      onStartShouldSetPanResponder: () => isFirstRef.current,
+      onMoveShouldSetPanResponder: (_, gesture) => isFirstRef.current && (Math.abs(gesture.dx) > 6 || Math.abs(gesture.dy) > 6),
       onPanResponderMove: (_, gesture) => {
         position.setValue({ x: gesture.dx, y: gesture.dy });
       },
       onPanResponderRelease: (_, gesture) => {
         if (gesture.dx > SWIPE_THRESHOLD) {
-          forceSwipe('like', SCREEN_WIDTH + 100, gesture.dy);
+          triggerSwipe('like');
         } else if (gesture.dx < -SWIPE_THRESHOLD) {
-          forceSwipe('pass', -SCREEN_WIDTH - 100, gesture.dy);
+          triggerSwipe('pass');
         } else if (gesture.dy < -SWIPE_THRESHOLD * 1.3) {
-          forceSwipe('supersynk', 0, -SCREEN_HEIGHT);
+          triggerSwipe('supersynk');
         } else {
           Animated.spring(position, {
             toValue: { x: 0, y: 0 },
@@ -49,23 +69,42 @@ export const SwipeCard: React.FC<Props> = ({ profile, isFirst = true, onSwipe })
     })
   ).current;
 
-  const forceSwipe = (action: 'like' | 'pass' | 'supersynk', toX: number, toY: number) => {
+  const forceSwipe = (action: 'like' | 'pass' | 'supersynk', toX: number, toY: number, duration = 450) => {
     Animated.timing(position, {
       toValue: { x: toX, y: toY },
-      duration: 250,
+      duration,
       useNativeDriver: true,
     }).start(() => {
-      onSwipe && onSwipe(action);
-      position.setValue({ x: 0, y: 0 });
-      setPhotoIndex(0);
+      onSwipeRef.current && onSwipeRef.current(action, profileIdRef.current);
     });
   };
+
+  const triggerSwipe = (action: 'like' | 'pass' | 'supersynk') => {
+    if (action === 'like') {
+      try { Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium); } catch (e) {}
+      forceSwipe('like', SCREEN_WIDTH + 100, 0, 450);
+    } else if (action === 'pass') {
+      try { Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light); } catch (e) {}
+      forceSwipe('pass', -SCREEN_WIDTH - 100, 0, 450);
+    } else if (action === 'supersynk') {
+      try { Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success); } catch (e) {}
+      forceSwipe('supersynk', 0, -SCREEN_HEIGHT, 450);
+    }
+  };
+
+  React.useImperativeHandle(ref, () => ({
+    triggerSwipe: (action: 'like' | 'pass' | 'supersynk') => {
+      triggerSwipe(action);
+    }
+  }));
 
   // Tap photo left / right like Tinder & Instagram
   const handlePhotoTap = (direction: 'left' | 'right') => {
     if (direction === 'right') {
       if (photoIndex < photos.length - 1) {
         setPhotoIndex(prev => prev + 1);
+      } else if (onShowProfile) {
+        onShowProfile();
       }
     } else {
       if (photoIndex > 0) {
@@ -141,8 +180,8 @@ export const SwipeCard: React.FC<Props> = ({ profile, isFirst = true, onSwipe })
 
       {/* Subtle Vignette Gradient Overlay */}
       <LinearGradient
-        colors={['rgba(0,0,0,0.2)', 'transparent', 'rgba(0,0,0,0.35)', 'rgba(0,0,0,0.85)', '#000000']}
-        locations={[0, 0.25, 0.5, 0.8, 1]}
+        colors={['transparent', 'rgba(0,0,0,0.8)', '#000000']}
+        locations={[0, 0.6, 1]}
         style={styles.gradientOverlay}
       />
 
@@ -162,27 +201,49 @@ export const SwipeCard: React.FC<Props> = ({ profile, isFirst = true, onSwipe })
 
       {/* Ultra-Clean Modern Profile Details */}
       <View style={styles.infoContainer}>
-        {/* Name, Age & Verified Shield */}
-        <View style={styles.nameRow}>
-          <Text style={styles.nameText}>
-            {profile.name}, <Text style={styles.ageText}>{profile.age}</Text>
-          </Text>
-          {profile.isVerified && (
-            <View style={styles.verifiedBadge}>
-              <Ionicons name="shield-checkmark" size={18} color="#00E5FF" />
-            </View>
-          )}
-        </View>
+        {/* Sleek Pull Handle Bar ("danda") for viewing profile */}
+        <TouchableOpacity 
+          style={styles.handleContainer} 
+          onPress={onShowProfile}
+          activeOpacity={0.7}
+        >
+          <View style={styles.handleBar} />
+        </TouchableOpacity>
 
-        {/* Profession & Distance 1-Liner */}
-        {(profile.occupation || profile.location) && (
-          <Text style={styles.subtitleText} numberOfLines={1}>
-            {[
-              profile.occupation,
-              typeof (profile.location as any) === 'object' ? ((profile.location as any)?.city || 'Nearby') : (profile.location || 'Nearby')
-            ].filter(Boolean).join(' • ')}
-          </Text>
-        )}
+        <View style={styles.infoHeaderRow}>
+          <View style={styles.nameContent}>
+            {/* Name, Age & Verified Shield */}
+            <View style={styles.nameRow}>
+              <Text style={styles.nameText}>
+                {profile.name}, <Text style={styles.ageText}>{profile.age}</Text>
+              </Text>
+              {profile.isVerified && (
+                <View style={styles.verifiedBadge}>
+                  <Ionicons name="shield-checkmark" size={18} color="#00E5FF" />
+                </View>
+              )}
+            </View>
+
+            {/* Profession & Distance 1-Liner (Strict Dating Privacy: Distance only, no city name) */}
+            {(profile.occupation || profile.distance) && (
+              <Text style={styles.subtitleText} numberOfLines={1}>
+                {[
+                  profile.occupation,
+                  profile.distance || 'Nearby'
+                ].filter(Boolean).join(' • ')}
+              </Text>
+            )}
+          </View>
+
+          {/* Info (i) Button for Full Profile Modal */}
+          <TouchableOpacity 
+            style={styles.infoBtn} 
+            activeOpacity={0.8} 
+            onPress={onShowProfile}
+          >
+            <Ionicons name="information" size={20} color="#0F172A" />
+          </TouchableOpacity>
+        </View>
 
         {/* 3 Clean Subtle Glass Tag Chips */}
         {profile.interests && profile.interests.length > 0 && (
@@ -197,7 +258,7 @@ export const SwipeCard: React.FC<Props> = ({ profile, isFirst = true, onSwipe })
       </View>
     </Animated.View>
   );
-};
+});
 
 const styles = StyleSheet.create({
   card: {
@@ -252,7 +313,7 @@ const styles = StyleSheet.create({
     left: 0,
     right: 0,
     bottom: 0,
-    height: '70%',
+    height: '60%',
   },
   stamp: {
     position: 'absolute',
@@ -272,7 +333,7 @@ const styles = StyleSheet.create({
   likeStampText: {
     color: '#FD3A73',
     fontSize: 40,
-    fontWeight: '900',
+    fontFamily: 'Poppins_900Black',
     letterSpacing: 4,
   },
   nopeStamp: {
@@ -285,7 +346,7 @@ const styles = StyleSheet.create({
   nopeStampText: {
     color: '#EF4444',
     fontSize: 40,
-    fontWeight: '900',
+    fontFamily: 'Poppins_900Black',
     letterSpacing: 4,
   },
   infoContainer: {
@@ -298,6 +359,45 @@ const styles = StyleSheet.create({
     gap: 6,
     zIndex: 20,
   },
+  handleContainer: {
+    width: '100%',
+    alignItems: 'center',
+    paddingVertical: 6,
+    marginBottom: 2,
+  },
+  handleBar: {
+    width: 44,
+    height: 5,
+    borderRadius: 3,
+    backgroundColor: 'rgba(255, 255, 255, 0.75)',
+    shadowColor: '#000000',
+    shadowOffset: { width: 0, height: 1 },
+    shadowOpacity: 0.3,
+    shadowRadius: 2,
+  },
+  infoHeaderRow: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    width: '100%',
+  },
+  nameContent: {
+    flex: 1,
+    paddingRight: 8,
+  },
+  infoBtn: {
+    width: 32,
+    height: 32,
+    borderRadius: 16,
+    backgroundColor: '#FFFFFF',
+    justifyContent: 'center',
+    alignItems: 'center',
+    shadowColor: '#000000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.3,
+    shadowRadius: 4,
+    elevation: 4,
+  },
   nameRow: {
     flexDirection: 'row',
     alignItems: 'center',
@@ -306,7 +406,7 @@ const styles = StyleSheet.create({
   nameText: {
     color: '#FFFFFF',
     fontSize: 32,
-    fontWeight: '900',
+    fontFamily: 'Poppins_900Black',
     letterSpacing: -0.5,
     textShadowColor: 'rgba(0, 0, 0, 0.75)',
     textShadowOffset: { width: 0, height: 1 },
@@ -315,7 +415,7 @@ const styles = StyleSheet.create({
   ageText: {
     color: '#FFFFFF',
     fontSize: 28,
-    fontWeight: '400',
+    fontFamily: 'Poppins_400Regular',
   },
   verifiedBadge: {
     marginTop: 4,
@@ -323,7 +423,7 @@ const styles = StyleSheet.create({
   subtitleText: {
     color: '#D1D5DB',
     fontSize: 13,
-    fontWeight: '500',
+    fontFamily: 'Poppins_500Medium',
     letterSpacing: 0.2,
   },
   interestsGrid: {
@@ -343,6 +443,6 @@ const styles = StyleSheet.create({
   chipText: {
     color: '#FFFFFF',
     fontSize: 11,
-    fontWeight: '600',
+    fontFamily: 'Poppins_600SemiBold',
   },
 });

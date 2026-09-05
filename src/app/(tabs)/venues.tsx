@@ -90,7 +90,7 @@ export default function VenuesScreen() {
                       styles.catText,
                       {
                         color: isActive ? '#FFFFFF' : textColor,
-                        fontWeight: isActive ? '800' : '600',
+                        fontFamily: isActive ? 'Poppins_800ExtraBold' : 'Poppins_600SemiBold',
                       },
                     ]}
                   >
@@ -130,8 +130,8 @@ const styles = StyleSheet.create({
     marginBottom: 4,
   },
   title: {
+    fontFamily: 'Poppins_900Black',
     fontSize: 22,
-    fontWeight: '900',
     letterSpacing: -0.5,
   },
   subtitle: {

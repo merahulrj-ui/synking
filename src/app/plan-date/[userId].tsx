@@ -211,7 +211,7 @@ const styles = StyleSheet.create({
   },
   title: {
     fontSize: 17,
-    fontWeight: '800',
+    fontFamily: 'Poppins_800ExtraBold',
     letterSpacing: -0.3,
   },
   closeBtn: {
@@ -226,7 +226,7 @@ const styles = StyleSheet.create({
   },
   label: {
     fontSize: 12.5,
-    fontWeight: '700',
+    fontFamily: 'Poppins_700Bold',
     marginBottom: 8,
   },
   userBox: {
@@ -244,7 +244,7 @@ const styles = StyleSheet.create({
   },
   userName: {
     fontSize: 16,
-    fontWeight: '800',
+    fontFamily: 'Poppins_800ExtraBold',
   },
   verifiedTag: {
     flexDirection: 'row',
@@ -258,7 +258,7 @@ const styles = StyleSheet.create({
   userVerified: {
     color: '#0369A1',
     fontSize: 11,
-    fontWeight: '800',
+    fontFamily: 'Poppins_800ExtraBold',
   },
   venueList: {
     gap: 10,
@@ -284,7 +284,7 @@ const styles = StyleSheet.create({
   },
   venueName: {
     fontSize: 15,
-    fontWeight: '800',
+    fontFamily: 'Poppins_800ExtraBold',
   },
   ratingBadge: {
     flexDirection: 'row',
@@ -294,11 +294,11 @@ const styles = StyleSheet.create({
   venueRating: {
     color: '#F59E0B',
     fontSize: 12,
-    fontWeight: '800',
+    fontFamily: 'Poppins_800ExtraBold',
   },
   venueMeta: {
     fontSize: 12,
-    fontWeight: '500',
+    fontFamily: 'Poppins_500Medium',
   },
   perkBox: {
     flexDirection: 'row',
@@ -309,7 +309,7 @@ const styles = StyleSheet.create({
   venuePerk: {
     color: '#FD3A73',
     fontSize: 11.5,
-    fontWeight: '700',
+    fontFamily: 'Poppins_700Bold',
   },
   slotsGrid: {
     flexDirection: 'row',
@@ -324,7 +324,7 @@ const styles = StyleSheet.create({
   },
   slotText: {
     fontSize: 12,
-    fontWeight: '700',
+    fontFamily: 'Poppins_700Bold',
   },
   splitRow: {
     flexDirection: 'row',
@@ -340,6 +340,6 @@ const styles = StyleSheet.create({
   },
   splitBtnText: {
     fontSize: 13,
-    fontWeight: '800',
+    fontFamily: 'Poppins_800ExtraBold',
   },
 });

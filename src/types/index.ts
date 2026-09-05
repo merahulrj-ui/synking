@@ -48,7 +48,7 @@ export interface EncryptedChatMessageRecord {
   receiverId: string;
   cipherText: string;
   isEncrypted: boolean;
-  type: 'text' | 'date_invite' | 'voice' | 'call' | 'system';
+  type: 'text' | 'date_invite' | 'voice' | 'call' | 'system' | 'call_request';
   extraData?: ChatMessage['extraData'];
   timestamp: string;
 }
@@ -103,7 +103,7 @@ export interface ChatMessage {
   receiverId: string;
   text: string;
   timestamp: string;
-  type: 'text' | 'date_invite' | 'voice' | 'call' | 'system';
+  type: 'text' | 'date_invite' | 'voice' | 'call' | 'system' | 'call_request';
   extraData?: {
     bookingId?: string;
     venueName?: string;
@@ -114,6 +114,9 @@ export interface ChatMessage {
     audioUrl?: string;
     audioDuration?: number;
     reaction?: string;
+    requestedBy?: string;
+    requestedByName?: string;
+    timestamp?: number;
   };
 }
 

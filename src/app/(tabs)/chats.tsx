@@ -293,25 +293,23 @@ const styles = StyleSheet.create({
     marginBottom: 12,
   },
   screenTitle: {
+    fontFamily: 'Poppins_900Black',
     fontSize: 24,
-    fontWeight: '900',
     letterSpacing: -0.5,
   },
   e2eeBadge: {
     flexDirection: 'row',
     alignItems: 'center',
     gap: 4,
-    backgroundColor: 'rgba(34, 197, 94, 0.12)',
-    borderWidth: 1,
-    borderColor: 'rgba(34, 197, 94, 0.3)',
+    backgroundColor: 'rgba(34, 197, 94, 0.15)',
     paddingHorizontal: 8,
-    paddingVertical: 3,
-    borderRadius: 10,
+    paddingVertical: 4,
+    borderRadius: 12,
   },
   e2eeText: {
     color: '#22C55E',
+    fontFamily: 'Poppins_700Bold',
     fontSize: 10,
-    fontWeight: '700',
   },
   chatCard: {
     flexDirection: 'row',
@@ -361,16 +359,16 @@ const styles = StyleSheet.create({
     justifyContent: 'space-between',
   },
   userName: {
+    fontFamily: 'Poppins_800ExtraBold',
     fontSize: 16,
-    fontWeight: '800',
   },
   timeText: {
+    fontFamily: 'Poppins_500Medium',
     fontSize: 11,
-    fontWeight: '500',
   },
   lastMsgText: {
+    fontFamily: 'Poppins_400Regular',
     fontSize: 13,
-    fontWeight: '400',
   },
   emptyContainer: {
     flex: 1,
@@ -396,10 +394,11 @@ const styles = StyleSheet.create({
     elevation: 8,
   },
   emptyTitle: {
+    fontFamily: 'Poppins_800ExtraBold',
     fontSize: 18,
-    fontWeight: '800',
   },
   emptySub: {
+    fontFamily: 'Poppins_500Medium',
     fontSize: 13,
     textAlign: 'center',
     lineHeight: 18,
@@ -418,7 +417,7 @@ const styles = StyleSheet.create({
   },
   discoverBtnText: {
     color: '#FFF',
+    fontFamily: 'Poppins_700Bold',
     fontSize: 14,
-    fontWeight: '700',
   },
 });

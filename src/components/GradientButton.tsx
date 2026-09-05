@@ -1,4 +1,4 @@
-﻿import React from 'react';
+import React from 'react';
 import { TouchableOpacity, Text, StyleSheet, ViewStyle, TextStyle } from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
 import { Colors } from '../constants/theme';
@@ -68,7 +68,7 @@ const styles = StyleSheet.create({
   text: {
     color: '#FFF',
     fontSize: 15,
-    fontWeight: '800',
+    fontFamily: 'Poppins_800ExtraBold',
     letterSpacing: 0.2,
   },
 });

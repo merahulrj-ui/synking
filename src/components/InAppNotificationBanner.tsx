@@ -251,12 +251,12 @@ const styles = StyleSheet.create({
   },
   senderName: {
     fontSize: 14,
-    fontWeight: '800',
+    fontFamily: 'Poppins_800ExtraBold',
     maxWidth: 160,
   },
   badgeText: {
     fontSize: 10,
-    fontWeight: '800',
+    fontFamily: 'Poppins_800ExtraBold',
     color: '#FD3A73',
     backgroundColor: 'rgba(253, 58, 115, 0.1)',
     paddingHorizontal: 6,
@@ -265,7 +265,7 @@ const styles = StyleSheet.create({
   },
   previewText: {
     fontSize: 12.5,
-    fontWeight: '500',
+    fontFamily: 'Poppins_500Medium',
   },
   closeBtn: {
     padding: 6,

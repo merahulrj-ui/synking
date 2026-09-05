@@ -43,7 +43,7 @@ export const MatchCelebrationModal: React.FC<Props> = ({ matchedUser, onClose })
           </View>
 
           <Text style={styles.userName}>{matchedUser.name}, {matchedUser.age}</Text>
-          <Text style={styles.userLocation}>📍 {typeof (matchedUser.location as any) === 'object' ? ((matchedUser.location as any)?.city || 'Roorkee') : (matchedUser.location || 'Roorkee')} • {matchedUser.occupation}</Text>
+          <Text style={styles.userLocation}>📍 {matchedUser.distance || 'Nearby'} • {matchedUser.occupation}</Text>
 
           <View style={styles.noticeBox}>
             <Ionicons name="lock-closed" size={14} color="#22C55E" />
@@ -104,13 +104,13 @@ const styles = StyleSheet.create({
   tagBadge: {
     color: '#FD3A73',
     fontSize: 12,
-    fontWeight: '900',
+    fontFamily: 'Poppins_900Black',
     letterSpacing: 1.2,
   },
   title: {
     color: '#FFFFFF',
     fontSize: 24,
-    fontWeight: '900',
+    fontFamily: 'Poppins_900Black',
     letterSpacing: -0.5,
   },
   avatarWrapper: {
@@ -139,12 +139,12 @@ const styles = StyleSheet.create({
   userName: {
     color: '#FFFFFF',
     fontSize: 19,
-    fontWeight: '800',
+    fontFamily: 'Poppins_800ExtraBold',
   },
   userLocation: {
     color: '#94A3B8',
     fontSize: 12.5,
-    fontWeight: '500',
+    fontFamily: 'Poppins_500Medium',
   },
   noticeBox: {
     flexDirection: 'row',
@@ -161,7 +161,7 @@ const styles = StyleSheet.create({
   noticeText: {
     color: '#4ADE80',
     fontSize: 11.5,
-    fontWeight: '600',
+    fontFamily: 'Poppins_600SemiBold',
     flex: 1,
     lineHeight: 16,
   },
@@ -187,7 +187,7 @@ const styles = StyleSheet.create({
   chatBtnText: {
     color: '#FFFFFF',
     fontSize: 14.5,
-    fontWeight: '900',
+    fontFamily: 'Poppins_900Black',
   },
   dismissBtn: {
     paddingVertical: 10,
@@ -196,6 +196,6 @@ const styles = StyleSheet.create({
   dismissBtnText: {
     color: '#94A3B8',
     fontSize: 13,
-    fontWeight: '700',
+    fontFamily: 'Poppins_700Bold',
   },
 });

@@ -12,7 +12,7 @@ const FIRESTORE_BASE_URL = `https://firestore.googleapis.com/v1/projects/${PROJE
 export const CLOUD_BACKEND_URL = 'https://synking-9my2.onrender.com';
 
 export function getLocalBackendUrl(): string {
-  // Unify Web & Native Mobile to the Central Live Render Cloud Backend
+  // Connected to Central Live Render Cloud Backend (matching installed APK)
   return CLOUD_BACKEND_URL;
 }
 
@@ -42,7 +42,7 @@ export interface EncryptedChatMessageRecord {
   receiverId: string;
   cipherText: string;
   isEncrypted: boolean;
-  type: 'text' | 'date_invite' | 'voice' | 'call' | 'system';
+  type: 'text' | 'date_invite' | 'voice' | 'call' | 'system' | 'call_request';
   extraData?: any;
   timestamp: string;
 }
@@ -175,6 +175,20 @@ export async function updateRequestStatusInFirestore(requestId: string, status: 
   } catch (e) {}
 
   return true;
+}
+
+/**
+ * Deletes a sent Synk request (e.g. user cancels their sent request)
+ */
+export async function deleteSynkRequestFromBackend(requestId: string): Promise<boolean> {
+  try {
+    const res = await fetch(`${getLocalBackendUrl()}/api/requests/${encodeURIComponent(requestId)}`, {
+      method: 'DELETE',
+    });
+    return res.ok;
+  } catch (e) {
+    return false;
+  }
 }
 
 /**

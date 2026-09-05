@@ -84,7 +84,7 @@ export const VenueCard: React.FC<Props> = ({ venue, onReserve }) => {
         }]}>
           <Ionicons name="gift" size={15} color="#FB8500" />
           <Text style={styles.perkText} numberOfLines={1}>
-            <Text style={{ fontWeight: '800', color: '#FB8500' }}>Perk: </Text>
+            <Text style={{ fontFamily: 'Poppins_800ExtraBold', color: '#FB8500' }}>Perk: </Text>
             {venue.perks}
           </Text>
         </View>
@@ -146,7 +146,7 @@ const styles = StyleSheet.create({
   tagText: {
     color: '#FFFFFF',
     fontSize: 11,
-    fontWeight: '700',
+    fontFamily: 'Poppins_700Bold',
   },
   safeBadge: {
     position: 'absolute',
@@ -165,7 +165,7 @@ const styles = StyleSheet.create({
   safeText: {
     color: '#00E5FF',
     fontSize: 11,
-    fontWeight: '800',
+    fontFamily: 'Poppins_800ExtraBold',
   },
   body: {
     padding: 14,
@@ -178,7 +178,7 @@ const styles = StyleSheet.create({
   },
   name: {
     fontSize: 17,
-    fontWeight: '800',
+    fontFamily: 'Poppins_800ExtraBold',
     letterSpacing: -0.3,
   },
   ratingBox: {
@@ -188,7 +188,7 @@ const styles = StyleSheet.create({
   },
   ratingText: {
     fontSize: 13,
-    fontWeight: '700',
+    fontFamily: 'Poppins_700Bold',
   },
   metaRow: {
     flexDirection: 'row',
@@ -197,11 +197,11 @@ const styles = StyleSheet.create({
   },
   addressText: {
     fontSize: 12,
-    fontWeight: '500',
+    fontFamily: 'Poppins_500Medium',
   },
   priceText: {
     fontSize: 12,
-    fontWeight: '700',
+    fontFamily: 'Poppins_700Bold',
   },
   perkBox: {
     flexDirection: 'row',
@@ -214,7 +214,7 @@ const styles = StyleSheet.create({
   perkText: {
     color: '#D97706',
     fontSize: 12,
-    fontWeight: '600',
+    fontFamily: 'Poppins_600SemiBold',
     flex: 1,
   },
   planBtn: {
@@ -228,7 +228,7 @@ const styles = StyleSheet.create({
   planBtnText: {
     color: '#FFFFFF',
     fontSize: 13.5,
-    fontWeight: '800',
+    fontFamily: 'Poppins_800ExtraBold',
     letterSpacing: 0.3,
   },
 });

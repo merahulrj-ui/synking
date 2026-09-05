@@ -70,27 +70,26 @@ const styles = StyleSheet.create({
   badge: {
     color: '#FD3A73',
     fontSize: 10,
-    fontWeight: '900',
+    fontFamily: 'Poppins_900Black',
     letterSpacing: 0.8,
   },
   qrText: {
     color: '#D97706',
     fontSize: 10.5,
-    fontWeight: '800',
     fontFamily: 'monospace',
   },
   title: {
     fontSize: 16,
-    fontWeight: '900',
+    fontFamily: 'Poppins_900Black',
     letterSpacing: -0.3,
   },
   venue: {
     fontSize: 12.5,
-    fontWeight: '600',
+    fontFamily: 'Poppins_600SemiBold',
   },
   time: {
     fontSize: 12.5,
-    fontWeight: '600',
+    fontFamily: 'Poppins_600SemiBold',
   },
   footer: {
     flexDirection: 'row',
@@ -103,11 +102,11 @@ const styles = StyleSheet.create({
   perk: {
     color: '#D97706',
     fontSize: 11.5,
-    fontWeight: '700',
+    fontFamily: 'Poppins_700Bold',
   },
   viewPass: {
     color: '#FD3A73',
     fontSize: 12,
-    fontWeight: '800',
+    fontFamily: 'Poppins_800ExtraBold',
   },
 });

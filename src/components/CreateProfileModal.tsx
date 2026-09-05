@@ -39,8 +39,8 @@ export const CreateProfileModal: React.FC<Props> = ({ visible, onClose }) => {
       return;
     }
 
-    const cleanName = name.trim().toLowerCase().replace(/[^a-z0-9]/g, '_');
-    const newId = `user_${cleanName}`;
+    const generateHashId = () => Array.from({length: 16}, () => Math.floor(Math.random() * 16).toString(16)).join('');
+    const newId = `usr_${generateHashId()}`;
     const newProfile = {
       id: newId,
       name: name.trim(),
@@ -55,7 +55,7 @@ export const CreateProfileModal: React.FC<Props> = ({ visible, onClose }) => {
       interests: ['Coffee', 'Music', 'Travel'],
       compatibility: 98,
       isVerified: true,
-      isVip: true,
+      isVip: false,
     };
 
     loginUser(newProfile);
@@ -229,7 +229,7 @@ const styles = StyleSheet.create({
   },
   logo: {
     fontSize: 16,
-    fontWeight: '900',
+    fontFamily: 'Poppins_900Black',
     letterSpacing: 1,
   },
   tagBadge: {
@@ -241,11 +241,11 @@ const styles = StyleSheet.create({
   tagBadgeText: {
     color: '#FD3A73',
     fontSize: 9,
-    fontWeight: '900',
+    fontFamily: 'Poppins_900Black',
   },
   title: {
     fontSize: 20,
-    fontWeight: '900',
+    fontFamily: 'Poppins_900Black',
     letterSpacing: -0.4,
   },
   subtitle: {
@@ -255,7 +255,7 @@ const styles = StyleSheet.create({
   },
   fieldLabel: {
     fontSize: 11,
-    fontWeight: '800',
+    fontFamily: 'Poppins_800ExtraBold',
     textTransform: 'uppercase',
     letterSpacing: 0.5,
     marginTop: 4,
@@ -308,7 +308,7 @@ const styles = StyleSheet.create({
   },
   genderText: {
     fontSize: 12,
-    fontWeight: '800',
+    fontFamily: 'Poppins_800ExtraBold',
   },
   createBtn: {
     flexDirection: 'row',
@@ -328,6 +328,6 @@ const styles = StyleSheet.create({
   createBtnText: {
     color: '#FFF',
     fontSize: 14.5,
-    fontWeight: '900',
+    fontFamily: 'Poppins_900Black',
   },
 });

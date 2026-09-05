@@ -45,7 +45,7 @@ class RealtimeBridgeManager {
 
   private connectWebSocket() {
     try {
-      // Connect both Web & Native Mobile to the Central Live Render Cloud WebSocket Engine
+      // Connect to Central Render Cloud WebSocket Engine (matching installed APK)
       const wsUrl = 'wss://synking-9my2.onrender.com';
       console.log(`[WS_CONNECTING] ${wsUrl}`);
       this.socket = new WebSocket(wsUrl);
@@ -138,6 +138,8 @@ class RealtimeBridgeManager {
       | 'LIVE_VIDEO_FRAME'
       | 'LIVE_AUDIO_PULSE'
       | 'CALL_UPGRADED_TO_VIDEO'
+      | 'CALL_REQUEST'
+      | 'CALL_WINDOW_APPROVED'
       | 'DELETE_MESSAGE',
     payload: any,
     targetUserId?: string

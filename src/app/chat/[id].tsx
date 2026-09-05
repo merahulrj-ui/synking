@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useRef } from 'react';
+import React, { useState, useEffect, useRef, useMemo } from 'react';
 import {
   View,
   Text,
@@ -25,6 +25,7 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
 import * as Haptics from 'expo-haptics';
+import { LinearGradient } from 'expo-linear-gradient';
 import { useApp } from '../../contexts/AppContext';
 import { WebRTCService } from '../../services/webrtcService';
 import { CallModal } from '../../components/CallModal';
@@ -78,6 +79,18 @@ function formatWhatsAppTime(timestamp?: string): string {
   } catch (e) {
     return timestamp;
   }
+}
+
+function isSameUser(idA?: string | null, idB?: string | null): boolean {
+  if (!idA || !idB) return false;
+  if (idA === idB) return true;
+  const cleanA = String(idA).trim();
+  const cleanB = String(idB).trim();
+  if (cleanA.toLowerCase() === cleanB.toLowerCase()) return true;
+  const digitsA = cleanA.replace(/\D/g, '').slice(-10);
+  const digitsB = cleanB.replace(/\D/g, '').slice(-10);
+  if (digitsA && digitsB && digitsA.length >= 7 && digitsA === digitsB) return true;
+  return false;
 }
 
 const ICEBREAKERS = [
@@ -217,6 +230,54 @@ export default function ChatScreen() {
     loadSuspension();
   }, []);
 
+  // ⏱️ 15-Minute Calling Window State & Persistence
+  const [callWindowActiveUntil, setCallWindowActiveUntil] = useState<number | null>(null);
+  const [callWindowRemainingSecs, setCallWindowRemainingSecs] = useState<number>(0);
+  const [callRequesterId, setCallRequesterId] = useState<string | null>(null);
+
+  useEffect(() => {
+    if (!id) return;
+    const loadCallWindow = async () => {
+      try {
+        const stored = await AsyncStorage.getItem(`synking_call_window_${id}`);
+        const storedRequester = await AsyncStorage.getItem(`synking_call_requester_${id}`);
+        if (storedRequester) {
+          setCallRequesterId(storedRequester);
+        }
+        if (stored) {
+          const timestamp = parseInt(stored, 10);
+          if (timestamp && Date.now() < timestamp) {
+            setCallWindowActiveUntil(timestamp);
+            setCallWindowRemainingSecs(Math.max(0, Math.floor((timestamp - Date.now()) / 1000)));
+          } else {
+            setCallWindowActiveUntil(null);
+            setCallRequesterId(null);
+            await AsyncStorage.removeItem(`synking_call_window_${id}`);
+            await AsyncStorage.removeItem(`synking_call_requester_${id}`);
+          }
+        }
+      } catch (e) {}
+    };
+    loadCallWindow();
+  }, [id]);
+
+  useEffect(() => {
+    if (!callWindowActiveUntil) return;
+    const timer = setInterval(() => {
+      const remaining = Math.max(0, Math.floor((callWindowActiveUntil - Date.now()) / 1000));
+      setCallWindowRemainingSecs(remaining);
+      if (remaining <= 0) {
+        setCallWindowActiveUntil(null);
+        setCallRequesterId(null);
+        if (id) {
+          AsyncStorage.removeItem(`synking_call_window_${id}`).catch(() => {});
+          AsyncStorage.removeItem(`synking_call_requester_${id}`).catch(() => {});
+        }
+      }
+    }, 1000);
+    return () => clearInterval(timer);
+  }, [callWindowActiveUntil, id]);
+
   const mediaRecorderRef = useRef<any>(null);
   const mediaStreamRef = useRef<any>(null);
   const audioChunksRef = useRef<any[]>([]);
@@ -318,6 +379,28 @@ const VOICE_COMPRESSED_CONFIG: any = {
   }, [isRecording, recordingSeconds]);
 
   const startRecording = async () => {
+    // 👑 VIP ONLY: Voice notes & audio are strictly for SYNKING Black VIP members to prevent safety violations & number sharing!
+    if (!currentUser?.isVip) {
+      const title = '✨ 👑 VIP Exclusive Feature 👑 ✨';
+      const msg = `⭐ Voice Notes & Audio Messages are reserved exclusively for SYNKING Black VIP members.\n\n🔒 For member safety and anti-fraud protection, audio messages are locked on standard accounts.\n\n✨ Upgrade to VIP to unlock unlimited voice notes & private calling!`;
+      if (Platform.OS === 'web') {
+        const upgrade = window.confirm(`${title}\n\n${msg}\n\nWould you like to upgrade to VIP now?`);
+        if (upgrade) {
+          router.push('/vip-membership');
+        }
+      } else {
+        Alert.alert(
+          title,
+          msg,
+          [
+            { text: 'Maybe Later', style: 'cancel' },
+            { text: 'Upgrade to VIP ✨', onPress: () => router.push('/vip-membership') }
+          ]
+        );
+      }
+      return;
+    }
+
     try {
       addAudioLog('🎙️ Requesting microphone access...');
       if (Platform.OS !== 'web') {
@@ -959,6 +1042,35 @@ const VOICE_COMPRESSED_CONFIG: any = {
         markMessageDeletedLocally(payload.messageId);
         addAudioLog(`🗑️ [DELETE_RECEIVED] Message ${payload.messageId.substring(0, 10)} deleted`);
       }
+
+      if (type === 'CALL_WINDOW_APPROVED' && (payload?.partnerId === id || payload?.partnerId === myId)) {
+        const until = payload.until || (Date.now() + 15 * 60 * 1000);
+        setCallWindowActiveUntil(until);
+        setCallWindowRemainingSecs(Math.max(0, Math.floor((until - Date.now()) / 1000)));
+        if (payload?.requesterId) {
+          setCallRequesterId(payload.requesterId);
+          if (id) {
+            AsyncStorage.setItem(`synking_call_requester_${id}`, payload.requesterId).catch(() => {});
+          }
+        }
+        if (id) {
+          AsyncStorage.setItem(`synking_call_window_${id}`, until.toString()).catch(() => {});
+        }
+        if (Platform.OS !== 'web') {
+          Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success).catch(() => {});
+        }
+      }
+
+      if (type === 'CALL_REQUEST' && (payload?.partnerId === myId || payload?.partnerId === id)) {
+        const reqId = payload?.callerUser?.id || payload?.requesterId || id;
+        setCallRequesterId(reqId);
+        if (id) {
+          AsyncStorage.setItem(`synking_call_requester_${id}`, reqId).catch(() => {});
+        }
+        if (Platform.OS !== 'web') {
+          Haptics.notificationAsync(Haptics.NotificationFeedbackType.Warning).catch(() => {});
+        }
+      }
     });
     return () => unsubscribe();
   }, [id, currentUser?.id]);
@@ -1286,6 +1398,20 @@ const VOICE_COMPRESSED_CONFIG: any = {
   };
 
   const handleVoiceNote = () => {
+    if (!currentUser?.isVip) {
+      const title = '✨ 👑 VIP Exclusive Feature 👑 ✨';
+      const msg = `⭐ Voice Notes & Audio Messages are reserved exclusively for SYNKING Black VIP members.\n\n✨ Upgrade to VIP to unlock unlimited voice notes & private calling!`;
+      if (Platform.OS === 'web') {
+        const upgrade = window.confirm(`${title}\n\n${msg}\n\nWould you like to upgrade to VIP now?`);
+        if (upgrade) router.push('/vip-membership');
+      } else {
+        Alert.alert(title, msg, [
+          { text: 'Maybe Later', style: 'cancel' },
+          { text: 'Upgrade to VIP ✨', onPress: () => router.push('/vip-membership') }
+        ]);
+      }
+      return;
+    }
     Alert.alert('Voice Note 🎙️', '10-second encrypted voice note recorded!');
     handleSend('🎙️ [Encrypted Voice Note · 0:14s]');
   };
@@ -1294,22 +1420,57 @@ const VOICE_COMPRESSED_CONFIG: any = {
   const handleStartCall = (type: 'audio' | 'video') => {
     if (!currentUser || !targetUser) return;
 
-    if (isSuspended && suspendedUntil && Date.now() < suspendedUntil) {
-      const unlockStr = new Date(suspendedUntil).toLocaleString();
-      const msg = `Your ENTIRE account is temporarily suspended for 3 days.\n\n🔒 Voice & Video calls unlock on: ${unlockStr}`;
-      if (Platform.OS === 'web') {
-        window.alert(`🚫 Calls Disabled\n\n${msg}`);
-      } else {
-        Alert.alert('🚫 Calls Disabled', msg, [{ text: 'OK' }]);
-      }
+    // 🚫 Prevent calling oneself
+    const myPhone = (currentUser.phoneNumber || '').replace(/\D/g, '').slice(-10);
+    const targetPhone = (targetUser.phoneNumber || '').replace(/\D/g, '').slice(-10);
+    const isSelf = targetUser.id === currentUser.id ||
+      (myPhone && targetPhone && myPhone === targetPhone) ||
+      (currentUser.name && targetUser.name && currentUser.name.trim().toLowerCase() === targetUser.name.trim().toLowerCase());
+    if (isSelf) {
+      Alert.alert('Cannot Call Yourself', 'You cannot send a call request or call your own profile!');
       return;
     }
 
+    // 🚀 DIRECT CALLING UNLOCKED FOR TESTING:
+    // (Approval window & VIP gating revoked and moved to Coming Soon as requested)
     WebRTCService.startCall({
       callerUser: currentUser,
       targetUser,
       type,
     });
+  };
+
+  const handleApproveCallRequest = () => {
+    const windowUntil = Date.now() + 15 * 60 * 1000;
+    setCallWindowActiveUntil(windowUntil);
+    setCallWindowRemainingSecs(15 * 60);
+    const requester = callRequesterId || id;
+    setCallRequesterId(requester);
+    if (id) {
+      AsyncStorage.setItem(`synking_call_window_${id}`, windowUntil.toString()).catch(() => {});
+      AsyncStorage.setItem(`synking_call_requester_${id}`, requester).catch(() => {});
+      sendMessage(id, '🟢 Call Request Approved! 15-Minute Calling Window is now active.');
+      RealtimeBridge.broadcast('CALL_WINDOW_APPROVED', {
+        partnerId: id,
+        until: windowUntil,
+        approvedBy: currentUser?.name || 'Partner',
+        requesterId: requester,
+      }, id);
+    }
+    if (Platform.OS !== 'web') {
+      Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success).catch(() => {});
+    }
+    Alert.alert(
+      '🟢 Calling Window Active!',
+      `You approved the call request. Waiting for ${targetUser?.name || 'them'} to call!`,
+      [{ text: 'Great 👍' }]
+    );
+  };
+
+  const handleDeclineCallRequest = () => {
+    if (id) {
+      sendMessage(id, `💬 Not available for call right now. Let's chat here!`);
+    }
   };
 
   // Trigger Real Incoming Call Ringing from Partner
@@ -1340,6 +1501,41 @@ const VOICE_COMPRESSED_CONFIG: any = {
     }
   };
 
+  const isUserCaller = useMemo(() => {
+    // 1. Check callRequesterId
+    if (callRequesterId) {
+      if (id && isSameUser(callRequesterId, id)) {
+        return false; // Partner is the requester -> current user is the approver
+      }
+      if (currentUser?.id && isSameUser(callRequesterId, currentUser.id)) {
+        return true; // Current user is the requester -> current user is the caller
+      }
+    }
+
+    // 2. Check the most recent call request in the chat
+    const allMsgs = [...(cloudMessages || []), ...(id && messages[id] ? messages[id] : [])];
+    const lastCallReq = allMsgs.slice().reverse().find(m =>
+      m && (m.type === 'call_request' || (typeof m.text === 'string' && m.text.includes('[Call Request')))
+    );
+
+    if (lastCallReq) {
+      const requester = lastCallReq.extraData?.requestedBy || lastCallReq.senderId;
+      if (requester) {
+        if (id && isSameUser(requester, id)) {
+          return false; // Sent by partner -> current user is the approver
+        }
+        return true; // Sent by current user -> current user is the caller
+      }
+    }
+
+    // 3. If callRequesterId is set but didn't match above
+    if (callRequesterId && id && isSameUser(callRequesterId, id)) {
+      return false;
+    }
+
+    return false;
+  }, [callRequesterId, currentUser?.id, cloudMessages, messages, id]);
+
   return (
     <View style={[styles.safeArea, { backgroundColor: bg, paddingTop: insets.top }]}>
       {/* 1. TOP APP BAR WITH WHATSAPP-STYLE CALLING ICONS */}
@@ -1357,7 +1553,7 @@ const VOICE_COMPRESSED_CONFIG: any = {
         <TouchableOpacity
           style={styles.userHeaderInfo}
           activeOpacity={0.8}
-          onPress={() => Alert.alert(targetUser.name, `${targetUser.occupation} • ${targetUser.location}`)}
+          onPress={() => Alert.alert(targetUser.name, `${targetUser.occupation} • ${targetUser.distance || 'Nearby'}`)}
         >
           <View style={styles.avatarWrapper}>
             <Image
@@ -1414,8 +1610,6 @@ const VOICE_COMPRESSED_CONFIG: any = {
           </TouchableOpacity>
         </View>
       </View>
-
-
 
       {/* 2. SUBTLE SECURITY NOTICE */}
       <View style={[styles.e2eePillWrapper, { backgroundColor: bg }]}>
@@ -1483,7 +1677,7 @@ const VOICE_COMPRESSED_CONFIG: any = {
                   You and {targetUser.name} Synked!
                 </Text>
                 <Text style={[styles.heroSubtitle, { color: subText }]}>
-                  {targetUser.occupation} • {typeof targetUser.location === 'object' ? (targetUser.location?.city || 'Nearby') : (targetUser.location || 'Nearby')}
+                  {[targetUser.occupation, targetUser.distance || 'Nearby'].filter(Boolean).join(' • ')}
                 </Text>
 
                 <View style={[styles.matchBadge, { backgroundColor: isDarkMode ? '#13141F' : '#FFFFFF', borderColor: borderCol }]}>
@@ -1500,8 +1694,10 @@ const VOICE_COMPRESSED_CONFIG: any = {
             ) : null
           }
           renderItem={({ item }) => {
-            const isMine = item.senderId === currentUser?.id || item.senderId === 'my_user_id';
-            const isCallLog = item.text.startsWith('📞') || item.text.startsWith('📹');
+            const isFromPartner = id ? isSameUser(item.senderId, id) : false;
+            const isMine = !isFromPartner;
+            const isCallRequestMsg = item.type === 'call_request' || (typeof item.text === 'string' && item.text.includes('[Call Request'));
+            const isCallLog = !isCallRequestMsg && (item.text.startsWith('📞') || item.text.startsWith('📹'));
 
             if (item.type === 'date_invite') {
               return (
@@ -1520,6 +1716,27 @@ const VOICE_COMPRESSED_CONFIG: any = {
                       <Text style={styles.inviteBtnText}>Open Safe Boarding Pass 🎟️</Text>
                     </TouchableOpacity>
                   )}
+                </View>
+              );
+            }
+
+            if (isCallRequestMsg) {
+              return (
+                <View style={[styles.callRequestCard, { backgroundColor: isDarkMode ? '#13141F' : '#F1F5F9', borderColor: isDarkMode ? '#334155' : '#CBD5E1', paddingVertical: 12 }]}>
+                  <View style={styles.callRequestHeader}>
+                    <Ionicons name="call" size={16} color="#10B981" />
+                    <Text style={[styles.callRequestTitle, { color: '#10B981' }]}>DIRECT CALLING READY 📞</Text>
+                  </View>
+                  <Text style={[styles.callRequestBody, { color: textColor, fontSize: 12 }]}>
+                    Approval system moved to Coming Soon. Tap below or use the Call icons in the top bar to connect instantly!
+                  </Text>
+                  <TouchableOpacity
+                    style={[styles.callNowBtn, { backgroundColor: '#10B981', marginTop: 6 }]}
+                    onPress={() => handleStartCall(item.extraData?.callType || 'audio')}
+                    activeOpacity={0.85}
+                  >
+                    <Text style={styles.callNowBtnText}>Call {targetUser?.name || 'Partner'} Directly 📞</Text>
+                  </TouchableOpacity>
                 </View>
               );
             }
@@ -1827,7 +2044,13 @@ const VOICE_COMPRESSED_CONFIG: any = {
                 onPress={() => handleSend(item.text)}
                 activeOpacity={0.75}
               >
-                <Text style={[styles.icebreakerText, { color: textColor }]}>{item.text}</Text>
+                  <Text 
+                    style={[styles.icebreakerText, { color: textColor }]} 
+                    numberOfLines={1}
+                    ellipsizeMode="tail"
+                  >
+                    {item.text}
+                  </Text>
               </TouchableOpacity>
             ))}
           </ScrollView>
@@ -2146,13 +2369,13 @@ const styles = StyleSheet.create({
     right: 0,
   },
   userName: {
+    fontFamily: 'Poppins_800ExtraBold',
     fontSize: 15,
-    fontWeight: '800',
     letterSpacing: -0.3,
   },
   userStatus: {
+    fontFamily: 'Poppins_600SemiBold',
     fontSize: 10,
-    fontWeight: '600',
   },
   headerActions: {
     flexDirection: 'row',
@@ -2164,6 +2387,27 @@ const styles = StyleSheet.create({
     borderRadius: 12,
     alignItems: 'center',
     justifyContent: 'center',
+    position: 'relative',
+  },
+  vipMiniBadge: {
+    position: 'absolute',
+    top: -2,
+    right: -2,
+    backgroundColor: '#FFB703',
+    borderRadius: 6,
+    paddingHorizontal: 3,
+    paddingVertical: 0.5,
+    borderWidth: 1,
+    borderColor: '#05060A',
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  vipMiniBadgeText: {
+    fontFamily: 'Poppins_900Black',
+    fontSize: 7.5,
+    color: '#000000',
+    lineHeight: 9,
+    letterSpacing: 0.2,
   },
   planDateBtn: {
     flexDirection: 'row',
@@ -2177,8 +2421,8 @@ const styles = StyleSheet.create({
   },
   planDateBtnText: {
     color: '#FFFFFF',
+    fontFamily: 'Poppins_800ExtraBold',
     fontSize: 11,
-    fontWeight: '800',
   },
   e2eePillWrapper: {
     alignItems: 'center',
@@ -2195,8 +2439,8 @@ const styles = StyleSheet.create({
     maxWidth: '94%',
   },
   e2eePillText: {
+    fontFamily: 'Poppins_500Medium',
     fontSize: 10.5,
-    fontWeight: '500',
     flex: 1,
     textAlign: 'center',
   },
@@ -2214,18 +2458,19 @@ const styles = StyleSheet.create({
   },
   datePassTitle: {
     color: '#FD3A73',
+    fontFamily: 'Poppins_800ExtraBold',
     fontSize: 13,
-    fontWeight: '800',
   },
   datePassSub: {
     color: '#64748B',
+    fontFamily: 'Poppins_400Regular',
     fontSize: 11,
     marginTop: 1,
   },
   datePassAction: {
     color: '#FD3A73',
+    fontFamily: 'Poppins_800ExtraBold',
     fontSize: 12,
-    fontWeight: '800',
   },
   messagesList: {
     paddingHorizontal: 14,
@@ -2244,83 +2489,88 @@ const styles = StyleSheet.create({
     height: 80,
     borderRadius: 40,
     padding: 3,
-    backgroundColor: '#FD3A73',
-    position: 'relative',
-    marginBottom: 4,
+    borderWidth: 2,
+    borderColor: '#FD3A73',
+    backgroundColor: '#05060A',
+    shadowColor: '#FD3A73',
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.2,
+    shadowRadius: 10,
+    marginBottom: 6,
   },
   heroAvatar: {
     width: '100%',
     height: '100%',
-    borderRadius: 38,
+    borderRadius: 40,
   },
   heroSparkle: {
     position: 'absolute',
     bottom: -2,
     right: -2,
+    backgroundColor: '#FD3A73',
     width: 22,
     height: 22,
     borderRadius: 11,
-    backgroundColor: '#FD3A73',
     alignItems: 'center',
     justifyContent: 'center',
     borderWidth: 2,
-    borderColor: '#FFF',
+    borderColor: '#05060A',
   },
   heroTitle: {
+    fontFamily: 'Poppins_900Black',
     fontSize: 19,
-    fontWeight: '900',
     letterSpacing: -0.5,
   },
   heroSubtitle: {
+    fontFamily: 'Poppins_500Medium',
     fontSize: 12.5,
-    fontWeight: '500',
   },
   matchBadge: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: 6,
+    gap: 4,
+    backgroundColor: 'rgba(253, 58, 115, 0.1)',
     paddingHorizontal: 12,
-    paddingVertical: 5,
+    paddingVertical: 4,
     borderRadius: 14,
-    borderWidth: 1,
     marginTop: 4,
+    borderWidth: 1,
+    borderColor: 'rgba(253, 58, 115, 0.25)',
   },
   matchBadgeText: {
+    fontFamily: 'Poppins_700Bold',
     fontSize: 11.5,
-    fontWeight: '700',
   },
   heroPromptIntro: {
+    fontFamily: 'Poppins_500Medium',
     fontSize: 11.5,
-    textAlign: 'center',
-    marginTop: 8,
-    maxWidth: 280,
-    lineHeight: 16,
+    marginTop: 14,
+    marginBottom: 6,
   },
   bubble: {
     maxWidth: '82%',
-    paddingHorizontal: 14,
-    paddingVertical: 10,
-    borderRadius: 18,
+    paddingHorizontal: 16,
+    paddingVertical: 12,
+    borderRadius: 20,
     shadowColor: '#000',
-    shadowOffset: { width: 0, height: 1 },
-    shadowOpacity: 0.05,
-    shadowRadius: 3,
-    elevation: 1,
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.15,
+    shadowRadius: 4,
+    elevation: 2,
   },
   myBubble: {
     alignSelf: 'flex-end',
-    backgroundColor: '#FD3A73',
     borderBottomRightRadius: 4,
+    backgroundColor: '#FD3A73',
   },
   theirBubble: {
     alignSelf: 'flex-start',
-    borderWidth: 1,
-    borderBottomLeftRadius: 4,
+    borderTopLeftRadius: 4,
   },
   bubbleText: {
+    fontFamily: 'Poppins_500Medium',
     fontSize: 14.5,
     lineHeight: 20,
-    fontWeight: '500',
   },
   myText: {
     color: '#FFFFFF',
@@ -2333,81 +2583,84 @@ const styles = StyleSheet.create({
     marginTop: 4,
   },
   timestamp: {
+    fontFamily: 'Poppins_500Medium',
     fontSize: 10,
-    fontWeight: '500',
   },
   callPill: {
     flexDirection: 'row',
     alignItems: 'center',
-    alignSelf: 'center',
-    paddingVertical: 5,
-    paddingHorizontal: 12,
-    borderRadius: 20,
-    borderWidth: 1,
-    gap: 6,
-    marginVertical: 4,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 1 },
-    shadowOpacity: 0.12,
-    shadowRadius: 3,
-    elevation: 1,
+    gap: 8,
+    marginTop: 4,
   },
   callPillText: {
+    fontFamily: 'Poppins_600SemiBold',
     fontSize: 11.5,
-    fontWeight: '600',
     letterSpacing: 0.1,
   },
   callPillTime: {
+    fontFamily: 'Poppins_400Regular',
     fontSize: 10,
-    fontWeight: '400',
   },
   typingRow: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: 6,
+    gap: 10,
     paddingHorizontal: 16,
-    paddingVertical: 4,
+    paddingVertical: 10,
+    backgroundColor: 'transparent',
+    alignSelf: 'flex-start',
+  },
+  typingAvatar: {
+    width: 24,
+    height: 24,
+    borderRadius: 12,
   },
   typingText: {
-    fontSize: 11.5,
+    fontFamily: 'Poppins_400Regular',
+    fontSize: 12,
     fontStyle: 'italic',
   },
   inviteCard: {
-    alignSelf: 'center',
-    width: '96%',
-    borderRadius: 18,
-    borderWidth: 1.5,
-    padding: 14,
-    gap: 8,
+    maxWidth: '85%',
+    alignSelf: 'flex-end',
+    padding: 16,
+    borderRadius: 20,
+    borderBottomRightRadius: 4,
+    borderWidth: 1,
+    marginBottom: 10,
+    marginTop: 6,
+    gap: 12,
   },
   inviteHeader: {
     flexDirection: 'row',
     alignItems: 'center',
     gap: 6,
+    borderBottomWidth: 1,
+    borderBottomColor: 'rgba(2, 132, 199, 0.2)',
+    paddingBottom: 8,
   },
   inviteTitle: {
     color: '#0284C7',
+    fontFamily: 'Poppins_900Black',
     fontSize: 12,
-    fontWeight: '900',
     letterSpacing: 0.5,
   },
   inviteBody: {
+    fontFamily: 'Poppins_500Medium',
     fontSize: 13.5,
     lineHeight: 19,
-    fontWeight: '500',
   },
   inviteBtn: {
     backgroundColor: '#0284C7',
     paddingVertical: 10,
     borderRadius: 12,
     alignItems: 'center',
-    justifyContent: 'center',
     marginTop: 4,
   },
   inviteBtnText: {
     color: '#FFFFFF',
+    fontFamily: 'Poppins_800ExtraBold',
     fontSize: 13,
-    fontWeight: '800',
   },
   icebreakerContainer: {
     paddingVertical: 6,
@@ -2415,6 +2668,8 @@ const styles = StyleSheet.create({
   icebreakerScroll: {
     paddingHorizontal: 12,
     gap: 8,
+    flexDirection: 'row',
+    alignItems: 'center',
   },
   icebreakerChip: {
     paddingHorizontal: 14,
@@ -2426,10 +2681,11 @@ const styles = StyleSheet.create({
     shadowOpacity: 0.05,
     shadowRadius: 2,
     elevation: 1,
+    flexShrink: 0,
   },
   icebreakerText: {
+    fontFamily: 'Poppins_600SemiBold',
     fontSize: 12.5,
-    fontWeight: '600',
   },
   inputBar: {
     flexDirection: 'row',
@@ -2464,6 +2720,161 @@ const styles = StyleSheet.create({
   },
   sendBtnDisabled: {
     opacity: 0.4,
+  },
+  activeCallWindowBanner: {
+    marginHorizontal: 16,
+    marginTop: 4,
+    marginBottom: 6,
+    borderRadius: 14,
+    overflow: 'hidden',
+    elevation: 3,
+    shadowColor: '#10B981',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.25,
+    shadowRadius: 4,
+  },
+  activeCallWindowGradient: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingVertical: 10,
+    paddingHorizontal: 14,
+    gap: 8,
+  },
+  activeCallWindowText: {
+    flex: 1,
+    color: '#FFFFFF',
+    fontFamily: 'Poppins_700Bold',
+    fontSize: 12,
+  },
+  activeCallNowMiniBtn: {
+    backgroundColor: '#FFFFFF',
+    paddingHorizontal: 12,
+    paddingVertical: 6,
+    borderRadius: 10,
+  },
+  activeCallNowMiniBtnText: {
+    color: '#059669',
+    fontFamily: 'Poppins_800ExtraBold',
+    fontSize: 11.5,
+  },
+  callRequestCard: {
+    maxWidth: '88%',
+    alignSelf: 'center',
+    padding: 16,
+    borderRadius: 20,
+    borderWidth: 1.5,
+    marginBottom: 12,
+    marginTop: 6,
+    gap: 10,
+    width: '88%',
+  },
+  callRequestHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+    borderBottomWidth: 1,
+    borderBottomColor: 'rgba(99, 102, 241, 0.2)',
+    paddingBottom: 8,
+  },
+  callRequestTitle: {
+    fontFamily: 'Poppins_900Black',
+    fontSize: 12,
+    letterSpacing: 0.5,
+  },
+  callRequestBody: {
+    fontFamily: 'Poppins_500Medium',
+    fontSize: 13,
+    lineHeight: 19,
+  },
+  callRequestActions: {
+    flexDirection: 'row',
+    gap: 10,
+    marginTop: 4,
+  },
+  callDeclineBtn: {
+    flex: 1,
+    paddingVertical: 10,
+    borderRadius: 12,
+    alignItems: 'center',
+    justifyContent: 'center',
+    backgroundColor: 'rgba(239, 68, 68, 0.12)',
+    borderWidth: 1,
+    borderColor: 'rgba(239, 68, 68, 0.3)',
+  },
+  callDeclineBtnText: {
+    color: '#EF4444',
+    fontFamily: 'Poppins_700Bold',
+    fontSize: 12,
+  },
+  callApproveBtn: {
+    flex: 1.5,
+    borderRadius: 12,
+    overflow: 'hidden',
+  },
+  callApproveGradient: {
+    paddingVertical: 10,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  callApproveBtnText: {
+    color: '#FFFFFF',
+    fontFamily: 'Poppins_800ExtraBold',
+    fontSize: 12,
+  },
+  callRequestFooter: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+    marginTop: 2,
+  },
+  callRequestFooterText: {
+    fontFamily: 'Poppins_500Medium',
+    fontSize: 11.5,
+    fontStyle: 'italic',
+  },
+  callNowBtn: {
+    backgroundColor: '#10B981',
+    paddingVertical: 10,
+    borderRadius: 12,
+    alignItems: 'center',
+    marginTop: 4,
+  },
+  callNowBtnText: {
+    color: '#FFFFFF',
+    fontFamily: 'Poppins_800ExtraBold',
+    fontSize: 13,
+  },
+  activeCallWaitingMiniPill: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 4,
+    backgroundColor: 'rgba(255, 255, 255, 0.22)',
+    paddingHorizontal: 10,
+    paddingVertical: 5,
+    borderRadius: 10,
+  },
+  activeCallWaitingMiniText: {
+    color: '#FFFFFF',
+    fontFamily: 'Poppins_700Bold',
+    fontSize: 11,
+  },
+  callWaitingCard: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 8,
+    backgroundColor: 'rgba(16, 185, 129, 0.12)',
+    borderWidth: 1,
+    borderColor: 'rgba(16, 185, 129, 0.3)',
+    borderRadius: 14,
+    paddingVertical: 12,
+    paddingHorizontal: 16,
+    marginTop: 4,
+  },
+  callWaitingCardText: {
+    fontFamily: 'Poppins_700Bold',
+    fontSize: 13,
+    color: '#10B981',
   },
 });
 

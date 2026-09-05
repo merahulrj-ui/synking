@@ -9,7 +9,7 @@ import { DatePassCard } from '../../components/DatePassCard';
 import { useRouter } from 'expo-router';
 
 export default function MatchesScreen() {
-  const { incomingRequests, sentRequests, acceptRequest, declineRequest, activeBookings, isDarkMode } = useApp();
+  const { incomingRequests, sentRequests, acceptRequest, declineRequest, deleteSentRequest, activeBookings, isDarkMode } = useApp();
   const router = useRouter();
   const [activeTab, setActiveTab] = useState<'requests' | 'passes'>('requests');
   const [showSentHistory, setShowSentHistory] = useState(false);
@@ -127,7 +127,7 @@ export default function MatchesScreen() {
                         </View>
 
                         <Text style={[styles.requestOccupation, { color: subText }]}>
-                          💼 {req.fromUser.occupation} • 📍 {typeof (req.fromUser.location as any) === 'object' ? ((req.fromUser.location as any)?.city || 'Nearby') : (req.fromUser.location || 'Nearby')}
+                          💼 {req.fromUser.occupation} • 📍 {req.fromUser.distance || 'Nearby'}
                         </Text>
 
                         <Text style={[styles.requestBio, { color: textColor }]} numberOfLines={2}>
@@ -194,13 +194,22 @@ export default function MatchesScreen() {
                   {sentRequests.length > 0 ? (
                     sentRequests.map((s, idx) => (
                       <View
-                        key={idx}
+                        key={s.id || idx}
                         style={[styles.sentItem, { backgroundColor: cardBg, borderColor: borderCol }]}
                       >
-                        <Ionicons name="time-outline" size={16} color="#F59E0B" />
-                        <Text style={[styles.sentText, { color: subText }]}>
-                          Sent like to <Text style={{ color: textColor, fontWeight: '800' }}>{s.toUserId}</Text> · {s.timestamp}
-                        </Text>
+                        <View style={{ flexDirection: 'row', alignItems: 'center', gap: 10, flex: 1 }}>
+                          <Ionicons name="time-outline" size={16} color="#F59E0B" />
+                          <Text style={[styles.sentText, { color: subText }]}>
+                            Sent like to <Text style={{ color: textColor, fontWeight: '800' }}>{s.toUserId}</Text> • {s.timestamp}
+                          </Text>
+                        </View>
+                        <TouchableOpacity 
+                          onPress={() => deleteSentRequest(s.id)}
+                          style={{ padding: 6 }}
+                          activeOpacity={0.7}
+                        >
+                          <Ionicons name="trash-outline" size={18} color="#EF4444" />
+                        </TouchableOpacity>
                       </View>
                     ))
                   ) : (
@@ -323,82 +332,100 @@ const styles = StyleSheet.create({
     elevation: 8,
   },
   toggleText: {
+    fontFamily: 'Poppins_800ExtraBold',
     fontSize: 12.5,
-    fontWeight: '800',
   },
   section: {
     marginTop: 8,
-    marginBottom: 16,
+    paddingHorizontal: 20,
+    marginBottom: 24,
   },
   sectionHeaderRow: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: 6,
-    marginBottom: 2,
+    justifyContent: 'space-between',
+    marginBottom: 4,
   },
   sectionHeader: {
+    fontFamily: 'Poppins_900Black',
     fontSize: 16,
-    fontWeight: '900',
     letterSpacing: -0.3,
   },
   sectionSub: {
-    fontSize: 11.5,
-    marginBottom: 12,
+    fontFamily: 'Poppins_500Medium',
+    fontSize: 12,
+    marginBottom: 16,
   },
   requestCardList: {
-    gap: 14,
+    gap: 12,
   },
   requestCard: {
-    borderRadius: 22,
+    padding: 14,
+    borderRadius: 20,
     borderWidth: 1,
-    overflow: 'hidden',
-    shadowColor: '#FD3A73',
-    shadowOffset: { width: 0, height: 4 },
-    shadowOpacity: 0.18,
-    shadowRadius: 14,
-    elevation: 6,
+  },
+  requestCardTop: {
+    flexDirection: 'row',
+    gap: 14,
+    alignItems: 'center',
+    marginBottom: 14,
+  },
+  requestAvatar: {
+    width: 64,
+    height: 64,
+    borderRadius: 32,
+    backgroundColor: '#333',
   },
   requestPhoto: {
-    width: '100%',
-    height: 190,
-    backgroundColor: '#E2E8F0',
+    width: 64,
+    height: 64,
+    borderRadius: 32,
+    backgroundColor: '#333',
+  },
+  requestInfo: {
+    flex: 1,
+    gap: 4,
   },
   requestBody: {
-    padding: 14,
-    gap: 6,
+    flex: 1,
+    gap: 4,
+  },
+  requestNameRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
   },
   requestTopRow: {
     flexDirection: 'row',
-    justifyContent: 'space-between',
     alignItems: 'center',
+    justifyContent: 'space-between',
+    gap: 8,
   },
   requestName: {
+    fontFamily: 'Poppins_800ExtraBold',
     fontSize: 17,
-    fontWeight: '800',
   },
   badgeBox: {
     flexDirection: 'row',
     alignItems: 'center',
     gap: 4,
-    backgroundColor: 'rgba(253, 58, 115, 0.1)',
-    borderWidth: 1,
-    borderColor: 'rgba(253, 58, 115, 0.25)',
+    backgroundColor: 'rgba(253, 58, 115, 0.12)',
     paddingHorizontal: 8,
     paddingVertical: 4,
     borderRadius: 10,
   },
   badgeText: {
     color: '#FD3A73',
+    fontFamily: 'Poppins_800ExtraBold',
     fontSize: 10.5,
-    fontWeight: '800',
   },
   requestOccupation: {
+    fontFamily: 'Poppins_500Medium',
     fontSize: 12,
-    fontWeight: '500',
   },
   requestBio: {
+    fontFamily: 'Poppins_400Regular',
     fontSize: 12.5,
-    lineHeight: 17,
     fontStyle: 'italic',
     marginTop: 2,
   },

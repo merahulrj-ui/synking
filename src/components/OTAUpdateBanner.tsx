@@ -115,7 +115,7 @@ const styles = StyleSheet.create({
   title: {
     color: '#FFFFFF',
     fontSize: 13,
-    fontWeight: '800',
+    fontFamily: 'Poppins_800ExtraBold',
   },
   versionBadge: {
     backgroundColor: '#22C55E',
@@ -126,7 +126,7 @@ const styles = StyleSheet.create({
   versionText: {
     color: '#FFF',
     fontSize: 10,
-    fontWeight: '900',
+    fontFamily: 'Poppins_900Black',
   },
   subText: {
     color: '#94A3B8',
@@ -145,6 +145,6 @@ const styles = StyleSheet.create({
   updateBtnText: {
     color: '#FFFFFF',
     fontSize: 12,
-    fontWeight: '800',
+    fontFamily: 'Poppins_800ExtraBold',
   },
 });

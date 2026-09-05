@@ -111,14 +111,14 @@ const styles = StyleSheet.create({
     gap: 6,
   },
   logo: {
+    fontFamily: 'Poppins_900Black',
     fontSize: 32,
-    fontWeight: '900',
     color: '#FF0055',
   },
   tagline: {
     color: Colors.textSecondary,
+    fontFamily: 'Poppins_600SemiBold',
     fontSize: 14,
-    fontWeight: '600',
   },
   safetyBadge: {
     backgroundColor: 'rgba(0, 242, 254, 0.1)',
@@ -131,8 +131,8 @@ const styles = StyleSheet.create({
   },
   safetyText: {
     color: Colors.neonCyan,
+    fontFamily: 'Poppins_700Bold',
     fontSize: 11,
-    fontWeight: '700',
   },
   card: {
     backgroundColor: Colors.surface,
@@ -144,8 +144,8 @@ const styles = StyleSheet.create({
   },
   label: {
     color: Colors.textSecondary,
+    fontFamily: 'Poppins_700Bold',
     fontSize: 12,
-    fontWeight: '700',
     marginTop: 4,
   },
   input: {

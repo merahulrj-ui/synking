@@ -7,8 +7,8 @@ export const MOCK_PROFILES: UserProfile[] = [
     age: 23,
     gender: 'female',
     occupation: 'UI/UX Designer',
-    location: 'Roorkee, Uttarakhand',
-    distance: '1.5 km away',
+    location: { city: 'Roorkee', coordinates: [29.8710, 77.8930] },
+    distance: '1 km away',
     bio: 'Coffee lover, aesthetic cafe hopper & bookworm ✨ Looking for genuine conversations and good vibes!',
     photo: 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=800&auto=format&fit=crop&q=80',
     photos: [
@@ -27,8 +27,8 @@ export const MOCK_PROFILES: UserProfile[] = [
     age: 25,
     gender: 'male',
     occupation: 'Software Engineer',
-    location: 'Roorkee, Uttarakhand',
-    distance: '2.8 km away',
+    location: { city: 'Roorkee', coordinates: [29.8820, 77.9050] },
+    distance: '3 km away',
     bio: 'Techie by day, guitarist by night 🎸 Let’s grab specialty coffee and talk about music, sci-fi, or deep thoughts.',
     photo: 'https://images.unsplash.com/photo-1506794778202-cad84cf45f1d?w=800&auto=format&fit=crop&q=80',
     photos: [

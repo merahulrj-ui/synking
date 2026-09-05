@@ -228,7 +228,7 @@ export default function VerifySelfieScreen() {
         interests: currentUser?.interests || ['Coffee', 'Music'],
         compatibility: 100,
         isVerified: true,
-        isVip: true,
+        isVip: currentUser?.isVip ?? false,
       });
 
       // Save to Cloud Firestore
@@ -430,14 +430,14 @@ export default function VerifySelfieScreen() {
             <Text style={{ fontSize: 48, marginBottom: 4 }}>🛡️</Text>
             <Text style={[styles.stepTitle, { color: Colors.neonCyan }]}>Verified Shield Active!</Text>
             <Text style={styles.stepSub}>
-              Welcome, <Text style={{ color: '#FFF', fontWeight: '900' }}>{fullName}</Text> ({calculatedAge} Yrs). Your profile is 100% authenticated.
+              Welcome, <Text style={{ color: '#FFF', fontFamily: 'Poppins_900Black' }}>{fullName}</Text> ({calculatedAge} Yrs). Your profile is 100% authenticated.
             </Text>
 
             <View style={styles.summaryCard}>
-              <Text style={styles.summaryRow}>👤 Name: <Text style={{ color: '#FFF', fontWeight: '800' }}>{fullName}</Text></Text>
-              <Text style={styles.summaryRow}>🎂 Age: <Text style={{ color: '#FFF', fontWeight: '800' }}>{calculatedAge} Years</Text></Text>
-              <Text style={styles.summaryRow}>🛡️ ID Status: <Text style={{ color: Colors.neonGreen, fontWeight: '800' }}>Authenticated & Approved ✅</Text></Text>
-              <Text style={styles.summaryRow}>☁️ Cloud Sync: <Text style={{ color: Colors.neonCyan, fontWeight: '800' }}>synking-apk Database ✅</Text></Text>
+              <Text style={styles.summaryRow}>👤 Name: <Text style={{ color: '#FFF', fontFamily: 'Poppins_800ExtraBold' }}>{fullName}</Text></Text>
+              <Text style={styles.summaryRow}>🎂 Age: <Text style={{ color: '#FFF', fontFamily: 'Poppins_800ExtraBold' }}>{calculatedAge} Years</Text></Text>
+              <Text style={styles.summaryRow}>🛡️ ID Status: <Text style={{ color: Colors.neonGreen, fontFamily: 'Poppins_800ExtraBold' }}>Authenticated & Approved ✅</Text></Text>
+              <Text style={styles.summaryRow}>☁️ Cloud Sync: <Text style={{ color: Colors.neonCyan, fontFamily: 'Poppins_800ExtraBold' }}>synking-apk Database ✅</Text></Text>
             </View>
 
             <GradientButton
@@ -472,12 +472,12 @@ const styles = StyleSheet.create({
   backBtnText: {
     color: '#FFF',
     fontSize: 22,
-    fontWeight: '800',
+    fontFamily: 'Poppins_800ExtraBold',
   },
   headerTitle: {
     color: '#FFF',
     fontSize: 16,
-    fontWeight: '800',
+    fontFamily: 'Poppins_800ExtraBold',
   },
   vipBadge: {
     backgroundColor: 'rgba(0, 242, 254, 0.15)',
@@ -490,7 +490,7 @@ const styles = StyleSheet.create({
   vipBadgeText: {
     color: Colors.neonCyan,
     fontSize: 10,
-    fontWeight: '900',
+    fontFamily: 'Poppins_900Black',
   },
   container: {
     flex: 1,
@@ -509,7 +509,7 @@ const styles = StyleSheet.create({
   stepTitle: {
     color: '#FFF',
     fontSize: 18,
-    fontWeight: '900',
+    fontFamily: 'Poppins_900Black',
     textAlign: 'center',
   },
   stepSub: {
@@ -546,11 +546,11 @@ const styles = StyleSheet.create({
   docPillText: {
     color: Colors.textSecondary,
     fontSize: 11,
-    fontWeight: '600',
+    fontFamily: 'Poppins_600SemiBold',
   },
   docPillTextActive: {
     color: '#FFF',
-    fontWeight: '800',
+    fontFamily: 'Poppins_800ExtraBold',
   },
   scannerFrame: {
     width: '100%',

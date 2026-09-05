@@ -148,7 +148,7 @@ const styles = StyleSheet.create({
   },
   headerTitle: {
     fontSize: 17,
-    fontWeight: '800',
+    fontFamily: 'Poppins_800ExtraBold',
   },
   closeBtn: {
     padding: 4,
@@ -176,7 +176,7 @@ const styles = StyleSheet.create({
   passStatus: {
     color: '#22C55E',
     fontSize: 13,
-    fontWeight: '900',
+    fontFamily: 'Poppins_900Black',
     letterSpacing: 1,
     marginBottom: 16,
   },
@@ -194,12 +194,12 @@ const styles = StyleSheet.create({
   },
   detailLabel: {
     fontSize: 11,
-    fontWeight: '700',
+    fontFamily: 'Poppins_700Bold',
     width: '38%',
   },
   detailValue: {
     fontSize: 12.5,
-    fontWeight: '800',
+    fontFamily: 'Poppins_800ExtraBold',
     width: '60%',
     textAlign: 'right',
   },
@@ -220,7 +220,7 @@ const styles = StyleSheet.create({
   qrCodeText: {
     color: '#00E5FF',
     fontSize: 18,
-    fontWeight: '900',
+    fontFamily: 'Poppins_900Black',
     letterSpacing: 2,
   },
   qrHelpText: {
@@ -242,6 +242,6 @@ const styles = StyleSheet.create({
   },
   feedbackBtnText: {
     fontSize: 13,
-    fontWeight: '800',
+    fontFamily: 'Poppins_800ExtraBold',
   },
 });

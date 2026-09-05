@@ -60,7 +60,7 @@ export default function FeedbackScreen() {
 
       <ScrollView style={styles.container} showsVerticalScrollIndicator={false}>
         <Text style={[styles.subtitle, { color: subText }]}>
-          Your feedback is <Text style={{ color: textColor, fontWeight: '800' }}>100% blind & anonymous</Text>. It is never shared with your date.
+          Your feedback is <Text style={{ color: textColor, fontFamily: 'Poppins_800ExtraBold' }}>100% blind & anonymous</Text>. It is never shared with your date.
         </Text>
 
         <View style={styles.questionsContainer}>
@@ -137,7 +137,7 @@ const styles = StyleSheet.create({
   },
   title: {
     fontSize: 17,
-    fontWeight: '800',
+    fontFamily: 'Poppins_800ExtraBold',
   },
   closeBtn: {
     padding: 4,
@@ -170,12 +170,12 @@ const styles = StyleSheet.create({
   },
   questionText: {
     fontSize: 13.5,
-    fontWeight: '700',
+    fontFamily: 'Poppins_700Bold',
     maxWidth: '75%',
   },
   checkIcon: {
     fontSize: 13,
-    fontWeight: '800',
+    fontFamily: 'Poppins_800ExtraBold',
   },
   notesSection: {
     marginTop: 18,
@@ -183,7 +183,7 @@ const styles = StyleSheet.create({
   },
   notesLabel: {
     fontSize: 12,
-    fontWeight: '700',
+    fontFamily: 'Poppins_700Bold',
   },
   notesInput: {
     borderRadius: 16,

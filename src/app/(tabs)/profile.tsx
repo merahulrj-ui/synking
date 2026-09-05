@@ -319,7 +319,7 @@ export default function ProfileScreen() {
   const handleVerifyLoginOtp = (preset?: Partial<UserProfile>) => {
     if (preset && preset.name) {
       const pUser: UserProfile = {
-        id: preset.id || 'user_' + Date.now().toString(36),
+        id: preset.id || 'usr_' + Array.from({length: 16}, () => Math.floor(Math.random() * 16).toString(16)).join(''),
         name: preset.name,
         age: preset.age || 23,
         gender: preset.gender || 'female',
@@ -364,7 +364,7 @@ export default function ProfileScreen() {
       : 'https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?w=800';
 
     const newUser: UserProfile = {
-      id: 'user_' + digits,
+      id: 'usr_' + Array.from({length: 16}, () => Math.floor(Math.random() * 16).toString(16)).join(''),
       name: finalName,
       age: 23,
       gender: loginGender,
@@ -1327,6 +1327,24 @@ const styles = StyleSheet.create({
     paddingHorizontal: 16,
     paddingTop: 8,
   },
+  optionCardText: {
+    fontFamily: 'Poppins_700Bold',
+    fontSize: 13,
+  },
+  selectorChip: {
+    paddingHorizontal: 12,
+    paddingVertical: 8,
+    borderRadius: 20,
+    borderWidth: 1,
+  },
+  selectorChipActive: {
+    backgroundColor: '#FD3A73',
+    borderColor: '#FD3A73',
+  },
+  selectorChipText: {
+    fontFamily: 'Poppins_700Bold',
+    fontSize: 12,
+  },
   guestCard: {
     borderRadius: 20,
     borderWidth: 1,
@@ -1395,8 +1413,8 @@ const styles = StyleSheet.create({
   },
   ringPercentageText: {
     color: '#FD3A73',
+    fontFamily: 'Poppins_900Black',
     fontSize: 11,
-    fontWeight: '900',
   },
   editPhotoFab: {
     position: 'absolute',
@@ -1660,8 +1678,8 @@ const styles = StyleSheet.create({
     alignSelf: 'flex-start',
   },
   intentionText: {
+    fontFamily: 'Poppins_700Bold',
     fontSize: 13,
-    fontWeight: '700',
   },
 
   // Lifestyle & Passion Grid
@@ -1690,8 +1708,8 @@ const styles = StyleSheet.create({
     borderWidth: 1,
   },
   passionChipText: {
+    fontFamily: 'Poppins_700Bold',
     fontSize: 12,
-    fontWeight: '700',
   },
 
   // Luxury VIP Black Banner
@@ -1711,11 +1729,16 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'space-between',
   },
+  vipBannerTitleRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+  },
   vipBannerTitle: {
-    color: '#FFD700',
-    fontSize: 14,
-    fontWeight: '900',
-    letterSpacing: 0.5,
+    color: '#FFF',
+    fontFamily: 'Poppins_900Black',
+    fontSize: 16,
+    letterSpacing: -0.3,
   },
   vipBannerTag: {
     backgroundColor: '#FFD700',
@@ -1725,14 +1748,14 @@ const styles = StyleSheet.create({
   },
   vipBannerTagText: {
     color: '#000',
+    fontFamily: 'Poppins_900Black',
     fontSize: 10,
-    fontWeight: '900',
   },
   vipBannerSub: {
     color: '#FEF08A',
+    fontFamily: 'Poppins_500Medium',
     fontSize: 11.5,
     lineHeight: 17,
-    fontWeight: '500',
   },
 
   // iOS Grouped Settings Section
@@ -1888,24 +1911,6 @@ const styles = StyleSheet.create({
   optionCardSelected: {
     borderColor: '#FD3A73',
     backgroundColor: 'rgba(253, 58, 115, 0.1)',
-  },
-  optionCardText: {
-    fontSize: 13,
-    fontWeight: '700',
-  },
-  selectorChip: {
-    paddingHorizontal: 12,
-    paddingVertical: 8,
-    borderRadius: 20,
-    borderWidth: 1,
-  },
-  selectorChipActive: {
-    backgroundColor: '#FD3A73',
-    borderColor: '#FD3A73',
-  },
-  selectorChipText: {
-    fontSize: 12,
-    fontWeight: '700',
   },
   chipsGrid: {
     flexDirection: 'row',

@@ -150,8 +150,10 @@ export const AuthModal: React.FC<Props> = ({ visible, onClose, targetUserName })
       const defaultFemalePhoto = 'https://images.unsplash.com/photo-1494790108377-be9c29b29330?w=800';
       const finalPhoto = gender === 'female' ? defaultFemalePhoto : defaultMalePhoto;
 
+      const generateHashId = () => Array.from({length: 16}, () => Math.floor(Math.random() * 16).toString(16)).join('');
+
       const newUser: UserProfile = {
-        id: `user_${cleanDigits}`,
+        id: `usr_${generateHashId()}`,
         name: name.trim() || (gender === 'female' ? 'Priya' : 'Rahul'),
         age: parseInt(age, 10) || 22,
         gender: gender,
@@ -202,7 +204,7 @@ export const AuthModal: React.FC<Props> = ({ visible, onClose, targetUserName })
               />
               <View>
                 <Text style={[styles.logo, { color: textColor }]}>SYNKING</Text>
-                <Text style={{ fontSize: 10, color: '#FD3A73', fontWeight: '800' }}>IRL DATING · SECURE P2P</Text>
+                <Text style={{ fontSize: 10, color: '#FD3A73', fontFamily: 'Poppins_800ExtraBold' }}>IRL DATING · SECURE P2P</Text>
               </View>
             </View>
             <TouchableOpacity onPress={onClose} style={styles.closeBtn}>
@@ -268,7 +270,7 @@ export const AuthModal: React.FC<Props> = ({ visible, onClose, targetUserName })
                         onPress={() => setGender('male')}
                         activeOpacity={0.8}
                       >
-                        <Text style={{ fontSize: 13, fontWeight: '800', color: gender === 'male' ? '#FFF' : textColor }}>
+                        <Text style={{ fontSize: 13, fontFamily: 'Poppins_800ExtraBold', color: gender === 'male' ? '#FFF' : textColor }}>
                           👦 Male
                         </Text>
                       </TouchableOpacity>
@@ -282,7 +284,7 @@ export const AuthModal: React.FC<Props> = ({ visible, onClose, targetUserName })
                         onPress={() => setGender('female')}
                         activeOpacity={0.8}
                       >
-                        <Text style={{ fontSize: 13, fontWeight: '800', color: gender === 'female' ? '#FFF' : textColor }}>
+                        <Text style={{ fontSize: 13, fontFamily: 'Poppins_800ExtraBold', color: gender === 'female' ? '#FFF' : textColor }}>
                           👧 Female
                         </Text>
                       </TouchableOpacity>
@@ -322,7 +324,7 @@ export const AuthModal: React.FC<Props> = ({ visible, onClose, targetUserName })
                     color={ageVerified ? '#00E5FF' : subText}
                   />
                   <Text style={[styles.safetyText, { color: isDarkMode ? '#E5E7EB' : '#0369A1' }]}>
-                    I am 18+ and agree to SYNKING's <Text style={{ fontWeight: '800' }}>Terms of Service</Text> & safe dating rules.
+                    I am 18+ and agree to SYNKING's <Text style={{ fontFamily: 'Poppins_800ExtraBold' }}>Terms of Service</Text> & safe dating rules.
                   </Text>
                 </TouchableOpacity>
 
@@ -345,10 +347,10 @@ export const AuthModal: React.FC<Props> = ({ visible, onClose, targetUserName })
                   <View style={[styles.existingUserBadge, { backgroundColor: isDarkMode ? '#1E293B' : '#F1F5F9', borderColor: borderCol }]}>
                     <Image source={{ uri: existingUserProfile.photo }} style={styles.badgeAvatar} />
                     <View style={{ flex: 1 }}>
-                      <Text style={{ color: textColor, fontWeight: '900', fontSize: 14 }}>
+                      <Text style={{ color: textColor, fontFamily: 'Poppins_900Black', fontSize: 14 }}>
                         Welcome back, {existingUserProfile.name}! 👋
                       </Text>
-                      <Text style={{ color: '#22C55E', fontWeight: '700', fontSize: 11 }}>
+                      <Text style={{ color: '#22C55E', fontFamily: 'Poppins_700Bold', fontSize: 11 }}>
                         Account Verified & Synked
                       </Text>
                     </View>
@@ -357,10 +359,10 @@ export const AuthModal: React.FC<Props> = ({ visible, onClose, targetUserName })
                   <View style={[styles.existingUserBadge, { backgroundColor: isDarkMode ? '#1E293B' : '#F1F5F9', borderColor: borderCol }]}>
                     <Text style={{ fontSize: 20 }}>✨</Text>
                     <View style={{ flex: 1 }}>
-                      <Text style={{ color: textColor, fontWeight: '900', fontSize: 14 }}>
+                      <Text style={{ color: textColor, fontFamily: 'Poppins_900Black', fontSize: 14 }}>
                         Creating New Profile for {name || 'You'}
                       </Text>
-                      <Text style={{ color: '#FD3A73', fontWeight: '700', fontSize: 11 }}>
+                      <Text style={{ color: '#FD3A73', fontFamily: 'Poppins_700Bold', fontSize: 11 }}>
                         {gender === 'female' ? '👧 Female' : '👦 Male'} · {age} yrs · Roorkee
                       </Text>
                     </View>
@@ -395,18 +397,18 @@ export const AuthModal: React.FC<Props> = ({ visible, onClose, targetUserName })
                 {/* Resend & Change Number Row */}
                 <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginTop: 14 }}>
                   <TouchableOpacity onPress={() => setOtpSent(false)}>
-                    <Text style={{ color: '#FD3A73', fontSize: 12, fontWeight: '800' }}>
+                    <Text style={{ color: '#FD3A73', fontSize: 12, fontFamily: 'Poppins_800ExtraBold' }}>
                       ← Change Phone
                     </Text>
                   </TouchableOpacity>
 
                   {resendTimer > 0 ? (
-                    <Text style={{ color: subText, fontSize: 12, fontWeight: '600' }}>
+                    <Text style={{ color: subText, fontSize: 12, fontFamily: 'Poppins_600SemiBold' }}>
                       Resend in {resendTimer}s
                     </Text>
                   ) : (
                     <TouchableOpacity onPress={handleSendOtp}>
-                      <Text style={{ color: '#00E5FF', fontSize: 12, fontWeight: '800' }}>
+                      <Text style={{ color: '#00E5FF', fontSize: 12, fontFamily: 'Poppins_800ExtraBold' }}>
                         Resend OTP 🔄
                       </Text>
                     </TouchableOpacity>
@@ -442,7 +444,7 @@ const styles = StyleSheet.create({
   },
   logo: {
     fontSize: 18,
-    fontWeight: '900',
+    fontFamily: 'Poppins_900Black',
     letterSpacing: 1,
   },
   closeBtn: {
@@ -450,7 +452,7 @@ const styles = StyleSheet.create({
   },
   title: {
     fontSize: 20,
-    fontWeight: '900',
+    fontFamily: 'Poppins_900Black',
     letterSpacing: -0.5,
     marginBottom: 4,
   },
@@ -464,7 +466,7 @@ const styles = StyleSheet.create({
   },
   inputLabel: {
     fontSize: 12,
-    fontWeight: '700',
+    fontFamily: 'Poppins_700Bold',
     marginBottom: 4,
   },
   phoneInputRow: {
@@ -477,13 +479,13 @@ const styles = StyleSheet.create({
   },
   countryCode: {
     fontSize: 14,
-    fontWeight: '700',
+    fontFamily: 'Poppins_700Bold',
     marginRight: 10,
   },
   phoneInput: {
     flex: 1,
     fontSize: 15,
-    fontWeight: '700',
+    fontFamily: 'Poppins_700Bold',
   },
   textInput: {
     borderWidth: 1,
@@ -491,7 +493,7 @@ const styles = StyleSheet.create({
     paddingHorizontal: 14,
     height: 50,
     fontSize: 14,
-    fontWeight: '700',
+    fontFamily: 'Poppins_700Bold',
   },
   genderBtn: {
     flex: 1,
@@ -519,7 +521,7 @@ const styles = StyleSheet.create({
     fontSize: 11.5,
     flex: 1,
     lineHeight: 16,
-    fontWeight: '600',
+    fontFamily: 'Poppins_600SemiBold',
   },
   existingUserBadge: {
     flexDirection: 'row',
@@ -543,7 +545,7 @@ const styles = StyleSheet.create({
     height: 54,
     textAlign: 'center',
     fontSize: 24,
-    fontWeight: '900',
+    fontFamily: 'Poppins_900Black',
     letterSpacing: 10,
   },
 });

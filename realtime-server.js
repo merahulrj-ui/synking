@@ -715,23 +715,37 @@ const server = http.createServer((req, res) => {
           cols.forEach((col, idx) => {
             const colName = (col && typeof col === 'object' && col.name) ? col.name : String(col);
             const rawVal = r[idx]?.value !== undefined ? r[idx].value : r[idx];
-            item[colName] = extractPlain(rawVal);
+            if (colName === 'location' || colName === 'photos' || colName === 'preferences') {
+              try {
+                item[colName] = typeof rawVal === 'string' ? JSON.parse(rawVal) : rawVal;
+              } catch (e) {
+                item[colName] = rawVal;
+              }
+            } else {
+              item[colName] = extractPlain(rawVal);
+            }
           });
+          const mem = db.profiles[item.id] || {};
+          const photos = (Array.isArray(item.photos) && item.photos.length > 0)
+            ? item.photos
+            : (mem.photos || [item.photo || 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=500']);
+
           return {
-            id: item.id || '',
-            name: item.name || 'Member',
-            age: parseInt(item.age, 10) || 22,
-            gender: item.gender || 'male',
-            occupation: item.occupation || 'Member',
-            location: item.location || 'Roorkee',
-            distance: '0 km',
-            bio: item.bio || 'Active on Synking ✨',
-            photo: item.photo || 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=500',
-            photos: [item.photo || 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=500'],
-            interests: ['Coffee', 'Music', 'Travel'],
-            compatibility: 100,
-            isVerified: true,
-            isVip: false,
+            ...mem,
+            id: item.id || mem.id || '',
+            name: item.name || mem.name || 'Member',
+            age: parseInt(item.age, 10) || mem.age || 22,
+            gender: item.gender || mem.gender || 'male',
+            occupation: item.occupation || mem.occupation || 'Member',
+            location: item.location || mem.location || 'Roorkee',
+            distance: mem.distance || '0 km',
+            bio: item.bio || mem.bio || 'Active on Synking ✨',
+            photo: item.photo || mem.photo || photos[0] || 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=500',
+            photos: photos,
+            interests: mem.interests || ['Coffee', 'Music', 'Travel'],
+            compatibility: mem.compatibility || 100,
+            isVerified: mem.isVerified !== undefined ? mem.isVerified : true,
+            isVip: mem.isVip !== undefined ? mem.isVip : false,
           };
         });
       }
@@ -894,7 +908,7 @@ const server = http.createServer((req, res) => {
           });
 
           res.writeHead(200, { 'Content-Type': 'application/json' });
-          res.end(JSON.stringify({ success: true }));
+          res.end(JSON.stringify({ success: true })); return;
           return;
         }
       } catch (e) {}
@@ -997,7 +1011,7 @@ const server = http.createServer((req, res) => {
     }).catch((err) => {
       console.error('[MASTER_WIPE_ERROR]', err);
       res.writeHead(200, { 'Content-Type': 'application/json' });
-      res.end(JSON.stringify({ success: true }));
+      res.end(JSON.stringify({ success: true })); return;
     });
     return;
   }
@@ -1114,7 +1128,7 @@ const server = http.createServer((req, res) => {
           broadcastToWebSockets({ type: 'SYNK_REQUEST', targetUserId: newReq.toUserId, payload: newReq });
 
           res.writeHead(200, { 'Content-Type': 'application/json' });
-          res.end(JSON.stringify({ success: true }));
+          res.end(JSON.stringify({ success: true })); return;
           return;
         }
       } catch (e) {}
@@ -1161,7 +1175,7 @@ const server = http.createServer((req, res) => {
           }
 
           res.writeHead(200, { 'Content-Type': 'application/json' });
-          res.end(JSON.stringify({ success: true }));
+          res.end(JSON.stringify({ success: true })); return;
           return;
         }
       } catch (e) {}
@@ -1179,7 +1193,7 @@ const server = http.createServer((req, res) => {
       queryTurso('DELETE FROM synk_requests').catch(() => {});
       console.log('[ALL_REQUESTS_CLEARED]');
       res.writeHead(200, { 'Content-Type': 'application/json' });
-      res.end(JSON.stringify({ success: true }));
+      res.end(JSON.stringify({ success: true })); return;
       return;
     }
     const id = pathname.replace('/api/requests/', '');
@@ -1189,7 +1203,7 @@ const server = http.createServer((req, res) => {
       queryTurso('DELETE FROM synk_requests WHERE id = ?', [{ type: 'text', value: id }]).catch(() => {});
       console.log(`[REQUEST_DELETED] ${id}`);
       res.writeHead(200, { 'Content-Type': 'application/json' });
-      res.end(JSON.stringify({ success: true }));
+      res.end(JSON.stringify({ success: true })); return;
 
     }
     res.writeHead(404, { 'Content-Type': 'application/json' });
@@ -1231,6 +1245,8 @@ const server = http.createServer((req, res) => {
             const rawVal = r[idx]?.value !== undefined ? r[idx].value : r[idx];
             item[colName] = extractPlain(rawVal);
           });
+          const isCallReq = (item.text && String(item.text).includes('[Call Request')) || item.type === 'call_request';
+          const memoryMatch = (db.chats || []).find(c => c && c.id === item.id);
           return {
             id: item.id,
             matchId: item.match_id,
@@ -1239,6 +1255,8 @@ const server = http.createServer((req, res) => {
             text: item.text,
             plainText: item.text,
             cipherText: item.text,
+            type: isCallReq ? 'call_request' : (memoryMatch?.type || item.type || 'text'),
+            extraData: memoryMatch?.extraData || (isCallReq ? { callType: String(item.text).includes('Video') ? 'video' : 'audio', requestedBy: item.sender_id } : undefined),
             timestamp: item.timestamp || item.created_at || new Date().toISOString()
           };
         });
@@ -1374,7 +1392,7 @@ const server = http.createServer((req, res) => {
           }
 
           res.writeHead(200, { 'Content-Type': 'application/json' });
-          res.end(JSON.stringify({ success: true }));
+          res.end(JSON.stringify({ success: true })); return;
           return;
         }
       } catch (e) {}
@@ -1422,7 +1440,7 @@ const server = http.createServer((req, res) => {
     req.on('end', () => {
       console.log('\n📥 [IN-CALL DEBUG REPORT RECEIVED]\n' + body + '\n');
       res.writeHead(200, { 'Content-Type': 'application/json' });
-      res.end(JSON.stringify({ success: true }));
+      res.end(JSON.stringify({ success: true })); return;
     });
     return;
   }
