@@ -59,7 +59,14 @@ class WebRTCManager {
       // We rely on the WebSocket server and AppContext to route messages correctly.
       // If a WebRTC signaling message reaches here with a targetUserId, it was meant for us.
 
-      if (type === 'CALL_ACCEPTED' && payload) {
+      if (type === 'CALL_RINGING' && payload) {
+        if (this.currentSession && (this.currentSession.id === payload.callId || !payload.callId) && this.currentSession.status === 'calling') {
+          this.currentSession.status = 'ringing';
+          CallDebugger.logStage('WEBSOCKET', 'OK', { signal: 'CALL_RINGING' });
+          this.log('🔔 CALL_RINGING received from peer: Remote phone is ringing!');
+          this.notify();
+        }
+      } else if (type === 'CALL_ACCEPTED' && payload) {
         if (this.currentSession && (this.currentSession.status === 'calling' || this.currentSession.status === 'ringing')) {
           this.currentSession.status = 'connected';
           RingtoneService.stop();
@@ -272,6 +279,11 @@ class WebRTCManager {
       // Normal React Native incoming call flow
       RingtoneService.playIncomingRing();
       this.startRingingTimeout(35);
+      RealtimeBridge.broadcast(
+        'CALL_RINGING',
+        { callId: incomingSession.id },
+        callerUser.id
+      );
     }
 
     return incomingSession;

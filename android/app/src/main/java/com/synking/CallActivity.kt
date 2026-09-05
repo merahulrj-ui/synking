@@ -136,6 +136,33 @@ class CallActivity : ReactActivity() {
         try {
             unregisterReceiver(callEndedReceiver)
         } catch (e: Exception) {}
+    override fun onUserLeaveHint() {
+        super.onUserLeaveHint()
+        try {
+            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
+                val aspectRatio = android.util.Rational(9, 16)
+                val pipParams = android.app.PictureInPictureParams.Builder()
+                    .setAspectRatio(aspectRatio)
+                    .build()
+                enterPictureInPictureMode(pipParams)
+                Log.d("SYNKING_PIP", "[CallActivity] Entered native Android Picture-in-Picture mode successfully!")
+            }
+        } catch (e: Exception) {
+            Log.w("SYNKING_PIP", "[CallActivity] enterPictureInPictureMode hint failed: ${e.message}")
+        }
+    }
+
+    override fun onPictureInPictureModeChanged(isInPictureInPictureMode: Boolean, newConfig: android.content.res.Configuration) {
+        super.onPictureInPictureModeChanged(isInPictureInPictureMode, newConfig)
+        Log.d("SYNKING_PIP", "[CallActivity] onPictureInPictureModeChanged: isInPictureInPictureMode=$isInPictureInPictureMode")
+        try {
+            val map = com.facebook.react.bridge.Arguments.createMap().apply {
+                putBoolean("isInPictureInPictureMode", isInPictureInPictureMode)
+            }
+            reactInstanceManager.currentReactContext
+                ?.getJSModule(com.facebook.react.modules.core.DeviceEventManagerModule.RCTDeviceEventEmitter::class.java)
+                ?.emit("onPictureInPictureModeChanged", map)
+        } catch (e: Exception) {}
     }
 
     override fun getMainComponentName(): String = "CallApp"

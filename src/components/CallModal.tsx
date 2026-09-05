@@ -1,5 +1,6 @@
 import React, { useRef, useEffect, useState } from 'react';
-import { View, Text, StyleSheet, Modal, TouchableOpacity, Image, Platform, ScrollView, Share, Animated, PanResponder, Vibration, NativeModules, BackHandler } from 'react-native';
+import { View, Text, StyleSheet, Modal, TouchableOpacity, Image, Platform, ScrollView, Share, Animated, PanResponder, Vibration, NativeModules, BackHandler, DeviceEventEmitter } from 'react-native';
+import { useKeepAwake } from 'expo-keep-awake';
 import { Ionicons } from '@expo/vector-icons';
 import { LinearGradient } from 'expo-linear-gradient';
 import { CallSession } from '../types';
@@ -183,6 +184,19 @@ interface Props {
 
 export const CallModal: React.FC<Props> = ({ session, onEndCall, onAcceptCall, onMinimize }) => {
   if (!session) return null;
+
+  // 💡 Keep Screen Awake throughout the entire call (Calling, Ringing, Connected)
+  useKeepAwake('synking-call-session');
+
+  const [isNativePip, setIsNativePip] = useState(false);
+
+  // 📺 Native Picture-in-Picture mode listener (hides UI buttons in PiP window)
+  useEffect(() => {
+    const sub = DeviceEventEmitter.addListener('onPictureInPictureModeChanged', (event: any) => {
+      setIsNativePip(Boolean(event?.isInPictureInPictureMode));
+    });
+    return () => sub.remove();
+  }, []);
 
   useEffect(() => {
     // If it's an audio call and connected, turn on proximity sensor to turn screen black near ear
@@ -582,8 +596,8 @@ Remote Video Tracks (${remoteVideo.length}): ${JSON.stringify(remoteVideo)}
             </View>
           )}
 
-          {/* Universal 1-Click Guaranteed Flip Camera Button (Always on top during Video) */}
-          {(session.type === 'video' || session.isVideoEnabled) && (
+          {/* Universal 1-Click Guaranteed Flip Camera Button (Always on top during Video, hidden in PiP) */}
+          {!isNativePip && (session.type === 'video' || session.isVideoEnabled) && (
             <TouchableOpacity 
               style={styles.floatingFlipBtn}
               onPress={() => WebRTCService.switchCamera()}
@@ -594,8 +608,8 @@ Remote Video Tracks (${remoteVideo.length}): ${JSON.stringify(remoteVideo)}
             </TouchableOpacity>
           )}
 
-          {/* Top Left: Chat Button (Always at Top-Left on Video Call, or on Audio Call once Connected) */}
-          {((session.type === 'video' || session.isVideoEnabled) || isConnected) && (
+          {/* Top Left: Chat Button (Always at Top-Left on Video Call, hidden in PiP) */}
+          {!isNativePip && ((session.type === 'video' || session.isVideoEnabled) || isConnected) && (
             <TouchableOpacity
               style={styles.chatMinimizeBtn}
               onPress={handleOpenChat}
@@ -606,31 +620,33 @@ Remote Video Tracks (${remoteVideo.length}): ${JSON.stringify(remoteVideo)}
             </TouchableOpacity>
           )}
 
-          {/* 1. TOP STATUS HEADER (ALWAYS AT TOP) */}
-          <View style={[styles.topHeader, (session.type === 'video' || session.isVideoEnabled) && styles.topHeaderFloating]}>
-            <View style={styles.e2eeBadge}>
-              <Ionicons name="lock-closed" size={13} color="#38BDF8" />
-              <Text style={styles.e2eeText}>End-to-End Encrypted HD</Text>
+          {/* 1. TOP STATUS HEADER (ALWAYS AT TOP, hidden in PiP) */}
+          {!isNativePip && (
+            <View style={[styles.topHeader, (session.type === 'video' || session.isVideoEnabled) && styles.topHeaderFloating]}>
+              <View style={styles.e2eeBadge}>
+                <Ionicons name="lock-closed" size={13} color="#38BDF8" />
+                <Text style={styles.e2eeText}>End-to-End Encrypted HD</Text>
+              </View>
+
+              <Text style={styles.callTypeTitle}>
+                {isIncomingRinging
+                  ? `Incoming ${session.type === 'video' ? 'Video' : 'Voice'} Call`
+                  : session.callerName}
+              </Text>
+
+              <Text style={[styles.callStatus, isConnected && styles.callStatusConnected]}>
+                {isIncomingRinging && 'Incoming Call...'}
+                {!isIncomingRinging && session.status === 'calling' && 'Calling...'}
+                {!isIncomingRinging && session.status === 'ringing' && 'Ringing...'}
+                {session.status === 'connected' && `Connected • ${durationText}`}
+                {session.status === 'ended' && 'Call Ended'}
+                {session.status === 'rejected' && 'Call Declined'}
+              </Text>
             </View>
+          )}
 
-            <Text style={styles.callTypeTitle}>
-              {isIncomingRinging
-                ? `Incoming ${session.type === 'video' ? 'Video' : 'Voice'} Call`
-                : session.callerName}
-            </Text>
-
-            <Text style={[styles.callStatus, isConnected && styles.callStatusConnected]}>
-              {isIncomingRinging && 'Incoming Call...'}
-              {!isIncomingRinging && session.status === 'calling' && 'Connecting to peer...'}
-              {!isIncomingRinging && session.status === 'ringing' && 'Ringing...'}
-              {session.status === 'connected' && `Connected • ${durationText}`}
-              {session.status === 'ended' && 'Call Ended'}
-              {session.status === 'rejected' && 'Call Declined'}
-            </Text>
-          </View>
-
-          {/* 2. INCOMING CALL (RECEIVER DIALER) OR VOICE CALL: Center Avatar */}
-          {(session.type !== 'video' && !session.isVideoEnabled) || (isIncomingRinging && !isConnected) ? (
+          {/* 2. INCOMING CALL (RECEIVER DIALER) OR VOICE CALL: Center Avatar (Hidden in PiP) */}
+          {!isNativePip && ((session.type !== 'video' && !session.isVideoEnabled) || (isIncomingRinging && !isConnected)) ? (
             <View style={styles.centerSection}>
               <View style={styles.avatarContainer}>
                 <LinearGradient
@@ -675,85 +691,87 @@ Remote Video Tracks (${remoteVideo.length}): ${JSON.stringify(remoteVideo)}
             <View style={{ flex: 1 }} />
           )}
 
-          {/* 3. BOTTOM CONTROL BAR */}
-          {isIncomingRinging ? (
-            // INCOMING CALL ACCEPT / DECLINE ACTIONS
-            <View style={styles.incomingActionsRow}>
-              {/* Decline Button */}
-              <TouchableOpacity
-                style={[styles.actionCircleBtn, styles.declineCallBtn]}
-                onPress={handleDecline}
-                activeOpacity={0.8}
-              >
-                <Ionicons name="call" size={28} color="#FFFFFF" style={{ transform: [{ rotate: '135deg' }] }} />
-                <Text style={styles.actionBtnLabel}>Decline</Text>
-              </TouchableOpacity>
+          {/* 3. BOTTOM CONTROL BAR (Hidden in PiP) */}
+          {!isNativePip && (
+            isIncomingRinging ? (
+              // INCOMING CALL ACCEPT / DECLINE ACTIONS
+              <View style={styles.incomingActionsRow}>
+                {/* Decline Button */}
+                <TouchableOpacity
+                  style={[styles.actionCircleBtn, styles.declineCallBtn]}
+                  onPress={handleDecline}
+                  activeOpacity={0.8}
+                >
+                  <Ionicons name="call" size={28} color="#FFFFFF" style={{ transform: [{ rotate: '135deg' }] }} />
+                  <Text style={styles.actionBtnLabel}>Decline</Text>
+                </TouchableOpacity>
 
-              {/* Accept Button */}
-              <TouchableOpacity
-                style={[styles.actionCircleBtn, styles.acceptCallBtn]}
-                onPress={handleAccept}
-                activeOpacity={0.8}
-              >
-                <Ionicons name="call" size={28} color="#FFFFFF" />
-                <Text style={styles.actionBtnLabel}>Accept</Text>
-              </TouchableOpacity>
-            </View>
-          ) : (
-            // ACTIVE / OUTGOING CALL CONTROLS (LUXURY OBSIDIAN & PEARL WHITE)
-            <View style={styles.controlBar}>
-              {/* Mute Button */}
-              <TouchableOpacity
-                style={[styles.controlBtn, session.isMuted && styles.controlBtnMuted]}
-                onPress={() => WebRTCService.toggleMute()}
-                activeOpacity={0.75}
-                hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
-              >
-                <Ionicons
-                  name={session.isMuted ? 'mic-off' : 'mic'}
-                  size={22}
-                  color={session.isMuted ? '#EF4444' : '#FFFFFF'}
-                />
-              </TouchableOpacity>
+                {/* Accept Button */}
+                <TouchableOpacity
+                  style={[styles.actionCircleBtn, styles.acceptCallBtn]}
+                  onPress={handleAccept}
+                  activeOpacity={0.8}
+                >
+                  <Ionicons name="call" size={28} color="#FFFFFF" />
+                  <Text style={styles.actionBtnLabel}>Accept</Text>
+                </TouchableOpacity>
+              </View>
+            ) : (
+              // ACTIVE / OUTGOING CALL CONTROLS (LUXURY OBSIDIAN & PEARL WHITE)
+              <View style={styles.controlBar}>
+                {/* Mute Button */}
+                <TouchableOpacity
+                  style={[styles.controlBtn, session.isMuted && styles.controlBtnMuted]}
+                  onPress={() => WebRTCService.toggleMute()}
+                  activeOpacity={0.75}
+                  hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
+                >
+                  <Ionicons
+                    name={session.isMuted ? 'mic-off' : 'mic'}
+                    size={22}
+                    color={session.isMuted ? '#EF4444' : '#FFFFFF'}
+                  />
+                </TouchableOpacity>
 
-              {/* Speaker Button (Pearl White Active / Frosted Glass Inactive) */}
-              <TouchableOpacity
-                style={[styles.controlBtn, session.isSpeakerOn && styles.controlBtnActive]}
-                onPress={() => WebRTCService.toggleSpeaker()}
-                activeOpacity={0.75}
-                hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
-              >
-                <Ionicons
-                  name={session.isSpeakerOn ? 'volume-high' : 'volume-mute'}
-                  size={22}
-                  color={session.isSpeakerOn ? '#0A0E17' : '#FFFFFF'}
-                />
-              </TouchableOpacity>
+                {/* Speaker Button (Pearl White Active / Frosted Glass Inactive) */}
+                <TouchableOpacity
+                  style={[styles.controlBtn, session.isSpeakerOn && styles.controlBtnActive]}
+                  onPress={() => WebRTCService.toggleSpeaker()}
+                  activeOpacity={0.75}
+                  hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
+                >
+                  <Ionicons
+                    name={session.isSpeakerOn ? 'volume-high' : 'volume-mute'}
+                    size={22}
+                    color={session.isSpeakerOn ? '#0A0E17' : '#FFFFFF'}
+                  />
+                </TouchableOpacity>
 
-              {/* Video Toggle (Pearl White Active / Frosted Glass Inactive) */}
-              <TouchableOpacity
-                style={[styles.controlBtn, session.isVideoEnabled && styles.controlBtnActive]}
-                onPress={() => WebRTCService.toggleVideo()}
-                activeOpacity={0.75}
-                hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
-              >
-                <Ionicons
-                  name={session.isVideoEnabled ? 'videocam' : 'videocam-off'}
-                  size={22}
-                  color={session.isVideoEnabled ? '#0A0E17' : '#FFFFFF'}
-                />
-              </TouchableOpacity>
+                {/* Video Toggle (Pearl White Active / Frosted Glass Inactive) */}
+                <TouchableOpacity
+                  style={[styles.controlBtn, session.isVideoEnabled && styles.controlBtnActive]}
+                  onPress={() => WebRTCService.toggleVideo()}
+                  activeOpacity={0.75}
+                  hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
+                >
+                  <Ionicons
+                    name={session.isVideoEnabled ? 'videocam' : 'videocam-off'}
+                    size={22}
+                    color={session.isVideoEnabled ? '#0A0E17' : '#FFFFFF'}
+                  />
+                </TouchableOpacity>
 
-              {/* End Call Button (Apple Signature Crimson with Ambient Glow) */}
-              <TouchableOpacity
-                style={styles.endCallBtn}
-                onPress={onEndCall}
-                activeOpacity={0.8}
-                hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
-              >
-                <Ionicons name="call" size={26} color="#FFFFFF" style={{ transform: [{ rotate: '135deg' }] }} />
-              </TouchableOpacity>
-            </View>
+                {/* End Call Button (Apple Signature Crimson with Ambient Glow) */}
+                <TouchableOpacity
+                  style={styles.endCallBtn}
+                  onPress={onEndCall}
+                  activeOpacity={0.8}
+                  hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
+                >
+                  <Ionicons name="call" size={26} color="#FFFFFF" style={{ transform: [{ rotate: '135deg' }] }} />
+                </TouchableOpacity>
+              </View>
+            )
           )}
         </LinearGradient>
       </View>

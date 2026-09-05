@@ -125,6 +125,7 @@ class RealtimeBridgeManager {
     type:
       | 'NEW_MESSAGE'
       | 'INCOMING_CALL'
+      | 'CALL_RINGING'
       | 'CALL_ACCEPTED'
       | 'CALL_REJECTED'
       | 'CALL_ENDED'

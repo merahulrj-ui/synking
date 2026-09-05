@@ -213,6 +213,14 @@ class MainActivity : ReactActivity() {
   override fun onPictureInPictureModeChanged(isInPictureInPictureMode: Boolean, newConfig: android.content.res.Configuration) {
     super.onPictureInPictureModeChanged(isInPictureInPictureMode, newConfig)
     android.util.Log.d("SYNKING_PIP", "onPictureInPictureModeChanged: isInPictureInPictureMode=$isInPictureInPictureMode")
+    try {
+      val map = com.facebook.react.bridge.Arguments.createMap().apply {
+        putBoolean("isInPictureInPictureMode", isInPictureInPictureMode)
+      }
+      reactInstanceManager.currentReactContext
+        ?.getJSModule(com.facebook.react.modules.core.DeviceEventManagerModule.RCTDeviceEventEmitter::class.java)
+        ?.emit("onPictureInPictureModeChanged", map)
+    } catch (e: Exception) {}
   }
 }
 

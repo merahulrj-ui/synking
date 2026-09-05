@@ -173,6 +173,7 @@ class TelecomModule(reactContext: ReactApplicationContext) : ReactContextBaseJav
             val nm = reactApplicationContext.getSystemService(Context.NOTIFICATION_SERVICE) as NotificationManager
             nm.cancel(MyFirebaseMessagingService.NOTIFICATION_ID)
             CallState.markAnswered(reactApplicationContext)
+            CallConnectionManager.answerCall()
             promise.resolve(true)
         } catch (e: Exception) {
             promise.resolve(false)
@@ -182,7 +183,20 @@ class TelecomModule(reactContext: ReactApplicationContext) : ReactContextBaseJav
     @ReactMethod
     fun startOngoingCall(callerName: String, promise: Promise) {
         try {
+            CallState.markAnswered(reactApplicationContext)
+            CallConnectionManager.answerCall()
             SynkingConnectionService.updateOngoingCallForeground(callerName)
+            promise.resolve(true)
+        } catch (e: Exception) {
+            promise.resolve(false)
+        }
+    }
+
+    @ReactMethod
+    fun answerCall(promise: Promise) {
+        try {
+            CallState.markAnswered(reactApplicationContext)
+            CallConnectionManager.answerCall()
             promise.resolve(true)
         } catch (e: Exception) {
             promise.resolve(false)
