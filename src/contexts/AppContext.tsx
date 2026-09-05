@@ -57,9 +57,11 @@ interface AppContextType {
   undoLastSwipe: () => UserProfile | null;
   superSynksRemaining: number;
   freeRewindsRemaining: number;
+  dailySwipesRemaining: number;
   boostActiveUntil: number | null;
   useSuperSynk: () => boolean;
   useRewind: () => boolean;
+  useSwipe: () => boolean;
   activateBoost: (durationMinutes?: number) => void;
   isSuspended: boolean;
   suspendedUntil: number | null;
@@ -221,9 +223,10 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
   // 5 Action Buttons Quotas & Profile Boost Management
   const [superSynksRemaining, setSuperSynksRemaining] = useState<number>(() => (currentUser?.isVip ? 5 : 1));
   const [freeRewindsRemaining, setFreeRewindsRemaining] = useState<number>(() => (currentUser?.isVip ? 999 : 1));
+  const [dailySwipesRemaining, setDailySwipesRemaining] = useState<number>(() => (currentUser?.isVip ? 9999 : 20));
   const [boostActiveUntil, setBoostActiveUntil] = useState<number | null>(null);
 
-  // Daily Quota Reset (Midnight reset for SuperSynks & Rewinds)
+  // Daily Quota Reset (Midnight reset for SuperSynks, Rewinds & 20 Daily Free Swipes)
   useEffect(() => {
     const loadQuotas = async () => {
       try {
@@ -263,7 +266,24 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
           await AsyncStorage.setItem('synking_rewinds_data', JSON.stringify({ date: todayStr, count: defaultCount }));
         }
 
-        // 3. Boost Active Status
+        // 3. Daily Free Swipes Quota (20 for free users, unlimited 9999 for VIP)
+        const storedSwipes = await AsyncStorage.getItem('synking_daily_swipes_data');
+        if (storedSwipes) {
+          const parsed = JSON.parse(storedSwipes);
+          if (parsed && parsed.date === todayStr) {
+            setDailySwipesRemaining(currentUser?.isVip ? 9999 : (typeof parsed.count === 'number' ? parsed.count : 20));
+          } else {
+            const defaultCount = currentUser?.isVip ? 9999 : 20;
+            setDailySwipesRemaining(defaultCount);
+            await AsyncStorage.setItem('synking_daily_swipes_data', JSON.stringify({ date: todayStr, count: defaultCount }));
+          }
+        } else {
+          const defaultCount = currentUser?.isVip ? 9999 : 20;
+          setDailySwipesRemaining(defaultCount);
+          await AsyncStorage.setItem('synking_daily_swipes_data', JSON.stringify({ date: todayStr, count: defaultCount }));
+        }
+
+        // 4. Boost Active Status
         const storedBoost = await AsyncStorage.getItem('synking_boost_active_until');
         if (storedBoost) {
           const boostUntil = parseInt(storedBoost, 10);
@@ -1016,6 +1036,18 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     return false;
   };
 
+  const useSwipe = (): boolean => {
+    if (currentUser?.isVip) return true;
+    if (dailySwipesRemaining > 0) {
+      const next = dailySwipesRemaining - 1;
+      setDailySwipesRemaining(next);
+      const todayStr = new Date().toISOString().split('T')[0];
+      AsyncStorage.setItem('synking_daily_swipes_data', JSON.stringify({ date: todayStr, count: next })).catch(() => {});
+      return true;
+    }
+    return false;
+  };
+
   const activateBoost = (durationMinutes = 30) => {
     const until = Date.now() + durationMinutes * 60 * 1000;
     setBoostActiveUntil(until);
@@ -1069,9 +1101,11 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
         undoLastSwipe,
         superSynksRemaining,
         freeRewindsRemaining,
+        dailySwipesRemaining,
         boostActiveUntil,
         useSuperSynk,
         useRewind,
+        useSwipe,
         activateBoost,
         isSuspended,
         suspendedUntil,
