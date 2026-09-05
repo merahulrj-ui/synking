@@ -1,6 +1,6 @@
-﻿const WebSocket = require('ws');
+const WebSocket = require('ws');
 
-const wsUrl = 'wss://synking-9my2.onrender.com';
+const wsUrl = 'ws://3.108.217.155:8082';
 
 function connect() {
     console.log('>>> [DUAL-RADAR] Connecting to Cloud Signaling Relay: ' + wsUrl);

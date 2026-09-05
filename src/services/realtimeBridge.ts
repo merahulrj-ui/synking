@@ -45,8 +45,8 @@ class RealtimeBridgeManager {
 
   private connectWebSocket() {
     try {
-      // Connect to Central Render Cloud WebSocket Engine (matching installed APK)
-      const wsUrl = 'wss://synking-9my2.onrender.com';
+      // Connect both Web & Native Mobile to Central AWS EC2 WebSocket Engine (Mumbai ap-south-1)
+      const wsUrl = 'ws://3.108.217.155:8082';
       console.log(`[WS_CONNECTING] ${wsUrl}`);
       this.socket = new WebSocket(wsUrl);
 

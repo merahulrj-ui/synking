@@ -12,7 +12,7 @@ import java.util.concurrent.TimeUnit
 
 object NativeCallSignaling {
     private const val TAG = "SYNKING_SIGNALING"
-    private const val SERVER_URL = "https://synking-9my2.onrender.com/api/call-signal"
+    private const val SERVER_URL = "http://3.108.217.155:8082/api/call-signal"
 
     private val client = OkHttpClient.Builder()
         .connectTimeout(5, TimeUnit.SECONDS)

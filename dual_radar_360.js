@@ -1,4 +1,4 @@
-﻿const WebSocket = require('ws');
+const WebSocket = require('ws');
 const { spawn } = require('child_process');
 
 console.log("===============================================================================");
@@ -6,7 +6,7 @@ console.log("🛰️ [360° DUAL RADAR ACTIVE] Monitoring Phone (Realme) + Lapto
 console.log("===============================================================================");
 
 // 1. CLOUD SIGNALING RADAR (Laptop WebRTC Relay)
-const wsUrl = 'wss://synking-9my2.onrender.com';
+const wsUrl = 'ws://3.108.217.155:8082';
 function connectWS() {
     try {
         const ws = new WebSocket(wsUrl);

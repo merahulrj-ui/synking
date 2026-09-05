@@ -9,10 +9,10 @@ const PROJECT_ID = "synking-apk";
 const API_KEY = "AIzaSyA3ieppicAwwe0jx4SAKhD4meSdSBkOjCs";
 const FIRESTORE_BASE_URL = `https://firestore.googleapis.com/v1/projects/${PROJECT_ID}/databases/(default)/documents`;
 
-export const CLOUD_BACKEND_URL = 'https://synking-9my2.onrender.com';
+export const CLOUD_BACKEND_URL = 'http://3.108.217.155:8082';
 
 export function getLocalBackendUrl(): string {
-  // Connected to Central Live Render Cloud Backend (matching installed APK)
+  // Connected to Central Live AWS EC2 Cloud Backend (Mumbai ap-south-1)
   return CLOUD_BACKEND_URL;
 }
 
