@@ -47,9 +47,12 @@ jobs:
           cd android
           ./gradlew assembleRelease -x lint -x lintVitalRelease -x bundleReleaseLocalLintAar --no-daemon
 
-      - name: 📲 Upload Synking APK Artifact
+      - name: 🏷️ Prepare Clean Synkin APK
+        run: cp android/app/build/outputs/apk/release/app-arm64-v8a-release.apk Synkin.apk
+
+      - name: 📲 Upload Synkin APK Artifact
         uses: actions/upload-artifact@v4
         with:
-          name: Synking-Release-APK
-          path: android/app/build/outputs/apk/release/app-arm64-v8a-release.apk
+          name: Synkin-Release-APK
+          path: Synkin.apk
           retention-days: 30
