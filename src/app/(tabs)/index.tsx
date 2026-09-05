@@ -165,10 +165,10 @@ export default function DiscoverScreen() {
     }
     if (!currentProfile || isProcessingSwipe.current) return;
 
-    // 👑 20 Daily Free Swipes Gate for Non-VIP
-    if (!currentUser?.isVip && dailySwipesRemaining <= 0) {
-      const title = '👑 20 Daily Swipes Finished!';
-      const msg = 'You have used all 20 of your free daily swipes.\n\nUpgrade to SYNKING VIP to unlock UNLIMITED swipes and match with everyone!';
+    // 👑 20 Daily Free Likes Gate for Non-VIP (Pass is 100% UNLIMITED!)
+    if (action !== 'pass' && !currentUser?.isVip && dailySwipesRemaining <= 0) {
+      const title = '👑 20 Daily Likes Finished!';
+      const msg = 'You have used all 20 of your free daily likes.\n\nUpgrade to SYNKING VIP to unlock UNLIMITED likes & Super Synks and match with everyone!';
       if (Platform.OS === 'web') {
         const upgrade = window.confirm(`${title}\n\n${msg}\n\nUpgrade to VIP now?`);
         if (upgrade) router.push('/vip-membership');
@@ -206,30 +206,33 @@ export default function DiscoverScreen() {
       return;
     }
 
-    // 👑 20 Daily Free Swipes Gate for Non-VIP
-    if (!currentUser?.isVip && dailySwipesRemaining <= 0) {
-      isProcessingSwipe.current = false;
-      const title = '👑 20 Daily Swipes Finished!';
-      const msg = 'You have used all 20 of your free daily swipes.\n\nUpgrade to SYNKING VIP to unlock UNLIMITED swipes and match with everyone!';
-      if (Platform.OS === 'web') {
-        const upgrade = window.confirm(`${title}\n\n${msg}\n\nUpgrade to VIP now?`);
-        if (upgrade) router.push('/vip-membership');
-      } else {
-        Alert.alert(title, msg, [
-          { text: 'Maybe Later', style: 'cancel' },
-          { text: 'Upgrade to VIP 👑', onPress: () => router.push('/vip-membership') }
-        ]);
+    // Pass is 100% UNLIMITED - user can pass as many profiles as they want!
+    if (action !== 'pass') {
+      // 👑 20 Daily Free Likes Gate for Non-VIP
+      if (!currentUser?.isVip && dailySwipesRemaining <= 0) {
+        isProcessingSwipe.current = false;
+        const title = '👑 20 Daily Likes Finished!';
+        const msg = 'You have used all 20 of your free daily likes.\n\nUpgrade to SYNKING VIP to unlock UNLIMITED likes and match with everyone!';
+        if (Platform.OS === 'web') {
+          const upgrade = window.confirm(`${title}\n\n${msg}\n\nUpgrade to VIP now?`);
+          if (upgrade) router.push('/vip-membership');
+        } else {
+          Alert.alert(title, msg, [
+            { text: 'Maybe Later', style: 'cancel' },
+            { text: 'Upgrade to VIP 👑', onPress: () => router.push('/vip-membership') }
+          ]);
+        }
+        router.push('/vip-membership');
+        return;
       }
-      router.push('/vip-membership');
-      return;
-    }
 
-    // Deduct from daily quota
-    const wasSwiped = useSwipe();
-    if (!wasSwiped && !currentUser?.isVip) {
-      isProcessingSwipe.current = false;
-      router.push('/vip-membership');
-      return;
+      // Deduct from daily quota
+      const wasSwiped = useSwipe();
+      if (!wasSwiped && !currentUser?.isVip) {
+        isProcessingSwipe.current = false;
+        router.push('/vip-membership');
+        return;
+      }
     }
 
     const res = swipeProfile(targetId, action);
@@ -247,12 +250,12 @@ export default function DiscoverScreen() {
       }
     }
 
-    // When user just completed their 20th swipe, immediately push to VIP membership screen!
-    if (!currentUser?.isVip && dailySwipesRemaining - 1 <= 0) {
+    // When user just completed their 20th like, push to VIP membership screen!
+    if (action !== 'pass' && !currentUser?.isVip && dailySwipesRemaining - 1 <= 0) {
       setTimeout(() => {
         Alert.alert(
-          '👑 20 Daily Swipes Finished!',
-          'You have reached your 20 free daily swipes limit. Unlock unlimited swipes with VIP!',
+          '👑 20 Daily Likes Finished!',
+          'You have reached your 20 free daily likes limit. Unlock unlimited likes with VIP!',
           [
             { text: 'View VIP Plans 👑', onPress: () => router.push('/vip-membership') }
           ]
