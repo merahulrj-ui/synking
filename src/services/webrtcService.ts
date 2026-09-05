@@ -115,11 +115,7 @@ class WebRTCManager {
         }
       } else if (type === 'CALL_ENDED' && payload) {
         if (this.currentSession && (!payload.callId || this.currentSession.id === payload.callId)) {
-          if (this.currentSession.status === 'calling' || this.currentSession.status === 'ringing') {
-            this.handleCallDeclined();
-          } else {
-            this.handleCallEnded();
-          }
+          this.handleCallEnded();
         }
       } else if (type === 'CALL_UPGRADED_TO_VIDEO' && payload) {
         if (this.currentSession && this.currentSession.id === payload.callId) {
