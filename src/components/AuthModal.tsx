@@ -203,7 +203,7 @@ export const AuthModal: React.FC<Props> = ({ visible, onClose, targetUserName })
                 resizeMode="contain"
               />
               <View>
-                <Text style={[styles.logo, { color: textColor }]}>SYNKING</Text>
+                <Text style={[styles.logo, { color: textColor }]}>Synkin</Text>
                 <Text style={{ fontSize: 10, color: '#FD3A73', fontFamily: 'Poppins_800ExtraBold' }}>IRL DATING · SECURE P2P</Text>
               </View>
             </View>

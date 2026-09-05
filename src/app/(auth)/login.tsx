@@ -17,7 +17,7 @@ export default function LoginScreen() {
   return (
     <SafeAreaView style={styles.safeArea}>
       <View style={styles.heroSection}>
-        <Text style={styles.logo}>⚡ SYNKING</Text>
+        <Text style={styles.logo}>⚡ Synkin</Text>
         <Text style={styles.tagline}>Discover. Synk. Meet IRL. 🔥</Text>
         <View style={styles.safetyBadge}>
           <Text style={styles.safetyText}>🛡️ Identity Verified · Safe Public Outlets Only</Text>

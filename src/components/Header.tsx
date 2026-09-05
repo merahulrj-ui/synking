@@ -44,7 +44,7 @@ export const Header: React.FC<HeaderProps> = ({ onOpenFilter, hasActiveFilters }
           ]}
           resizeMode="contain"
         />
-        <Text style={[styles.logoText, { color: logoTextColor }]}>SYNKING</Text>
+        <Text style={[styles.logoText, { color: logoTextColor }]}>Synkin</Text>
       </View>
 
       {/* Right: Discovery Filter + VIP Crown Actions */}

@@ -21,7 +21,7 @@ export default function RegisterScreen() {
     <SafeAreaView style={styles.safeArea}>
       <ScrollView contentContainerStyle={styles.container} showsVerticalScrollIndicator={false}>
         <View style={styles.heroSection}>
-          <Text style={styles.logo}>⚡ SYNKING</Text>
+          <Text style={styles.logo}>⚡ Synkin</Text>
           <Text style={styles.tagline}>Create Your Verified Profile</Text>
           <View style={styles.safetyBadge}>
             <Text style={styles.safetyText}>🛡️ Identity Verification Required</Text>

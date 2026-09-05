@@ -75,7 +75,7 @@ export const CreateProfileModal: React.FC<Props> = ({ visible, onClose }) => {
                 style={{ width: 28, height: 28, borderRadius: 8 }}
                 resizeMode="contain"
               />
-              <Text style={[styles.logo, { color: textColor }]}>SYNKING</Text>
+              <Text style={[styles.logo, { color: textColor }]}>Synkin</Text>
             </View>
             <View style={styles.tagBadge}>
               <Text style={styles.tagBadgeText}>REAL ROORKEE NETWORK</Text>

@@ -62,7 +62,7 @@ class MainActivity : ReactActivity() {
     try {
       if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
         val channelId = "incoming_calls"
-        val channelName = "SYNKING Incoming Calls"
+        val channelName = "Synkin Incoming Calls"
         val importance = android.app.NotificationManager.IMPORTANCE_HIGH
         val channel = android.app.NotificationChannel(channelId, channelName, importance).apply {
           description = "Full screen and lock screen notifications for incoming calls"
