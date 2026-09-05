@@ -196,6 +196,7 @@ class WebRTCManager {
       isMuted: false,
       isSpeakerOn: params.type === 'video',
       isVideoEnabled: params.type === 'video',
+      isIncoming: false,
     };
 
     this.currentSession = newSession;
@@ -260,6 +261,7 @@ class WebRTCManager {
       isMuted: false,
       isSpeakerOn: type === 'video',
       isVideoEnabled: type === 'video',
+      isIncoming: true,
     };
 
     this.currentSession = incomingSession;

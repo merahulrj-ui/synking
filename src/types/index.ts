@@ -95,6 +95,7 @@ export interface CallSession {
   isSpeakerOn: boolean;
   isVideoEnabled: boolean;
   isFrontCamera?: boolean;
+  isIncoming?: boolean;
 }
 
 export interface ChatMessage {

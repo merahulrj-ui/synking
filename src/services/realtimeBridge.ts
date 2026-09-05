@@ -147,8 +147,15 @@ class RealtimeBridgeManager {
   ) {
     const data = { type, payload, targetUserId };
 
-    // 1. Notify local window (except for WebRTC signals which cause self-echo loops)
-    if (!type.startsWith('WEBRTC_') && type !== 'LIVE_VIDEO_FRAME' && type !== 'LIVE_AUDIO_PULSE') {
+    // 1. Notify local window (skip call signaling to prevent self-echo loops)
+    const isCallSignaling =
+      type === 'INCOMING_CALL' ||
+      type.startsWith('CALL_') ||
+      type.startsWith('WEBRTC_') ||
+      type === 'LIVE_VIDEO_FRAME' ||
+      type === 'LIVE_AUDIO_PULSE';
+
+    if (!isCallSignaling) {
       this.notify(data);
     }
 

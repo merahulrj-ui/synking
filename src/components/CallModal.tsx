@@ -241,7 +241,8 @@ export const CallModal: React.FC<Props> = ({ session, onEndCall, onAcceptCall, o
 
   const [showDebugger, setShowDebugger] = useState(false);
   const [isLocalExpanded, setIsLocalExpanded] = useState(false);
-  const isIncomingRinging = session.status === 'ringing';
+  const isIncoming = session.isIncoming === true;
+  const isIncomingRinging = isIncoming && session.status === 'ringing';
   const isConnected = session.status === 'connected';
   const durationText = WebRTCService.formatDuration(session.durationSeconds);
   const localStream = WebRTCService.getLocalStream();
@@ -272,9 +273,10 @@ export const CallModal: React.FC<Props> = ({ session, onEndCall, onAcceptCall, o
     return () => unsubscribe();
   }, []);
 
-  // Ringtone & Repeating Vibration Manager for Incoming Calls
+  // Ringtone & Repeating Vibration Manager
   useEffect(() => {
-    if (session.status === 'ringing') {
+    const isInc = session.isIncoming === true;
+    if (isInc && session.status === 'ringing') {
       RingtoneService.playIncomingRing();
       // Repeating Vibration Pattern: wait 0ms, vibrate 1000ms, pause 1000ms (repeating loop)
       if (Platform.OS !== 'web') {
@@ -284,7 +286,7 @@ export const CallModal: React.FC<Props> = ({ session, onEndCall, onAcceptCall, o
           navigator.vibrate([1000, 1000]);
         } catch (e) {}
       }
-    } else if (session.status === 'calling') {
+    } else if (!isInc && (session.status === 'calling' || session.status === 'ringing')) {
       RingtoneService.playOutgoingRing();
       Vibration.cancel();
     } else {
@@ -296,7 +298,7 @@ export const CallModal: React.FC<Props> = ({ session, onEndCall, onAcceptCall, o
       RingtoneService.stop();
       Vibration.cancel();
     };
-  }, [session.status]);
+  }, [session.status, session.isIncoming]);
 
   const handleAccept = () => {
     RingtoneService.stop();
@@ -706,6 +708,10 @@ Remote Video Tracks (${remoteVideo.length}): ${JSON.stringify(remoteVideo)}
                   ? 'Call has ended'
                   : isConnected
                   ? '🔒 Direct Peer-to-Peer Encrypted'
+                  : session.status === 'ringing'
+                  ? 'Ringing...'
+                  : session.status === 'calling'
+                  ? 'Calling...'
                   : 'Connecting safely on Synkin'}
               </Text>
             </View>
