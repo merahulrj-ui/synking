@@ -1676,6 +1676,21 @@ async function sendMessagePushNotification(targetUserId, msgPayload) {
     }
 
     if (!pushToken && !nativeFcmToken) {
+      const cleanTarget = String(targetUserId).replace(/\D/g, '').slice(-10);
+      for (const [uid, prof] of Object.entries(db.profiles || {})) {
+        const profPhone = (prof?.phoneNumber || '').replace(/\D/g, '').slice(-10);
+        if ((cleanTarget && profPhone === cleanTarget) || prof?.id === targetUserId) {
+          nativeFcmToken = db.fcmTokens?.[uid] || prof?.fcmPushToken;
+          pushToken = db.pushTokens?.[uid] || prof?.pushToken;
+          if (nativeFcmToken || pushToken) {
+            console.log(`[MSG_PUSH_RESOLVED] Target ${targetUserId} mapped to profile ${uid}`);
+            break;
+          }
+        }
+      }
+    }
+
+    if (!pushToken && !nativeFcmToken) {
       console.log(`[MSG_PUSH_SKIP] No push token registered for target ${targetUserId}`);
       return;
     }
@@ -1701,8 +1716,20 @@ async function sendMessagePushNotification(targetUserId, msgPayload) {
       try {
         const response = await fcmMessaging.send({
           token: nativeFcmToken,
+          notification: {
+            title: String(senderName),
+            body: String(text),
+          },
           data: dataPayload,
-          android: { priority: 'high' }
+          android: {
+            priority: 'high',
+            notification: {
+              channelId: 'synking_messages',
+              priority: 'high',
+              defaultSound: true,
+              defaultVibrateTimings: true,
+            }
+          }
         });
         console.log(`✅ [FCM_CHAT_PUSH_SUCCESS] ID: ${response} to ${targetUserId}`);
         return;

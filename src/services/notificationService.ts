@@ -49,6 +49,15 @@ class NotificationServiceClass {
           bypassDnd: true,
           sound: 'default',
         });
+
+        await Notifications.setNotificationChannelAsync('synking_messages', {
+          name: 'SYNKING Messages',
+          importance: Notifications.AndroidImportance.MAX,
+          vibrationPattern: [0, 250, 250, 250],
+          lightColor: '#FD3A73',
+          lockscreenVisibility: Notifications.AndroidNotificationVisibility.PUBLIC,
+          sound: 'default',
+        });
       }
 
       // 4. Interactive Call Actions: Answer (Pick) & Decline (Disconnect) Buttons

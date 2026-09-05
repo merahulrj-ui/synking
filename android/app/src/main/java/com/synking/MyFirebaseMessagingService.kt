@@ -194,9 +194,16 @@ class MyFirebaseMessagingService : FirebaseMessagingService() {
 
             val nm = getSystemService(Context.NOTIFICATION_SERVICE) as NotificationManager
             if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
-                val channel = NotificationChannel(msgChannelId, "Messages", NotificationManager.IMPORTANCE_HIGH).apply {
+                val soundUri = RingtoneManager.getDefaultUri(RingtoneManager.TYPE_NOTIFICATION)
+                val channel = NotificationChannel(msgChannelId, "SYNKING Messages", NotificationManager.IMPORTANCE_HIGH).apply {
+                    description = "Chat message notifications"
                     enableVibration(true)
                     enableLights(true)
+                    lightColor = 0xFFFD3A73.toInt()
+                    setSound(soundUri, AudioAttributes.Builder()
+                        .setContentType(AudioAttributes.CONTENT_TYPE_SONIFICATION)
+                        .setUsage(AudioAttributes.USAGE_NOTIFICATION_COMMUNICATION_INSTANT)
+                        .build())
                 }
                 nm.createNotificationChannel(channel)
             }
@@ -224,6 +231,7 @@ class MyFirebaseMessagingService : FirebaseMessagingService() {
                 .setContentTitle(title)
                 .setContentText(body)
                 .setPriority(NotificationCompat.PRIORITY_HIGH)
+                .setDefaults(NotificationCompat.DEFAULT_ALL)
                 .setAutoCancel(true)
                 .setContentIntent(pendingIntent)
                 .build()

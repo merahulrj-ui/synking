@@ -1,7 +1,7 @@
 import React, { useEffect, useState, useRef } from 'react';
 import { View, Text, StyleSheet, TouchableOpacity, Image, Animated, Platform } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
-import { useRouter, useSegments } from 'expo-router';
+import { useRouter, useSegments, useGlobalSearchParams } from 'expo-router';
 import { useApp } from '../contexts/AppContext';
 import { RealtimeBridge } from '../services/realtimeBridge';
 import { RingtoneService } from '../services/ringtoneService';
@@ -19,6 +19,7 @@ interface NotificationState {
 export const InAppNotificationBanner: React.FC = () => {
   const router = useRouter();
   const segments = useSegments();
+  const { id: activeChatId } = useGlobalSearchParams<{ id?: string }>();
   const { currentUser, profiles, matches, isDarkMode } = useApp();
   const [notification, setNotification] = useState<NotificationState | null>(null);
   const slideAnim = useRef(new Animated.Value(-120)).current;
@@ -44,19 +45,31 @@ export const InAppNotificationBanner: React.FC = () => {
         if (seenMessageIds.current.has(msg.id)) return;
         seenMessageIds.current.add(msg.id);
 
-        const myId = currentUser?.id || 'my_user_id';
+        function isMe(targetId?: string) {
+          if (!targetId || !currentUser) return false;
+          if (currentUser.id === targetId) return true;
+          const myPhone = (currentUser.phoneNumber || '').replace(/\D/g, '').slice(-10);
+          const tPhone = String(targetId).replace(/\D/g, '').slice(-10);
+          if (myPhone && tPhone && myPhone === tPhone) return true;
+          return false;
+        }
 
         // Ignore messages sent by ourselves
-        if (msg.senderId === myId) return;
+        if (isMe(msg.senderId)) return;
 
         // ⛔ CRITICAL: Only show notification if this message is addressed to ME
-        if (msg.receiverId !== myId) return;
+        if (!isMe(msg.receiverId)) return;
 
         // Check if user is currently inside the chat with this specific sender
-        const currentRoute = segments.join('/');
-        const isCurrentlyInThisChat = currentRoute.includes(`chat/${msg.senderId}`) || currentRoute.includes(`chat/[id]`);
+        const isCurrentlyInThisChat = Boolean(
+          activeChatId &&
+          (activeChatId === msg.senderId ||
+           (activeChatId.replace(/\D/g, '').slice(-10) &&
+            activeChatId.replace(/\D/g, '').slice(-10) === String(msg.senderId).replace(/\D/g, '').slice(-10)))
+        );
 
         // Decrypt text if E2EE encrypted
+        const myId = currentUser?.id || 'my_user_id';
         let readableText = msg.text || (msg as any).plainText || 'New message';
         if (readableText && typeof readableText === 'string' && readableText.startsWith('E2EE::')) {
           readableText = await decryptE2EEMessage(readableText, msg.senderId, myId);
