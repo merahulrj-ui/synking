@@ -11,6 +11,7 @@ import {
   Image,
   ActivityIndicator,
   Platform,
+  KeyboardAvoidingView,
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { GradientButton } from './GradientButton';
@@ -191,8 +192,11 @@ export const AuthModal: React.FC<Props> = ({ visible, onClose, targetUserName })
   };
 
   return (
-    <Modal visible={visible} animationType="slide" transparent onRequestClose={onClose}>
-      <View style={styles.overlay}>
+    <Modal visible={visible} animationType="slide" transparent onRequestClose={onClose} statusBarTranslucent>
+      <KeyboardAvoidingView
+        behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
+        style={styles.overlay}
+      >
         <View style={[styles.modalCard, { backgroundColor: cardBg, borderColor: borderCol }]}>
           {/* Header */}
           <View style={styles.header}>
@@ -212,7 +216,11 @@ export const AuthModal: React.FC<Props> = ({ visible, onClose, targetUserName })
             </TouchableOpacity>
           </View>
 
-          <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={{ paddingBottom: 20 }}>
+          <ScrollView 
+            showsVerticalScrollIndicator={false} 
+            keyboardShouldPersistTaps="handled"
+            contentContainerStyle={{ paddingBottom: 40 }}
+          >
             {/* Title & Subtitle */}
             <Text style={[styles.title, { color: textColor }]}>
               {targetUserName
@@ -418,7 +426,7 @@ export const AuthModal: React.FC<Props> = ({ visible, onClose, targetUserName })
             )}
           </ScrollView>
         </View>
-      </View>
+      </KeyboardAvoidingView>
     </Modal>
   );
 };
