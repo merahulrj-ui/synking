@@ -551,14 +551,16 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
               const { RingtoneService } = require('../services/ringtoneService');
               if (RingtoneService) RingtoneService.playMessageChime();
 
-              // Trigger local message notification with sound and heads-up banner
-              const sender = profiles.find(p => p.id === msg.senderId || (p.phoneNumber && (p.phoneNumber.replace(/\D/g, '').slice(-10) === msg.senderId.replace(/\D/g, '').slice(-10))));
-              const senderTitle = sender?.name || 'New Message';
-              let bodyText = msg.text || 'Sent you a message';
-              if (bodyText.includes('|||AUDIO_DATA::')) {
-                bodyText = '🎤 Voice note';
+              // Post notification banner on Web/iOS (Android is handled natively by MyFirebaseMessagingService to prevent duplicates)
+              if (Platform.OS !== 'android') {
+                const sender = profiles.find(p => p.id === msg.senderId || (p.phoneNumber && (p.phoneNumber.replace(/\D/g, '').slice(-10) === msg.senderId.replace(/\D/g, '').slice(-10))));
+                const senderTitle = sender?.name || 'New Message';
+                let bodyText = msg.text || 'Sent you a message';
+                if (bodyText.includes('|||AUDIO_DATA::')) {
+                  bodyText = '🎤 Voice note';
+                }
+                NotificationService.showMessageNotification(senderTitle, bodyText, msg.senderId);
               }
-              NotificationService.showMessageNotification(senderTitle, bodyText, msg.senderId);
             } catch(e) {}
           }
 
@@ -777,7 +779,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
   useEffect(() => {
     if (currentUser) {
       RealtimeBridge.registerUser(currentUser.id);
-      NotificationService.registerForPushNotificationsAsync(currentUser.id);
+      NotificationService.registerForPushNotificationsAsync(currentUser.id, currentUser.phoneNumber);
       setIsLoggedIn(true);
       syncCloudState();
     }

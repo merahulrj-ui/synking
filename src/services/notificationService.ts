@@ -195,8 +195,8 @@ class NotificationServiceClass {
   }
 
   // Register device push token to backend for background / closed app call wakeups
-    public async registerForPushNotificationsAsync(userId: string) {
-  if (Platform.OS === 'web' || !Notifications || !userId) return;
+  public async registerForPushNotificationsAsync(userId: string, phoneNumber?: string) {
+    if (Platform.OS === 'web' || !Notifications || !userId) return;
 
   try {
     await this.initialize();
@@ -260,6 +260,9 @@ class NotificationServiceClass {
     const { getLocalBackendUrl } = require('./firebase');
     const backendUrl = getLocalBackendUrl();
 
+    const cleanPhone = (phoneNumber || '').replace(/\D/g, '').slice(-10);
+    const userPhoneKey = cleanPhone ? `user_${cleanPhone}` : null;
+
     await fetch(`${backendUrl}/api/profiles/push-token`, {
       method: 'POST',
       headers: {
@@ -273,8 +276,24 @@ class NotificationServiceClass {
       }),
     });
 
+    if (userPhoneKey && userPhoneKey !== userId) {
+      await fetch(`${backendUrl}/api/profiles/push-token`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          userId: userPhoneKey,
+          pushToken: expoPushToken || fcmPushToken,
+          expoPushToken,
+          fcmPushToken,
+        }),
+      }).catch(() => {});
+    }
+
     CallDebugger.logStage('PUSH TOKEN REGISTERED', 'OK', {
       userId,
+      userPhoneKey,
       expo: !!expoPushToken,
       fcm: !!fcmPushToken,
     });
