@@ -204,6 +204,20 @@ class TelecomModule(reactContext: ReactApplicationContext) : ReactContextBaseJav
     }
 
     @ReactMethod
+    fun setCurrentUser(userId: String, userName: String, promise: Promise) {
+        try {
+            val prefs = reactApplicationContext.getSharedPreferences("synking_call_state", Context.MODE_PRIVATE)
+            prefs.edit()
+                .putString("current_user_id", userId)
+                .putString("current_user_name", userName)
+                .apply()
+            promise.resolve(true)
+        } catch (e: Exception) {
+            promise.resolve(false)
+        }
+    }
+
+    @ReactMethod
     fun attachLocalVideo(streamUrl: String, promise: Promise) {
         promise.resolve(true)
     }

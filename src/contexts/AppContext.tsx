@@ -1,5 +1,5 @@
 import React, { createContext, useContext, useState, useEffect, useRef, useCallback } from 'react';
-import { Alert, Platform } from 'react-native';
+import { Alert, Platform, NativeModules } from 'react-native';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { UserProfile, SynkRequest, Venue, DateBooking, ChatMessage, SafetyContact } from '../types';
 import { MOCK_VENUES } from '../constants/mockData';
@@ -205,6 +205,15 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
   useEffect(() => {
     refreshLocation();
   }, []);
+
+  // Sync user credentials to Native TelecomModule so self missed-calls are 100% suppressed
+  useEffect(() => {
+    if (currentUser?.id && Platform.OS === 'android') {
+      try {
+        NativeModules.TelecomModule?.setCurrentUser(currentUser.id, currentUser.name || '');
+      } catch (e) {}
+    }
+  }, [currentUser]);
 
   const [profiles, setProfiles] = useState<UserProfile[]>([]);
   const [matches, setMatches] = useState<UserProfile[]>([]);
@@ -833,6 +842,11 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       const updated = { ...prev, ...updates };
       saveUserProfileToFirestore(updated);
       AsyncStorage.setItem('synking_my_user', JSON.stringify(updated)).catch(() => {});
+      if (Platform.OS === 'android' && updated.id) {
+        try {
+          NativeModules.TelecomModule?.setCurrentUser(updated.id, updated.name || '');
+        } catch (e) {}
+      }
       return updated;
     });
   };
@@ -845,6 +859,11 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       window.localStorage.setItem('synking_my_user', JSON.stringify(user));
     }
     AsyncStorage.setItem('synking_my_user', JSON.stringify(user)).catch(() => {});
+    if (Platform.OS === 'android' && user.id) {
+      try {
+        NativeModules.TelecomModule?.setCurrentUser(user.id, user.name || '');
+      } catch (e) {}
+    }
     setTimeout(() => {
       syncCloudState();
     }, 100);

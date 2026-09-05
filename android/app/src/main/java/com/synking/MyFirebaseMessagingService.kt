@@ -129,16 +129,45 @@ class MyFirebaseMessagingService : FirebaseMessagingService() {
                 return
             }
 
-            // 6. Resolve Real Caller Name from PendingCallStore if missing or 'Someone'
+            // 6. IF THIS DEVICE WAS NOT RINGING AS RECEIVER (savedPending is null or callId mismatch), DO NOT post Missed Call!
+            // Outgoing callers never have a savedPending incoming call.
+            if (savedPending == null || savedPending.callId != callId) {
+                CallState.clear(this@MyFirebaseMessagingService, callId)
+                PendingCallStore.clear(this@MyFirebaseMessagingService)
+                CallIntentModule.clear()
+                debug("FCM_CALL_ENDED", "OK", "No pending incoming ringing call for callId=$callId on this device. Suppressing Missed Call notification.")
+                return
+            }
+
+            // 7. Resolve Real Caller Name from PendingCallStore if missing or 'Someone'
             val rawName = data["callerName"] ?: ""
             val resolvedCallerName = if (rawName.isNotEmpty() && rawName != "Someone") {
                 rawName
-            } else if (!savedPending?.callerName.isNullOrEmpty() && savedPending?.callerName != "Someone") {
-                savedPending!!.callerName
+            } else if (!savedPending.callerName.isNullOrEmpty() && savedPending.callerName != "Someone") {
+                savedPending.callerName
             } else {
                 "Someone"
             }
-            val resolvedCallerId = if (!data["callerId"].isNullOrEmpty()) data["callerId"]!! else (savedPending?.callerId ?: "")
+            val resolvedCallerId = if (!data["callerId"].isNullOrEmpty()) data["callerId"]!! else savedPending.callerId
+
+            // 8. NEVER post Missed Call from YOURSELF (if caller ID/name matches current logged in user)
+            val prefs = getSharedPreferences("synking_call_state", Context.MODE_PRIVATE)
+            val currentUserId = prefs.getString("current_user_id", null)
+            val currentUserName = prefs.getString("current_user_name", null)
+            if (!currentUserId.isNullOrEmpty() && (currentUserId == resolvedCallerId || currentUserId == data["callerId"])) {
+                CallState.clear(this@MyFirebaseMessagingService, callId)
+                PendingCallStore.clear(this@MyFirebaseMessagingService)
+                CallIntentModule.clear()
+                debug("FCM_CALL_ENDED", "OK", "Caller ID matches current user ($currentUserId). Self missed call suppressed.")
+                return
+            }
+            if (!currentUserName.isNullOrEmpty() && currentUserName.equals(resolvedCallerName, ignoreCase = true)) {
+                CallState.clear(this@MyFirebaseMessagingService, callId)
+                PendingCallStore.clear(this@MyFirebaseMessagingService)
+                CallIntentModule.clear()
+                debug("FCM_CALL_ENDED", "OK", "Caller name matches current user name ($currentUserName). Self missed call suppressed.")
+                return
+            }
 
             CallState.clear(this@MyFirebaseMessagingService, callId)
             PendingCallStore.clear(this@MyFirebaseMessagingService)

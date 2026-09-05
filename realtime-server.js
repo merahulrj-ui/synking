@@ -2494,9 +2494,14 @@ server.on('upgrade', (req, socket, head) => {
           // 📲 High-Priority Push Notification to wake up phone if app is closed or locked!
           if (parsed.type === 'INCOMING_CALL' && parsed.payload) {
             sendCallPushNotification(targetUserId, parsed.payload);
-          } else if ((parsed.type === 'END_CALL' || parsed.type === 'CALL_DECLINED' || parsed.type === 'CALL_ENDED' || parsed.type === 'CALL_REJECTED') && parsed.payload) {
-            // Send a Missed Call push to clear the native ringing state!
-            sendCallPushNotification(targetUserId, parsed.payload, true);
+          } else if ((parsed.type === 'END_CALL' || parsed.type === 'CALL_ENDED') && parsed.payload) {
+            // Only send Missed Call push to the RECEIVER if the CALLER hung up before answer
+            const callerId = parsed.payload?.callerUser?.id || parsed.payload?.callerId;
+            if (callerId && String(callerId) === String(targetUserId)) {
+              console.log(`[PUSH_SKIP] Suppressing Missed Call push to caller themselves (${targetUserId})`);
+            } else {
+              sendCallPushNotification(targetUserId, parsed.payload, true);
+            }
           } else if (parsed.type === 'NEW_MESSAGE' && parsed.payload) {
             sendMessagePushNotification(targetUserId, parsed.payload);
           }
