@@ -231,11 +231,13 @@ export default function ProfileScreen() {
         mediaTypes: ImagePicker.MediaTypeOptions.Images,
         allowsEditing: true,
         aspect: [1, 1],
-        quality: 0.8,
+        quality: 0.6,
+        base64: true,
       });
 
       if (!result.canceled && result.assets?.[0]?.uri) {
-        const uri = result.assets[0].uri;
+        const asset = result.assets[0];
+        const uri = asset.base64 ? `data:image/jpeg;base64,${asset.base64}` : asset.uri;
         const newPhotos = [...editPhotos];
         if (index < newPhotos.length) {
           newPhotos[index] = uri;
@@ -347,9 +349,9 @@ export default function ProfileScreen() {
       loginUser(pUser);
       populateEditState(pUser);
       if (Platform.OS === 'web') {
-        window.alert(`Signed In as ${pUser.name}! 🎉\n\nWelcome to SYNKING!`);
+        window.alert(`Signed In as ${pUser.name}! 🎉\n\nWelcome to Synkin!`);
       } else {
-        Alert.alert(`Signed In as ${pUser.name}! 🎉`, 'Welcome to SYNKING!');
+        Alert.alert(`Signed In as ${pUser.name}! 🎉`, 'Welcome to Synkin!');
       }
       return;
     }
@@ -392,9 +394,9 @@ export default function ProfileScreen() {
     loginUser(newUser);
     populateEditState(newUser);
     if (Platform.OS === 'web') {
-      window.alert(`Signed In as ${finalName}! 🎉\n\nWelcome to SYNKING!`);
+      window.alert(`Signed In as ${finalName}! 🎉\n\nWelcome to Synkin!`);
     } else {
-      Alert.alert(`Signed In as ${finalName}! 🎉`, 'Welcome to SYNKING!');
+      Alert.alert(`Signed In as ${finalName}! 🎉`, 'Welcome to Synkin!');
     }
   };
 
@@ -455,7 +457,7 @@ export default function ProfileScreen() {
                 style={{ width: 64, height: 64, borderRadius: 18, marginBottom: 12 }}
                 resizeMode="contain"
               />
-              <Text style={[styles.guestTitle, { color: textColor, fontSize: 22, fontWeight: '900' }]}>
+              <Text style={[styles.guestTitle, { color: textColor, fontSize: 22, fontFamily: 'Poppins_900Black' }]}>
                 Sign In with Phone ⚡
               </Text>
               <Text style={[styles.guestSub, { color: subText, textAlign: 'center', marginTop: 4, marginBottom: 12 }]}>
@@ -612,7 +614,7 @@ export default function ProfileScreen() {
                   activeOpacity={0.8}
                 >
                   <MaterialCommunityIcons name="crown" size={16} color={isDarkMode ? '#FDE047' : '#D97706'} />
-                  <Text style={[styles.secondaryActionText, { color: isDarkMode ? '#FDE047' : '#D97706', fontWeight: '900' }]}>Get VIP</Text>
+                  <Text style={[styles.secondaryActionText, { color: isDarkMode ? '#FDE047' : '#D97706', fontFamily: 'Poppins_900Black' }]}>Get VIP</Text>
                 </TouchableOpacity>
 
                 <TouchableOpacity
@@ -847,7 +849,7 @@ export default function ProfileScreen() {
                 <View style={styles.vipBannerHeader}>
                   <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
                     <Ionicons name="sparkles" size={18} color="#FFD700" />
-                    <Text style={styles.vipBannerTitle}>SYNKING BLACK VIP</Text>
+                    <Text style={styles.vipBannerTitle}>Synkin Black VIP</Text>
                   </View>
                   <View style={styles.vipBannerTag}>
                     <Text style={styles.vipBannerTagText}>UPGRADE</Text>
@@ -930,18 +932,18 @@ export default function ProfileScreen() {
               </TouchableOpacity>
             </View>
 
-            {/* 🏷️ SYNKING App Version & Live Release Status */}
+            {/* 🏷️ Synkin App Version & Live Release Status */}
             <View style={{ alignItems: 'center', justifyContent: 'center', marginTop: 24, marginBottom: 8, gap: 4 }}>
               <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6, backgroundColor: isDarkMode ? '#131927' : '#F1F5F9', paddingHorizontal: 14, paddingVertical: 6, borderRadius: 14, borderWidth: 1, borderColor: borderColor }}>
                 <View style={{ width: 8, height: 8, borderRadius: 4, backgroundColor: '#22C55E' }} />
-                <Text style={{ color: textColor, fontSize: 12, fontWeight: '800', letterSpacing: 0.5 }}>
-                  SYNKING v1.0.69
+                <Text style={{ color: textColor, fontSize: 12, fontFamily: 'Poppins_800ExtraBold', letterSpacing: 0.5 }}>
+                  Synkin v1.0.69
                 </Text>
-                <Text style={{ color: '#FD3A73', fontSize: 11, fontWeight: '700' }}>
+                <Text style={{ color: '#FD3A73', fontSize: 11, fontFamily: 'Poppins_700Bold' }}>
                   • Build #69
                 </Text>
               </View>
-              <Text style={{ color: subText, fontSize: 11, fontWeight: '600' }}>
+              <Text style={{ color: subText, fontSize: 11, fontFamily: 'Poppins_600SemiBold' }}>
                 P2P Ultra-Fast HD Calling Engine 🚀
               </Text>
             </View>
@@ -984,7 +986,7 @@ export default function ProfileScreen() {
                   <Text
                     style={[
                       styles.editTabText,
-                      { color: activeEditTab === tab.key ? '#FD3A73' : subText, fontWeight: activeEditTab === tab.key ? '800' : '600' },
+                      { color: activeEditTab === tab.key ? '#FD3A73' : subText, fontFamily: activeEditTab === tab.key ? 'Poppins_800ExtraBold' : 'Poppins_600SemiBold' },
                     ]}
                   >
                     {tab.label}
@@ -1030,7 +1032,7 @@ export default function ProfileScreen() {
                               activeOpacity={0.8}
                             >
                               <Ionicons name="add-circle" size={32} color="#FD3A73" />
-                              <Text style={{ color: subText, fontSize: 11, fontWeight: '700', marginTop: 4 }}>Add Photo</Text>
+                              <Text style={{ color: subText, fontSize: 11, fontFamily: 'Poppins_700Bold', marginTop: 4 }}>Add Photo</Text>
                             </TouchableOpacity>
                           )}
                         </View>
@@ -1442,11 +1444,11 @@ const styles = StyleSheet.create({
   },
   userNameText: {
     fontSize: 22,
-    fontWeight: '900',
+    fontFamily: 'Poppins_900Black',
     letterSpacing: -0.4,
   },
   userAgeText: {
-    fontWeight: '500',
+    fontFamily: 'Poppins_500Medium',
   },
   verifiedShield: {
     width: 18,
@@ -1479,11 +1481,11 @@ const styles = StyleSheet.create({
   vipCrownText: {
     color: '#F59E0B',
     fontSize: 10,
-    fontWeight: '900',
+    fontFamily: 'Poppins_900Black',
   },
   subHeadline: {
     fontSize: 13,
-    fontWeight: '600',
+    fontFamily: 'Poppins_600SemiBold',
     marginTop: 3,
     letterSpacing: -0.2,
   },
@@ -1516,7 +1518,7 @@ const styles = StyleSheet.create({
   primaryActionText: {
     color: '#FFF',
     fontSize: 13,
-    fontWeight: '800',
+    fontFamily: 'Poppins_800ExtraBold',
   },
   secondaryActionBtn: {
     flexDirection: 'row',
@@ -1529,7 +1531,7 @@ const styles = StyleSheet.create({
   },
   secondaryActionText: {
     fontSize: 13,
-    fontWeight: '800',
+    fontFamily: 'Poppins_800ExtraBold',
   },
   iconActionBtn: {
     width: 38,
@@ -1577,11 +1579,11 @@ const styles = StyleSheet.create({
   },
   boostTitle: {
     fontSize: 13,
-    fontWeight: '800',
+    fontFamily: 'Poppins_800ExtraBold',
   },
   boostSub: {
     fontSize: 11,
-    fontWeight: '500',
+    fontFamily: 'Poppins_500Medium',
     marginTop: 1,
   },
 
@@ -1605,13 +1607,13 @@ const styles = StyleSheet.create({
   },
   cardHeaderTitle: {
     fontSize: 14,
-    fontWeight: '800',
+    fontFamily: 'Poppins_800ExtraBold',
     letterSpacing: -0.2,
   },
   cardActionLink: {
     color: '#FD3A73',
     fontSize: 12,
-    fontWeight: '700',
+    fontFamily: 'Poppins_700Bold',
   },
 
   // Photo Showcase Gallery
@@ -1642,7 +1644,7 @@ const styles = StyleSheet.create({
   mainTagText: {
     color: '#FFF',
     fontSize: 9,
-    fontWeight: '900',
+    fontFamily: 'Poppins_900Black',
   },
   addPhotoSlotLuxury: {
     width: 96,
@@ -1655,7 +1657,7 @@ const styles = StyleSheet.create({
   },
   addPhotoSlotText: {
     fontSize: 11,
-    fontWeight: '700',
+    fontFamily: 'Poppins_700Bold',
     marginTop: 4,
   },
 
@@ -1663,7 +1665,7 @@ const styles = StyleSheet.create({
   bioBodyText: {
     fontSize: 13.5,
     lineHeight: 20,
-    fontWeight: '500',
+    fontFamily: 'Poppins_500Medium',
   },
 
   // Intention Capsule
@@ -1699,7 +1701,7 @@ const styles = StyleSheet.create({
   },
   lifestylePillText: {
     fontSize: 12,
-    fontWeight: '700',
+    fontFamily: 'Poppins_700Bold',
   },
   passionChip: {
     paddingHorizontal: 12,
@@ -1786,7 +1788,7 @@ const styles = StyleSheet.create({
   },
   settingItemTitle: {
     fontSize: 13.5,
-    fontWeight: '700',
+    fontFamily: 'Poppins_700Bold',
   },
   settingDivider: {
     height: 1,
@@ -1815,7 +1817,7 @@ const styles = StyleSheet.create({
   },
   modalTitle: {
     fontSize: 18,
-    fontWeight: '900',
+    fontFamily: 'Poppins_900Black',
   },
   editTabsRow: {
     flexDirection: 'row',
@@ -1837,7 +1839,7 @@ const styles = StyleSheet.create({
   },
   tabSectionTitle: {
     fontSize: 15,
-    fontWeight: '800',
+    fontFamily: 'Poppins_800ExtraBold',
   },
   photoSlotsGrid: {
     flexDirection: 'row',
@@ -1869,7 +1871,7 @@ const styles = StyleSheet.create({
   mainBadgeText: {
     color: '#FFF',
     fontSize: 9,
-    fontWeight: '800',
+    fontFamily: 'Poppins_800ExtraBold',
   },
   removePhotoBtn: {
     position: 'absolute',
@@ -1889,7 +1891,7 @@ const styles = StyleSheet.create({
   },
   fieldLabel: {
     fontSize: 12,
-    fontWeight: '700',
+    fontFamily: 'Poppins_700Bold',
     textTransform: 'uppercase',
   },
   inputBox: {
@@ -1898,7 +1900,7 @@ const styles = StyleSheet.create({
     paddingHorizontal: 14,
     paddingVertical: 10,
     fontSize: 14,
-    fontWeight: '600',
+    fontFamily: 'Poppins_600SemiBold',
   },
   optionCard: {
     flexDirection: 'row',
@@ -1925,7 +1927,7 @@ const styles = StyleSheet.create({
   },
   interestToggleText: {
     fontSize: 12,
-    fontWeight: '700',
+    fontFamily: 'Poppins_700Bold',
   },
   editModalFooter: {
     padding: 16,
@@ -1943,7 +1945,7 @@ const styles = StyleSheet.create({
   saveBtnText: {
     color: '#FFFFFF',
     fontSize: 15,
-    fontWeight: '800',
+    fontFamily: 'Poppins_800ExtraBold',
   },
 });
 
