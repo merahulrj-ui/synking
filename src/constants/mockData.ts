@@ -1,46 +1,6 @@
 import { UserProfile, Venue, DateBooking } from '../types';
 
-export const MOCK_PROFILES: UserProfile[] = [
-  {
-    id: 'user_ananya_01',
-    name: 'Ananya Sharma',
-    age: 23,
-    gender: 'female',
-    occupation: 'UI/UX Designer',
-    location: { city: 'Roorkee', coordinates: [29.8710, 77.8930] },
-    distance: '1 km away',
-    bio: 'Coffee lover, aesthetic cafe hopper & bookworm ✨ Looking for genuine conversations and good vibes!',
-    photo: 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=800&auto=format&fit=crop&q=80',
-    photos: [
-      'https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=800&auto=format&fit=crop&q=80',
-      'https://images.unsplash.com/photo-1517841905240-472988babdf9?w=800&auto=format&fit=crop&q=80',
-      'https://images.unsplash.com/photo-1524504388940-b1c1722653e1?w=800&auto=format&fit=crop&q=80',
-    ],
-    interests: ['Coffee ☕', 'Design 🎨', 'Travel ✈️', 'Photography 📸', 'Books 📚'],
-    compatibility: 96,
-    isVerified: true,
-    isVip: true,
-  },
-  {
-    id: 'user_rohan_02',
-    name: 'Rohan Verma',
-    age: 25,
-    gender: 'male',
-    occupation: 'Software Engineer',
-    location: { city: 'Roorkee', coordinates: [29.8820, 77.9050] },
-    distance: '3 km away',
-    bio: 'Techie by day, guitarist by night 🎸 Let’s grab specialty coffee and talk about music, sci-fi, or deep thoughts.',
-    photo: 'https://images.unsplash.com/photo-1506794778202-cad84cf45f1d?w=800&auto=format&fit=crop&q=80',
-    photos: [
-      'https://images.unsplash.com/photo-1506794778202-cad84cf45f1d?w=800&auto=format&fit=crop&q=80',
-      'https://images.unsplash.com/photo-1500648767791-00dcc994a43e?w=800&auto=format&fit=crop&q=80',
-    ],
-    interests: ['Guitar 🎸', 'Coding 💻', 'Fitness 🏋️', 'Gaming 🎮', 'Rock Music 🎧'],
-    compatibility: 92,
-    isVerified: true,
-    isVip: false,
-  }
-];
+export const MOCK_PROFILES: UserProfile[] = [];
 
 export const MOCK_VENUES: Venue[] = [
   {

@@ -5,7 +5,6 @@ import { useLocalSearchParams, useRouter } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
 import { useApp } from '../../contexts/AppContext';
 import { GradientButton } from '../../components/GradientButton';
-import { MOCK_PROFILES } from '../../constants/mockData';
 
 const TIME_SLOTS = [
   '5:30 PM (Evening Coffee)',
@@ -21,8 +20,7 @@ export default function PlanDateScreen() {
 
   const targetUser =
     matches.find(m => m.id === userId) ||
-    profiles.find(p => p.id === userId) ||
-    MOCK_PROFILES[0];
+    profiles.find(p => p.id === userId);
 
   const [selectedVenue, setSelectedVenue] = useState(
     venues.find(v => v.id === venueId) || venues[0]

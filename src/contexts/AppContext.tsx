@@ -2,7 +2,7 @@ import React, { createContext, useContext, useState, useEffect, useRef, useCallb
 import { Alert, Platform } from 'react-native';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { UserProfile, SynkRequest, Venue, DateBooking, ChatMessage, SafetyContact } from '../types';
-import { MOCK_VENUES, MOCK_PROFILES } from '../constants/mockData';
+import { MOCK_VENUES } from '../constants/mockData';
 import {
   saveChatMessageToFirestore,
   saveUserProfileToFirestore,
@@ -705,13 +705,6 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     const currentId = currentUser?.id || 'guest';
     const realUsers = await fetchProfilesFromFirestore(currentId);
     let combinedProfiles: UserProfile[] = Array.isArray(realUsers) ? realUsers.filter(Boolean) : [];
-
-    // Always merge 4 rich dummy profiles so Discover feed is full and engaging
-    MOCK_PROFILES.forEach(mock => {
-      if (!combinedProfiles.some(p => p.id === mock.id)) {
-        combinedProfiles.push(mock);
-      }
-    });
 
     if (currentUser) {
       const myId = currentUser.id;
