@@ -1,6 +1,6 @@
 import '../services/telecomBridge';
 import React, { useEffect } from 'react';
-import { View, StyleSheet, Platform, Alert, NativeModules, TouchableOpacity, Text, Animated, PanResponder, Dimensions, Image } from 'react-native';
+import { View, StyleSheet, Platform, Alert, NativeModules, TouchableOpacity, Text, Animated, PanResponder, Dimensions, Image, DeviceEventEmitter } from 'react-native';
 import { Stack, useRouter } from 'expo-router';
 import { StatusBar } from 'expo-status-bar';
 import { Ionicons } from '@expo/vector-icons';
@@ -10,6 +10,7 @@ import { Colors } from '../constants/theme';
 import { useFonts, Poppins_400Regular, Poppins_500Medium, Poppins_600SemiBold, Poppins_700Bold, Poppins_800ExtraBold, Poppins_900Black } from '@expo-google-fonts/poppins';
 
 import { CallModal } from '../components/CallModal';
+import { DedicatedPipView } from '../components/DedicatedPipView';
 import { InAppNotificationBanner } from '../components/InAppNotificationBanner';
 import { WebRTCService } from '../services/webrtcService';
 import { NativeRTCView } from '../services/webrtcCore';
@@ -375,8 +376,28 @@ function FloatingInCallPill({
 function GlobalCallOverlay() {
   const [activeCall, setActiveCall] = React.useState<CallSession | null>(null);
   const [isMinimized, setIsMinimized] = React.useState<boolean>(false);
+  const [isNativePip, setIsNativePip] = React.useState<boolean>(() => {
+    if (Platform.OS !== 'android') return false;
+    const { width } = Dimensions.get('window');
+    return width > 0 && width < 300;
+  });
   const { sendMessage, currentUser } = useApp();
   const router = useRouter();
+
+  React.useEffect(() => {
+    const sub = DeviceEventEmitter.addListener('onPictureInPictureModeChanged', (event: any) => {
+      setIsNativePip(Boolean(event?.isInPictureInPictureMode));
+    });
+    const dimSub = Dimensions.addEventListener('change', ({ window }) => {
+      if (Platform.OS === 'android') {
+        setIsNativePip(window.width > 0 && window.width < 300);
+      }
+    });
+    return () => {
+      sub.remove();
+      dimSub.remove();
+    };
+  }, []);
 
   React.useEffect(() => {
     // Pure UI Observer: listens to WebRTC session state changes
@@ -439,6 +460,14 @@ function GlobalCallOverlay() {
       router.push(`/chat/${partnerId}`);
     }
   };
+
+  if (isNativePip && activeCall) {
+    return (
+      <View style={[StyleSheet.absoluteFill, { zIndex: 999999, elevation: 999999, backgroundColor: '#05060A' }]}>
+        <DedicatedPipView session={activeCall} remoteStream={WebRTCService.getRemoteStream()} />
+      </View>
+    );
+  }
 
   if (isMinimized) {
     const isVideo = activeCall.type === 'video' || activeCall.isVideoEnabled;
