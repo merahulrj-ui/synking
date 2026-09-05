@@ -69,6 +69,42 @@ function broadcastWs(data) {
   }
 }
 
+// ----------------------------------------------------
+// Secure Admin Portal Session & Authentication Engine
+// ----------------------------------------------------
+const ADMIN_SECRET = process.env.ADMIN_SECRET_KEY || 'synking_secret_admin_2026';
+const ADMIN_SESSION_HASH = crypto.createHmac('sha256', 'synking_cookie_salt_2026').update(ADMIN_SECRET).digest('hex');
+
+function parseCookies(req) {
+  const list = {};
+  const rc = req.headers.cookie;
+  if (rc) {
+    rc.split(';').forEach(cookie => {
+      const parts = cookie.split('=');
+      list[parts.shift().trim()] = decodeURI(parts.join('='));
+    });
+  }
+  return list;
+}
+
+function isAdminAuthorized(req) {
+  const cookies = parseCookies(req);
+  if (cookies['synking_admin_session'] === ADMIN_SESSION_HASH) {
+    return true;
+  }
+  try {
+    const urlObj = new URL(req.url, `http://${req.headers.host || 'localhost'}`);
+    const keyParam = urlObj.searchParams.get('key');
+    if (keyParam && keyParam === ADMIN_SECRET) {
+      return true;
+    }
+  } catch(e) {}
+  if (req.headers['authorization'] === `Bearer ${ADMIN_SECRET}`) {
+    return true;
+  }
+  return false;
+}
+
 // Turso 9GB Cloud SQLite is 100% Single Source of Truth (No Local JSON)
 
 // 9 GB Turso Cloud SQLite Configuration (AWS Mumbai - 0ms Latency)
@@ -493,7 +529,12 @@ async function renderAdminHtml() {
       <div class="logo">SYNKING ADMIN CONSOLE</div>
       <div style="color: #94A3B8; font-size: 12px; margin-top: 2px;">Live Cloud Backend • 24/7 Zero Cost Production</div>
     </div>
-    <div class="badge">● 100% ONLINE (Turso 9GB SQLite)</div>
+    <div style="display: flex; align-items: center; gap: 12px;">
+      <div class="badge">● 100% ONLINE (Turso 9GB SQLite)</div>
+      <a href="/admin/logout" style="background: rgba(239, 68, 68, 0.15); border: 1px solid rgba(239, 68, 68, 0.4); color: #EF4444; padding: 6px 14px; border-radius: 20px; font-size: 12px; font-weight: 700; text-decoration: none; display: flex; align-items: center; gap: 4px; transition: all 0.2s;">
+        🚪 Logout
+      </a>
+    </div>
   </div>
 
   <!-- VIP Membership & Monetization Master Toggle Card -->
@@ -701,10 +742,8 @@ async function renderAdminHtml() {
         btn.disabled = true;
         btn.innerText = 'Updating VIP Status... ⏳';
       }
-      const urlParams = new URLSearchParams(window.location.search);
-      const key = urlParams.get('key') || 'synking_secret_admin_2026';
       try {
-        const res = await fetch('/api/admin/toggle-vip?key=' + encodeURIComponent(key), {
+        const res = await fetch('/api/admin/toggle-vip', {
           method: 'POST'
         });
         const data = await res.json();
@@ -765,11 +804,8 @@ async function renderAdminHtml() {
         });
       });
 
-      const urlParams = new URLSearchParams(window.location.search);
-      const key = urlParams.get('key') || 'synking_secret_admin_2026';
-
       try {
-        const res = await fetch('/api/admin/update-vip-config?key=' + encodeURIComponent(key), {
+        const res = await fetch('/api/admin/update-vip-config', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({
@@ -914,30 +950,44 @@ const server = http.createServer((req, res) => {
 
   // 0.1 GET /admin (Password Protected Private Admin Console)
   if (req.method === 'GET' && pathname === '/admin') {
-    const adminKey = url.searchParams.get('key');
-    const validKey = process.env.ADMIN_SECRET_KEY || 'synking_secret_admin_2026';
+    // If key is supplied in URL query string, authenticate, set HttpOnly cookie, and redirect to clean /admin!
+    const keyParam = url.searchParams.get('key');
+    if (keyParam) {
+      if (keyParam === ADMIN_SECRET) {
+        res.writeHead(302, {
+          'Location': '/admin',
+          'Set-Cookie': `synking_admin_session=${ADMIN_SESSION_HASH}; Path=/; HttpOnly; Max-Age=604800; SameSite=Lax`
+        });
+        res.end();
+        return;
+      }
+    }
 
-    if (adminKey !== validKey) {
-      res.writeHead(401, { 'Content-Type': 'text/html; charset=utf-8' });
+    if (!isAdminAuthorized(req)) {
+      res.writeHead(200, { 'Content-Type': 'text/html; charset=utf-8' });
       res.end(`<!DOCTYPE html>
 <html>
 <head>
   <meta charset="utf-8">
-  <title>SYNKING • Access Restricted</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>SYNKING • Admin Login</title>
+  <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;600;700;800&display=swap" rel="stylesheet">
   <style>
-    body { background: #05060A; color: #FFF; font-family: -apple-system, sans-serif; display: flex; align-items: center; justify-content: center; height: 100vh; margin: 0; }
-    .box { background: #12131F; border: 1px solid rgba(255,255,255,0.1); border-radius: 16px; padding: 32px; text-align: center; max-width: 360px; width: 100%; }
-    input { width: 100%; padding: 12px; border-radius: 8px; border: 1px solid rgba(255,255,255,0.2); background: #08090F; color: #FFF; margin: 16px 0; box-sizing: border-box; }
-    button { width: 100%; padding: 12px; border-radius: 8px; border: none; background: #FD3A73; color: #FFF; font-weight: bold; cursor: pointer; }
+    body { background: #05060A; color: #FFF; font-family: 'Plus Jakarta Sans', sans-serif; display: flex; align-items: center; justify-content: center; height: 100vh; margin: 0; padding: 16px; box-sizing: border-box; }
+    .box { background: #12131F; border: 1px solid rgba(255,255,255,0.1); border-radius: 16px; padding: 36px 28px; text-align: center; max-width: 360px; width: 100%; box-shadow: 0 10px 30px rgba(0,0,0,0.5); }
+    input { width: 100%; padding: 12px 14px; border-radius: 8px; border: 1px solid rgba(255,255,255,0.2); background: #08090F; color: #FFF; margin: 16px 0; box-sizing: border-box; font-size: 14px; outline: none; transition: border-color 0.2s; }
+    input:focus { border-color: #FD3A73; }
+    button { width: 100%; padding: 12px; border-radius: 8px; border: none; background: linear-gradient(135deg, #FD3A73, #FF7B00); color: #FFF; font-weight: 800; cursor: pointer; font-size: 14px; box-shadow: 0 4px 14px rgba(253, 58, 115, 0.3); }
+    button:hover { opacity: 0.95; }
   </style>
 </head>
 <body>
   <div class="box">
-    <div style="font-size: 32px; margin-bottom: 12px;">🔒</div>
-    <h2 style="margin: 0 0 8px;">Private Admin Console</h2>
+    <div style="font-size: 36px; margin-bottom: 12px;">🔒</div>
+    <h2 style="margin: 0 0 8px; font-weight: 800;">Private Admin Console</h2>
     <p style="color: #94A3B8; font-size: 13px; margin: 0;">Enter Secret Master Key to access dashboard.</p>
-    <form method="GET" action="/admin">
-      <input type="password" name="key" placeholder="Enter Admin Secret Key" required />
+    <form method="POST" action="/admin/login">
+      <input type="password" name="key" placeholder="Enter Admin Secret Key" required autofocus />
       <button type="submit">Unlock Dashboard</button>
     </form>
   </div>
@@ -953,6 +1003,69 @@ const server = http.createServer((req, res) => {
       res.writeHead(500);
       res.end('Error loading admin dashboard: ' + err);
     });
+    return;
+  }
+
+  // 0.11 POST /admin/login (Secure POST Login -> HttpOnly Cookie -> Clean Redirect)
+  if (req.method === 'POST' && pathname === '/admin/login') {
+    let body = '';
+    req.on('data', chunk => { body += chunk; });
+    req.on('end', () => {
+      let key = '';
+      const contentType = req.headers['content-type'] || '';
+      if (contentType.includes('application/x-www-form-urlencoded')) {
+        const params = new URLSearchParams(body);
+        key = params.get('key') || '';
+      } else {
+        try {
+          const json = JSON.parse(body);
+          key = json.key || '';
+        } catch (e) {
+          const params = new URLSearchParams(body);
+          key = params.get('key') || '';
+        }
+      }
+
+      if (key === ADMIN_SECRET) {
+        res.writeHead(302, {
+          'Location': '/admin',
+          'Set-Cookie': `synking_admin_session=${ADMIN_SESSION_HASH}; Path=/; HttpOnly; Max-Age=604800; SameSite=Lax`
+        });
+        res.end();
+      } else {
+        res.writeHead(401, { 'Content-Type': 'text/html; charset=utf-8' });
+        res.end(`<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="utf-8">
+  <title>SYNKING • Invalid Key</title>
+  <style>
+    body { background: #05060A; color: #FFF; font-family: -apple-system, sans-serif; display: flex; align-items: center; justify-content: center; height: 100vh; margin: 0; }
+    .box { background: #12131F; border: 1px solid rgba(239, 68, 68, 0.4); border-radius: 16px; padding: 32px; text-align: center; max-width: 360px; width: 100%; }
+    button { width: 100%; padding: 12px; border-radius: 8px; border: none; background: #EF4444; color: #FFF; font-weight: bold; cursor: pointer; margin-top: 16px; }
+  </style>
+</head>
+<body>
+  <div class="box">
+    <div style="font-size: 36px; margin-bottom: 12px;">❌</div>
+    <h2 style="margin: 0 0 8px; color: #EF4444;">Invalid Secret Key</h2>
+    <p style="color: #94A3B8; font-size: 13px; margin: 0;">The key you entered is incorrect. Access denied.</p>
+    <a href="/admin"><button type="button">Try Again</button></a>
+  </div>
+</body>
+</html>`);
+      }
+    });
+    return;
+  }
+
+  // 0.12 GET /admin/logout (Clear HttpOnly Cookie & Redirect to /admin)
+  if (req.method === 'GET' && pathname === '/admin/logout') {
+    res.writeHead(302, {
+      'Location': '/admin',
+      'Set-Cookie': 'synking_admin_session=; Path=/; HttpOnly; Max-Age=0'
+    });
+    res.end();
     return;
   }
 
@@ -975,10 +1088,7 @@ const server = http.createServer((req, res) => {
 
   // 0.3 POST /api/admin/toggle-vip (Admin One-Click VIP Plans Master Toggle)
   if (req.method === 'POST' && pathname === '/api/admin/toggle-vip') {
-    const adminKey = url.searchParams.get('key');
-    const validKey = process.env.ADMIN_SECRET_KEY || 'synking_secret_admin_2026';
-
-    if (adminKey !== validKey) {
+    if (!isAdminAuthorized(req)) {
       res.writeHead(401, { 'Content-Type': 'application/json' });
       res.end(JSON.stringify({ success: false, error: 'Unauthorized key' }));
       return;
@@ -1011,10 +1121,7 @@ const server = http.createServer((req, res) => {
 
   // 0.4 POST /api/admin/update-vip-config (Admin Live Pricing, Plans & Discount Management)
   if (req.method === 'POST' && pathname === '/api/admin/update-vip-config') {
-    const adminKey = url.searchParams.get('key');
-    const validKey = process.env.ADMIN_SECRET_KEY || 'synking_secret_admin_2026';
-
-    if (adminKey !== validKey) {
+    if (!isAdminAuthorized(req)) {
       res.writeHead(401, { 'Content-Type': 'application/json' });
       res.end(JSON.stringify({ success: false, error: 'Unauthorized key' }));
       return;
@@ -1303,6 +1410,11 @@ const server = http.createServer((req, res) => {
 
     // 2.1 DELETE /api/profiles/:id (Delete from Local DB + Turso Cloud SQLite)
   if (req.method === 'DELETE' && pathname.startsWith('/api/profiles/')) {
+    if (!isAdminAuthorized(req)) {
+      res.writeHead(401, { 'Content-Type': 'application/json' });
+      res.end(JSON.stringify({ success: false, error: 'Unauthorized: Admin session required' }));
+      return;
+    }
     const id = pathname.replace('/api/profiles/', '').trim();
     if (id) {
       if (db.profiles[id]) {
@@ -1344,6 +1456,11 @@ const server = http.createServer((req, res) => {
 
   // MASTER DATABASE WIPE (Wipe all users, requests, chats from Local + Turso Cloud SQLite 100%)
   if (pathname === '/api/reset-all' || pathname === '/api/wipe-database') {
+    if (!isAdminAuthorized(req)) {
+      res.writeHead(401, { 'Content-Type': 'application/json' });
+      res.end(JSON.stringify({ success: false, error: 'Unauthorized: Admin session required' }));
+      return;
+    }
     db.profiles = {};
     db.requests = {};
     db.chats = [];
