@@ -1223,6 +1223,39 @@ const server = http.createServer((req, res) => {
     return;
   }
 
+  // 1.1 GET /api/check-user (Verify if specific user ID exists in memory or Turso SQLite)
+  if (req.method === 'GET' && pathname === '/api/check-user') {
+    const userId = url.searchParams.get('userId');
+    if (!userId) {
+      res.writeHead(400, { 'Content-Type': 'application/json' });
+      res.end(JSON.stringify({ exists: false, error: 'User ID required' }));
+      return;
+    }
+
+    // 1. Check in-memory profiles first
+    if (db.profiles && db.profiles[userId]) {
+      res.writeHead(200, { 'Content-Type': 'application/json' });
+      res.end(JSON.stringify({ exists: true, user: db.profiles[userId] }));
+      return;
+    }
+
+    // 2. Check Turso Cloud SQLite
+    queryTurso('SELECT id, name FROM users WHERE id = ?', [{ type: 'text', value: userId }]).then(resTurso => {
+      const rows = resTurso?.results?.[0]?.response?.result?.rows;
+      if (Array.isArray(rows) && rows.length > 0) {
+        res.writeHead(200, { 'Content-Type': 'application/json' });
+        res.end(JSON.stringify({ exists: true }));
+      } else {
+        res.writeHead(200, { 'Content-Type': 'application/json' });
+        res.end(JSON.stringify({ exists: false }));
+      }
+    }).catch(() => {
+      res.writeHead(200, { 'Content-Type': 'application/json' });
+      res.end(JSON.stringify({ exists: !!(db.profiles && db.profiles[userId]) }));
+    });
+    return;
+  }
+
   // 1.5 GET /api/check-phone (For Real Phone Login & Auto Account Detection)
   if (req.method === 'GET' && pathname === '/api/check-phone') {
     const phone = url.searchParams.get('phone');

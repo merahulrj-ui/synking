@@ -14,6 +14,7 @@ import {
   deleteSynkRequestFromBackend,
   deleteUserProfileFromBackend,
   deleteChatMessageFromBackend,
+  checkUserExistsOnBackend,
   CLOUD_BACKEND_URL,
 } from '../services/firebase';
 import { encryptE2EEMessage } from '../utils/encryption';
@@ -710,6 +711,21 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
 
   // 2. Sync Real User Profiles & Incoming/Sent Requests from Cloud Firestore
   const syncCloudState = async () => {
+    // 0. Auto-Validate: Check if current logged-in user still exists on server
+    if (currentUser && currentUser.id) {
+      const exists = await checkUserExistsOnBackend(currentUser.id);
+      if (!exists) {
+        console.log('🚨 [USER_NOT_FOUND_ON_SERVER] User was deleted by admin or database wiped. Auto-logging out.');
+        logoutUser();
+        setProfiles([]);
+        setMatches([]);
+        setIncomingRequests([]);
+        setSentRequests([]);
+        setMessages({});
+        return;
+      }
+    }
+
     // 1. Fetch real registered profiles for Discover (even if NOT logged in)
     const currentId = currentUser?.id || 'guest';
     const realUsers = await fetchProfilesFromFirestore(currentId);
@@ -810,6 +826,16 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
         if (stored && !currentUser) {
           const parsed = JSON.parse(stored);
           if (parsed && parsed.id && parsed.name) {
+            // Verify if user was deleted on server (e.g. admin reset database)
+            const exists = await checkUserExistsOnBackend(parsed.id);
+            if (!exists) {
+              console.log('🧹 [STALE_USER_PURGED] User does not exist on server. Clearing local storage.');
+              await AsyncStorage.removeItem('synking_my_user');
+              setCurrentUser(null);
+              setIsLoggedIn(false);
+              return;
+            }
+
             setCurrentUser(parsed);
             setIsLoggedIn(true);
           }

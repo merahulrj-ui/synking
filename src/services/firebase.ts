@@ -101,6 +101,23 @@ export async function deleteUserProfileFromBackend(userId: string): Promise<bool
 }
 
 /**
+ * Verify if user ID exists in the cloud database (Turso SQLite / Server)
+ * Returns false ONLY if server confirms user does NOT exist (HTTP 200 with exists: false).
+ * Returns true on network failure to avoid logging out offline users.
+ */
+export async function checkUserExistsOnBackend(userId: string): Promise<boolean> {
+  if (!userId) return false;
+  try {
+    const res = await fetch(`${getLocalBackendUrl()}/api/check-user?userId=${encodeURIComponent(userId)}`);
+    if (res.ok) {
+      const data = await res.json();
+      return data?.exists !== false;
+    }
+  } catch (e) {}
+  return true; // Keep session on network/offline error
+}
+
+/**
  * Master Reset: Wipe all users, requests, and chats completely
  */
 export async function wipeAllUsersFromBackend(): Promise<boolean> {
