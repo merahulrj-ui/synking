@@ -362,7 +362,10 @@ function FloatingInCallPill({
 
         <TouchableOpacity
           style={floatingPillStyles.endBtn}
-          onPress={onEndCall}
+          onPress={(e) => {
+            e.stopPropagation?.();
+            onEndCall();
+          }}
           hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
         >
           <Ionicons name="call" size={13} color="#FFFFFF" style={{ transform: [{ rotate: '135deg' }] }} />

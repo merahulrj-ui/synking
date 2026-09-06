@@ -212,9 +212,10 @@ class WebRTCManager {
     // Capture Local Hardware Microphone & Camera (This resets the audio route)
     await this.initLocalStream(params.type === 'video');
 
-    // FIX: Delay speaker activation to ensure OS doesn't override it!
+    // Route audio: Loudspeaker for video call, In-ear Handset Earpiece for voice call
+    const isVideo = params.type === 'video';
     setTimeout(() => {
-        AudioRouteService.setSpeakerOn(true).catch(() => {});
+        AudioRouteService.setSpeakerOn(isVideo).catch(() => {});
     }, 500);
 
     // Send Targeted INCOMING_CALL to recipient device
@@ -255,7 +256,7 @@ class WebRTCManager {
       status: autoAccept ? 'connected' : 'ringing', // Bypass ringing if coming from native accept!
       durationSeconds: 0,
       isMuted: false,
-      isSpeakerOn: true, // Forcing loudspeaker for testing
+      isSpeakerOn: type === 'video', // Video defaults to Loudspeaker, Audio defaults to In-ear Earpiece
       isVideoEnabled: type === 'video',
       isIncoming: true,
     };
@@ -318,9 +319,10 @@ class WebRTCManager {
         await this.initLocalStream(isVideo);
       }
 
-      // FIX: Set speaker ON only AFTER WebRTC initializes the mic!
+      // Route audio: Loudspeaker for video call, In-ear Handset Earpiece for voice call
+      const isVideoCall = this.currentSession?.type === 'video' || this.currentSession?.isVideoEnabled;
       setTimeout(() => {
-        AudioRouteService.setSpeakerOn(true).catch(() => {});
+        AudioRouteService.setSpeakerOn(!!isVideoCall).catch(() => {});
       }, 500);
 
       this.currentSession.status = 'connected';
@@ -464,7 +466,8 @@ class WebRTCManager {
 
           if (this.remoteStream) {
             this.log(`🎥 REMOTE STREAM READY! Audio: ${this.remoteStream.getAudioTracks().length}, Video: ${this.remoteStream.getVideoTracks().length}`);
-            const shouldBeSpeaker = this.currentSession?.isSpeakerOn ?? true;
+            const isVideoCall = this.currentSession?.type === 'video' || this.currentSession?.isVideoEnabled;
+            const shouldBeSpeaker = this.currentSession?.isSpeakerOn ?? !!isVideoCall;
             AudioRouteService.setSpeakerOn(shouldBeSpeaker).catch(() => {});
             this.notify();
           }
@@ -478,7 +481,8 @@ class WebRTCManager {
             this.remoteStream = event.stream;
             this.notifyNativeVideoStreams();
             this.log(`🎥 REMOTE STREAM READY (Legacy)! Audio: ${this.remoteStream.getAudioTracks().length}, Video: ${this.remoteStream.getVideoTracks().length}`);
-            const shouldBeSpeaker = this.currentSession?.isSpeakerOn ?? true;
+            const isVideoCall = this.currentSession?.type === 'video' || this.currentSession?.isVideoEnabled;
+            const shouldBeSpeaker = this.currentSession?.isSpeakerOn ?? !!isVideoCall;
             AudioRouteService.setSpeakerOn(shouldBeSpeaker).catch(() => {});
             this.notify();
           }
