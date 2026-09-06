@@ -677,7 +677,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       } else if (type === 'INCOMING_CALL' && payload) {
         if (payload.receiverId === currentUser?.id && payload.callerUser) {
           const currentSession = WebRTCService.getCurrentSession();
-          if (currentSession && currentSession.id === payload.callId) {
+          if (currentSession && currentSession.id === payload.callId && (currentSession.status === 'ringing' || currentSession.status === 'connected')) {
             // Already active/ringing for this callId, ignore 3.5s pulse
             return;
           }
