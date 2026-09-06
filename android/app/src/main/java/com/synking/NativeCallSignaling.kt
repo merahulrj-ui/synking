@@ -22,6 +22,10 @@ object NativeCallSignaling {
 
     private val executor = Executors.newSingleThreadExecutor()
 
+    fun sendRingingNatively(callId: String, callerId: String, callType: String = "audio") {
+        sendSignal("CALL_RINGING", callId, callerId, callType)
+    }
+
     fun sendAcceptNatively(callId: String, callerId: String, callType: String = "audio") {
         sendSignal("CALL_ACCEPTED", callId, callerId, callType)
     }

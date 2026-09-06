@@ -328,14 +328,6 @@ class WebRTCManager {
     this.log(`📲 Incoming ${type} call from ${callerUser.name} (autoAccept: ${autoAccept})...`);
     this.notify();
 
-    if (type === 'video') {
-      this.initLocalStream(true).then(() => {
-        this.notify();
-      }).catch((e: any) => {
-        this.log(`⚠️ initLocalStream failed on incoming video call: ${e?.message}`);
-      });
-    }
-
     if (autoAccept) {
       // Native lockscreen already accepted it, skip ringtone and timer!
       this.startTimer();

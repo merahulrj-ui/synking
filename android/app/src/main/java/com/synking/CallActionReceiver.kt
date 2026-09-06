@@ -9,10 +9,16 @@ import android.util.Log
 class CallActionReceiver : BroadcastReceiver() {
     override fun onReceive(context: Context, intent: Intent) {
         val action = intent.action
+        val callId = intent.getStringExtra("callId") ?: ""
+        val callerId = intent.getStringExtra("callerId") ?: ""
         if (action == "ACTION_DECLINE_CALL" || action == "ACTION_END_CALL") {
             Log.d("SYNKING_CALL", "Decline/End button tapped from notification: action=$action")
             IncomingCallActivity.stopRingtoneGlobally()
             AudioRouteModule.stopAllRingtones()
+            AudioRouteModule.stopGlobalVibration(context)
+            if (callId.isNotEmpty() && callerId.isNotEmpty()) {
+                NativeCallSignaling.sendDeclineNatively(callId, callerId)
+            }
             CallConnectionManager.rejectCall()
             TelecomModule.emitEndCallEvent()
             SynkingConnectionService.stopCallForeground()

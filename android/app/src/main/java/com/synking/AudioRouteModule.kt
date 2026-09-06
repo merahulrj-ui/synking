@@ -10,6 +10,9 @@ import android.media.MediaPlayer
 import android.os.Build
 import android.os.Handler
 import android.os.Looper
+import android.os.VibrationEffect
+import android.os.Vibrator
+import android.os.VibratorManager
 import android.util.Log
 import com.facebook.react.bridge.ReactApplicationContext
 import com.facebook.react.bridge.ReactContextBaseJavaModule
@@ -191,33 +194,9 @@ class AudioRouteModule(private val reactContext: ReactApplicationContext) : Reac
     @ReactMethod
     fun startIncomingRingtone(promise: Promise) {
         mainHandler.post {
-            try {
-                if (globalIncomingMediaPlayer?.isPlaying == true) {
-                    Log.i("SYNKING_AUDIO", "Synk Signature incoming ringtone already playing globally, ignoring restart")
-                    promise.resolve(true)
-                    return@post
-                }
-                stopGlobalIncomingRingtone()
-                val resId = reactContext.resources.getIdentifier("synk_signature", "raw", reactContext.packageName)
-                if (resId != 0) {
-                    val audioAttributes = AudioAttributes.Builder()
-                        .setUsage(AudioAttributes.USAGE_NOTIFICATION_RINGTONE)
-                        .setContentType(AudioAttributes.CONTENT_TYPE_MUSIC)
-                        .build()
-                    globalIncomingMediaPlayer = MediaPlayer.create(reactContext.applicationContext, resId, audioAttributes, 0)?.apply {
-                        isLooping = true
-                        setVolume(1.0f, 1.0f)
-                        start()
-                    }
-                    Log.i("SYNKING_AUDIO", "✅ Synk Signature incoming ringtone started playing globally")
-                } else {
-                    Log.w("SYNKING_AUDIO", "⚠️ synk_signature raw resource not found")
-                }
-                promise.resolve(true)
-            } catch (e: Exception) {
-                Log.e("SYNKING_AUDIO", "startIncomingRingtone error: ${e.message}")
-                promise.resolve(false)
-            }
+            startGlobalIncomingRingtone(reactContext.applicationContext)
+            startGlobalVibration(reactContext.applicationContext)
+            promise.resolve(true)
         }
     }
 
@@ -225,6 +204,7 @@ class AudioRouteModule(private val reactContext: ReactApplicationContext) : Reac
     fun stopIncomingRingtone(promise: Promise) {
         mainHandler.post {
             stopGlobalIncomingRingtone()
+            stopGlobalVibration(reactContext.applicationContext)
             promise.resolve(true)
         }
     }
@@ -232,6 +212,97 @@ class AudioRouteModule(private val reactContext: ReactApplicationContext) : Reac
     companion object {
         private var instance: AudioRouteModule? = null
         @Volatile private var globalIncomingMediaPlayer: MediaPlayer? = null
+        @Volatile private var globalVibrator: Vibrator? = null
+
+        @Synchronized
+        fun startGlobalIncomingRingtone(context: Context) {
+            try {
+                if (globalIncomingMediaPlayer?.isPlaying == true) {
+                    Log.i("SYNKING_AUDIO", "Synk Signature incoming ringtone already playing globally, ignoring restart")
+                    return
+                }
+                stopGlobalIncomingRingtone()
+
+                // Force system audio routing to bottom Loudspeaker for ringtone
+                val audioManager = context.getSystemService(Context.AUDIO_SERVICE) as? AudioManager
+                audioManager?.let { am ->
+                    try {
+                        am.mode = AudioManager.MODE_NORMAL
+                        am.isSpeakerphoneOn = true
+                        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
+                            val speakerDevice = am.availableCommunicationDevices.find { 
+                                it.type == AudioDeviceInfo.TYPE_BUILTIN_SPEAKER 
+                            } ?: am.getDevices(AudioManager.GET_DEVICES_OUTPUTS).find {
+                                it.type == AudioDeviceInfo.TYPE_BUILTIN_SPEAKER
+                            }
+                            if (speakerDevice != null) {
+                                am.setCommunicationDevice(speakerDevice)
+                            }
+                        }
+                    } catch (e: Exception) {}
+                }
+
+                val resId = context.resources.getIdentifier("synk_signature", "raw", context.packageName)
+                if (resId != 0) {
+                    val audioAttributes = AudioAttributes.Builder()
+                        .setUsage(AudioAttributes.USAGE_NOTIFICATION_RINGTONE)
+                        .setContentType(AudioAttributes.CONTENT_TYPE_SONIFICATION)
+                        .build()
+                    globalIncomingMediaPlayer = MediaPlayer.create(context.applicationContext, resId, audioAttributes, 0)?.apply {
+                        isLooping = true
+                        setVolume(1.0f, 1.0f)
+                        start()
+                    }
+                    Log.i("SYNKING_AUDIO", "✅ Synk Signature incoming ringtone started on LOUDSPEAKER natively")
+                } else {
+                    Log.w("SYNKING_AUDIO", "⚠️ synk_signature raw resource not found")
+                }
+            } catch (e: Exception) {
+                Log.e("SYNKING_AUDIO", "startGlobalIncomingRingtone error: ${e.message}")
+            }
+        }
+
+        @Synchronized
+        fun startGlobalVibration(context: Context) {
+            try {
+                stopGlobalVibration(context)
+                val vibrator = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
+                    val vm = context.getSystemService(Context.VIBRATOR_MANAGER_SERVICE) as? VibratorManager
+                    vm?.defaultVibrator
+                } else {
+                    @Suppress("DEPRECATION")
+                    context.getSystemService(Context.VIBRATOR_SERVICE) as? Vibrator
+                }
+                vibrator?.let { v ->
+                    globalVibrator = v
+                    val pattern = longArrayOf(0, 1000, 1000)
+                    if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
+                        v.vibrate(VibrationEffect.createWaveform(pattern, 0)) // 0 means repeat in continuous loop
+                    } else {
+                        @Suppress("DEPRECATION")
+                        v.vibrate(pattern, 0)
+                    }
+                    Log.i("SYNKING_AUDIO", "✅ Continuous vibration started natively")
+                }
+            } catch (e: Exception) {
+                Log.e("SYNKING_AUDIO", "startGlobalVibration error: ${e.message}")
+            }
+        }
+
+        @Synchronized
+        fun stopGlobalVibration(context: Context? = null) {
+            try {
+                globalVibrator?.cancel()
+                globalVibrator = null
+                val ctx = context ?: instance?.reactContext?.applicationContext
+                ctx?.let {
+                    val v = it.getSystemService(Context.VIBRATOR_SERVICE) as? Vibrator
+                    v?.cancel()
+                }
+            } catch (e: Exception) {
+                Log.w("SYNKING_AUDIO", "stopGlobalVibration error: ${e.message}")
+            }
+        }
 
         @Synchronized
         fun stopGlobalIncomingRingtone() {
@@ -250,6 +321,7 @@ class AudioRouteModule(private val reactContext: ReactApplicationContext) : Reac
 
         fun stopAllRingtones() {
             stopGlobalIncomingRingtone()
+            stopGlobalVibration()
             instance?.mainHandler?.post {
                 instance?.stopRingbackInternal()
             }

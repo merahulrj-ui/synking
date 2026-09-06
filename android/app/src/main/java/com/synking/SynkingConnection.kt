@@ -36,6 +36,22 @@ class SynkingConnection(
         super.onShowIncomingCallUi()
         Log.d("SYNKING_TELECOM", "[UI] INCOMING_CALL_SHOWN: callId=$callId caller=$callerName type=$callType")
 
+        // 📢 1. Force audio to bottom Loudspeaker immediately for incoming ringing!
+        setAudioRoute(android.telecom.CallAudioState.ROUTE_SPEAKER)
+
+        // 🎵 2. Start Native Ringtone on Loudspeaker & Continuous Vibration immediately (Works on both Unlocked & Locked!)
+        AudioRouteModule.startGlobalIncomingRingtone(context)
+        AudioRouteModule.startGlobalVibration(context)
+
+        // 📡 3. Notify caller immediately that phone is RINGING (Updates Laptop/Caller to 'Ringing' during heads-up banner!)
+        if (callerId.isNotEmpty()) {
+            NativeCallSignaling.sendRingingNatively(callId, callerId, callType)
+        }
+
+        // 🌉 4. Emit to React Native bridge so WebRTC session is active in JS
+        val pending = PendingCall(callId, callerId, callerName, callerPhoto, callType)
+        TelecomModule.emitIncomingCallEvent(pending)
+
         val fullScreenIntent = Intent(context, CallActivity::class.java).apply {
             flags = Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_SINGLE_TOP
             putExtra("SYNKING_INCOMING_CALL", true)
@@ -77,6 +93,7 @@ class SynkingConnection(
         val declineIntent = Intent(context, CallActionReceiver::class.java).apply {
             action = "ACTION_DECLINE_CALL"
             putExtra("callId", callId)
+            putExtra("callerId", callerId)
         }
         val declinePendingIntent = PendingIntent.getBroadcast(
             context, callId.hashCode() + 1, declineIntent, piFlags
@@ -181,6 +198,7 @@ class SynkingConnection(
         Log.d("SYNKING_TELECOM", "[UI] ANSWER: natively accepted")
         IncomingCallActivity.stopRingtoneGlobally()
         AudioRouteModule.stopAllRingtones()
+        AudioRouteModule.stopGlobalVibration(context)
         CallState.markAnswered(context)
         try {
             val nm = context.getSystemService(Context.NOTIFICATION_SERVICE) as NotificationManager
@@ -191,6 +209,9 @@ class SynkingConnection(
         if (callType == "video") {
             setAudioRoute(android.telecom.CallAudioState.ROUTE_SPEAKER)
             Log.d("SYNKING_TELECOM", "[UI] ANSWER: Video call -> auto setAudioRoute ROUTE_SPEAKER")
+        } else {
+            setAudioRoute(android.telecom.CallAudioState.ROUTE_EARPIECE)
+            Log.d("SYNKING_TELECOM", "[UI] ANSWER: Audio call -> setAudioRoute ROUTE_EARPIECE")
         }
     }
 
@@ -206,6 +227,10 @@ class SynkingConnection(
         Log.d("SYNKING_TELECOM", "[UI] REJECT: natively rejected")
         IncomingCallActivity.stopRingtoneGlobally()
         AudioRouteModule.stopAllRingtones()
+        AudioRouteModule.stopGlobalVibration(context)
+        if (callerId.isNotEmpty()) {
+            NativeCallSignaling.sendDeclineNatively(callId, callerId)
+        }
         try {
             val nm = context.getSystemService(Context.NOTIFICATION_SERVICE) as NotificationManager
             nm.cancel(MyFirebaseMessagingService.NOTIFICATION_ID)
@@ -219,6 +244,10 @@ class SynkingConnection(
         Log.d("SYNKING_TELECOM", "[UI] DISCONNECT: natively disconnected")
         IncomingCallActivity.stopRingtoneGlobally()
         AudioRouteModule.stopAllRingtones()
+        AudioRouteModule.stopGlobalVibration(context)
+        if (callerId.isNotEmpty()) {
+            NativeCallSignaling.sendEndCallNatively(callId, callerId)
+        }
         try {
             val nm = context.getSystemService(Context.NOTIFICATION_SERVICE) as NotificationManager
             nm.cancel(MyFirebaseMessagingService.NOTIFICATION_ID)

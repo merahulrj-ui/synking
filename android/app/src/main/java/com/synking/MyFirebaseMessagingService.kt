@@ -427,7 +427,11 @@ class MyFirebaseMessagingService : FirebaseMessagingService() {
 
             
             // DECLINE ACTION
-            val declineIntent = Intent(this, CallActionReceiver::class.java).apply { action = "ACTION_DECLINE_CALL" }
+            val declineIntent = Intent(this, CallActionReceiver::class.java).apply {
+                action = "ACTION_DECLINE_CALL"
+                putExtra("callId", callId)
+                putExtra("callerId", callerId)
+            }
             val declinePendingIntent = PendingIntent.getBroadcast(this, callId.hashCode() + 1, declineIntent, piFlags)
             
             // ACCEPT ACTION
