@@ -104,7 +104,7 @@ class CallActivity : ReactActivity() {
     fun enterPipModeIfActive() {
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
             try {
-                val isCallActive = TelecomModule.isCallActive || CallConnectionManager.isCallActive
+                val isCallActive = TelecomModule.isCallActive || (CallConnectionManager.currentConnection != null)
                 if (isCallActive) {
                     val aspectRatio = Rational(9, 16)
                     val builder = PictureInPictureParams.Builder()

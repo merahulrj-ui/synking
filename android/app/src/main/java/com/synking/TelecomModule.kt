@@ -267,7 +267,29 @@ class TelecomModule(reactContext: ReactApplicationContext) : ReactContextBaseJav
 
     @ReactMethod
     fun enterPipMode(promise: Promise) {
-        promise.resolve(false)
+        try {
+            val act = CallActivity.currentCallActivity ?: reactApplicationContext.currentActivity
+            if (act != null && Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
+                act.runOnUiThread {
+                    try {
+                        val aspectRatio = Rational(9, 16)
+                        val builder = PictureInPictureParams.Builder()
+                            .setAspectRatio(aspectRatio)
+                        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
+                            builder.setAutoEnterEnabled(true)
+                        }
+                        val success = act.enterPictureInPictureMode(builder.build())
+                        promise.resolve(success)
+                    } catch (e: Exception) {
+                        promise.resolve(false)
+                    }
+                }
+            } else {
+                promise.resolve(false)
+            }
+        } catch (e: Exception) {
+            promise.resolve(false)
+        }
     }
 
     @ReactMethod
@@ -379,33 +401,6 @@ class TelecomModule(reactContext: ReactApplicationContext) : ReactContextBaseJav
             promise.resolve(true)
         } catch (e: Exception) {
             Log.e("SYNKING_DEBUG", "openChatFromCall error: ${e.message}")
-            promise.resolve(false)
-        }
-    }
-
-    @ReactMethod
-    fun enterPipMode(promise: Promise) {
-        try {
-            val act = CallActivity.currentCallActivity ?: currentActivity
-            if (act != null && Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
-                act.runOnUiThread {
-                    try {
-                        val aspectRatio = Rational(9, 16)
-                        val builder = PictureInPictureParams.Builder()
-                            .setAspectRatio(aspectRatio)
-                        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
-                            builder.setAutoEnterEnabled(true)
-                        }
-                        val success = act.enterPictureInPictureMode(builder.build())
-                        promise.resolve(success)
-                    } catch (e: Exception) {
-                        promise.resolve(false)
-                    }
-                }
-            } else {
-                promise.resolve(false)
-            }
-        } catch (e: Exception) {
             promise.resolve(false)
         }
     }
