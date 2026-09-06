@@ -19,94 +19,54 @@ import com.facebook.react.bridge.Promise
 class AudioRouteModule(private val reactContext: ReactApplicationContext) : ReactContextBaseJavaModule(reactContext) {
     private val audioManager: AudioManager = reactContext.getSystemService(Context.AUDIO_SERVICE) as AudioManager
     private val mainHandler = Handler(Looper.getMainLooper())
-    private var audioFocusRequest: AudioFocusRequest? = null
 
     override fun getName(): String {
         return "AudioRouteModule"
-    }
-
-    private fun applyAudioRoute(on: Boolean) {
-        try {
-            // Synchronize Android Telecom Connection audio route
-            CallConnectionManager.setSpeakerOn(on)
-
-            audioManager.mode = AudioManager.MODE_IN_COMMUNICATION
-            
-            // Request AudioFocus for Voice Communication on Android 8.0+ / Android 14/15
-            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
-                if (audioFocusRequest == null) {
-                    val playbackAttributes = AudioAttributes.Builder()
-                        .setUsage(AudioAttributes.USAGE_VOICE_COMMUNICATION)
-                        .setContentType(AudioAttributes.CONTENT_TYPE_SPEECH)
-                        .build()
-                    audioFocusRequest = AudioFocusRequest.Builder(AudioManager.AUDIOFOCUS_GAIN)
-                        .setAudioAttributes(playbackAttributes)
-                        .setAcceptsDelayedFocusGain(true)
-                        .setOnAudioFocusChangeListener { focusChange ->
-                            Log.d("SYNKING_AUDIO", "AudioFocus changed: $focusChange")
-                        }
-                        .build()
-                }
-                audioFocusRequest?.let { audioManager.requestAudioFocus(it) }
-            } else {
-                @Suppress("DEPRECATION")
-                audioManager.requestAudioFocus(null, AudioManager.STREAM_VOICE_CALL, AudioManager.AUDIOFOCUS_GAIN)
-            }
-
-            audioManager.isSpeakerphoneOn = on
-            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
-                if (on) {
-                    val speaker = audioManager.availableCommunicationDevices.find { 
-                        it.type == AudioDeviceInfo.TYPE_BUILTIN_SPEAKER 
-                    } ?: audioManager.getDevices(AudioManager.GET_DEVICES_OUTPUTS).find {
-                        it.type == AudioDeviceInfo.TYPE_BUILTIN_SPEAKER
-                    }
-                    if (speaker != null) {
-                        val res = audioManager.setCommunicationDevice(speaker)
-                        Log.d("SYNKING_AUDIO", "[AudioRouteModule] setCommunicationDevice target=${speaker.type} result=$res")
-                    } else {
-                        Log.w("SYNKING_AUDIO", "[AudioRouteModule] TYPE_BUILTIN_SPEAKER fallback to isSpeakerphoneOn=true")
-                    }
-                } else {
-                    val earpiece = audioManager.availableCommunicationDevices.find { 
-                        it.type == AudioDeviceInfo.TYPE_BUILTIN_EARPIECE 
-                    } ?: audioManager.getDevices(AudioManager.GET_DEVICES_OUTPUTS).find {
-                        it.type == AudioDeviceInfo.TYPE_BUILTIN_EARPIECE
-                    }
-                    if (earpiece != null) {
-                        audioManager.setCommunicationDevice(earpiece)
-                    } else {
-                        audioManager.clearCommunicationDevice()
-                    }
-                }
-            }
-            if (on) {
-                val maxCallVol = audioManager.getStreamMaxVolume(AudioManager.STREAM_VOICE_CALL)
-                audioManager.setStreamVolume(AudioManager.STREAM_VOICE_CALL, maxCallVol, 0)
-                val maxMusicVol = audioManager.getStreamMaxVolume(AudioManager.STREAM_MUSIC)
-                audioManager.setStreamVolume(AudioManager.STREAM_MUSIC, maxMusicVol, 0)
-                val maxSysVol = audioManager.getStreamMaxVolume(AudioManager.STREAM_SYSTEM)
-                audioManager.setStreamVolume(AudioManager.STREAM_SYSTEM, maxSysVol, 0)
-            }
-            audioManager.isMicrophoneMute = false
-        } catch (e: Exception) {
-            Log.w("SYNKING_AUDIO", "applyAudioRoute notice: ${e.message}")
-        }
     }
 
     @ReactMethod
     fun setSpeakerphoneOn(on: Boolean, promise: Promise) {
         mainHandler.post {
             try {
-                // Immediate enforcement
-                applyAudioRoute(on)
-
-                // Multi-stage delayed enforcement to prevent WebRTC native C++ layer from overriding to earpiece
-                val delays = longArrayOf(150, 400, 800, 1500, 2500)
-                for (delay in delays) {
-                    mainHandler.postDelayed({ applyAudioRoute(on) }, delay)
+                if (on) {
+                    // 1. Loudspeaker Mode (Video Call OR Speaker Button ON)
+                    audioManager.mode = AudioManager.MODE_IN_COMMUNICATION
+                    audioManager.isSpeakerphoneOn = true
+                    if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
+                        val speakerDevice = audioManager.availableCommunicationDevices.find { 
+                            it.type == AudioDeviceInfo.TYPE_BUILTIN_SPEAKER 
+                        } ?: audioManager.getDevices(AudioManager.GET_DEVICES_OUTPUTS).find {
+                            it.type == AudioDeviceInfo.TYPE_BUILTIN_SPEAKER
+                        }
+                        if (speakerDevice != null) {
+                            audioManager.setCommunicationDevice(speakerDevice)
+                        }
+                    }
+                    try {
+                        val maxCallVol = audioManager.getStreamMaxVolume(AudioManager.STREAM_VOICE_CALL)
+                        audioManager.setStreamVolume(AudioManager.STREAM_VOICE_CALL, maxCallVol, 0)
+                        val maxMusicVol = audioManager.getStreamMaxVolume(AudioManager.STREAM_MUSIC)
+                        audioManager.setStreamVolume(AudioManager.STREAM_MUSIC, maxMusicVol, 0)
+                    } catch (ve: Exception) {}
+                } else {
+                    // 2. Private Earpiece Mode (Voice Call Near Ear)
+                    audioManager.mode = AudioManager.MODE_IN_COMMUNICATION
+                    audioManager.isSpeakerphoneOn = false
+                    if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
+                        val earpieceDevice = audioManager.availableCommunicationDevices.find { 
+                            it.type == AudioDeviceInfo.TYPE_BUILTIN_EARPIECE 
+                        } ?: audioManager.getDevices(AudioManager.GET_DEVICES_OUTPUTS).find {
+                            it.type == AudioDeviceInfo.TYPE_BUILTIN_EARPIECE
+                        }
+                        if (earpieceDevice != null) {
+                            audioManager.setCommunicationDevice(earpieceDevice)
+                        } else {
+                            audioManager.clearCommunicationDevice()
+                        }
+                    }
                 }
 
+                audioManager.isMicrophoneMute = false
                 promise.resolve(on)
             } catch (e: Exception) {
                 promise.reject("AUDIO_ROUTE_ERROR", e.message)
@@ -136,12 +96,6 @@ class AudioRouteModule(private val reactContext: ReactApplicationContext) : Reac
     fun resetAudioMode(promise: Promise) {
         mainHandler.post {
             try {
-                if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
-                    audioFocusRequest?.let { audioManager.abandonAudioFocusRequest(it) }
-                } else {
-                    @Suppress("DEPRECATION")
-                    audioManager.abandonAudioFocus(null)
-                }
                 if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
                     audioManager.clearCommunicationDevice()
                 }
