@@ -142,9 +142,15 @@ class SynkingConnectionService : ConnectionService() {
             ?: rawExtras?.getString("type") 
             ?: "audio"
 
+        val callerPhoto = incomingExtras?.getString("callerPhoto") 
+            ?: incomingExtras?.getString("photo") 
+            ?: rawExtras?.getString("callerPhoto") 
+            ?: rawExtras?.getString("photo") 
+            ?: ""
+
         Log.d("SYNKING_TELECOM", "[TELECOM] CONNECTION_CREATED: Handling incoming for $callerName ($callId) from $callerId")
 
-        val connection = SynkingConnection(applicationContext, callId, callerId, callerName, callType)
+        val connection = SynkingConnection(applicationContext, callId, callerId, callerName, callType, callerPhoto)
         connection.setInitializing()
         connection.setRinging()
         

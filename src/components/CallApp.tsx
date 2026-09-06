@@ -94,6 +94,7 @@ export default function CallApp() {
       <StatusBar hidden={false} barStyle="light-content" translucent backgroundColor="transparent" />
       <CallModal
         session={session}
+        isLockscreen={true}
         onEndCall={handleEndCall}
         onAcceptCall={handleAcceptCall}
         onMinimize={handleMinimizeToChat}

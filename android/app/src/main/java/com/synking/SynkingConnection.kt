@@ -1,22 +1,28 @@
 package com.synking
 
+import android.app.KeyguardManager
 import android.app.NotificationChannel
 import android.app.NotificationManager
 import android.app.PendingIntent
 import android.content.Context
 import android.content.Intent
+import android.graphics.BitmapFactory
 import android.os.Build
 import android.telecom.Connection
 import android.telecom.DisconnectCause
 import android.util.Log
 import androidx.core.app.NotificationCompat
+import androidx.core.app.Person
+import androidx.core.graphics.drawable.IconCompat
+import java.net.URL
 
 class SynkingConnection(
     private val context: Context,
     private val callId: String,
     private val callerId: String = "",
     private val callerName: String,
-    val callType: String
+    val callType: String,
+    private val callerPhoto: String = ""
 ) : Connection() {
 
     init {
@@ -27,7 +33,7 @@ class SynkingConnection(
 
     override fun onShowIncomingCallUi() {
         super.onShowIncomingCallUi()
-        Log.d("SYNKING_TELECOM", "[UI] INCOMING_CALL_SHOWN: Launching CallActivity directly as Single Unified CallModal Dialer for $callId ($callerId)")
+        Log.d("SYNKING_TELECOM", "[UI] INCOMING_CALL_SHOWN: callId=$callId caller=$callerName type=$callType")
 
         val fullScreenIntent = Intent(context, CallActivity::class.java).apply {
             flags = Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_SINGLE_TOP
@@ -35,6 +41,7 @@ class SynkingConnection(
             putExtra("callId", callId)
             putExtra("callerId", callerId)
             putExtra("callerName", callerName)
+            putExtra("callerPhoto", callerPhoto)
             putExtra("callType", callType)
             putExtra("autoAccept", false)
         }
@@ -48,7 +55,7 @@ class SynkingConnection(
             context, callId.hashCode(), fullScreenIntent, piFlags
         )
 
-        // ── Notification Channel (lock screen needs this) ──
+        // ── Notification Channel ──
         val channelId = "synking_telecom_calls"
         val nm = context.getSystemService(Context.NOTIFICATION_SERVICE) as NotificationManager
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
@@ -68,6 +75,7 @@ class SynkingConnection(
         // ── Decline Action ──
         val declineIntent = Intent(context, CallActionReceiver::class.java).apply {
             action = "ACTION_DECLINE_CALL"
+            putExtra("callId", callId)
         }
         val declinePendingIntent = PendingIntent.getBroadcast(
             context, callId.hashCode() + 1, declineIntent, piFlags
@@ -80,6 +88,7 @@ class SynkingConnection(
             putExtra("callId", callId)
             putExtra("callerId", callerId)
             putExtra("callerName", callerName)
+            putExtra("callerPhoto", callerPhoto)
             putExtra("callType", callType)
             putExtra("autoAccept", true)
         }
@@ -87,32 +96,77 @@ class SynkingConnection(
             context, callId.hashCode() + 2, acceptIntent, piFlags
         )
 
-        // ── Build Notification with FullScreenIntent for Lock Screen ──
-        val notification = NotificationCompat.Builder(context, channelId)
+        // ── Person & CallStyle Setup (Renders WhatsApp-style colorful pills) ──
+        val isVideo = callType == "video"
+        val personBuilder = Person.Builder()
+            .setName(callerName)
+            .setImportant(true)
+
+        val callStyle = NotificationCompat.CallStyle.forIncomingCall(
+            personBuilder.build(),
+            declinePendingIntent,
+            acceptPendingIntent
+        ).setIsVideo(isVideo)
+
+        // ── Build Notification: Locked against swiping (setOngoing=true) ──
+        val notificationBuilder = NotificationCompat.Builder(context, channelId)
             .setSmallIcon(R.mipmap.ic_launcher)
-            .setContentTitle("📞 Incoming ${if (callType == "video") "Video" else "Voice"} Call")
-            .setContentText("$callerName is calling on SYNKING")
+            .setStyle(callStyle)
+            .setContentTitle("Incoming ${if (isVideo) "video" else "voice"} call")
+            .setContentText(callerName)
+            .setSubText("SYNKING")
             .setPriority(NotificationCompat.PRIORITY_MAX)
             .setCategory(NotificationCompat.CATEGORY_CALL)
             .setVisibility(NotificationCompat.VISIBILITY_PUBLIC)
-            .setFullScreenIntent(fullScreenPendingIntent, true) // ✅ LOCK SCREEN!
-            .setContentIntent(fullScreenPendingIntent)
             .setAutoCancel(false)
-            .setOngoing(true)
-            .addAction(android.R.drawable.ic_menu_close_clear_cancel, "Decline", declinePendingIntent)
-            .addAction(android.R.drawable.ic_menu_call, "Accept", acceptPendingIntent)
-            .build()
+            .setOngoing(true) // 🔒 Locked: Cannot be swiped away/cleaned while ringing!
+            .setFullScreenIntent(fullScreenPendingIntent, true) // For lockscreen presentation
+            .setContentIntent(fullScreenPendingIntent) // Tap banner to expand to full screen
+            .setColor(android.graphics.Color.parseColor("#FD3A73"))
 
+        val notification = notificationBuilder.build()
         SynkingConnectionService.startCallForeground(notification)
         nm.notify(MyFirebaseMessagingService.NOTIFICATION_ID, notification)
-        Log.d("SYNKING_TELECOM", "[UI] NOTIFICATION_POSTED: with FullScreenIntent for lock screen")
+        Log.d("SYNKING_TELECOM", "[UI] NOTIFICATION_POSTED: CallStyle notification active (locked ongoing)")
 
-        // ── Also try direct Activity launch (works when app is foreground) ──
-        try {
-            context.startActivity(fullScreenIntent)
-            Log.d("SYNKING_TELECOM", "[UI] DIRECT_ACTIVITY_LAUNCH: SUCCESS")
-        } catch (e: Exception) {
-            Log.e("SYNKING_TELECOM", "[UI] DIRECT_ACTIVITY_LAUNCH: BLOCKED (${e.message}) — FullScreenIntent notification will handle it")
+        // ── Asynchronous Caller Avatar Loading ──
+        if (callerPhoto.isNotEmpty() && (callerPhoto.startsWith("http://") || callerPhoto.startsWith("https://"))) {
+            Thread {
+                try {
+                    val url = URL(callerPhoto)
+                    val stream = url.openStream()
+                    val bmp = BitmapFactory.decodeStream(stream)
+                    if (bmp != null) {
+                        val updatedPerson = personBuilder.setIcon(IconCompat.createWithBitmap(bmp)).build()
+                        val updatedCallStyle = NotificationCompat.CallStyle.forIncomingCall(
+                            updatedPerson,
+                            declinePendingIntent,
+                            acceptPendingIntent
+                        ).setIsVideo(isVideo)
+                        notificationBuilder.setStyle(updatedCallStyle)
+                        nm.notify(MyFirebaseMessagingService.NOTIFICATION_ID, notificationBuilder.build())
+                        Log.d("SYNKING_TELECOM", "[UI] Caller avatar loaded and applied to CallStyle notification")
+                    }
+                } catch (e: Exception) {
+                    Log.d("SYNKING_TELECOM", "Caller photo load error: ${e.message}")
+                }
+            }.start()
+        }
+
+        // ── Smart Lockscreen Routing ──
+        val km = context.getSystemService(Context.KEYGUARD_SERVICE) as KeyguardManager
+        if (km.isKeyguardLocked) {
+            // Phone is locked: wake screen and launch full-screen CallActivity over lockscreen
+            try {
+                context.startActivity(fullScreenIntent)
+                Log.d("SYNKING_TELECOM", "[UI] DIRECT_ACTIVITY_LAUNCH: Phone is locked, launched CallActivity over lockscreen")
+            } catch (e: Exception) {
+                Log.e("SYNKING_TELECOM", "[UI] DIRECT_ACTIVITY_LAUNCH failed: ${e.message}")
+            }
+        } else {
+            // Screen is OPEN (unlocked): DO NOT hijack the screen with full-screen Activity!
+            // Let Android OS show the locked Heads-Up Notification banner at the top of the screen.
+            Log.d("SYNKING_TELECOM", "[UI] Screen is open/unlocked: Showing locked Heads-Up notification banner with colourful Decline & Answer pills")
         }
     }
 

@@ -326,6 +326,15 @@ class WebRTCManager {
       // Native lockscreen already accepted it, skip ringtone and timer!
       this.startTimer();
     } else {
+      if (Platform.OS === 'android' && NativeModules.TelecomModule?.showIncomingCallNotification) {
+        NativeModules.TelecomModule.showIncomingCallNotification(
+          incomingSession.id,
+          callerUser.id,
+          callerUser.name,
+          incomingSession.callerPhoto || '',
+          type
+        ).catch(() => {});
+      }
       // Normal React Native incoming call flow
       RingtoneService.playIncomingRing();
       this.startRingingTimeout(50);

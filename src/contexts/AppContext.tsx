@@ -676,7 +676,14 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
         }
       } else if (type === 'INCOMING_CALL' && payload) {
         if (payload.receiverId === currentUser?.id && payload.callerUser) {
-          NotificationService.showIncomingCallNotification(payload.callerUser.name, payload.type, payload.callId);
+          const photo = payload.callerUser.photo || payload.callerUser.photos?.[0] || '';
+          NotificationService.showIncomingCallNotification(
+            payload.callerUser.name, 
+            payload.type, 
+            payload.callId,
+            payload.callerUser.id,
+            photo
+          );
           WebRTCService.receiveIncomingCall(payload.callerUser, payload.type, payload.callId);
         }
       } else if (type === 'CALL_ENDED' || type === 'CALL_REJECTED' || type === 'CALL_ACCEPTED') {

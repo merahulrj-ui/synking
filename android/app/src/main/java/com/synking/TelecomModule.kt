@@ -145,6 +145,18 @@ class TelecomModule(reactContext: ReactApplicationContext) : ReactContextBaseJav
     }
 
     @ReactMethod
+    fun showIncomingCallNotification(callId: String, callerId: String, callerName: String, callerPhoto: String, callType: String, promise: Promise) {
+        try {
+            val ctx = reactApplicationContext
+            val conn = SynkingConnection(ctx, callId, callerId, callerName, callType, callerPhoto)
+            conn.onShowIncomingCallUi()
+            promise.resolve(true)
+        } catch (e: Exception) {
+            promise.resolve(false)
+        }
+    }
+
+    @ReactMethod
     fun requestVoipPermissions(promise: Promise) {
         try {
             CallReliabilityHelper.runOnboardingReliabilityCheck(reactApplicationContext)

@@ -173,6 +173,7 @@ const LiveRemoteMedia: React.FC<{ type: 'voice' | 'video'; photoUrl?: string; is
 
 interface Props {
   session: CallSession | null;
+  isLockscreen?: boolean;
   onEndCall: () => void;
   onAcceptCall?: () => void;
   onToggleMute?: () => boolean;
@@ -181,8 +182,18 @@ interface Props {
   onMinimize?: () => void;
 }
 
-export const CallModal: React.FC<Props> = ({ session, onEndCall, onAcceptCall, onToggleMute, onToggleVideo, onToggleSpeaker, onMinimize }) => {
+export const CallModal: React.FC<Props> = ({ session, isLockscreen, onEndCall, onAcceptCall, onToggleMute, onToggleVideo, onToggleSpeaker, onMinimize }) => {
   if (!session) return null;
+
+  const [isExpanded, setIsExpanded] = useState<boolean>(() => {
+    return !!isLockscreen || !session.isIncoming || session.status !== 'ringing';
+  });
+
+  useEffect(() => {
+    if (session.status === 'connected' || isLockscreen) {
+      setIsExpanded(true);
+    }
+  }, [session.status, isLockscreen]);
 
   useEffect(() => {
     // If it's an audio call and connected, turn on proximity sensor to turn screen black near ear
@@ -601,6 +612,84 @@ export const CallModal: React.FC<Props> = ({ session, onEndCall, onAcceptCall, o
       </View>
   );
 
+  if (!isExpanded && isIncomingRinging) {
+    const isVideo = session.type === 'video' || session.isVideoEnabled;
+    return (
+      <View style={styles.bannerOuterWrapper} pointerEvents="box-none">
+        <TouchableOpacity
+          activeOpacity={0.92}
+          onPress={() => setIsExpanded(true)}
+          style={styles.bannerCard}
+        >
+          {/* Top Info Row */}
+          <View style={styles.bannerInfoRow}>
+            {/* Avatar on Left */}
+            <View style={styles.bannerAvatarWrapper}>
+              <Image
+                source={{ uri: session.callerPhoto || 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=800' }}
+                style={styles.bannerAvatar}
+              />
+              <View style={styles.bannerBadge}>
+                <Ionicons
+                  name={isVideo ? 'videocam' : 'call'}
+                  size={10}
+                  color="#FFFFFF"
+                />
+              </View>
+            </View>
+
+            {/* Text details in middle */}
+            <View style={styles.bannerTextCol}>
+              <View style={styles.bannerTitleRow}>
+                <Text style={styles.bannerCallerName} numberOfLines={1}>
+                  {session.callerName}
+                </Text>
+                <Text style={styles.bannerAppTag}>• Synkin • Now</Text>
+              </View>
+              <Text style={styles.bannerCallSub} numberOfLines={1}>
+                {isVideo ? 'Incoming video call' : 'Incoming voice call'}
+              </Text>
+            </View>
+
+            {/* Subtle expand chevron on right */}
+            <View style={styles.bannerChevron}>
+              <Ionicons name="chevron-down" size={18} color="#94A3B8" />
+            </View>
+          </View>
+
+          {/* Action Buttons Row */}
+          <View style={styles.bannerActionsRow}>
+            {/* Colorful RED Decline Pill Button */}
+            <TouchableOpacity
+              style={styles.bannerDeclineBtn}
+              onPress={handleDecline}
+              activeOpacity={0.8}
+            >
+              <Ionicons name="call" size={15} color="#FFFFFF" style={{ transform: [{ rotate: '135deg' }] }} />
+              <Text style={styles.bannerDeclineText}>Decline</Text>
+            </TouchableOpacity>
+
+            {/* Colorful GREEN Answer / Video Pill Button */}
+            <TouchableOpacity
+              style={styles.bannerAcceptBtn}
+              onPress={handleAccept}
+              activeOpacity={0.8}
+            >
+              <Ionicons
+                name={isVideo ? 'videocam' : 'call'}
+                size={16}
+                color="#FFFFFF"
+              />
+              <Text style={styles.bannerAcceptText}>
+                {isVideo ? 'Video' : 'Answer'}
+              </Text>
+            </TouchableOpacity>
+          </View>
+        </TouchableOpacity>
+      </View>
+    );
+  }
+
   if (Platform.OS === 'android') {
     return (
       <View style={[StyleSheet.absoluteFill, { zIndex: 999999, elevation: 999999 }]}>
@@ -998,6 +1087,129 @@ const styles = StyleSheet.create({
     color: '#FFFFFF',
     fontSize: 11,
     fontFamily: 'Poppins_800ExtraBold',
+  },
+  bannerOuterWrapper: {
+    position: 'absolute',
+    top: Platform.OS === 'android' ? 36 : 50,
+    left: 12,
+    right: 12,
+    zIndex: 999999,
+    elevation: 999999,
+  },
+  bannerCard: {
+    backgroundColor: '#FFFFFF',
+    borderRadius: 24,
+    paddingHorizontal: 16,
+    paddingTop: 14,
+    paddingBottom: 14,
+    shadowColor: '#000000',
+    shadowOffset: { width: 0, height: 8 },
+    shadowOpacity: 0.22,
+    shadowRadius: 16,
+    elevation: 12,
+    borderWidth: 1,
+    borderColor: 'rgba(0, 0, 0, 0.08)',
+  },
+  bannerInfoRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginBottom: 12,
+  },
+  bannerAvatarWrapper: {
+    position: 'relative',
+    marginRight: 12,
+  },
+  bannerAvatar: {
+    width: 46,
+    height: 46,
+    borderRadius: 23,
+    backgroundColor: '#E2E8F0',
+  },
+  bannerBadge: {
+    position: 'absolute',
+    bottom: -2,
+    right: -2,
+    width: 18,
+    height: 18,
+    borderRadius: 9,
+    backgroundColor: '#0F172A',
+    alignItems: 'center',
+    justifyContent: 'center',
+    borderWidth: 1.5,
+    borderColor: '#FFFFFF',
+  },
+  bannerTextCol: {
+    flex: 1,
+    justifyContent: 'center',
+  },
+  bannerTitleRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 4,
+  },
+  bannerCallerName: {
+    fontSize: 15,
+    fontFamily: 'Poppins_700Bold',
+    color: '#0F172A',
+    maxWidth: '65%',
+  },
+  bannerAppTag: {
+    fontSize: 11,
+    fontFamily: 'Poppins_400Regular',
+    color: '#64748B',
+  },
+  bannerCallSub: {
+    fontSize: 13,
+    fontFamily: 'Poppins_500Medium',
+    color: '#475569',
+    marginTop: 1,
+  },
+  bannerChevron: {
+    paddingLeft: 8,
+  },
+  bannerActionsRow: {
+    flexDirection: 'row',
+    gap: 10,
+  },
+  bannerDeclineBtn: {
+    flex: 1,
+    backgroundColor: '#DC2626',
+    borderRadius: 22,
+    paddingVertical: 10,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 8,
+    shadowColor: '#DC2626',
+    shadowOffset: { width: 0, height: 3 },
+    shadowOpacity: 0.35,
+    shadowRadius: 6,
+    elevation: 4,
+  },
+  bannerDeclineText: {
+    color: '#FFFFFF',
+    fontSize: 14,
+    fontFamily: 'Poppins_600SemiBold',
+  },
+  bannerAcceptBtn: {
+    flex: 1,
+    backgroundColor: '#16A34A',
+    borderRadius: 22,
+    paddingVertical: 10,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 8,
+    shadowColor: '#16A34A',
+    shadowOffset: { width: 0, height: 3 },
+    shadowOpacity: 0.35,
+    shadowRadius: 6,
+    elevation: 4,
+  },
+  bannerAcceptText: {
+    color: '#FFFFFF',
+    fontSize: 14,
+    fontFamily: 'Poppins_600SemiBold',
   },
 });
 

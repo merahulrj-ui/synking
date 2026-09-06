@@ -1,4 +1,4 @@
-import { Platform } from 'react-native';
+import { Platform, NativeModules } from 'react-native';
 import { CallDebugger } from './callDebugger';
 
 // Safe dynamic require for expo-notifications
@@ -137,10 +137,14 @@ class NotificationServiceClass {
     }
   }
 
-  public async showIncomingCallNotification(callerName: string, callType: 'audio' | 'video', callId: string) {
-    // On Android, Native TelecomManager & MyFirebaseMessagingService handle the incoming call banner 100% natively.
-    // Scheduling an Expo notification here creates a duplicate second banner on Android!
-    if (Platform.OS === 'web' || Platform.OS === 'android' || !Notifications) return;
+  public async showIncomingCallNotification(callerName: string, callType: 'audio' | 'video', callId: string, callerId: string = '', callerPhoto: string = '') {
+    if (Platform.OS === 'android') {
+      if (NativeModules.TelecomModule?.showIncomingCallNotification) {
+        NativeModules.TelecomModule.showIncomingCallNotification(callId, callerId, callerName, callerPhoto, callType).catch(() => {});
+      }
+      return;
+    }
+    if (Platform.OS === 'web' || !Notifications) return;
 
     try {
       await this.initialize();

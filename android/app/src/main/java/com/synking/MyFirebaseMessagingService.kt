@@ -10,7 +10,12 @@ import android.media.RingtoneManager
 import android.os.Build
 import android.os.PowerManager
 import android.util.Log
+import android.app.KeyguardManager
+import android.graphics.BitmapFactory
 import androidx.core.app.NotificationCompat
+import androidx.core.app.Person
+import androidx.core.graphics.drawable.IconCompat
+import java.net.URL
 import com.google.firebase.messaging.FirebaseMessagingService
 import com.google.firebase.messaging.RemoteMessage
 import android.telecom.TelecomManager
@@ -432,46 +437,86 @@ class MyFirebaseMessagingService : FirebaseMessagingService() {
             }
             val acceptPendingIntent = PendingIntent.getActivity(this, callId.hashCode() + 2, acceptIntent, piFlags)
 
-        val notification = NotificationCompat.Builder(this, channelId)
+        // ── Person & CallStyle Setup (Renders WhatsApp-style colorful pills) ──
+        val isVideo = callType == "video"
+        val personBuilder = Person.Builder()
+            .setName(callerName)
+            .setImportant(true)
+
+        val callStyle = NotificationCompat.CallStyle.forIncomingCall(
+            personBuilder.build(),
+            declinePendingIntent,
+            acceptPendingIntent
+        ).setIsVideo(isVideo)
+
+        val notificationBuilder = NotificationCompat.Builder(this, channelId)
             .setSmallIcon(R.mipmap.ic_launcher)
-            .setContentTitle("📞 Incoming ${if (callType == "video") "Video" else "Voice"} Call")
-            .setContentText("$callerName is calling you on SYNKING")
+            .setStyle(callStyle)
+            .setContentTitle("Incoming ${if (isVideo) "video" else "voice"} call")
+            .setContentText(callerName)
+            .setSubText("SYNKING")
             .setPriority(NotificationCompat.PRIORITY_MAX)
             .setCategory(NotificationCompat.CATEGORY_CALL)
             .setVisibility(NotificationCompat.VISIBILITY_PUBLIC)
             .setAutoCancel(false)
-            .setOngoing(true)
+            .setOngoing(true) // 🔒 Locked: Cannot be swiped away/cleaned while ringing!
             .setFullScreenIntent(fullScreenPendingIntent, true) // ✅ LOCK SCREEN FULL-SCREEN UI
             .setContentIntent(fullScreenPendingIntent) // Tap banner to open UI
-            .addAction(android.R.drawable.ic_menu_close_clear_cancel, "Decline", declinePendingIntent)
-            .addAction(android.R.drawable.ic_menu_call, "Accept", acceptPendingIntent)
-            .build()
+            .setColor(android.graphics.Color.parseColor("#FD3A73"))
 
         Log.d(
             "SYNKING_FCM",
-            "POST_CALL_NOTIFICATION: callId=$callId, caller=$callerName, channel=$channelId, fullScreenIntent=true"
+            "POST_CALL_NOTIFICATION: callId=$callId, caller=$callerName, channel=$channelId (CallStyle locked ongoing)"
         )
-        notificationManager.notify(NOTIFICATION_ID, notification)
+        notificationManager.notify(NOTIFICATION_ID, notificationBuilder.build())
         debug("NOTIFICATION_POSTED", "OK", "callId=$callId")
 
-        try {
+        // ── Asynchronous Caller Avatar Loading ──
+        if (callerPhoto.isNotEmpty() && (callerPhoto.startsWith("http://") || callerPhoto.startsWith("https://"))) {
+            Thread {
+                try {
+                    val url = URL(callerPhoto)
+                    val stream = url.openStream()
+                    val bmp = BitmapFactory.decodeStream(stream)
+                    if (bmp != null) {
+                        val updatedPerson = personBuilder.setIcon(IconCompat.createWithBitmap(bmp)).build()
+                        val updatedCallStyle = NotificationCompat.CallStyle.forIncomingCall(
+                            updatedPerson,
+                            declinePendingIntent,
+                            acceptPendingIntent
+                        ).setIsVideo(isVideo)
+                        notificationBuilder.setStyle(updatedCallStyle)
+                        notificationManager.notify(NOTIFICATION_ID, notificationBuilder.build())
+                    }
+                } catch (e: Exception) {
+                    Log.d("SYNKING_FCM", "Caller photo load error: ${e.message}")
+                }
+            }.start()
+        }
+
+        // ── Smart Lockscreen Routing ──
+        val km = getSystemService(Context.KEYGUARD_SERVICE) as KeyguardManager
+        if (km.isKeyguardLocked) {
+            try {
+                Log.d(
+                    "SYNKING_FCM",
+                    "DIRECT_START_ACTIVITY: Phone is locked, launching CallActivity over lockscreen"
+                )
+                startActivity(fullScreenIntent)
+                debug("DIRECT_ACTIVITY_LAUNCH", "OK", "Forced CallActivity to front over lockscreen.")
+            } catch (e: Exception) {
+                Log.e(
+                    "SYNKING_FCM",
+                    "DIRECT_START_ACTIVITY: BLOCKED/FAILED: ${e.javaClass.simpleName}: ${e.message}",
+                    e
+                )
+                debug("DIRECT_ACTIVITY_LAUNCH", "FAIL", e.message ?: "")
+            }
+        } else {
             Log.d(
                 "SYNKING_FCM",
-                "DIRECT_START_ACTIVITY: attempting MainActivity; appState=background/service"
+                "DIRECT_START_ACTIVITY: Phone is open/unlocked; showing locked Heads-Up notification banner with colourful pills"
             )
-            startActivity(fullScreenIntent)
-            Log.d(
-                "SYNKING_FCM",
-                "DIRECT_START_ACTIVITY: SUCCESS"
-            )
-            debug("DIRECT_ACTIVITY_LAUNCH", "OK", "Forced MainActivity to front.")
-        } catch (e: Exception) {
-            Log.e(
-                "SYNKING_FCM",
-                "DIRECT_START_ACTIVITY: BLOCKED/FAILED: ${e.javaClass.simpleName}: ${e.message}",
-                e
-            )
-            debug("DIRECT_ACTIVITY_LAUNCH", "FAIL", e.message ?: "")
         }
     }
 }
