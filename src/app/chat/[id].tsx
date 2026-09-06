@@ -240,6 +240,7 @@ export default function ChatScreen() {
   const [callWindowActiveUntil, setCallWindowActiveUntil] = useState<number | null>(null);
   const [callWindowRemainingSecs, setCallWindowRemainingSecs] = useState<number>(0);
   const [callRequesterId, setCallRequesterId] = useState<string | null>(null);
+  const [callWindowType, setCallWindowType] = useState<'audio' | 'video'>('video');
 
   useEffect(() => {
     if (!id) return;
@@ -247,8 +248,12 @@ export default function ChatScreen() {
       try {
         const stored = await AsyncStorage.getItem(`synking_call_window_${id}`);
         const storedRequester = await AsyncStorage.getItem(`synking_call_requester_${id}`);
+        const storedType = await AsyncStorage.getItem(`synking_call_type_${id}`);
         if (storedRequester) {
           setCallRequesterId(storedRequester);
+        }
+        if (storedType === 'audio' || storedType === 'video') {
+          setCallWindowType(storedType);
         }
         if (stored) {
           const timestamp = parseInt(stored, 10);
@@ -260,6 +265,7 @@ export default function ChatScreen() {
             setCallRequesterId(null);
             await AsyncStorage.removeItem(`synking_call_window_${id}`);
             await AsyncStorage.removeItem(`synking_call_requester_${id}`);
+            await AsyncStorage.removeItem(`synking_call_type_${id}`);
           }
         }
       } catch (e) {}
@@ -278,6 +284,7 @@ export default function ChatScreen() {
         if (id) {
           AsyncStorage.removeItem(`synking_call_window_${id}`).catch(() => {});
           AsyncStorage.removeItem(`synking_call_requester_${id}`).catch(() => {});
+          AsyncStorage.removeItem(`synking_call_type_${id}`).catch(() => {});
         }
       }
     }, 1000);
@@ -1053,6 +1060,12 @@ const VOICE_COMPRESSED_CONFIG: any = {
         const until = payload.until || (Date.now() + 15 * 60 * 1000);
         setCallWindowActiveUntil(until);
         setCallWindowRemainingSecs(Math.max(0, Math.floor((until - Date.now()) / 1000)));
+        if (payload?.callType) {
+          setCallWindowType(payload.callType);
+          if (id) {
+            AsyncStorage.setItem(`synking_call_type_${id}`, payload.callType).catch(() => {});
+          }
+        }
         if (payload?.requesterId) {
           setCallRequesterId(payload.requesterId);
           if (id) {
@@ -1070,6 +1083,12 @@ const VOICE_COMPRESSED_CONFIG: any = {
       if (type === 'CALL_REQUEST' && (payload?.partnerId === myId || payload?.partnerId === id)) {
         const reqId = payload?.callerUser?.id || payload?.requesterId || id;
         setCallRequesterId(reqId);
+        if (payload?.callType) {
+          setCallWindowType(payload.callType);
+          if (id) {
+            AsyncStorage.setItem(`synking_call_type_${id}`, payload.callType).catch(() => {});
+          }
+        }
         if (id) {
           AsyncStorage.setItem(`synking_call_requester_${id}`, reqId).catch(() => {});
         }
@@ -1517,7 +1536,7 @@ const VOICE_COMPRESSED_CONFIG: any = {
     }
   };
 
-  const handleSendCallRequest = (type: 'audio' | 'video' = 'audio') => {
+  const handleSendCallRequest = (type: 'audio' | 'video' = 'video') => {
     if (!currentUser || !id) return;
     const reqText = `📞 [Call Request: ${type === 'video' ? 'Video Call' : 'Voice Call'}]`;
     const extra = {
@@ -1528,7 +1547,9 @@ const VOICE_COMPRESSED_CONFIG: any = {
     };
 
     setCallRequesterId(currentUser.id);
+    setCallWindowType(type);
     AsyncStorage.setItem(`synking_call_requester_${id}`, currentUser.id).catch(() => {});
+    AsyncStorage.setItem(`synking_call_type_${id}`, type).catch(() => {});
 
     sendMessage(id, reqText, 'call_request', extra);
 
@@ -1550,21 +1571,24 @@ const VOICE_COMPRESSED_CONFIG: any = {
     );
   };
 
-  const handleApproveCallRequest = () => {
+  const handleApproveCallRequest = (type: 'audio' | 'video' = callWindowType || 'video') => {
     const windowUntil = Date.now() + 15 * 60 * 1000;
     setCallWindowActiveUntil(windowUntil);
     setCallWindowRemainingSecs(15 * 60);
+    setCallWindowType(type);
     const requester = callRequesterId || id;
     setCallRequesterId(requester);
     if (id) {
       AsyncStorage.setItem(`synking_call_window_${id}`, windowUntil.toString()).catch(() => {});
       AsyncStorage.setItem(`synking_call_requester_${id}`, requester).catch(() => {});
+      AsyncStorage.setItem(`synking_call_type_${id}`, type).catch(() => {});
       sendMessage(id, '🟢 Call Request Approved! 15-Minute Calling Window is now active.');
       RealtimeBridge.broadcast('CALL_WINDOW_APPROVED', {
         partnerId: id,
         until: windowUntil,
         approvedBy: currentUser?.name || 'Partner',
         requesterId: requester,
+        callType: type,
       }, id);
     }
     if (Platform.OS !== 'web') {
@@ -1775,10 +1799,12 @@ const VOICE_COMPRESSED_CONFIG: any = {
             {isUserCaller ? (
               <TouchableOpacity
                 style={styles.activeCallNowMiniBtn}
-                onPress={() => handleStartCall('audio')}
+                onPress={() => handleStartCall(callWindowType || 'video')}
                 activeOpacity={0.85}
               >
-                <Text style={styles.activeCallNowMiniBtnText}>CALL NOW 📞</Text>
+                <Text style={styles.activeCallNowMiniBtnText}>
+                  {callWindowType === 'video' ? 'VIDEO CALL 📹' : 'CALL NOW 📞'}
+                </Text>
               </TouchableOpacity>
             ) : (
               <View style={styles.activeCallWaitingMiniPill}>
@@ -1903,10 +1929,12 @@ const VOICE_COMPRESSED_CONFIG: any = {
                     isITheRequester ? (
                       <TouchableOpacity
                         style={styles.callNowBtn}
-                        onPress={() => handleStartCall(item.extraData?.callType || 'audio')}
+                        onPress={() => handleStartCall(item.extraData?.callType || callWindowType || 'video')}
                         activeOpacity={0.85}
                       >
-                        <Text style={styles.callNowBtnText}>CALL NOW 📞</Text>
+                        <Text style={styles.callNowBtnText}>
+                          {(item.extraData?.callType || callWindowType) === 'video' ? 'VIDEO CALL NOW 📹' : 'CALL NOW 📞'}
+                        </Text>
                       </TouchableOpacity>
                     ) : (
                       <View style={styles.callWaitingCard}>
@@ -1928,7 +1956,7 @@ const VOICE_COMPRESSED_CONFIG: any = {
                         </TouchableOpacity>
                         <TouchableOpacity
                           style={styles.callApproveBtn}
-                          onPress={handleApproveCallRequest}
+                          onPress={() => handleApproveCallRequest(item.extraData?.callType || 'video')}
                           activeOpacity={0.85}
                         >
                           <LinearGradient

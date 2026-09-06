@@ -350,6 +350,23 @@ class TelecomModule(reactContext: ReactApplicationContext) : ReactContextBaseJav
             val km = ctx.getSystemService(Context.KEYGUARD_SERVICE) as? KeyguardManager
 
             val openChatAction: () -> Unit = {
+                // If running inside CallActivity, enter PiP so video call floats over chat!
+                CallActivity.currentCallActivity?.let { act ->
+                    act.runOnUiThread {
+                        try {
+                            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
+                                val aspectRatio = Rational(9, 16)
+                                val params = PictureInPictureParams.Builder()
+                                    .setAspectRatio(aspectRatio)
+                                    .build()
+                                act.enterPictureInPictureMode(params)
+                            }
+                        } catch (e: Exception) {
+                            Log.w("SYNKING_DEBUG", "PiP enter on CallActivity failed: ${e.message}")
+                        }
+                    }
+                }
+
                 val intent = Intent(ctx, MainActivity::class.java).apply {
                     flags = Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_CLEAR_TOP
                     data = Uri.parse("synking://chat/$partnerId")
@@ -359,14 +376,7 @@ class TelecomModule(reactContext: ReactApplicationContext) : ReactContextBaseJav
                 }
                 ctx.startActivity(intent)
 
-                // If running inside CallActivity on lockscreen, move it to back so chat is displayed
-                CallActivity.currentCallActivity?.let { act ->
-                    act.runOnUiThread {
-                        try {
-                            act.moveTaskToBack(true)
-                        } catch (e: Exception) {}
-                    }
-                }
+                emitOpenChatEvent(partnerId)
             }
 
             val currentAct = activity
@@ -518,6 +528,17 @@ class TelecomModule(reactContext: ReactApplicationContext) : ReactContextBaseJav
         fun emitEndCallEvent() {
             reactContext?.getJSModule(DeviceEventManagerModule.RCTDeviceEventEmitter::class.java)
                 ?.emit("onTelecomEndCall", null)
+        }
+
+        fun emitOpenChatEvent(partnerId: String) {
+            val ctx = reactContext ?: return
+            if (!ctx.hasActiveCatalystInstance()) return
+            val params = Arguments.createMap().apply {
+                putString("partnerId", partnerId)
+            }
+            Log.d("SYNKING_DEBUG", "📤 [BRIDGE] emitOpenChatEvent -> onOpenChatRequested: partnerId=$partnerId")
+            ctx.getJSModule(DeviceEventManagerModule.RCTDeviceEventEmitter::class.java)
+                .emit("onOpenChatRequested", params)
         }
 
         fun flushPendingEvents() {

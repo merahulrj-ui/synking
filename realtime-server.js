@@ -1969,6 +1969,7 @@ const server = http.createServer((req, res) => {
         console.log(`📡 [NATIVE_CALL_SIGNAL_RECEIVED] type=${signalType} callId=${callId} target=${targetUserId} from=${senderId}`);
 
         // Construct targeted WebSocket packet for Laptop/Peer
+        const resolvedCallType = parsed.callType || parsed.type || 'video';
         const wsMessage = {
           type: signalType,
           targetUserId: targetUserId,
@@ -1977,7 +1978,8 @@ const server = http.createServer((req, res) => {
             callId: callId,
             callerId: targetUserId,
             receiverId: senderId,
-            type: parsed.callType || 'audio'
+            type: resolvedCallType,
+            callType: resolvedCallType
           }
         };
 
@@ -2007,7 +2009,7 @@ const server = http.createServer((req, res) => {
         if (signalType === 'CALL_ENDED') {
           if (targetUserId) {
             const callerName = parsed.callerName || (parsed.payload && parsed.payload.callerName) || '';
-            sendCallPushNotification(targetUserId, { callId, callerId: senderId, callerName }, true);
+            sendCallPushNotification(targetUserId, { callId, callerId: senderId, callerName, callType: resolvedCallType }, true);
           }
         }
 

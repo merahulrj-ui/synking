@@ -99,7 +99,10 @@ class CallActivity : ReactActivity() {
         val callId = intent.getStringExtra("callId") ?: ""
         val callerId = intent.getStringExtra("callerId") ?: ""
         val callerName = intent.getStringExtra("callerName") ?: "Someone"
-        val callType = intent.getStringExtra("callType") ?: "audio"
+        val callType = intent.getStringExtra("callType") 
+            ?: intent.getStringExtra("call_type") 
+            ?: intent.getStringExtra("type") 
+            ?: "audio"
         val callerPhoto = intent.getStringExtra("callerPhoto")
         val autoAccept = intent.getBooleanExtra("autoAccept", false)
 

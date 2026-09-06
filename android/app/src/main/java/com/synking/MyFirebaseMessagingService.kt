@@ -281,7 +281,7 @@ class MyFirebaseMessagingService : FirebaseMessagingService() {
 
         val callId = data["callId"] ?: ""
         val callerName = data["callerName"] ?: "Someone"
-        val callType = data["callType"] ?: "audio"
+        val callType = data["callType"] ?: data["call_type"] ?: data["type"] ?: "audio"
         val callerId = data["callerId"] ?: ""
         val callerPhoto = data["callerPhoto"] ?: ""
 
@@ -331,6 +331,7 @@ class MyFirebaseMessagingService : FirebaseMessagingService() {
             .putString("caller_name", callerName)
             .putString("caller_photo", callerPhoto)
             .putString("call_type", callType)
+            .putString("callType", callType)
             .apply()
 
         debug(
@@ -357,6 +358,7 @@ class MyFirebaseMessagingService : FirebaseMessagingService() {
                 putString("callerId", callerId)
                 putString("callerName", callerName)
                 putString("callType", callType)
+                putString("call_type", callType)
             }
             val telecomExtras = Bundle().apply {
                 putParcelable(TelecomManager.EXTRA_INCOMING_CALL_EXTRAS, extrasBundle)
@@ -386,6 +388,7 @@ class MyFirebaseMessagingService : FirebaseMessagingService() {
             putExtra("callerName", callerName)
             putExtra("callerPhoto", callerPhoto)
             putExtra("callType", callType)
+            putExtra("call_type", callType)
             putExtra("autoAccept", false)
         }
         val fullScreenPendingIntent = PendingIntent.getActivity(this, callId.hashCode(), fullScreenIntent, piFlags)

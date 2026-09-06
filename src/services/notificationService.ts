@@ -124,7 +124,7 @@ class NotificationServiceClass {
           try {
             CallDebugger.logStage('MESSAGE HANDLER', 'OK', { launchingCall: true });
             const { WebRTCService } = require('./webrtcService');
-            WebRTCService.receiveIncomingCall(data.callerUser, data.callType || 'audio', data.callId);
+            WebRTCService.receiveIncomingCall(data.callerUser, data.callType || data.type || 'audio', data.callId);
           } catch (e: any) {
             CallDebugger.logStage('MESSAGE HANDLER', 'FAIL', { error: e?.message });
           }

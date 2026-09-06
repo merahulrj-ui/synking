@@ -117,7 +117,13 @@ class SynkingConnectionService : ConnectionService() {
         val callId = incomingExtras?.getString("callId") ?: rawExtras?.getString("callId") ?: "unknown_call_id"
         val callerId = incomingExtras?.getString("callerId") ?: rawExtras?.getString("callerId") ?: ""
         val callerName = incomingExtras?.getString("callerName") ?: rawExtras?.getString("callerName") ?: "Unknown"
-        val callType = incomingExtras?.getString("callType") ?: rawExtras?.getString("callType") ?: "audio"
+        val callType = incomingExtras?.getString("callType") 
+            ?: incomingExtras?.getString("call_type") 
+            ?: incomingExtras?.getString("type") 
+            ?: rawExtras?.getString("callType") 
+            ?: rawExtras?.getString("call_type") 
+            ?: rawExtras?.getString("type") 
+            ?: "audio"
 
         Log.d("SYNKING_TELECOM", "[TELECOM] CONNECTION_CREATED: Handling incoming for $callerName ($callId) from $callerId")
 

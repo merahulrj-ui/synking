@@ -226,6 +226,7 @@ class WebRTCManager {
         callerUser: params.callerUser,
         receiverId: params.targetUser.id,
         type: params.type,
+        callType: params.type,
       },
       params.targetUser.id
     );

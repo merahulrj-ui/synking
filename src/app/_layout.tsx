@@ -393,9 +393,18 @@ function GlobalCallOverlay() {
         setIsNativePip(window.width > 0 && window.width < 300);
       }
     });
+    const chatSub = DeviceEventEmitter.addListener('onOpenChatRequested', (event: any) => {
+      const partnerId = event?.partnerId;
+      if (partnerId) {
+        console.log('[GlobalCallOverlay] 💬 onOpenChatRequested received for partnerId:', partnerId);
+        setIsMinimized(true);
+        router.push(`/chat/${partnerId}`);
+      }
+    });
     return () => {
       sub.remove();
       dimSub.remove();
+      chatSub.remove();
     };
   }, []);
 

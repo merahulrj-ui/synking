@@ -58,6 +58,10 @@ class MainActivity : ReactActivity() {
     try {
       requestedOrientation = android.content.pm.ActivityInfo.SCREEN_ORIENTATION_PORTRAIT
     } catch (e: Exception) {}
+    val chatPartnerId = intent?.getStringExtra("chatPartnerId") ?: intent?.getStringExtra("senderId")
+    if (!chatPartnerId.isNullOrEmpty()) {
+        TelecomModule.emitOpenChatEvent(chatPartnerId)
+    }
     handleIncomingCallIntent(intent)
 
     // 1. Native High-Priority Incoming Calls Notification Channel for Lock Screen & AOD Wakeup
@@ -163,6 +167,11 @@ class MainActivity : ReactActivity() {
     super.onNewIntent(intent)
     if (intent != null) {
         setIntent(intent)
+        val chatPartnerId = intent.getStringExtra("chatPartnerId") ?: intent.getStringExtra("senderId")
+        if (!chatPartnerId.isNullOrEmpty()) {
+            android.util.Log.d("SYNKING_DEBUG", "MainActivity: onNewIntent with chatPartnerId=$chatPartnerId")
+            TelecomModule.emitOpenChatEvent(chatPartnerId)
+        }
         handleIncomingCallIntent(intent)
     }
   }
@@ -188,7 +197,10 @@ class MainActivity : ReactActivity() {
     val callId = intent.getStringExtra("callId") ?: ""
     val callerId = intent.getStringExtra("callerId") ?: ""
     val callerName = intent.getStringExtra("callerName") ?: "Someone"
-    val callType = intent.getStringExtra("callType") ?: "audio"
+    val callType = intent.getStringExtra("callType") 
+        ?: intent.getStringExtra("call_type") 
+        ?: intent.getStringExtra("type") 
+        ?: "audio"
     val callerPhoto = intent.getStringExtra("callerPhoto")
     val autoAccept = intent.getBooleanExtra("autoAccept", false)
 

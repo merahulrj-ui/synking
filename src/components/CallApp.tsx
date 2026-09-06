@@ -36,7 +36,7 @@ export default function CallApp() {
               isVerified: true,
               isVip: false,
             },
-            (pending.callType || 'audio') as 'audio' | 'video',
+            (pending.callType || pending.type || 'video') as 'audio' | 'video',
             pending.callId,
             false
           );
