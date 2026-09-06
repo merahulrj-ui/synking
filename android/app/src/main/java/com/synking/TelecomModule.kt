@@ -211,11 +211,22 @@ class TelecomModule(reactContext: ReactApplicationContext) : ReactContextBaseJav
 
     @ReactMethod
     fun startOngoingCall(callerName: String, promise: Promise) {
+        val photo = CallIntentModule.pendingCallerPhoto ?: ""
+        val isVideo = CallIntentModule.pendingCallType == "video"
+        startOngoingCallInternal(callerName, photo, isVideo, promise)
+    }
+
+    @ReactMethod
+    fun startOngoingCallWithDetails(callerName: String, callerPhoto: String?, isVideo: Boolean?, promise: Promise) {
+        startOngoingCallInternal(callerName, callerPhoto ?: (CallIntentModule.pendingCallerPhoto ?: ""), isVideo ?: (CallIntentModule.pendingCallType == "video"), promise)
+    }
+
+    private fun startOngoingCallInternal(callerName: String, callerPhoto: String, isVideo: Boolean, promise: Promise) {
         try {
             isCallActive = true
             CallState.markAnswered(reactApplicationContext)
             CallConnectionManager.answerCall()
-            SynkingConnectionService.updateOngoingCallForeground(callerName)
+            SynkingConnectionService.updateOngoingCallForeground(callerName, callerPhoto, isVideo)
             val activity: Activity? = CallActivity.currentCallActivity ?: reactApplicationContext.currentActivity
             activity?.let { act ->
                 act.runOnUiThread {
@@ -444,7 +455,7 @@ class TelecomModule(reactContext: ReactApplicationContext) : ReactContextBaseJav
         fun emitAcceptEvent(call: PendingCall) {
             reactContext?.let { ctx ->
                 CallState.markAnswered(ctx)
-                SynkingConnectionService.updateOngoingCallForeground(call.callerName)
+                SynkingConnectionService.updateOngoingCallForeground(call.callerName, call.callerPhoto ?: "", call.callType == "video")
             }
             if (isJSBridgeReady.get() && reactContext?.hasActiveCatalystInstance() == true) {
                 sendAcceptDirect(call)

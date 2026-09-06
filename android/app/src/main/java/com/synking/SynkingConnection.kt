@@ -182,7 +182,7 @@ class SynkingConnection(
             nm.cancel(MyFirebaseMessagingService.NOTIFICATION_ID)
         } catch (e: Exception) {}
         setActive()
-        SynkingConnectionService.updateOngoingCallForeground(callerName)
+        SynkingConnectionService.updateOngoingCallForeground(callerName, callerPhoto, callType == "video")
         if (callType == "video") {
             setAudioRoute(android.telecom.CallAudioState.ROUTE_SPEAKER)
             Log.d("SYNKING_TELECOM", "[UI] ANSWER: Video call -> auto setAudioRoute ROUTE_SPEAKER")

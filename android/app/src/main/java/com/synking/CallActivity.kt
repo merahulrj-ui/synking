@@ -116,7 +116,7 @@ class CallActivity : ReactActivity() {
             PendingCallStore.save(this, pending)
             if (autoAccept) {
                 CallState.markAnswered(this)
-                SynkingConnectionService.updateOngoingCallForeground(callerName)
+                SynkingConnectionService.updateOngoingCallForeground(callerName, callerPhoto ?: "", callType == "video")
                 try {
                     val nm = getSystemService(Context.NOTIFICATION_SERVICE) as NotificationManager
                     nm.cancel(MyFirebaseMessagingService.NOTIFICATION_ID)

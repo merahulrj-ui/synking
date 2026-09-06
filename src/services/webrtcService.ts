@@ -100,7 +100,13 @@ class WebRTCManager {
           this.startConnectionWatchdog();
           this.startTimer();
           if (Platform.OS === 'android' && NativeModules.TelecomModule?.startOngoingCall) {
-            NativeModules.TelecomModule.startOngoingCall(this.currentSession.callerName || 'Synkin Call').catch(() => {});
+            const isVideo = this.currentSession.type === 'video' || this.currentSession.isVideoEnabled;
+            const photo = this.currentSession.callerPhoto || '';
+            if (NativeModules.TelecomModule.startOngoingCallWithDetails) {
+              NativeModules.TelecomModule.startOngoingCallWithDetails(this.currentSession.callerName || 'Synkin Call', photo, !!isVideo).catch(() => {});
+            } else {
+              NativeModules.TelecomModule.startOngoingCall(this.currentSession.callerName || 'Synkin Call').catch(() => {});
+            }
           }
 
           // Create SDP Offer if I am caller
@@ -398,7 +404,13 @@ class WebRTCManager {
       this.startConnectionWatchdog();
       this.startTimer();
       if (Platform.OS === 'android' && NativeModules.TelecomModule?.startOngoingCall) {
-        NativeModules.TelecomModule.startOngoingCall(this.currentSession.callerName || 'Synkin Call').catch(() => {});
+        const isVideo = this.currentSession.type === 'video' || this.currentSession.isVideoEnabled;
+        const photo = this.currentSession.callerPhoto || '';
+        if (NativeModules.TelecomModule.startOngoingCallWithDetails) {
+          NativeModules.TelecomModule.startOngoingCallWithDetails(this.currentSession.callerName || 'Synkin Call', photo, !!isVideo).catch(() => {});
+        } else {
+          NativeModules.TelecomModule.startOngoingCall(this.currentSession.callerName || 'Synkin Call').catch(() => {});
+        }
       }
 
       const peerId = this.getPeerUserId();

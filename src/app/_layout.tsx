@@ -434,7 +434,13 @@ function GlobalCallOverlay() {
           if (!hasStartedOngoingCallRef.current) {
             hasStartedOngoingCallRef.current = true;
             if (Platform.OS === 'android' && NativeModules.TelecomModule?.startOngoingCall) {
-              NativeModules.TelecomModule.startOngoingCall(session.callerName || 'Synkin Call').catch(() => {});
+              const isVideo = session.type === 'video' || session.isVideoEnabled;
+              const photo = session.callerPhoto || '';
+              if (NativeModules.TelecomModule.startOngoingCallWithDetails) {
+                NativeModules.TelecomModule.startOngoingCallWithDetails(session.callerName || 'Synkin Call', photo, !!isVideo).catch(() => {});
+              } else {
+                NativeModules.TelecomModule.startOngoingCall(session.callerName || 'Synkin Call').catch(() => {});
+              }
             }
           }
         } else {
