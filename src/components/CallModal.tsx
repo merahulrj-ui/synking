@@ -300,11 +300,14 @@ export const CallModal: React.FC<Props> = ({ session, onEndCall, onAcceptCall, o
   };
 
   const handleOpenChat = () => {
+    const partnerId = session.callerId || session.receiverId;
+    if (partnerId) {
+      WebRTCService.setTargetChatUserId(partnerId);
+    }
     WebRTCService.setMinimized(true);
     if (onMinimize) {
       onMinimize();
     } else {
-      const partnerId = session.callerId || session.receiverId;
       if (Platform.OS === 'web' && partnerId && typeof window !== 'undefined' && window.location) {
         window.location.href = `/chat/${partnerId}`;
       }

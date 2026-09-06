@@ -57,6 +57,8 @@ class WebRTCManager {
   private connectionWatchdogTimer: any = null;
   private isCallMinimized: boolean = false;
 
+  private targetChatUserId: string | null = null;
+
   public setMinimized(minimized: boolean) {
     this.isCallMinimized = minimized;
     this.notify();
@@ -64,6 +66,14 @@ class WebRTCManager {
 
   public getIsMinimized(): boolean {
     return this.isCallMinimized;
+  }
+
+  public setTargetChatUserId(userId: string | null) {
+    this.targetChatUserId = userId;
+  }
+
+  public getTargetChatUserId(): string | null {
+    return this.targetChatUserId;
   }
 
   constructor() {
@@ -615,8 +625,28 @@ class WebRTCManager {
   }
 
   private async createAndSendOffer() {
+    // 🛡️ HARDWARE-READY LOCK: Ensure local audio/video hardware is captured before creating Offer
+    if (!this.localStream) {
+      const isVideo = this.currentSession?.type === 'video' || this.currentSession?.isVideoEnabled;
+      await this.initLocalStream(!!isVideo);
+    }
+
     this.setupPeerConnection();
     if (!this.peerConnection) return;
+
+    // Attach any unattached local stream tracks to PeerConnection
+    if (this.localStream && this.peerConnection) {
+      const senders = typeof this.peerConnection.getSenders === 'function' ? this.peerConnection.getSenders() : [];
+      this.localStream.getTracks().forEach((track: any) => {
+        const alreadyAdded = senders.some((s: any) => s.track && s.track.kind === track.kind);
+        if (!alreadyAdded) {
+          try {
+            this.peerConnection.addTrack(track, this.localStream);
+            this.log(`📤 Attached local ${track.kind} track to PeerConnection before Offer.`);
+          } catch (e) {}
+        }
+      });
+    }
 
     try {
       const isVideo = this.currentSession?.isVideoEnabled || false;
@@ -634,8 +664,28 @@ class WebRTCManager {
   }
 
   private async handleIncomingOffer(offer: any) {
+    // 🛡️ HARDWARE-READY LOCK: Ensure local audio/video hardware is captured before creating Answer
+    if (!this.localStream) {
+      const isVideo = this.currentSession?.type === 'video' || this.currentSession?.isVideoEnabled;
+      await this.initLocalStream(!!isVideo);
+    }
+
     this.setupPeerConnection();
     if (!this.peerConnection) return;
+
+    // Attach any unattached local stream tracks to PeerConnection
+    if (this.localStream && this.peerConnection) {
+      const senders = typeof this.peerConnection.getSenders === 'function' ? this.peerConnection.getSenders() : [];
+      this.localStream.getTracks().forEach((track: any) => {
+        const alreadyAdded = senders.some((s: any) => s.track && s.track.kind === track.kind);
+        if (!alreadyAdded) {
+          try {
+            this.peerConnection.addTrack(track, this.localStream);
+            this.log(`📤 Attached local ${track.kind} track to PeerConnection before Answer.`);
+          } catch (e) {}
+        }
+      });
+    }
 
     try {
       await this.peerConnection.setRemoteDescription(new SessionDescription(offer));

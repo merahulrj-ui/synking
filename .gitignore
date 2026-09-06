@@ -24,3 +24,5 @@ android/local.properties
 firebase-service-account.json
 frames/
 wa_frame_*.png
+
+artifacts/

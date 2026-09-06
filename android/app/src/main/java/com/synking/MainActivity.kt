@@ -151,6 +151,11 @@ class MainActivity : ReactActivity() {
     super.onNewIntent(intent)
     if (intent != null) {
         setIntent(intent)
+        val chatPartnerId = intent.getStringExtra("chatPartnerId") ?: intent.getStringExtra("senderId")
+        if (!chatPartnerId.isNullOrEmpty()) {
+            android.util.Log.d("SYNKING_DEBUG", "MainActivity: onNewIntent with chatPartnerId=$chatPartnerId")
+            TelecomModule.emitOpenChatEvent(chatPartnerId)
+        }
         handleIncomingCallIntent(intent)
     }
   }

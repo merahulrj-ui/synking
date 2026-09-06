@@ -409,6 +409,14 @@ function GlobalCallOverlay() {
   }, [navigateToChat]);
 
   React.useEffect(() => {
+    const target = WebRTCService.getTargetChatUserId();
+    if (target) {
+      WebRTCService.setTargetChatUserId(null);
+      navigateToChat(target);
+    }
+  }, [isMinimized, activeCall, navigateToChat]);
+
+  React.useEffect(() => {
     // Pure UI Observer: listens to WebRTC session state changes
     const unsubscribe = WebRTCService.subscribe(session => {
       setActiveCall(session);
