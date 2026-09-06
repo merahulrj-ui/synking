@@ -241,15 +241,27 @@ class TelecomModule(reactContext: ReactApplicationContext) : ReactContextBaseJav
             audioManager.isSpeakerphoneOn = on
 
             if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
-                val targetDevice = audioManager.availableCommunicationDevices.find { 
-                    if (on) it.type == AudioDeviceInfo.TYPE_BUILTIN_SPEAKER 
-                    else it.type == AudioDeviceInfo.TYPE_BUILTIN_EARPIECE 
-                }
-                if (targetDevice != null) {
-                    val res = audioManager.setCommunicationDevice(targetDevice)
-                    Log.d("SYNKING_TELECOM", "[TelecomModule] setCommunicationDevice (${targetDevice.type}) result: $res")
-                } else if (!on) {
-                    audioManager.clearCommunicationDevice()
+                if (on) {
+                    val targetDevice = audioManager.availableCommunicationDevices.find { 
+                        it.type == AudioDeviceInfo.TYPE_BUILTIN_SPEAKER 
+                    } ?: audioManager.getDevices(AudioManager.GET_DEVICES_OUTPUTS).find {
+                        it.type == AudioDeviceInfo.TYPE_BUILTIN_SPEAKER
+                    }
+                    if (targetDevice != null) {
+                        val res = audioManager.setCommunicationDevice(targetDevice)
+                        Log.d("SYNKING_TELECOM", "[TelecomModule] setCommunicationDevice (${targetDevice.type}) result: $res")
+                    }
+                } else {
+                    val targetDevice = audioManager.availableCommunicationDevices.find { 
+                        it.type == AudioDeviceInfo.TYPE_BUILTIN_EARPIECE 
+                    } ?: audioManager.getDevices(AudioManager.GET_DEVICES_OUTPUTS).find {
+                        it.type == AudioDeviceInfo.TYPE_BUILTIN_EARPIECE
+                    }
+                    if (targetDevice != null) {
+                        audioManager.setCommunicationDevice(targetDevice)
+                    } else {
+                        audioManager.clearCommunicationDevice()
+                    }
                 }
             }
             promise.resolve(true)

@@ -39,7 +39,7 @@ class AudioRouteModule(private val reactContext: ReactApplicationContext) : Reac
                         .setUsage(AudioAttributes.USAGE_VOICE_COMMUNICATION)
                         .setContentType(AudioAttributes.CONTENT_TYPE_SPEECH)
                         .build()
-                    audioFocusRequest = AudioFocusRequest.Builder(AudioManager.AUDIOFOCUS_GAIN_TRANSIENT)
+                    audioFocusRequest = AudioFocusRequest.Builder(AudioManager.AUDIOFOCUS_GAIN)
                         .setAudioAttributes(playbackAttributes)
                         .setAcceptsDelayedFocusGain(true)
                         .setOnAudioFocusChangeListener { focusChange ->
@@ -50,20 +50,34 @@ class AudioRouteModule(private val reactContext: ReactApplicationContext) : Reac
                 audioFocusRequest?.let { audioManager.requestAudioFocus(it) }
             } else {
                 @Suppress("DEPRECATION")
-                audioManager.requestAudioFocus(null, AudioManager.STREAM_VOICE_CALL, AudioManager.AUDIOFOCUS_GAIN_TRANSIENT)
+                audioManager.requestAudioFocus(null, AudioManager.STREAM_VOICE_CALL, AudioManager.AUDIOFOCUS_GAIN)
             }
 
             audioManager.isSpeakerphoneOn = on
             if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
-                val targetDevice = audioManager.availableCommunicationDevices.find { 
-                    if (on) it.type == AudioDeviceInfo.TYPE_BUILTIN_SPEAKER 
-                    else it.type == AudioDeviceInfo.TYPE_BUILTIN_EARPIECE 
-                }
-                if (targetDevice != null) {
-                    val res = audioManager.setCommunicationDevice(targetDevice)
-                    Log.d("SYNKING_AUDIO", "[AudioRouteModule] setCommunicationDevice target=${targetDevice.type} result=$res")
+                if (on) {
+                    val speaker = audioManager.availableCommunicationDevices.find { 
+                        it.type == AudioDeviceInfo.TYPE_BUILTIN_SPEAKER 
+                    } ?: audioManager.getDevices(AudioManager.GET_DEVICES_OUTPUTS).find {
+                        it.type == AudioDeviceInfo.TYPE_BUILTIN_SPEAKER
+                    }
+                    if (speaker != null) {
+                        val res = audioManager.setCommunicationDevice(speaker)
+                        Log.d("SYNKING_AUDIO", "[AudioRouteModule] setCommunicationDevice target=${speaker.type} result=$res")
+                    } else {
+                        Log.w("SYNKING_AUDIO", "[AudioRouteModule] TYPE_BUILTIN_SPEAKER fallback to isSpeakerphoneOn=true")
+                    }
                 } else {
-                    audioManager.clearCommunicationDevice()
+                    val earpiece = audioManager.availableCommunicationDevices.find { 
+                        it.type == AudioDeviceInfo.TYPE_BUILTIN_EARPIECE 
+                    } ?: audioManager.getDevices(AudioManager.GET_DEVICES_OUTPUTS).find {
+                        it.type == AudioDeviceInfo.TYPE_BUILTIN_EARPIECE
+                    }
+                    if (earpiece != null) {
+                        audioManager.setCommunicationDevice(earpiece)
+                    } else {
+                        audioManager.clearCommunicationDevice()
+                    }
                 }
             }
             if (on) {
