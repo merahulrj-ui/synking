@@ -5,7 +5,7 @@ import { RealtimeBridge } from './realtimeBridge';
 import { RingtoneService } from './ringtoneService';
 import { AudioRouteService } from './audioRouteService';
 import { UserProfile, CallSession } from '../types';
-import { PermissionsAndroid, Platform, NativeModules } from 'react-native';
+import { PermissionsAndroid, Platform, NativeModules, Alert } from 'react-native';
 import { MediaDevices, PeerConnection, SessionDescription, IceCandidate } from './webrtcCore';
 import { NotificationService } from './notificationService';
 import { CallDebugger } from './callDebugger';
@@ -58,6 +58,15 @@ class WebRTCManager {
   private isCallMinimized: boolean = false;
 
   private targetChatUserId: string | null = null;
+  private blockedUserIds: Set<string> = new Set();
+
+  public setBlockedUsers(ids: string[] | Set<string>) {
+    this.blockedUserIds = new Set(ids);
+  }
+
+  public isUserBlocked(userId: string): boolean {
+    return this.blockedUserIds.has(userId);
+  }
 
   public setMinimized(minimized: boolean) {
     this.isCallMinimized = minimized;
@@ -211,7 +220,11 @@ class WebRTCManager {
     callerUser: UserProfile;
     targetUser: UserProfile;
     type: 'audio' | 'video';
-  }): Promise<CallSession> {
+  }): Promise<CallSession | null> {
+    if (this.blockedUserIds.has(params.targetUser.id)) {
+      Alert.alert('Contact Blocked', 'You have blocked this contact. Unblock them to make calls.');
+      return null;
+    }
     this.cleanup();
 
     const newSession: CallSession = {
@@ -302,7 +315,13 @@ class WebRTCManager {
   }
 
   // 2. Receive Incoming Call
-  public receiveIncomingCall(callerUser: UserProfile, type: 'audio' | 'video' = 'audio', callId?: string, autoAccept: boolean = false): CallSession {
+  public receiveIncomingCall(callerUser: UserProfile, type: 'audio' | 'video' = 'audio', callId?: string, autoAccept: boolean = false): CallSession | null {
+    if (this.blockedUserIds.has(callerUser.id)) {
+      this.log(`🚫 Incoming call from blocked user ${callerUser.id} rejected.`);
+      RealtimeBridge.broadcast('CALL_REJECTED', { callId: callId || 'blocked' }, callerUser.id);
+      return null;
+    }
+
     if (callId && this.currentSession && this.currentSession.id === callId && (this.currentSession.status === 'ringing' || this.currentSession.status === 'connected')) {
       this.log(`📲 Duplicate call event ignored for callId=${callId}`);
       return this.currentSession;

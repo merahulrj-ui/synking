@@ -119,7 +119,10 @@ export default function ChatScreen() {
     currentUser,
     isDarkMode,
     markChatAsRead,
-    vipPlansEnabled
+    vipPlansEnabled,
+    isUserBlocked,
+    blockUser,
+    unblockUser,
   } = useApp();
 
   const [isOptionsMenuVisible, setIsOptionsMenuVisible] = useState(false);
@@ -128,6 +131,8 @@ export default function ChatScreen() {
   const [isEmojiPickerOpen, setIsEmojiPickerOpen] = useState(false);
   const [isClearChatModalVisible, setIsClearChatModalVisible] = useState(false);
   const [isDeleteSelectedModalVisible, setIsDeleteSelectedModalVisible] = useState(false);
+  const [isBlockModalVisible, setIsBlockModalVisible] = useState(false);
+  const isPartnerBlocked = id ? isUserBlocked(id) : false;
 
   useEffect(() => {
     if (id) {
@@ -1607,6 +1612,18 @@ const VOICE_COMPRESSED_CONFIG: any = {
   const handleStartCall = (type: 'audio' | 'video') => {
     if (!currentUser || !targetUser) return;
 
+    if (isPartnerBlocked) {
+      Alert.alert(
+        'Contact Blocked',
+        'Unblock this contact to make voice or video calls.',
+        [
+          { text: 'Cancel', style: 'cancel' },
+          { text: 'Unblock', onPress: () => { if (id) unblockUser(id); } }
+        ]
+      );
+      return;
+    }
+
     // 🚫 Prevent calling oneself
     const myPhone = (currentUser.phoneNumber || '').replace(/\D/g, '').slice(-10);
     const targetPhone = (targetUser.phoneNumber || '').replace(/\D/g, '').slice(-10);
@@ -2743,62 +2760,119 @@ const VOICE_COMPRESSED_CONFIG: any = {
               </View>
             )}
 
-            <View style={[styles.inputBar, { backgroundColor: inputBg, borderTopColor: borderCol, paddingBottom: isKeyboardOpen ? 8 : Math.max(Platform.OS === 'android' ? 18 : 10, insets.bottom + 4) }]}>
-              {/* Plan Date Quick Icon */}
-              <TouchableOpacity
-                style={styles.actionIconBtn}
-                onPress={() => router.push(`/plan-date/${id}`)}
-                activeOpacity={0.7}
-              >
-                <Ionicons name="calendar-outline" size={22} color="#FD3A73" />
-              </TouchableOpacity>
-
-              {/* Emoji Drawer Toggle Button */}
-              <TouchableOpacity
-                style={[styles.actionIconBtn, { width: 34 }]}
-                onPress={() => setIsEmojiPickerOpen(prev => !prev)}
-                activeOpacity={0.7}
-              >
-                <Text style={{ fontSize: 20 }}>{isEmojiPickerOpen ? '⌨️' : '😊'}</Text>
-              </TouchableOpacity>
-
-              {/* Text Input */}
-              <TextInput
+            {isPartnerBlocked ? (
+              <View
                 style={[
-                  styles.input,
+                  styles.inputBar,
                   {
-                    backgroundColor: inputFieldBg,
-                    borderColor: borderCol,
-                    color: textColor,
+                    backgroundColor: isDarkMode ? '#13141F' : '#F8FAFC',
+                    borderTopColor: isDarkMode ? 'rgba(239, 68, 68, 0.25)' : '#FECACA',
+                    paddingBottom: isKeyboardOpen ? 8 : Math.max(Platform.OS === 'android' ? 18 : 10, insets.bottom + 4),
+                    paddingVertical: 14,
+                    paddingHorizontal: 16,
+                    flexDirection: 'row',
+                    alignItems: 'center',
+                    justifyContent: 'space-between',
                   },
                 ]}
-                value={inputText}
-                onChangeText={handleTyping}
-                placeholder="Type a message..."
-                placeholderTextColor={subText}
-                multiline
-                maxLength={2000}
-              />
+              >
+                <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8, flex: 1 }}>
+                  <Ionicons name="ban" size={18} color="#EF4444" />
+                  <Text
+                    style={{
+                      fontSize: 13,
+                      fontFamily: 'Poppins_500Medium',
+                      color: isDarkMode ? '#CBD5E1' : '#475569',
+                      flex: 1,
+                    }}
+                    numberOfLines={1}
+                  >
+                    You blocked this contact.
+                  </Text>
+                </View>
+                <TouchableOpacity
+                  style={{
+                    paddingVertical: 6,
+                    paddingHorizontal: 16,
+                    borderRadius: 16,
+                    backgroundColor: 'rgba(239, 68, 68, 0.12)',
+                    borderWidth: 1,
+                    borderColor: '#EF4444',
+                  }}
+                  activeOpacity={0.8}
+                  onPress={() => {
+                    if (id) unblockUser(id);
+                  }}
+                >
+                  <Text
+                    style={{
+                      fontSize: 12,
+                      fontFamily: 'Poppins_700Bold',
+                      color: '#EF4444',
+                    }}
+                  >
+                    Unblock
+                  </Text>
+                </TouchableOpacity>
+              </View>
+            ) : (
+              <View style={[styles.inputBar, { backgroundColor: inputBg, borderTopColor: borderCol, paddingBottom: isKeyboardOpen ? 8 : Math.max(Platform.OS === 'android' ? 18 : 10, insets.bottom + 4) }]}>
+                {/* Plan Date Quick Icon */}
+                <TouchableOpacity
+                  style={styles.actionIconBtn}
+                  onPress={() => router.push(`/plan-date/${id}`)}
+                  activeOpacity={0.7}
+                >
+                  <Ionicons name="calendar-outline" size={22} color="#FD3A73" />
+                </TouchableOpacity>
 
-              {/* Mic or Send Button depending on inputText */}
-              {inputText.trim() ? (
+                {/* Emoji Drawer Toggle Button */}
                 <TouchableOpacity
-                  style={styles.sendBtn}
-                  onPress={() => handleSend()}
-                  activeOpacity={0.8}
+                  style={[styles.actionIconBtn, { width: 34 }]}
+                  onPress={() => setIsEmojiPickerOpen(prev => !prev)}
+                  activeOpacity={0.7}
                 >
-                  <Ionicons name="send" size={16} color="#FFFFFF" />
+                  <Text style={{ fontSize: 20 }}>{isEmojiPickerOpen ? '⌨️' : '😊'}</Text>
                 </TouchableOpacity>
-              ) : (
-                <TouchableOpacity
-                  style={[styles.sendBtn, { backgroundColor: '#FD3A73' }]}
-                  onPress={startRecording}
-                  activeOpacity={0.8}
-                >
-                  <Ionicons name="mic" size={20} color="#FFFFFF" />
-                </TouchableOpacity>
-              )}
-            </View>
+
+                {/* Text Input */}
+                <TextInput
+                  style={[
+                    styles.input,
+                    {
+                      backgroundColor: inputFieldBg,
+                      borderColor: borderCol,
+                      color: textColor,
+                    },
+                  ]}
+                  value={inputText}
+                  onChangeText={handleTyping}
+                  placeholder="Type a message..."
+                  placeholderTextColor={subText}
+                  multiline
+                  maxLength={2000}
+                />
+
+                {/* Mic or Send Button depending on inputText */}
+                {inputText.trim() ? (
+                  <TouchableOpacity
+                    style={styles.sendBtn}
+                    onPress={() => handleSend()}
+                    activeOpacity={0.8}
+                  >
+                    <Ionicons name="send" size={16} color="#FFFFFF" />
+                  </TouchableOpacity>
+                ) : (
+                  <TouchableOpacity
+                    style={[styles.sendBtn, { backgroundColor: '#FD3A73' }]}
+                    onPress={startRecording}
+                    activeOpacity={0.8}
+                  >
+                    <Ionicons name="mic" size={20} color="#FFFFFF" />
+                  </TouchableOpacity>
+                )}
+              </View>
+            )}
           </>
         )}
       </KeyboardAvoidingView>
@@ -3092,6 +3166,51 @@ const VOICE_COMPRESSED_CONFIG: any = {
                 </Text>
               </TouchableOpacity>
 
+              {/* Block / Unblock Contact */}
+              {isPartnerBlocked ? (
+                <TouchableOpacity
+                  style={{
+                    flexDirection: 'row',
+                    alignItems: 'center',
+                    gap: 12,
+                    paddingVertical: 12,
+                    paddingHorizontal: 12,
+                    borderRadius: 12,
+                    backgroundColor: isDarkMode ? 'rgba(16, 185, 129, 0.08)' : '#ECFDF5',
+                  }}
+                  onPress={() => {
+                    setIsOptionsMenuVisible(false);
+                    if (id) unblockUser(id);
+                  }}
+                >
+                  <Ionicons name="lock-open-outline" size={20} color="#10B981" />
+                  <Text style={{ fontSize: 14, fontFamily: 'Poppins_700Bold', color: '#10B981' }}>
+                    Unblock {targetUser?.name || 'Contact'}
+                  </Text>
+                </TouchableOpacity>
+              ) : (
+                <TouchableOpacity
+                  style={{
+                    flexDirection: 'row',
+                    alignItems: 'center',
+                    gap: 12,
+                    paddingVertical: 12,
+                    paddingHorizontal: 12,
+                    borderRadius: 12,
+                    backgroundColor: isDarkMode ? 'rgba(239, 68, 68, 0.08)' : '#FEF2F2',
+                  }}
+                  onPress={() => {
+                    setIsOptionsMenuVisible(false);
+                    setIsBlockModalVisible(true);
+                  }}
+                >
+                  <Ionicons name="ban" size={20} color="#EF4444" />
+                  <Text style={{ fontSize: 14, fontFamily: 'Poppins_700Bold', color: '#EF4444' }}>
+                    Block {targetUser?.name || 'Contact'}
+                  </Text>
+                </TouchableOpacity>
+              )}
+
               {/* Cancel Button */}
               <TouchableOpacity
                 style={{
@@ -3313,6 +3432,147 @@ const VOICE_COMPRESSED_CONFIG: any = {
                 onPress={() => setIsDeleteSelectedModalVisible(false)}
               >
                 <Text style={{ color: subText, fontFamily: 'Poppins_600SemiBold', fontSize: 13 }}>
+                  Cancel
+                </Text>
+              </TouchableOpacity>
+            </View>
+          </View>
+        </TouchableOpacity>
+      </Modal>
+
+      {/* 10. BLOCK USER CONFIRMATION MODAL */}
+      <Modal
+        visible={isBlockModalVisible}
+        transparent
+        animationType="fade"
+        onRequestClose={() => setIsBlockModalVisible(false)}
+      >
+        <TouchableOpacity
+          style={{
+            flex: 1,
+            backgroundColor: 'rgba(0, 0, 0, 0.75)',
+            justifyContent: 'center',
+            alignItems: 'center',
+            padding: 24,
+          }}
+          activeOpacity={1}
+          onPress={() => setIsBlockModalVisible(false)}
+        >
+          <View
+            style={{
+              width: '100%',
+              maxWidth: 320,
+              backgroundColor: isDarkMode ? '#13141F' : '#FFFFFF',
+              borderRadius: 24,
+              padding: 24,
+              alignItems: 'center',
+              borderWidth: 1.5,
+              borderColor: isDarkMode ? 'rgba(239, 68, 68, 0.25)' : '#FECACA',
+              shadowColor: '#EF4444',
+              shadowOffset: { width: 0, height: 8 },
+              shadowOpacity: 0.2,
+              shadowRadius: 20,
+              elevation: 12,
+            }}
+          >
+            {/* Red Ban Icon with subtle glow circle */}
+            <View
+              style={{
+                width: 56,
+                height: 56,
+                borderRadius: 28,
+                backgroundColor: 'rgba(239, 68, 68, 0.12)',
+                alignItems: 'center',
+                justifyContent: 'center',
+                marginBottom: 16,
+              }}
+            >
+              <Ionicons name="ban" size={28} color="#EF4444" />
+            </View>
+
+            <Text
+              style={{
+                fontSize: 18,
+                fontFamily: 'Poppins_800ExtraBold',
+                color: isDarkMode ? '#FFFFFF' : '#0F172A',
+                marginBottom: 8,
+                textAlign: 'center',
+              }}
+            >
+              Block {targetUser?.name || 'Contact'}?
+            </Text>
+
+            <Text
+              style={{
+                fontSize: 13,
+                fontFamily: 'Poppins_400Regular',
+                color: isDarkMode ? '#94A3B8' : '#64748B',
+                textAlign: 'center',
+                lineHeight: 20,
+                marginBottom: 20,
+              }}
+            >
+              Blocked contacts can no longer call you or send you messages. They will not be notified that you blocked them.
+            </Text>
+
+            {/* Action Buttons */}
+            <View style={{ width: '100%', gap: 10 }}>
+              <TouchableOpacity
+                style={{
+                  width: '100%',
+                  paddingVertical: 14,
+                  borderRadius: 14,
+                  backgroundColor: '#EF4444',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  shadowColor: '#EF4444',
+                  shadowOffset: { width: 0, height: 4 },
+                  shadowOpacity: 0.3,
+                  shadowRadius: 8,
+                  elevation: 4,
+                }}
+                activeOpacity={0.85}
+                onPress={async () => {
+                  setIsBlockModalVisible(false);
+                  if (id) {
+                    await blockUser(id);
+                    if (Platform.OS !== 'web') {
+                      const Haptics = require('expo-haptics');
+                      Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success).catch(() => {});
+                    }
+                  }
+                }}
+              >
+                <Text
+                  style={{
+                    color: '#FFFFFF',
+                    fontSize: 14,
+                    fontFamily: 'Poppins_700Bold',
+                  }}
+                >
+                  Block
+                </Text>
+              </TouchableOpacity>
+
+              <TouchableOpacity
+                style={{
+                  width: '100%',
+                  paddingVertical: 12,
+                  borderRadius: 14,
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  backgroundColor: isDarkMode ? 'rgba(255, 255, 255, 0.06)' : '#F1F5F9',
+                }}
+                activeOpacity={0.7}
+                onPress={() => setIsBlockModalVisible(false)}
+              >
+                <Text
+                  style={{
+                    color: isDarkMode ? '#CBD5E1' : '#475569',
+                    fontSize: 14,
+                    fontFamily: 'Poppins_600SemiBold',
+                  }}
+                >
                   Cancel
                 </Text>
               </TouchableOpacity>

@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { View, Text, StyleSheet, Modal, TouchableOpacity, ScrollView, Dimensions, Platform } from 'react-native';
+import { View, Text, StyleSheet, Modal, TouchableOpacity, ScrollView, Dimensions, Platform, Alert } from 'react-native';
 import { Image } from 'expo-image';
 import { Ionicons, MaterialCommunityIcons } from '@expo/vector-icons';
 import { UserProfile } from '../types';
@@ -15,16 +15,72 @@ interface Props {
 }
 
 export const FullProfileModal: React.FC<Props> = ({ profile, visible, onClose, onSwipe }) => {
-  const { isDarkMode } = useApp();
+  const { isDarkMode, isUserBlocked, blockUser, unblockUser } = useApp();
   const [photoIndex, setPhotoIndex] = useState(0);
 
   if (!profile) return null;
 
+  const isBlocked = isUserBlocked(profile.id);
   const photos = (profile.photos && profile.photos.length > 0) ? profile.photos : [profile.photo];
   const bgTheme = isDarkMode ? '#000000' : '#F8FAFC';
   const cardTheme = isDarkMode ? '#000000' : '#FFFFFF';
   const textTheme = isDarkMode ? '#FFFFFF' : '#0F172A';
   const subTextTheme = isDarkMode ? '#94A3B8' : '#64748B';
+
+  const handleToggleBlock = () => {
+    if (isBlocked) {
+      Alert.alert(
+        `Unblock ${profile.name}?`,
+        `They will be able to send you messages and call you again.`,
+        [
+          { text: 'Cancel', style: 'cancel' },
+          {
+            text: 'Unblock',
+            onPress: async () => {
+              await unblockUser(profile.id);
+            },
+          },
+        ]
+      );
+    } else {
+      Alert.alert(
+        `Block ${profile.name}?`,
+        `Blocked contacts will no longer be able to call you or send you messages.`,
+        [
+          { text: 'Cancel', style: 'cancel' },
+          {
+            text: 'Block',
+            style: 'destructive',
+            onPress: async () => {
+              await blockUser(profile.id);
+              onSwipe('pass');
+              onClose();
+            },
+          },
+        ]
+      );
+    }
+  };
+
+  const handleReport = () => {
+    Alert.alert(
+      `Report ${profile.name}`,
+      `Are you sure you want to report this profile? Our moderation team reviews reports within 24 hours.`,
+      [
+        { text: 'Cancel', style: 'cancel' },
+        {
+          text: 'Report & Block',
+          style: 'destructive',
+          onPress: async () => {
+            await blockUser(profile.id);
+            Alert.alert('Report Submitted', 'Thank you for keeping our community safe. This user has also been blocked.');
+            onSwipe('pass');
+            onClose();
+          },
+        },
+      ]
+    );
+  };
 
   const handlePhotoTap = (direction: 'left' | 'right') => {
     if (direction === 'right' && photoIndex < photos.length - 1) {
@@ -127,10 +183,22 @@ export const FullProfileModal: React.FC<Props> = ({ profile, visible, onClose, o
               </View>
             )}
             
-            {/* Report/Block */}
-            <TouchableOpacity style={styles.reportBtn}>
-              <Text style={styles.reportText}>REPORT {profile.name.toUpperCase()}</Text>
-            </TouchableOpacity>
+            {/* Safety Actions: Block & Report */}
+            <View style={styles.safetyRow}>
+              <TouchableOpacity style={styles.blockBtn} activeOpacity={0.7} onPress={handleToggleBlock}>
+                <Ionicons name="ban-outline" size={16} color={isBlocked ? '#10B981' : '#EF4444'} style={{ marginRight: 6 }} />
+                <Text style={[styles.blockText, isBlocked && { color: '#10B981', textShadowColor: 'rgba(16, 185, 129, 0.4)' }]}>
+                  {isBlocked ? `UNBLOCK ${profile.name.toUpperCase()}` : `BLOCK ${profile.name.toUpperCase()}`}
+                </Text>
+              </TouchableOpacity>
+
+              <TouchableOpacity style={styles.reportBtn} activeOpacity={0.7} onPress={handleReport}>
+                <Ionicons name="flag-outline" size={15} color={subTextTheme} style={{ marginRight: 6 }} />
+                <Text style={[styles.reportText, { color: subTextTheme, textShadowColor: 'transparent' }]}>
+                  REPORT {profile.name.toUpperCase()}
+                </Text>
+              </TouchableOpacity>
+            </View>
           </View>
         </ScrollView>
 
@@ -341,12 +409,21 @@ const styles = StyleSheet.create({
     fontSize: 14,
     lineHeight: 18,
   },
-  reportBtn: {
-    marginTop: 40,
+  safetyRow: {
+    marginTop: 36,
     alignSelf: 'center',
-    paddingVertical: 12,
+    alignItems: 'center',
+    gap: 12,
+    paddingBottom: 24,
   },
-  reportText: {
+  blockBtn: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingVertical: 10,
+    paddingHorizontal: 20,
+    borderRadius: 12,
+  },
+  blockText: {
     color: '#EF4444',
     fontSize: 14,
     fontFamily: 'Poppins_700Bold',
@@ -354,6 +431,17 @@ const styles = StyleSheet.create({
     textShadowColor: 'rgba(239, 68, 68, 0.4)',
     textShadowOffset: { width: 0, height: 0 },
     textShadowRadius: 8,
+  },
+  reportBtn: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingVertical: 8,
+    paddingHorizontal: 16,
+  },
+  reportText: {
+    fontSize: 12,
+    fontFamily: 'Poppins_600SemiBold',
+    letterSpacing: 0.8,
   },
   floatingActions: {
     position: 'absolute',

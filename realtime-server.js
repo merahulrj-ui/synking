@@ -344,18 +344,35 @@ async function initTursoTables() {
           console.log('⚡ [VIP_CONFIG_HYDRATED] Custom VIP Plans & Pricing Loaded From Turso Cloud!');
         } catch (pe) {}
       } else {
-        await queryTurso("INSERT OR REPLACE INTO app_settings (key, value) VALUES ('vip_plans_config', ?)", [{ type: 'text', value: JSON.stringify(DEFAULT_VIP_CONFIG) }]);
-      }
-    } catch (cfgErr) {
-      console.warn('[TURSO_CONFIG_HYDRATE_WARN]', cfgErr.message);
-    }
+      // Hydrate Blocked Users Table
+      await queryTurso(`
+        CREATE TABLE IF NOT EXISTS blocked_users (
+          blocker_id TEXT,
+          blocked_id TEXT,
+          created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+          PRIMARY KEY (blocker_id, blocked_id)
+        );
+      `);
+      try {
+        const blkRes = await queryTurso('SELECT * FROM blocked_users');
+        const blkRows = blkRes?.results?.[0]?.response?.result?.rows || [];
+        if (!db.blockedUsers) db.blockedUsers = [];
+        blkRows.forEach(r => {
+          const blockerId = r[0]?.value;
+          const blockedId = r[1]?.value;
+          if (blockerId && blockedId) {
+            db.blockedUsers.push({ blockerId, blockedId });
+          }
+        });
+        console.log(`⚡ [TURSO_BLOCKED_USERS_HYDRATED] Restored ${db.blockedUsers.length} blocked user relations`);
+      } catch (be) {}
 
-    console.log('⚡ [TURSO_SQLITE_CONNECTED] 9 GB Cloud Database Initialized & Synchronized.');
-  } catch (e) {
-    console.warn('[TURSO_INIT_WARN]', e.message);
+      console.log('⚡ [TURSO_SQLITE_CONNECTED] 9 GB Cloud Database Initialized & Synchronized.');
+    } catch (e) {
+      console.warn('[TURSO_INIT_WARN]', e.message);
+    }
   }
-}
-initTursoTables();
+  initTursoTables();
 
 function syncUserToTurso(user) {
   if (!user || !user.id) return;
@@ -2048,6 +2065,79 @@ const server = http.createServer((req, res) => {
       res.writeHead(400, { 'Content-Type': 'application/json' });
       res.end(JSON.stringify({ success: false }));
     });
+    return;
+  }
+
+  // 7.6 POST /api/users/block
+  if (req.method === 'POST' && pathname === '/api/users/block') {
+    let body = '';
+    req.on('data', chunk => { body += chunk; });
+    req.on('end', () => {
+      try {
+        const { blockerId, blockedId } = JSON.parse(body || '{}');
+        if (blockerId && blockedId) {
+          if (!db.blockedUsers) db.blockedUsers = [];
+          if (!db.blockedUsers.some(b => b.blockerId === blockerId && b.blockedId === blockedId)) {
+            db.blockedUsers.push({ blockerId, blockedId });
+          }
+          saveDb();
+          queryTurso(
+            'INSERT OR REPLACE INTO blocked_users (blocker_id, blocked_id) VALUES (?, ?)',
+            [{ type: 'text', value: String(blockerId) }, { type: 'text', value: String(blockedId) }]
+          ).catch(() => {});
+          console.log(`🚫 [USER_BLOCKED] User ${blockerId} blocked ${blockedId}`);
+          res.writeHead(200, { 'Content-Type': 'application/json' });
+          res.end(JSON.stringify({ success: true, blockerId, blockedId }));
+          return;
+        }
+      } catch (e) {}
+      res.writeHead(400, { 'Content-Type': 'application/json' });
+      res.end(JSON.stringify({ success: false }));
+    });
+    return;
+  }
+
+  // 7.7 POST /api/users/unblock
+  if (req.method === 'POST' && pathname === '/api/users/unblock') {
+    let body = '';
+    req.on('data', chunk => { body += chunk; });
+    req.on('end', () => {
+      try {
+        const { blockerId, blockedId } = JSON.parse(body || '{}');
+        if (blockerId && blockedId) {
+          if (db.blockedUsers) {
+            db.blockedUsers = db.blockedUsers.filter(b => !(b.blockerId === blockerId && b.blockedId === blockedId));
+          }
+          saveDb();
+          queryTurso(
+            'DELETE FROM blocked_users WHERE blocker_id = ? AND blocked_id = ?',
+            [{ type: 'text', value: String(blockerId) }, { type: 'text', value: String(blockedId) }]
+          ).catch(() => {});
+          console.log(`✅ [USER_UNBLOCKED] User ${blockerId} unblocked ${blockedId}`);
+          res.writeHead(200, { 'Content-Type': 'application/json' });
+          res.end(JSON.stringify({ success: true, blockerId, blockedId }));
+          return;
+        }
+      } catch (e) {}
+      res.writeHead(400, { 'Content-Type': 'application/json' });
+      res.end(JSON.stringify({ success: false }));
+    });
+    return;
+  }
+
+  // 7.8 GET /api/users/blocked/:userId
+  if (req.method === 'GET' && pathname.startsWith('/api/users/blocked/')) {
+    const userId = pathname.replace('/api/users/blocked/', '').trim();
+    if (userId) {
+      const blocked = (db.blockedUsers || [])
+        .filter(b => b && b.blockerId === userId)
+        .map(b => b.blockedId);
+      res.writeHead(200, { 'Content-Type': 'application/json' });
+      res.end(JSON.stringify({ success: true, blocked }));
+      return;
+    }
+    res.writeHead(400, { 'Content-Type': 'application/json' });
+    res.end(JSON.stringify({ success: false, error: 'User ID missing' }));
     return;
   }
 

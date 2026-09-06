@@ -145,7 +145,9 @@ class RealtimeBridgeManager {
       | 'DELETE_MESSAGES'
       | 'CLEAR_CHAT'
       | 'MESSAGES_READ'
-      | 'MESSAGE_DELIVERED',
+      | 'MESSAGE_DELIVERED'
+      | 'USER_BLOCKED'
+      | 'USER_UNBLOCKED',
     payload: any,
     targetUserId?: string
   ) {

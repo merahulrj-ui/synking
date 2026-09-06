@@ -19,6 +19,9 @@ import {
   markMessagesAsReadOnBackend,
   updateMessageReactionOnBackend,
   checkUserExistsOnBackend,
+  blockUserOnBackend,
+  unblockUserOnBackend,
+  fetchBlockedUsersFromBackend,
   CLOUD_BACKEND_URL,
 } from '../services/firebase';
 import { encryptE2EEMessage } from '../utils/encryption';
@@ -49,6 +52,10 @@ interface AppContextType {
   messages: Record<string, ChatMessage[]>;
   unreadChatIds: Set<string>;
   markChatAsRead: (partnerId: string) => void;
+  blockedUsers: Set<string>;
+  blockUser: (userId: string) => Promise<void>;
+  unblockUser: (userId: string) => Promise<void>;
+  isUserBlocked: (userId: string) => boolean;
   safetyContact: SafetyContact;
   acceptedMatchAlert: UserProfile | null;
   clearAcceptedMatchAlert: () => void;
@@ -267,6 +274,77 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
   const [messages, setMessages] = useState<Record<string, ChatMessage[]>>({});
   const [readChatTimestamps, setReadChatTimestamps] = useState<Record<string, number>>({});
   const [unreadChatIds, setUnreadChatIds] = useState<Set<string>>(new Set());
+  const [blockedUsers, setBlockedUsers] = useState<Set<string>>(new Set());
+
+  // Load blocked users from AsyncStorage on mount
+  useEffect(() => {
+    AsyncStorage.getItem('@synking_blocked_users').then(stored => {
+      if (stored) {
+        try {
+          const parsed = JSON.parse(stored);
+          if (Array.isArray(parsed)) {
+            const set = new Set<string>(parsed);
+            setBlockedUsers(set);
+            WebRTCService.setBlockedUsers(set);
+          }
+        } catch (e) {}
+      }
+    });
+  }, []);
+
+  // Sync blocked users from backend when currentUser changes
+  useEffect(() => {
+    if (currentUser?.id) {
+      fetchBlockedUsersFromBackend(currentUser.id).then(serverBlocked => {
+        if (serverBlocked && serverBlocked.length > 0) {
+          setBlockedUsers(prev => {
+            const next = new Set([...Array.from(prev), ...serverBlocked]);
+            AsyncStorage.setItem('@synking_blocked_users', JSON.stringify(Array.from(next))).catch(() => {});
+            WebRTCService.setBlockedUsers(next);
+            return next;
+          });
+        }
+      }).catch(() => {});
+    }
+  }, [currentUser?.id]);
+
+  const blockUser = useCallback(async (userId: string) => {
+    if (!userId) return;
+    setBlockedUsers(prev => {
+      const next = new Set(prev);
+      next.add(userId);
+      AsyncStorage.setItem('@synking_blocked_users', JSON.stringify(Array.from(next))).catch(() => {});
+      WebRTCService.setBlockedUsers(next);
+      return next;
+    });
+    if (currentUser?.id) {
+      blockUserOnBackend(currentUser.id, userId).catch(() => {});
+      RealtimeBridge.broadcast('USER_BLOCKED', { blockerId: currentUser.id, blockedId: userId }, userId);
+    }
+    const currentSession = WebRTCService.getCurrentSession();
+    if (currentSession && (currentSession.callerId === userId || currentSession.receiverId === userId)) {
+      WebRTCService.endCall();
+    }
+  }, [currentUser?.id]);
+
+  const unblockUser = useCallback(async (userId: string) => {
+    if (!userId) return;
+    setBlockedUsers(prev => {
+      const next = new Set(prev);
+      next.delete(userId);
+      AsyncStorage.setItem('@synking_blocked_users', JSON.stringify(Array.from(next))).catch(() => {});
+      WebRTCService.setBlockedUsers(next);
+      return next;
+    });
+    if (currentUser?.id) {
+      unblockUserOnBackend(currentUser.id, userId).catch(() => {});
+      RealtimeBridge.broadcast('USER_UNBLOCKED', { blockerId: currentUser.id, blockedId: userId }, userId);
+    }
+  }, [currentUser?.id]);
+
+  const isUserBlocked = useCallback((userId: string): boolean => {
+    return blockedUsers.has(userId);
+  }, [blockedUsers]);
 
   // Load chat read timestamps from AsyncStorage on mount
   useEffect(() => {
@@ -606,6 +684,12 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     const unsubscribe = RealtimeBridge.subscribe(({ type, payload }) => {
       if (type === 'NEW_MESSAGE' && payload) {
         const msg = payload as ChatMessage;
+
+        // Drop incoming messages from blocked contacts immediately
+        if (blockedUsers.has(msg.senderId) || (msg.senderId && blockedUsers.has(String(msg.senderId).replace(/\D/g, '').slice(-10)))) {
+          console.log(`🛡️ [BLOCKED_USER] Dropped incoming message from blocked contact ${msg.senderId}`);
+          return;
+        }
         
         function isMe(targetId?: string) {
           if (!targetId || !currentUser) return false;
@@ -1240,6 +1324,15 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
 
   // Send Message: Instant 0ms Broadcast + Fast Firestore Stream
   const sendMessage = async (receiverId: string, text: string, type: 'text' | 'voice' | 'call_request' | 'date_invite' = 'text', extraData?: ChatMessage['extraData']) => {
+    if (blockedUsers.has(receiverId) || blockedUsers.has(String(receiverId).replace(/\D/g, '').slice(-10))) {
+      if (Platform.OS === 'web') {
+        window.alert('🚫 Contact Blocked\nYou have blocked this contact. Unblock them to send messages.');
+      } else {
+        Alert.alert('Contact Blocked', 'You have blocked this contact. Unblock them to send messages.');
+      }
+      return;
+    }
+
     if (isSuspended && suspendedUntil && Date.now() < suspendedUntil) {
       const unlockStr = new Date(suspendedUntil).toLocaleString();
       const msg = `Your ENTIRE account is temporarily suspended for 3 days.\n\n🔒 Messaging unlocks on: ${unlockStr}`;
@@ -1505,6 +1598,10 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
         messages,
         unreadChatIds,
         markChatAsRead,
+        blockedUsers,
+        blockUser,
+        unblockUser,
+        isUserBlocked,
         safetyContact,
         acceptedMatchAlert,
         clearAcceptedMatchAlert: () => {

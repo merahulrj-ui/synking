@@ -342,3 +342,52 @@ export async function updateMessageReactionOnBackend(messageId: string, reaction
     return false;
   }
 }
+
+/**
+ * Block a user on the backend
+ */
+export async function blockUserOnBackend(blockerId: string, blockedId: string): Promise<boolean> {
+  try {
+    const res = await fetch(`${getLocalBackendUrl()}/api/users/block`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ blockerId, blockedId }),
+    });
+    return res.ok;
+  } catch (e) {
+    return false;
+  }
+}
+
+/**
+ * Unblock a user on the backend
+ */
+export async function unblockUserOnBackend(blockerId: string, blockedId: string): Promise<boolean> {
+  try {
+    const res = await fetch(`${getLocalBackendUrl()}/api/users/unblock`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ blockerId, blockedId }),
+    });
+    return res.ok;
+  } catch (e) {
+    return false;
+  }
+}
+
+/**
+ * Fetch list of blocked user IDs for a user from the backend
+ */
+export async function fetchBlockedUsersFromBackend(userId: string): Promise<string[]> {
+  try {
+    const res = await fetch(`${getLocalBackendUrl()}/api/users/blocked/${userId}`);
+    if (res.ok) {
+      const data = await res.json();
+      return Array.isArray(data.blocked) ? data.blocked : [];
+    }
+    return [];
+  } catch (e) {
+    return [];
+  }
+}
+
