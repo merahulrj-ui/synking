@@ -240,35 +240,35 @@ class AudioRouteModule(private val reactContext: ReactApplicationContext) : Reac
                 }
                 stopGlobalIncomingRingtone()
 
-                // Force system audio routing to bottom Loudspeaker for ringtone
-                val audioManager = context.getSystemService(Context.AUDIO_SERVICE) as? AudioManager
-                audioManager?.let { am ->
-                    try {
-                        am.mode = AudioManager.MODE_NORMAL
-                        am.isSpeakerphoneOn = true
-                        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
-                            val speakerDevice = am.availableCommunicationDevices.find { 
-                                it.type == AudioDeviceInfo.TYPE_BUILTIN_SPEAKER 
-                            }
-                            if (speakerDevice != null) {
-                                am.setCommunicationDevice(speakerDevice)
-                            }
-                        }
-                    } catch (e: Exception) {}
-                }
-
                 val resId = context.resources.getIdentifier("synk_signature", "raw", context.packageName)
                 if (resId != 0) {
-                    val audioAttributes = AudioAttributes.Builder()
+                    val ringtoneAudioAttributes = AudioAttributes.Builder()
                         .setUsage(AudioAttributes.USAGE_NOTIFICATION_RINGTONE)
                         .setContentType(AudioAttributes.CONTENT_TYPE_SONIFICATION)
+                        .setLegacyStreamType(AudioManager.STREAM_RING)
+                        .setFlags(AudioAttributes.FLAG_AUDIBILITY_ENFORCED)
                         .build()
-                    globalIncomingMediaPlayer = MediaPlayer.create(context.applicationContext, resId, audioAttributes, 0)?.apply {
-                        isLooping = true
-                        setVolume(1.0f, 1.0f)
-                        start()
+
+                    val mp = MediaPlayer()
+                    mp.setAudioAttributes(ringtoneAudioAttributes)
+                    @Suppress("DEPRECATION")
+                    mp.setAudioStreamType(AudioManager.STREAM_RING)
+
+                    val afd = context.resources.openRawResourceFd(resId)
+                    if (afd != null) {
+                        mp.setDataSource(afd.fileDescriptor, afd.startOffset, afd.length)
+                        afd.close()
+                    } else {
+                        val uri = android.net.Uri.parse("android.resource://${context.packageName}/$resId")
+                        mp.setDataSource(context, uri)
                     }
-                    Log.i("SYNKING_AUDIO", "✅ Synk Signature incoming ringtone started on LOUDSPEAKER natively")
+
+                    mp.isLooping = true
+                    mp.setVolume(1.0f, 1.0f)
+                    mp.prepare()
+                    mp.start()
+                    globalIncomingMediaPlayer = mp
+                    Log.i("SYNKING_AUDIO", "✅ Synk Signature incoming ringtone started strictly on STREAM_RING loudspeaker")
                 } else {
                     Log.w("SYNKING_AUDIO", "⚠️ synk_signature raw resource not found")
                 }

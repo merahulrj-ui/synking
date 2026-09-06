@@ -398,9 +398,22 @@ class WebRTCManager {
 
       // Route audio: Loudspeaker for video call, In-ear Handset Earpiece for voice call
       const isVideoCall = this.currentSession?.type === 'video' || this.currentSession?.isVideoEnabled;
-      setTimeout(() => {
-        AudioRouteService.setSpeakerOn(!!isVideoCall).catch(() => {});
-      }, 500);
+      if (isVideoCall) {
+        AudioRouteService.setSpeakerOn(true).catch(() => {});
+        setTimeout(() => {
+          AudioRouteService.setSpeakerOn(true).catch(() => {});
+        }, 300);
+        setTimeout(() => {
+          AudioRouteService.setSpeakerOn(true).catch(() => {});
+        }, 800);
+        setTimeout(() => {
+          AudioRouteService.setSpeakerOn(true).catch(() => {});
+        }, 1500);
+      } else {
+        setTimeout(() => {
+          AudioRouteService.setSpeakerOn(false).catch(() => {});
+        }, 300);
+      }
 
       this.currentSession.status = 'connected';
       this.notify();
@@ -636,8 +649,14 @@ class WebRTCManager {
           NativeModules.TelecomModule.updateDebugStatus('WEBRTC', pc.connectionState.toUpperCase()).catch(() => {});
         }
         // 🚀 Signal IncomingCallActivity to hand off when WebRTC is connected
-        if (pc.connectionState === 'connected' && Platform.OS === 'android' && NativeModules.TelecomModule?.notifyWebRTCConnected) {
-          NativeModules.TelecomModule.notifyWebRTCConnected().catch(() => {});
+        if (pc.connectionState === 'connected') {
+          const isVideoCall = this.currentSession?.type === 'video' || this.currentSession?.isVideoEnabled;
+          if (isVideoCall) {
+            AudioRouteService.setSpeakerOn(true).catch(() => {});
+          }
+          if (Platform.OS === 'android' && NativeModules.TelecomModule?.notifyWebRTCConnected) {
+            NativeModules.TelecomModule.notifyWebRTCConnected().catch(() => {});
+          }
         }
         if (pc.connectionState === 'disconnected' || pc.connectionState === 'failed' || pc.connectionState === 'closed') {
           this.log('🛑 Remote peer disconnected. Auto cleaning up...');

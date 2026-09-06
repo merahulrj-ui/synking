@@ -486,34 +486,9 @@ class IncomingCallActivity : Activity() {
 
     private fun playRingtoneAndVibrate() {
         try {
-            Log.d("SYNKING_DEBUG", "[AUDIO] START_RINGTONE_AND_VIBRATION: Initiating audio & haptics")
-            val resId = resources.getIdentifier("synk_signature", "raw", packageName)
-            if (resId != 0) {
-                val soundUri = android.net.Uri.parse("android.resource://$packageName/$resId")
-                activeRingtone = RingtoneManager.getRingtone(applicationContext, soundUri)
-            } else {
-                val uri = RingtoneManager.getDefaultUri(RingtoneManager.TYPE_RINGTONE)
-                activeRingtone = RingtoneManager.getRingtone(applicationContext, uri)
-            }
-            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.LOLLIPOP) {
-                activeRingtone?.audioAttributes = AudioAttributes.Builder()
-                    .setUsage(AudioAttributes.USAGE_NOTIFICATION_RINGTONE)
-                    .setContentType(AudioAttributes.CONTENT_TYPE_SONIFICATION)
-                    .build()
-            }
-            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.P) {
-                activeRingtone?.isLooping = true
-            }
-            activeRingtone?.play()
-
-            activeVibrator = getSystemService(Context.VIBRATOR_SERVICE) as Vibrator
-            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
-                activeVibrator?.vibrate(VibrationEffect.createWaveform(longArrayOf(0, 1000, 1000), 0))
-            } else {
-                @Suppress("DEPRECATION")
-                activeVibrator?.vibrate(longArrayOf(0, 1000, 1000), 0)
-            }
-            Log.d("SYNKING_DEBUG", "[AUDIO] RINGTONE_AND_VIBRATION: Active and playing")
+            Log.d("SYNKING_DEBUG", "[AUDIO] START_RINGTONE_AND_VIBRATION: Initiating audio & haptics via AudioRouteModule")
+            AudioRouteModule.startGlobalIncomingRingtone(applicationContext)
+            AudioRouteModule.startGlobalVibration(applicationContext)
         } catch (e: Exception) {
             Log.e("SYNKING_DEBUG", "[AUDIO] RINGTONE_ERROR: ${e.message}")
         }
@@ -521,7 +496,7 @@ class IncomingCallActivity : Activity() {
 
     private fun stopRingtoneAndVibration() {
         Log.d("SYNKING_DEBUG", "[AUDIO] STOP_RINGTONE_AND_VIBRATION: Cancelling all audio and vibration globally")
-        stopRingtoneGlobally()
+        stopRingtoneGlobally(applicationContext)
     }
 
     override fun onDestroy() {
