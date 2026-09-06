@@ -200,14 +200,13 @@ class AudioRouteModule(private val reactContext: ReactApplicationContext) : Reac
                 stopGlobalIncomingRingtone()
                 val resId = reactContext.resources.getIdentifier("synk_signature", "raw", reactContext.packageName)
                 if (resId != 0) {
-                    globalIncomingMediaPlayer = MediaPlayer.create(reactContext.applicationContext, resId)?.apply {
+                    val audioAttributes = AudioAttributes.Builder()
+                        .setUsage(AudioAttributes.USAGE_NOTIFICATION_RINGTONE)
+                        .setContentType(AudioAttributes.CONTENT_TYPE_MUSIC)
+                        .build()
+                    globalIncomingMediaPlayer = MediaPlayer.create(reactContext.applicationContext, resId, audioAttributes, 0)?.apply {
                         isLooping = true
-                        setAudioAttributes(
-                            AudioAttributes.Builder()
-                                .setUsage(AudioAttributes.USAGE_NOTIFICATION_RINGTONE)
-                                .setContentType(AudioAttributes.CONTENT_TYPE_MUSIC)
-                                .build()
-                        )
+                        setVolume(1.0f, 1.0f)
                         start()
                     }
                     Log.i("SYNKING_AUDIO", "✅ Synk Signature incoming ringtone started playing globally")
