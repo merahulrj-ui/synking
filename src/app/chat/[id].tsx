@@ -1036,9 +1036,12 @@ const VOICE_COMPRESSED_CONFIG: any = {
               displayText = parts[0];
               audioUrl = parts[1];
             }
+            const isMine = msg.senderId === myId || (Boolean(myId) && String(msg.senderId).replace(/\D/g, '').slice(-10) === String(myId).replace(/\D/g, '').slice(-10));
             const clean = {
               ...msg,
               text: displayText,
+              read: isMine ? Boolean(msg.read) : true,
+              status: isMine ? (msg.status || 'sent') : ('read' as const),
               extraData: {
                 ...msg.extraData,
                 audioUrl: audioUrl || msg.extraData?.audioUrl,
@@ -1052,6 +1055,19 @@ const VOICE_COMPRESSED_CONFIG: any = {
               addAudioLog(`📥 [WS_MESSAGE_ACCEPTED] "${clean.text.substring(0, 20)}"`);
               return [...prev, clean];
             });
+
+            // Active screen reader: acknowledge read back to sender immediately (Double Blue Tick on sender's device)
+            if (clean.senderId !== myId) {
+              try {
+                RealtimeBridge.broadcast('MESSAGES_READ', {
+                  readerId: myId,
+                  partnerId: id,
+                  messageId: clean.id,
+                  timestamp: new Date().toISOString(),
+                }, id);
+                markChatAsRead(id);
+              } catch (e) {}
+            }
           };
           decryptAndAdd();
         }
@@ -1060,6 +1076,53 @@ const VOICE_COMPRESSED_CONFIG: any = {
       if (type === 'DELETE_MESSAGE' && payload?.messageId) {
         markMessageDeletedLocally(payload.messageId);
         addAudioLog(`🗑️ [DELETE_RECEIVED] Message ${payload.messageId.substring(0, 10)} deleted`);
+      }
+
+      if (type === 'MESSAGES_READ') {
+        const rId = String(payload?.readerId || '');
+        const pId = String(payload?.partnerId || '');
+        const threadId = String(id || '');
+        const rDigits = rId.replace(/\D/g, '').slice(-10);
+        const pDigits = pId.replace(/\D/g, '').slice(-10);
+        const tDigits = threadId.replace(/\D/g, '').slice(-10);
+
+        const isMatch =
+          rId === threadId ||
+          pId === threadId ||
+          (rDigits && tDigits && rDigits === tDigits) ||
+          (pDigits && tDigits && pDigits === tDigits);
+
+        if (isMatch) {
+          setCloudMessages(prev =>
+            prev.map(m => {
+              const sId = String(m.senderId || '');
+              const sDigits = sId.replace(/\D/g, '').slice(-10);
+              const myDigits = String(myId).replace(/\D/g, '').slice(-10);
+              const isMine = sId === myId || (sDigits && myDigits && sDigits === myDigits);
+              return isMine ? { ...m, read: true, status: 'read' as const } : m;
+            })
+          );
+        }
+      }
+
+      if (type === 'MESSAGE_DELIVERED' && payload?.messageId) {
+        setCloudMessages(prev =>
+          prev.map(m =>
+            m.id === payload.messageId && m.status !== 'read' && !m.read
+              ? { ...m, status: 'delivered' as const }
+              : m
+          )
+        );
+      }
+
+      if (type === 'MESSAGE_REACTION' && payload?.messageId && payload?.emoji) {
+        setCloudMessages(prev =>
+          prev.map(m =>
+            m.id === payload.messageId
+              ? { ...m, extraData: { ...m.extraData, reaction: payload.emoji } }
+              : m
+          )
+        );
       }
 
       if (type === 'CALL_WINDOW_APPROVED' && (payload?.partnerId === id || payload?.partnerId === myId)) {
@@ -1129,9 +1192,29 @@ const VOICE_COMPRESSED_CONFIG: any = {
         if (Array.isArray(msgs) && msgs.length > 0) {
           const filtered = msgs.filter(m => m && !deletedMsgIds.has(m.id));
           setCloudMessages(prev => {
-            const hasNew = filtered.some(f => !prev.some(p => p.id === f.id));
-            if (hasNew) {
-              return filtered;
+            const prevMap = new Map(prev.map(p => [p.id, p]));
+            let hasChanged = filtered.length !== prev.length;
+            const merged = filtered.map(f => {
+              const existing = prevMap.get(f.id);
+              if (existing && (existing.read || existing.status === 'read')) {
+                return {
+                  ...f,
+                  read: true,
+                  status: 'read' as const,
+                  extraData: { ...(f.extraData || {}), ...(existing.extraData || {}) },
+                };
+              }
+              if (existing && existing.extraData?.reaction && !f.extraData?.reaction) {
+                return {
+                  ...f,
+                  extraData: { ...(f.extraData || {}), reaction: existing.extraData.reaction },
+                };
+              }
+              if (!existing) hasChanged = true;
+              return f;
+            });
+            if (hasChanged || merged.some((m, idx) => m !== prev[idx])) {
+              return merged;
             }
             return prev;
           });
@@ -2198,12 +2281,30 @@ const VOICE_COMPRESSED_CONFIG: any = {
                     <Text style={[styles.timestamp, { color: isMine ? 'rgba(255, 255, 255, 0.75)' : subText }]}>
                       {formatWhatsAppTime(item.timestamp)}
                     </Text>
-                    <Ionicons
-                      name="checkmark-done"
-                      size={12}
-                      color={isMine ? '#FFFFFF' : '#22C55E'}
-                      style={{ marginLeft: 2 }}
-                    />
+                    {isMine && (
+                      (item.status === 'read' || item.read) ? (
+                        <Ionicons
+                          name="checkmark-done"
+                          size={13}
+                          color="#00E5FF"
+                          style={{ marginLeft: 2 }}
+                        />
+                      ) : (item.status === 'delivered' || (item.status !== 'sending' && item.timestamp !== 'Just now')) ? (
+                        <Ionicons
+                          name="checkmark-done"
+                          size={13}
+                          color="rgba(255, 255, 255, 0.75)"
+                          style={{ marginLeft: 2 }}
+                        />
+                      ) : (
+                        <Ionicons
+                          name="checkmark"
+                          size={13}
+                          color="rgba(255, 255, 255, 0.65)"
+                          style={{ marginLeft: 2 }}
+                        />
+                      )
+                    )}
                     <TouchableOpacity
                       onPress={() => setSelectedMsgForAction(item)}
                       style={{ marginLeft: 4, paddingHorizontal: 2 }}
@@ -2257,12 +2358,30 @@ const VOICE_COMPRESSED_CONFIG: any = {
                   <Text style={[styles.timestamp, { color: isMine ? 'rgba(255, 255, 255, 0.75)' : subText }]}>
                     {formatWhatsAppTime(item.timestamp)}
                   </Text>
-                  <Ionicons
-                    name="checkmark-done"
-                    size={12}
-                    color={isMine ? '#FFFFFF' : '#22C55E'}
-                    style={{ marginLeft: 2 }}
-                  />
+                  {isMine && (
+                    (item.status === 'read' || item.read) ? (
+                      <Ionicons
+                        name="checkmark-done"
+                        size={13}
+                        color="#00E5FF"
+                        style={{ marginLeft: 2 }}
+                      />
+                    ) : (item.status === 'delivered' || (item.status !== 'sending' && item.timestamp !== 'Just now')) ? (
+                      <Ionicons
+                        name="checkmark-done"
+                        size={13}
+                        color="rgba(255, 255, 255, 0.75)"
+                        style={{ marginLeft: 2 }}
+                      />
+                    ) : (
+                      <Ionicons
+                        name="checkmark"
+                        size={13}
+                        color="rgba(255, 255, 255, 0.65)"
+                        style={{ marginLeft: 2 }}
+                      />
+                    )
+                  )}
                   <TouchableOpacity
                     onPress={() => setSelectedMsgForAction(item)}
                     style={{ marginLeft: 4, paddingHorizontal: 2 }}

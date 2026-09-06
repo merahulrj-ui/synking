@@ -250,6 +250,8 @@ export async function fetchChatMessagesFromFirestore(user1Id: string, user2Id: s
               ...m,
               text: displayText,
               plainText: displayText,
+              read: Boolean(m.read || m.status === 'read'),
+              status: (m.read || m.status === 'read') ? ('read' as const) : (m.status || 'delivered'),
               extraData: {
                 ...m.extraData,
                 audioUrl: audioUrl || m.extraData?.audioUrl,
@@ -272,6 +274,68 @@ export async function deleteChatMessageFromBackend(messageId: string): Promise<b
   try {
     const res = await fetch(`${getLocalBackendUrl()}/api/chats/${encodeURIComponent(messageId)}`, {
       method: 'DELETE',
+    });
+    return res.ok;
+  } catch (e) {
+    return false;
+  }
+}
+
+/**
+ * Permanently clears all chat messages between two users
+ */
+export async function clearChatFromBackend(user1Id: string, user2Id: string): Promise<boolean> {
+  try {
+    const res = await fetch(`${getLocalBackendUrl()}/api/chats/clear?user1=${encodeURIComponent(user1Id)}&user2=${encodeURIComponent(user2Id)}`, {
+      method: 'DELETE',
+    });
+    return res.ok;
+  } catch (e) {
+    return false;
+  }
+}
+
+/**
+ * Batch delete multiple chat messages from backend
+ */
+export async function deleteMultipleMessagesFromBackend(messageIds: string[]): Promise<boolean> {
+  try {
+    const res = await fetch(`${getLocalBackendUrl()}/api/chats/batch-delete`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ messageIds }),
+    });
+    return res.ok;
+  } catch (e) {
+    return false;
+  }
+}
+
+/**
+ * Mark messages as read on backend
+ */
+export async function markMessagesAsReadOnBackend(readerId: string, partnerId: string): Promise<boolean> {
+  try {
+    const res = await fetch(`${getLocalBackendUrl()}/api/chats/read`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ readerId, partnerId }),
+    });
+    return res.ok;
+  } catch (e) {
+    return false;
+  }
+}
+
+/**
+ * Update reaction on a message in backend
+ */
+export async function updateMessageReactionOnBackend(messageId: string, reaction: string): Promise<boolean> {
+  try {
+    const res = await fetch(`${getLocalBackendUrl()}/api/chats/reaction`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ messageId, reaction }),
     });
     return res.ok;
   } catch (e) {

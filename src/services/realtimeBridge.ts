@@ -141,7 +141,11 @@ class RealtimeBridgeManager {
       | 'CALL_UPGRADED_TO_VIDEO'
       | 'CALL_REQUEST'
       | 'CALL_WINDOW_APPROVED'
-      | 'DELETE_MESSAGE',
+      | 'DELETE_MESSAGE'
+      | 'DELETE_MESSAGES'
+      | 'CLEAR_CHAT'
+      | 'MESSAGES_READ'
+      | 'MESSAGE_DELIVERED',
     payload: any,
     targetUserId?: string
   ) {

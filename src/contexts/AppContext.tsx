@@ -14,6 +14,10 @@ import {
   deleteSynkRequestFromBackend,
   deleteUserProfileFromBackend,
   deleteChatMessageFromBackend,
+  clearChatFromBackend,
+  deleteMultipleMessagesFromBackend,
+  markMessagesAsReadOnBackend,
+  updateMessageReactionOnBackend,
   checkUserExistsOnBackend,
   CLOUD_BACKEND_URL,
 } from '../services/firebase';
@@ -60,6 +64,10 @@ interface AppContextType {
   bookDate: (params: { targetUser: UserProfile; venue: Venue; dateTime: string; splitType: 'split_50_50' | 'i_treat' | 'they_treat' }) => DateBooking;
   sendMessage: (receiverId: string, text: string, type?: 'text' | 'voice' | 'call_request' | 'date_invite', extraData?: ChatMessage['extraData']) => void;
   deleteMessage: (partnerId: string, messageId: string, deleteForEveryone?: boolean) => void;
+  clearChat: (partnerId: string, deleteForEveryone?: boolean) => void;
+  deleteMultipleMessages: (partnerId: string, messageIds: string[], deleteForEveryone?: boolean) => void;
+  deleteChat: (partnerId: string) => void;
+  addMessageReaction: (messageId: string, partnerId: string, emoji: string) => void;
   submitFeedback: (bookingId: string, feedback: { matched: boolean; respectful: boolean; safe: boolean; notes: string }) => void;
   refreshDiscoverFeed: () => Promise<void>;
   resetPassedProfiles: () => void;
@@ -293,7 +301,36 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       if (cleanDigits) next.delete(cleanDigits);
       return next;
     });
-  }, []);
+
+    // Mark incoming messages as read in local state
+    setMessages(prev => {
+      const thread = prev[cleanId] || (cleanDigits ? prev[cleanDigits] : []) || [];
+      let changed = false;
+      const updated = thread.map(m => {
+        if (m && m.senderId !== currentUser?.id && (!m.read || m.status !== 'read')) {
+          changed = true;
+          return { ...m, read: true, status: 'read' as const, readAt: new Date().toISOString() };
+        }
+        return m;
+      });
+      if (!changed) return prev;
+      return {
+        ...prev,
+        [cleanId]: updated,
+        ...(cleanDigits ? { [cleanDigits]: updated } : {}),
+      };
+    });
+
+    // Notify partner in real-time that their messages were read
+    if (currentUser?.id) {
+      RealtimeBridge.broadcast('MESSAGES_READ', {
+        readerId: currentUser.id,
+        partnerId: cleanId,
+        timestamp: new Date().toISOString(),
+      }, cleanId);
+      markMessagesAsReadOnBackend(currentUser.id, cleanId).catch(() => {});
+    }
+  }, [currentUser]);
 
   // Recalculate unreadChatIds whenever messages or readChatTimestamps change
   useEffect(() => {
@@ -586,6 +623,11 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
         if (isIncoming || isOutgoing) {
           // Play Incoming Message Sound/Haptic if we are receiving it from someone else
           if (isIncoming) {
+            // Acknowledge delivery back to sender immediately (Double Gray Tick on sender's device)
+            try {
+              RealtimeBridge.broadcast('MESSAGE_DELIVERED', { messageId: msg.id, senderId: msg.senderId }, msg.senderId);
+            } catch (e) {}
+
             const isChatCurrentlyOpen = activeChatTracker.isChatActive(msg.senderId);
 
             // Instantly mark sender as having an unread message ONLY if not currently looking at this chat!
@@ -641,19 +683,88 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
             return next;
           });
         }
-      } else if (type === 'MESSAGE_REACTION' && payload) {
-          const { messageId, threadKey, emoji } = payload;
-          if (messageId && threadKey) {
-            setMessages(prev => {
-              const list = prev[threadKey] || [];
-              const updated = list.map(m => 
-                m.id === messageId 
-                  ? { ...m, extraData: { ...m.extraData, reaction: emoji } } 
+      } else if (type === 'DELETE_MESSAGES' && payload) {
+        const { messageIds } = payload;
+        if (Array.isArray(messageIds) && messageIds.length > 0) {
+          const idSet = new Set(messageIds);
+          setMessages(prev => {
+            const next = { ...prev };
+            for (const key of Object.keys(next)) {
+              next[key] = (next[key] || []).filter(m => m && !idSet.has(m.id));
+            }
+            return next;
+          });
+        }
+      } else if (type === 'CLEAR_CHAT' && payload) {
+        const { partnerId, clearedBy } = payload;
+        const targetThread = clearedBy === currentUser?.id ? partnerId : (partnerId || clearedBy);
+        if (targetThread) {
+          setMessages(prev => ({
+            ...prev,
+            [targetThread]: [],
+          }));
+        }
+      } else if (type === 'MESSAGE_DELIVERED' && payload) {
+        const { messageId } = payload;
+        if (messageId) {
+          setMessages(prev => {
+            const next = { ...prev };
+            for (const key of Object.keys(next)) {
+              next[key] = (next[key] || []).map(m =>
+                m.id === messageId && m.status !== 'read' && !m.read
+                  ? { ...m, status: 'delivered' as const }
                   : m
               );
-              return { ...prev, [threadKey]: updated };
-            });
+            }
+            return next;
+          });
+        }
+      } else if (type === 'MESSAGES_READ' && payload) {
+        const { readerId, partnerId } = payload;
+        const myId = currentUser?.id || '';
+        const myDigits = myId.replace(/\D/g, '').slice(-10);
+        const rDigits = String(readerId || '').replace(/\D/g, '').slice(-10);
+        const pDigits = String(partnerId || '').replace(/\D/g, '').slice(-10);
+
+        const isReaderMe = readerId === myId || (Boolean(rDigits) && Boolean(myDigits) && rDigits === myDigits);
+        const targetThread = isReaderMe ? partnerId : readerId;
+        const targetDigits = (isReaderMe ? pDigits : rDigits) || '';
+
+        setMessages(prev => {
+          const next = { ...prev };
+          for (const key of Object.keys(next)) {
+            const keyDigits = key.replace(/\D/g, '').slice(-10);
+            const isTargetThread =
+              key === targetThread ||
+              (Boolean(targetDigits) && Boolean(keyDigits) && keyDigits === targetDigits);
+
+            if (isTargetThread) {
+              next[key] = (next[key] || []).map(m => {
+                const sDigits = String(m.senderId || '').replace(/\D/g, '').slice(-10);
+                const isSentByMe = m.senderId === myId || (Boolean(sDigits) && Boolean(myDigits) && sDigits === myDigits);
+                return isSentByMe
+                  ? { ...m, read: true, status: 'read' as const, readAt: new Date().toISOString() }
+                  : m;
+              });
+            }
           }
+          return next;
+        });
+      } else if (type === 'MESSAGE_REACTION' && payload) {
+        const { messageId, emoji } = payload;
+        if (messageId) {
+          setMessages(prev => {
+            const next = { ...prev };
+            for (const key of Object.keys(next)) {
+              next[key] = (next[key] || []).map(m =>
+                m.id === messageId
+                  ? { ...m, extraData: { ...m.extraData, reaction: emoji } }
+                  : m
+              );
+            }
+            return next;
+          });
+        }
       } else if (type === 'SYNK_REQUEST' && payload) {
         const req = payload as SynkRequest;
         if (req.toUserId === currentUser?.id && req.fromUser?.id !== currentUser?.id) {
@@ -1148,6 +1259,8 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       text: text,
       timestamp: new Date().toISOString(),
       type: type,
+      read: false,
+      status: 'sent',
       extraData: extraData,
     };
 
@@ -1186,7 +1299,15 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       type: newMsg.type,
       extraData: newMsg.extraData,
       timestamp: new Date().toISOString(),
-    });
+    }).then(() => {
+      setMessages(prev => {
+        const list = prev[receiverId] || [];
+        return {
+          ...prev,
+          [receiverId]: list.map(m => m.id === newMsg.id && m.status !== 'read' && !m.read ? { ...m, status: 'delivered' as const } : m)
+        };
+      });
+    }).catch(() => {});
   };
 
   const deleteMessage = (partnerId: string, messageId: string, deleteForEveryone = false) => {
@@ -1206,6 +1327,83 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
         console.warn('RealtimeBridge delete broadcast error:', e);
       }
     }
+  };
+
+  const clearChat = (partnerId: string, deleteForEveryone = false) => {
+    if (!partnerId) return;
+    setMessages(prev => {
+      const next = { ...prev };
+      next[partnerId] = [];
+      const pDigits = partnerId.replace(/\D/g, '').slice(-10);
+      if (pDigits) next[pDigits] = [];
+      return next;
+    });
+
+    if (currentUser?.id) {
+      clearChatFromBackend(currentUser.id, partnerId).catch(() => {});
+    }
+
+    if (deleteForEveryone) {
+      try {
+        RealtimeBridge.broadcast('CLEAR_CHAT', { partnerId, clearedBy: currentUser?.id }, partnerId);
+      } catch (e) {}
+    }
+  };
+
+  const deleteMultipleMessages = (partnerId: string, messageIds: string[], deleteForEveryone = false) => {
+    if (!partnerId || !messageIds || messageIds.length === 0) return;
+    const idSet = new Set(messageIds);
+
+    setMessages(prev => {
+      const list = prev[partnerId] || [];
+      const filtered = list.filter(m => m && !idSet.has(m.id));
+      const next = { ...prev, [partnerId]: filtered };
+      const pDigits = partnerId.replace(/\D/g, '').slice(-10);
+      if (pDigits && prev[pDigits]) {
+        next[pDigits] = (prev[pDigits] || []).filter(m => m && !idSet.has(m.id));
+      }
+      return next;
+    });
+
+    deleteMultipleMessagesFromBackend(messageIds).catch(() => {});
+
+    if (deleteForEveryone) {
+      try {
+        RealtimeBridge.broadcast('DELETE_MESSAGES', { messageIds, partnerId, senderId: currentUser?.id }, partnerId);
+      } catch (e) {}
+    }
+  };
+
+  const deleteChat = (partnerId: string) => {
+    clearChat(partnerId, false);
+    setMatches(prev => prev.filter(m => m && m.id !== partnerId));
+  };
+
+  const addMessageReaction = (messageId: string, partnerId: string, emoji: string) => {
+    if (!messageId) return;
+    setMessages(prev => {
+      const next = { ...prev };
+      for (const key of Object.keys(next)) {
+        next[key] = (next[key] || []).map(m =>
+          m.id === messageId
+            ? { ...m, extraData: { ...m.extraData, reaction: emoji } }
+            : m
+        );
+      }
+      return next;
+    });
+
+    updateMessageReactionOnBackend(messageId, emoji).catch(() => {});
+
+    try {
+      RealtimeBridge.broadcast('MESSAGE_REACTION', {
+        messageId,
+        threadKey: partnerId,
+        emoji,
+        senderId: currentUser?.id,
+        partnerId
+      }, partnerId);
+    } catch (e) {}
   };
 
   const submitFeedback = (bookingId: string, feedback: { matched: boolean; respectful: boolean; safe: boolean; notes: string }) => {
@@ -1333,6 +1531,10 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
         bookDate,
         sendMessage,
         deleteMessage,
+        clearChat,
+        deleteMultipleMessages,
+        deleteChat,
+        addMessageReaction,
         submitFeedback,
         refreshDiscoverFeed: syncCloudState,
         resetPassedProfiles,

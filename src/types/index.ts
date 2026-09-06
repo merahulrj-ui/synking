@@ -105,6 +105,11 @@ export interface ChatMessage {
   text: string;
   timestamp: string;
   type: 'text' | 'date_invite' | 'voice' | 'call' | 'system' | 'call_request';
+  read?: boolean;
+  readAt?: string;
+  status?: 'sending' | 'sent' | 'delivered' | 'read';
+  deletedForEveryone?: boolean;
+  deletedFor?: string[];
   extraData?: {
     bookingId?: string;
     venueName?: string;

@@ -354,19 +354,31 @@ export default function ChatsScreen() {
                       </View>
                     </View>
 
-                    <Text
-                      style={[
-                        styles.lastMsgText,
-                        {
-                          color: isUnread ? (isDarkMode ? '#FFFFFF' : '#0F172A') : subText,
-                          fontFamily: isUnread ? 'Poppins_700Bold' : 'Poppins_400Regular',
-                          fontSize: isUnread ? 13.5 : 13,
-                        },
-                      ]}
-                      numberOfLines={1}
-                    >
-                      {displayLastText}
-                    </Text>
+                    <View style={{ flexDirection: 'row', alignItems: 'center', gap: 4 }}>
+                      {isSentByMe && lastMsg && (
+                        (lastMsg.status === 'read' || lastMsg.read) ? (
+                          <Ionicons name="checkmark-done" size={15} color="#00E5FF" />
+                        ) : (lastMsg.status === 'delivered' || (lastMsg.status !== 'sending' && lastMsg.timestamp !== 'Just now')) ? (
+                          <Ionicons name="checkmark-done" size={15} color={subText} />
+                        ) : (
+                          <Ionicons name="checkmark" size={15} color={subText} />
+                        )
+                      )}
+                      <Text
+                        style={[
+                          styles.lastMsgText,
+                          {
+                            color: isUnread ? (isDarkMode ? '#FFFFFF' : '#0F172A') : subText,
+                            fontFamily: isUnread ? 'Poppins_700Bold' : 'Poppins_400Regular',
+                            fontSize: isUnread ? 13.5 : 13,
+                            flex: 1,
+                          },
+                        ]}
+                        numberOfLines={1}
+                      >
+                        {displayLastText}
+                      </Text>
+                    </View>
                   </View>
 
                   <Ionicons

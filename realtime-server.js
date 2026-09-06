@@ -1765,6 +1765,8 @@ const server = http.createServer((req, res) => {
             plainText: item.text,
             cipherText: item.text,
             type: isCallReq ? 'call_request' : (memoryMatch?.type || item.type || 'text'),
+            read: memoryMatch?.read || false,
+            status: memoryMatch?.status || (memoryMatch?.read ? 'read' : 'delivered'),
             extraData: memoryMatch?.extraData || (isCallReq ? { callType: String(item.text).includes('Video') ? 'video' : 'audio', requestedBy: item.sender_id } : undefined),
             timestamp: item.timestamp || item.created_at || new Date().toISOString()
           };
@@ -1925,6 +1927,127 @@ const server = http.createServer((req, res) => {
     }
     res.writeHead(400, { 'Content-Type': 'application/json' });
     res.end(JSON.stringify({ success: false, error: 'Message ID missing' }));
+    return;
+  }
+
+  // 7.2 POST /api/chats/read (Mark messages as read in memory & SQLite, and broadcast MESSAGES_READ)
+  if (req.method === 'POST' && pathname === '/api/chats/read') {
+    let body = '';
+    req.on('data', chunk => { body += chunk; });
+    req.on('end', () => {
+      try {
+        const { readerId, partnerId } = JSON.parse(body || '{}');
+        if (readerId && partnerId) {
+          const rDigits = String(readerId).replace(/\D/g, '').slice(-10);
+          const pDigits = String(partnerId).replace(/\D/g, '').slice(-10);
+
+          (db.chats || []).forEach(m => {
+            if (!m) return;
+            const sDigits = String(m.senderId || '').replace(/\D/g, '').slice(-10);
+            const rcvDigits = String(m.receiverId || '').replace(/\D/g, '').slice(-10);
+
+            const isFromPartner = m.senderId === partnerId || (pDigits && sDigits && pDigits === sDigits);
+            const isToReader = m.receiverId === readerId || (rDigits && rcvDigits && rDigits === rcvDigits);
+
+            if (isFromPartner && isToReader) {
+              m.read = true;
+              m.status = 'read';
+              m.readAt = new Date().toISOString();
+            }
+          });
+          saveDb();
+
+          // Broadcast to connected WebSocket clients
+          broadcastToClients({
+            type: 'MESSAGES_READ',
+            payload: {
+              readerId,
+              partnerId,
+              timestamp: new Date().toISOString()
+            }
+          });
+
+          res.writeHead(200, { 'Content-Type': 'application/json' });
+          res.end(JSON.stringify({ success: true }));
+          return;
+        }
+      } catch (e) {}
+      res.writeHead(400, { 'Content-Type': 'application/json' });
+      res.end(JSON.stringify({ success: false }));
+    });
+    return;
+  }
+
+  // 7.3 POST /api/chats/batch-delete (Delete Multiple Messages)
+  if (req.method === 'POST' && pathname === '/api/chats/batch-delete') {
+    let body = '';
+    req.on('data', chunk => { body += chunk; });
+    req.on('end', () => {
+      try {
+        const { messageIds } = JSON.parse(body || '{}');
+        if (Array.isArray(messageIds) && messageIds.length > 0) {
+          const idSet = new Set(messageIds);
+          db.chats = (db.chats || []).filter(c => c && !idSet.has(c.id));
+          saveDb();
+          const placeholders = messageIds.map(() => '?').join(',');
+          queryTurso(`DELETE FROM messages WHERE id IN (${placeholders})`, messageIds.map(id => ({ type: 'text', value: id }))).catch(() => {});
+          res.writeHead(200, { 'Content-Type': 'application/json' });
+          res.end(JSON.stringify({ success: true, count: messageIds.length }));
+          return;
+        }
+      } catch (e) {}
+      res.writeHead(400, { 'Content-Type': 'application/json' });
+      res.end(JSON.stringify({ success: false }));
+    });
+    return;
+  }
+
+  // 7.4 DELETE /api/chats/clear (Clear Entire Conversation)
+  if (req.method === 'DELETE' && pathname === '/api/chats/clear') {
+    const u1 = url.searchParams.get('user1') || url.searchParams.get('u1');
+    const u2 = url.searchParams.get('user2') || url.searchParams.get('u2');
+    if (u1 && u2) {
+      db.chats = (db.chats || []).filter(c => !(
+        (c.senderId === u1 && c.receiverId === u2) ||
+        (c.senderId === u2 && c.receiverId === u1)
+      ));
+      saveDb();
+      queryTurso('DELETE FROM messages WHERE (sender_id = ? AND receiver_id = ?) OR (sender_id = ? AND receiver_id = ?)', [
+        { type: 'text', value: u1 },
+        { type: 'text', value: u2 },
+        { type: 'text', value: u2 },
+        { type: 'text', value: u1 }
+      ]).catch(() => {});
+      res.writeHead(200, { 'Content-Type': 'application/json' });
+      res.end(JSON.stringify({ success: true }));
+      return;
+    }
+    res.writeHead(400, { 'Content-Type': 'application/json' });
+    res.end(JSON.stringify({ success: false, error: 'Users missing' }));
+    return;
+  }
+
+  // 7.5 POST /api/chats/reaction (Update Message Reaction)
+  if (req.method === 'POST' && pathname === '/api/chats/reaction') {
+    let body = '';
+    req.on('data', chunk => { body += chunk; });
+    req.on('end', () => {
+      try {
+        const { messageId, reaction } = JSON.parse(body || '{}');
+        if (messageId) {
+          const msg = (db.chats || []).find(c => c && c.id === messageId);
+          if (msg) {
+            msg.extraData = { ...(msg.extraData || {}), reaction };
+            saveDb();
+          }
+          res.writeHead(200, { 'Content-Type': 'application/json' });
+          res.end(JSON.stringify({ success: true }));
+          return;
+        }
+      } catch (e) {}
+      res.writeHead(400, { 'Content-Type': 'application/json' });
+      res.end(JSON.stringify({ success: false }));
+    });
     return;
   }
 
