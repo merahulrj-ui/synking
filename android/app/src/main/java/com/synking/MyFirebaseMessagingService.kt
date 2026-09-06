@@ -453,6 +453,8 @@ class MyFirebaseMessagingService : FirebaseMessagingService() {
             declinePendingIntent,
             acceptPendingIntent
         ).setIsVideo(isVideo)
+         .setAnswerButtonColorHint(android.graphics.Color.parseColor("#16A34A")) // 🟢 Vibrant Green Answer Button
+         .setDeclineButtonColorHint(android.graphics.Color.parseColor("#DC2626")) // 🔴 Vibrant Red Decline Button
 
         val notificationBuilder = NotificationCompat.Builder(this, channelId)
             .setSmallIcon(R.mipmap.ic_launcher)
@@ -468,6 +470,7 @@ class MyFirebaseMessagingService : FirebaseMessagingService() {
             .setFullScreenIntent(fullScreenPendingIntent, true) // ✅ LOCK SCREEN FULL-SCREEN UI
             .setContentIntent(fullScreenPendingIntent) // Tap banner to open UI
             .setColor(android.graphics.Color.parseColor("#FD3A73"))
+            .setColorized(true)
 
         Log.d(
             "SYNKING_FCM",
@@ -490,6 +493,8 @@ class MyFirebaseMessagingService : FirebaseMessagingService() {
                             declinePendingIntent,
                             acceptPendingIntent
                         ).setIsVideo(isVideo)
+                         .setAnswerButtonColorHint(android.graphics.Color.parseColor("#16A34A"))
+                         .setDeclineButtonColorHint(android.graphics.Color.parseColor("#DC2626"))
                         notificationBuilder.setStyle(updatedCallStyle)
                         notificationManager.notify(NOTIFICATION_ID, notificationBuilder.build())
                     }

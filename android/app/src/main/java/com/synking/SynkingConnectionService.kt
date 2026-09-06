@@ -56,7 +56,7 @@ class SynkingConnectionService : ConnectionService() {
                     callStartTime = System.currentTimeMillis()
                 }
                 val nm = context.getSystemService(Context.NOTIFICATION_SERVICE) as? NotificationManager
-                val channelId = "synking_ongoing_call"
+                val channelId = "synking_ongoing_calls_v3"
                 if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
                     val channel = NotificationChannel(
                         channelId,
@@ -95,6 +95,7 @@ class SynkingConnectionService : ConnectionService() {
                     personBuilder.build(),
                     endCallPendingIntent
                 ).setIsVideo(isVideo)
+                 .setDeclineButtonColorHint(Color.parseColor("#DC2626"))
 
                 val builder = NotificationCompat.Builder(context, channelId)
                     .setSmallIcon(R.mipmap.ic_launcher)
@@ -111,7 +112,8 @@ class SynkingConnectionService : ConnectionService() {
                     .setShowWhen(true)
                     .setUsesChronometer(true) // ⏱️ Live chronometer timer on notification panel
                     .setContentIntent(tapPendingIntent)
-                    .setColor(Color.parseColor("#FD3A73"))
+                    .setColor(Color.parseColor("#DC2626")) // 🔴 Vibrant Red theme
+                    .setColorized(true) // 🔴 Colorize notification & buttons
 
                 val notification = builder.build()
                 notification.flags = notification.flags or
@@ -136,6 +138,7 @@ class SynkingConnectionService : ConnectionService() {
                                     updatedPerson,
                                     endCallPendingIntent
                                 ).setIsVideo(isVideo)
+                                 .setDeclineButtonColorHint(Color.parseColor("#DC2626"))
                                 builder.setStyle(updatedCallStyle)
                                 val updatedNotif = builder.build()
                                 updatedNotif.flags = updatedNotif.flags or
@@ -160,10 +163,11 @@ class SynkingConnectionService : ConnectionService() {
                     @Suppress("DEPRECATION")
                     instance?.stopForeground(true)
                 }
-                instance?.let { s ->
-                    val nm = s.getSystemService(android.content.Context.NOTIFICATION_SERVICE) as? android.app.NotificationManager
-                    nm?.cancel(MyFirebaseMessagingService.NOTIFICATION_ID)
-                }
+                val context = instance
+                    ?: TelecomModule.reactContextInstance
+                    ?: TelecomModule.globalReactContext
+                val nm = context?.getSystemService(android.content.Context.NOTIFICATION_SERVICE) as? android.app.NotificationManager
+                nm?.cancel(MyFirebaseMessagingService.NOTIFICATION_ID)
                 Log.d("SYNKING_TELECOM", "[FGS] stopCallForeground: Notification completely removed")
             } catch (e: Exception) {
                 Log.e("SYNKING_TELECOM", "[FGS] stopCallForeground error: ${e.message}")

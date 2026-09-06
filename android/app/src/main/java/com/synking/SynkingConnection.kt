@@ -108,6 +108,8 @@ class SynkingConnection(
             declinePendingIntent,
             acceptPendingIntent
         ).setIsVideo(isVideo)
+         .setAnswerButtonColorHint(android.graphics.Color.parseColor("#16A34A")) // 🟢 Vibrant Green Answer Button
+         .setDeclineButtonColorHint(android.graphics.Color.parseColor("#DC2626")) // 🔴 Vibrant Red Decline Button
 
         // ── Build Notification: Locked against swiping (setOngoing=true) ──
         val notificationBuilder = NotificationCompat.Builder(context, channelId)
@@ -124,6 +126,7 @@ class SynkingConnection(
             .setFullScreenIntent(fullScreenPendingIntent, true) // For lockscreen presentation
             .setContentIntent(fullScreenPendingIntent) // Tap banner to expand to full screen
             .setColor(android.graphics.Color.parseColor("#FD3A73"))
+            .setColorized(true)
 
         val notification = notificationBuilder.build()
         SynkingConnectionService.startCallForeground(notification)
@@ -144,6 +147,8 @@ class SynkingConnection(
                             declinePendingIntent,
                             acceptPendingIntent
                         ).setIsVideo(isVideo)
+                         .setAnswerButtonColorHint(android.graphics.Color.parseColor("#16A34A"))
+                         .setDeclineButtonColorHint(android.graphics.Color.parseColor("#DC2626"))
                         notificationBuilder.setStyle(updatedCallStyle)
                         nm.notify(MyFirebaseMessagingService.NOTIFICATION_ID, notificationBuilder.build())
                         Log.d("SYNKING_TELECOM", "[UI] Caller avatar loaded and applied to CallStyle notification")
