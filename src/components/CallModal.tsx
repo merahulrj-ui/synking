@@ -325,6 +325,13 @@ export const CallModal: React.FC<Props> = ({ session, isLockscreen, onEndCall, o
     }
   };
 
+  const handleIncomingMessage = () => {
+    handleDecline();
+    handleOpenChat();
+  };
+
+  const isVideoCall = session.type === 'video' || session.isVideoEnabled;
+
   const callContent = (
     <View style={styles.modalOverlay}>
       <LinearGradient
@@ -390,15 +397,16 @@ export const CallModal: React.FC<Props> = ({ session, isLockscreen, onEndCall, o
             <LiveRemoteMedia type="voice" photoUrl={session.callerPhoto} isSpeakerOn={session.isSpeakerOn} />
           )}
 
-          {/* 3. OUTGOING VIDEO CALL (CALLER PREVIEW): Fullscreen Self Camera */}
-          {!isConnected && !isIncomingRinging && (session.type === 'video' || session.isVideoEnabled) && (
+          {/* 3. VIDEO PREVIEW (OUTGOING OR INCOMING VIDEO CALL): Fullscreen Self Camera */}
+          {!isConnected && (session.type === 'video' || session.isVideoEnabled) && session.isVideoEnabled !== false && (
             <View style={styles.videoSurfaceContainer}>
               <LiveSelfVideo isPip={false} />
+              {isIncomingRinging && <View style={styles.videoIncomingBackdropTint} />}
             </View>
           )}
 
-          {/* Top Left: Chat Button */}
-          {((session.type === 'video' || session.isVideoEnabled) || isConnected) && (
+          {/* Top Left: Chat Button (Only when active/connected or outgoing, incoming has bottom Message button) */}
+          {!isIncomingRinging && ((session.type === 'video' || session.isVideoEnabled) || isConnected) && (
             <TouchableOpacity
               style={styles.chatMinimizeBtn}
               onPress={handleOpenChat}
@@ -422,35 +430,110 @@ export const CallModal: React.FC<Props> = ({ session, isLockscreen, onEndCall, o
           )}
 
           {/* 1. TOP STATUS HEADER (ALWAYS AT TOP, hidden in PiP) */}
-          <View style={[styles.topHeader, (session.type === 'video' || session.isVideoEnabled) && styles.topHeaderFloating]}>
-            <View style={styles.e2eeBadge}>
-              <Ionicons name="lock-closed" size={13} color="#38BDF8" />
-              <Text style={styles.e2eeText}>End-to-End Encrypted HD</Text>
+          {isIncomingRinging ? (
+            <View style={styles.topHeaderIncoming}>
+              <View style={styles.e2eeBadge}>
+                <Ionicons name="lock-closed" size={12} color="#38BDF8" />
+                <Text style={styles.e2eeText}>End-to-End Encrypted HD</Text>
+              </View>
+
+              <Text style={styles.incomingCallerNameHeader} numberOfLines={1}>
+                {session.callerName}
+              </Text>
+
+              <Text style={styles.incomingCallTypeSubtitle}>
+                {isVideoCall ? 'Synkin Video Call' : 'Synkin Voice Call'}
+              </Text>
             </View>
+          ) : (
+            <View style={[styles.topHeader, (session.type === 'video' || session.isVideoEnabled) && styles.topHeaderFloating]}>
+              <View style={styles.e2eeBadge}>
+                <Ionicons name="lock-closed" size={13} color="#38BDF8" />
+                <Text style={styles.e2eeText}>End-to-End Encrypted HD</Text>
+              </View>
 
-            <Text style={styles.callTypeTitle}>
-              {isIncomingRinging
-                ? `Incoming ${session.type === 'video' ? 'Video' : 'Voice'} Call`
-                : session.callerName}
-            </Text>
+              <Text style={styles.callTypeTitle}>
+                {session.callerName}
+              </Text>
 
-            <Text style={[
-              styles.callStatus,
-              isConnected && styles.callStatusConnected,
-              session.status === 'rejected' && styles.callStatusRejected,
-              session.status === 'ended' && styles.callStatusEnded,
-            ]}>
-              {isIncomingRinging && 'Incoming Call...'}
-              {!isIncomingRinging && session.status === 'calling' && 'Calling...'}
-              {!isIncomingRinging && session.status === 'ringing' && 'Ringing...'}
-              {session.status === 'connected' && `Connected • ${durationText}`}
-              {session.status === 'ended' && 'Call Ended'}
-              {session.status === 'rejected' && '❌ Call Declined'}
-            </Text>
-          </View>
+              <Text style={[
+                styles.callStatus,
+                isConnected && styles.callStatusConnected,
+                session.status === 'rejected' && styles.callStatusRejected,
+                session.status === 'ended' && styles.callStatusEnded,
+              ]}>
+                {session.status === 'calling' && 'Calling...'}
+                {session.status === 'ringing' && 'Ringing...'}
+                {session.status === 'connected' && `Connected • ${durationText}`}
+                {session.status === 'ended' && 'Call Ended'}
+                {session.status === 'rejected' && '❌ Call Declined'}
+              </Text>
+            </View>
+          )}
 
-          {/* 2. INCOMING CALL (RECEIVER DIALER) OR VOICE CALL: Center Avatar */}
-          {((session.type !== 'video' && !session.isVideoEnabled) || (isIncomingRinging && !isConnected)) ? (
+          {/* 2. CENTER SECTION */}
+          {isIncomingRinging ? (
+            isVideoCall ? (
+              // INCOMING VIDEO CALL CENTER: WhatsApp style with medium avatar & "Turn off your video" pill
+              <View style={styles.videoIncomingCenterSection}>
+                <View style={styles.videoIncomingAvatarWrap}>
+                  <Image
+                    source={{ uri: session.callerPhoto || 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=800' }}
+                    style={styles.videoIncomingAvatar}
+                  />
+                </View>
+
+                {/* Turn off your video Pill Button */}
+                <TouchableOpacity
+                  style={styles.turnOffVideoPill}
+                  onPress={() => (onToggleVideo ? onToggleVideo() : WebRTCService.toggleVideo())}
+                  activeOpacity={0.8}
+                >
+                  <Ionicons
+                    name={session.isVideoEnabled !== false ? 'videocam-off' : 'videocam'}
+                    size={18}
+                    color="#FFFFFF"
+                  />
+                  <Text style={styles.turnOffVideoText}>
+                    {session.isVideoEnabled !== false ? 'Turn off your video' : 'Turn on your video'}
+                  </Text>
+                </TouchableOpacity>
+              </View>
+            ) : (
+              // INCOMING VOICE CALL CENTER: Classic large avatar with glowing ring
+              <View style={styles.centerSection}>
+                <View style={styles.avatarContainer}>
+                  <LinearGradient
+                    colors={['#A855F7', '#38BDF8']}
+                    start={{ x: 0, y: 0 }}
+                    end={{ x: 1, y: 1 }}
+                    style={{
+                      width: 170,
+                      height: 170,
+                      borderRadius: 85,
+                      padding: 3,
+                      alignItems: 'center',
+                      justifyContent: 'center',
+                      shadowColor: '#38BDF8',
+                      shadowOpacity: 0.6,
+                      shadowRadius: 16,
+                      elevation: 10,
+                    }}
+                  >
+                    <Image
+                      source={{ uri: session.callerPhoto || 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=800' }}
+                      style={{
+                        width: 164,
+                        height: 164,
+                        borderRadius: 82,
+                        backgroundColor: '#0F172A',
+                      }}
+                    />
+                  </LinearGradient>
+                </View>
+              </View>
+            )
+          ) : (session.type !== 'video' && !session.isVideoEnabled) || session.status === 'rejected' || session.status === 'ended' ? (
             <View style={styles.centerSection}>
               <View style={styles.avatarContainer}>
                 <LinearGradient
@@ -497,9 +580,7 @@ export const CallModal: React.FC<Props> = ({ session, isLockscreen, onEndCall, o
                 session.status === 'ended' && styles.callerSubEnded,
                 isConnected && styles.callerSubConnected,
               ]}>
-                {isIncomingRinging
-                  ? `Incoming ${session.type === 'video' ? 'Video' : 'Voice'} Call • Tap Accept`
-                  : session.status === 'rejected'
+                {session.status === 'rejected'
                   ? 'Call was declined by recipient'
                   : session.status === 'ended'
                   ? 'Call has ended'
@@ -529,27 +610,47 @@ export const CallModal: React.FC<Props> = ({ session, isLockscreen, onEndCall, o
                 </TouchableOpacity>
               </View>
             ) : isIncomingRinging ? (
-              // INCOMING CALL ACCEPT / DECLINE ACTIONS
+              // INCOMING CALL ACCEPT / DECLINE / MESSAGE ACTIONS
               <View style={styles.incomingActionsRow}>
-                {/* Decline Button */}
-                <TouchableOpacity
-                  style={[styles.actionCircleBtn, styles.declineCallBtn]}
-                  onPress={handleDecline}
-                  activeOpacity={0.8}
-                >
-                  <Ionicons name="call" size={28} color="#FFFFFF" style={{ transform: [{ rotate: '135deg' }] }} />
+                {/* 1. Decline Button */}
+                <View style={styles.actionItemCol}>
+                  <TouchableOpacity
+                    style={[styles.actionCircleBtn, styles.declineCallBtn]}
+                    onPress={handleDecline}
+                    activeOpacity={0.8}
+                  >
+                    <Ionicons name="call" size={28} color="#FFFFFF" style={{ transform: [{ rotate: '135deg' }] }} />
+                  </TouchableOpacity>
                   <Text style={styles.actionBtnLabel}>Decline</Text>
-                </TouchableOpacity>
+                </View>
 
-                {/* Accept Button */}
-                <TouchableOpacity
-                  style={[styles.actionCircleBtn, styles.acceptCallBtn]}
-                  onPress={handleAccept}
-                  activeOpacity={0.8}
-                >
-                  <Ionicons name="call" size={28} color="#FFFFFF" />
+                {/* 2. Accept Button (Camera icon if video call, Phone icon if voice call) */}
+                <View style={styles.actionItemCol}>
+                  <TouchableOpacity
+                    style={[styles.actionCircleBtn, styles.acceptCallBtn]}
+                    onPress={handleAccept}
+                    activeOpacity={0.8}
+                  >
+                    <Ionicons
+                      name={isVideoCall ? 'videocam' : 'call'}
+                      size={28}
+                      color="#FFFFFF"
+                    />
+                  </TouchableOpacity>
                   <Text style={styles.actionBtnLabel}>Accept</Text>
-                </TouchableOpacity>
+                </View>
+
+                {/* 3. Message Button */}
+                <View style={styles.actionItemCol}>
+                  <TouchableOpacity
+                    style={[styles.actionCircleBtn, styles.messageCallBtn]}
+                    onPress={handleIncomingMessage}
+                    activeOpacity={0.8}
+                  >
+                    <Ionicons name="chatbubble-ellipses" size={24} color="#FFFFFF" />
+                  </TouchableOpacity>
+                  <Text style={styles.actionBtnLabel}>Message</Text>
+                </View>
               </View>
             ) : (
               // ACTIVE / OUTGOING CALL CONTROLS (LUXURY OBSIDIAN & PEARL WHITE)
@@ -968,25 +1069,114 @@ const styles = StyleSheet.create({
     fontFamily: 'Poppins_700Bold',
     letterSpacing: 0.3,
   },
+  videoIncomingBackdropTint: {
+    position: 'absolute',
+    top: 0,
+    left: 0,
+    right: 0,
+    bottom: 0,
+    backgroundColor: 'rgba(0, 0, 0, 0.4)',
+  },
+  topHeaderIncoming: {
+    alignItems: 'center',
+    gap: 6,
+    width: '100%',
+    paddingTop: Platform.OS === 'web' ? 12 : 24,
+    zIndex: 10,
+  },
+  incomingCallerNameHeader: {
+    color: '#FFFFFF',
+    fontSize: 26,
+    fontFamily: 'Poppins_700Bold',
+    letterSpacing: -0.4,
+    textAlign: 'center',
+    textShadowColor: 'rgba(0, 0, 0, 0.7)',
+    textShadowOffset: { width: 0, height: 1 },
+    textShadowRadius: 6,
+  },
+  incomingCallTypeSubtitle: {
+    color: '#E2E8F0',
+    fontSize: 14,
+    fontFamily: 'Poppins_500Medium',
+    letterSpacing: 0.2,
+    textAlign: 'center',
+    textShadowColor: 'rgba(0, 0, 0, 0.7)',
+    textShadowOffset: { width: 0, height: 1 },
+    textShadowRadius: 4,
+  },
+  videoIncomingCenterSection: {
+    flex: 1,
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 16,
+    width: '100%',
+    marginBottom: 60,
+    zIndex: 10,
+  },
+  videoIncomingAvatarWrap: {
+    width: 106,
+    height: 106,
+    borderRadius: 53,
+    borderWidth: 2.5,
+    borderColor: '#FFFFFF',
+    overflow: 'hidden',
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.45,
+    shadowRadius: 10,
+    elevation: 8,
+  },
+  videoIncomingAvatar: {
+    width: '100%',
+    height: '100%',
+    borderRadius: 53,
+    backgroundColor: '#0F172A',
+  },
+  turnOffVideoPill: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 8,
+    backgroundColor: 'rgba(30, 41, 59, 0.82)',
+    borderWidth: 1,
+    borderColor: 'rgba(255, 255, 255, 0.22)',
+    paddingVertical: 10,
+    paddingHorizontal: 22,
+    borderRadius: 26,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 3 },
+    shadowOpacity: 0.35,
+    shadowRadius: 6,
+    elevation: 5,
+  },
+  turnOffVideoText: {
+    color: '#FFFFFF',
+    fontSize: 13,
+    fontFamily: 'Poppins_600SemiBold',
+    letterSpacing: 0.2,
+  },
   incomingActionsRow: {
     position: 'absolute',
-    bottom: 40,
+    bottom: Platform.OS === 'web' ? 36 : 48,
     left: 0,
     right: 0,
     flexDirection: 'row',
-    gap: 48,
     alignItems: 'center',
-    justifyContent: 'center',
+    justifyContent: 'space-around',
+    paddingHorizontal: 28,
     zIndex: 999,
     elevation: 999,
   },
+  actionItemCol: {
+    alignItems: 'center',
+    gap: 8,
+  },
   actionCircleBtn: {
-    width: 80,
-    height: 80,
-    borderRadius: 40,
+    width: 68,
+    height: 68,
+    borderRadius: 34,
     alignItems: 'center',
     justifyContent: 'center',
-    gap: 2,
     elevation: 8,
     shadowColor: '#000',
     shadowOffset: { width: 0, height: 4 },
@@ -994,17 +1184,24 @@ const styles = StyleSheet.create({
     shadowRadius: 8,
   },
   declineCallBtn: {
-    backgroundColor: '#1F1315',
-    borderWidth: 2,
-    borderColor: '#EF4444',
+    backgroundColor: '#DC2626',
   },
   acceptCallBtn: {
-    backgroundColor: '#10B981',
+    backgroundColor: '#16A34A',
+  },
+  messageCallBtn: {
+    backgroundColor: 'rgba(30, 41, 59, 0.85)',
+    borderWidth: 1.5,
+    borderColor: 'rgba(255, 255, 255, 0.25)',
   },
   actionBtnLabel: {
     color: '#FFFFFF',
-    fontSize: 11,
-    fontFamily: 'Poppins_800ExtraBold',
+    fontSize: 12,
+    fontFamily: 'Poppins_600SemiBold',
+    letterSpacing: 0.2,
+    textShadowColor: 'rgba(0, 0, 0, 0.65)',
+    textShadowOffset: { width: 0, height: 1 },
+    textShadowRadius: 3,
   },
   controlBar: {
     position: 'absolute',
