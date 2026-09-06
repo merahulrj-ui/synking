@@ -112,8 +112,6 @@ class SynkingConnectionService : ConnectionService() {
                     .setShowWhen(true)
                     .setUsesChronometer(true) // ⏱️ Live chronometer timer on notification panel
                     .setContentIntent(tapPendingIntent)
-                    .setColor(Color.parseColor("#DC2626")) // 🔴 Vibrant Red theme
-                    .setColorized(true) // 🔴 Colorize notification & buttons
 
                 val notification = builder.build()
                 notification.flags = notification.flags or

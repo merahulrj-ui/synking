@@ -328,6 +328,10 @@ class WebRTCManager {
     this.log(`📲 Incoming ${type} call from ${callerUser.name} (autoAccept: ${autoAccept})...`);
     this.notify();
 
+    if (!autoAccept && type === 'video') {
+      this.initCameraPreviewOnly().catch(() => {});
+    }
+
     if (autoAccept) {
       // Native lockscreen already accepted it, skip ringtone and timer!
       this.startTimer();
@@ -380,7 +384,7 @@ class WebRTCManager {
 
       const isVideo = this.currentSession?.type === 'video';
       
-      if (!this.localStream) {
+      if (!this.localStream || this.localStream.getAudioTracks().length === 0) {
         await this.initLocalStream(isVideo);
       }
 
@@ -450,6 +454,29 @@ class WebRTCManager {
     return { session: sessionCopy, durationFormatted };
   }
 
+  public async initCameraPreviewOnly() {
+    try {
+      if (this.localStream) return;
+      if (Platform.OS === 'android') {
+        const granted = await PermissionsAndroid.request(PermissionsAndroid.PERMISSIONS.CAMERA);
+        if (granted !== PermissionsAndroid.RESULTS.GRANTED) {
+          this.log('❌ Camera permission denied for incoming video preview.');
+          return;
+        }
+      }
+      if (MediaDevices && MediaDevices.getUserMedia) {
+        this.localStream = await MediaDevices.getUserMedia({
+          audio: false, // ⚠️ CRITICAL: Audio is FALSE so ringtone & loudspeaker are 100% unaffected!
+          video: { facingMode: 'user', width: { ideal: 640 }, height: { ideal: 480 } },
+        });
+        this.log(`📸 Front camera preview active for incoming video call (tracks: ${this.localStream.getVideoTracks().length})`);
+        this.notify();
+      }
+    } catch (err: any) {
+      this.log(`⚠️ Camera preview capture error: ${err?.message}`);
+    }
+  }
+
   private async initLocalStream(includeVideo: boolean) {
     try {
       if (Platform.OS === 'android') {
@@ -467,15 +494,29 @@ class WebRTCManager {
       }
 
       if (MediaDevices && MediaDevices.getUserMedia) {
-        // HACK: Always request video! If we don't request video, mobile Chrome/Safari routes audio to the EARPIECE and sometimes uses the wrong muted mic!
-        this.localStream = await MediaDevices.getUserMedia({
-          audio: {
-            echoCancellation: true,
-            noiseSuppression: true,
-            autoGainControl: true,
-          },
-          video: includeVideo ? { facingMode: 'user', width: { ideal: 640 }, height: { ideal: 480 } } : false,
-        });
+        if (!this.localStream) {
+          this.localStream = await MediaDevices.getUserMedia({
+            audio: {
+              echoCancellation: true,
+              noiseSuppression: true,
+              autoGainControl: true,
+            },
+            video: includeVideo ? { facingMode: 'user', width: { ideal: 640 }, height: { ideal: 480 } } : false,
+          });
+        } else if (this.localStream.getAudioTracks().length === 0) {
+          // Attach audio track to existing camera preview stream
+          const audioStream = await MediaDevices.getUserMedia({
+            audio: {
+              echoCancellation: true,
+              noiseSuppression: true,
+              autoGainControl: true,
+            },
+            video: false,
+          });
+          audioStream.getAudioTracks().forEach((track: any) => {
+            this.localStream.addTrack(track);
+          });
+        }
 
         const audioTracks = this.localStream?.getAudioTracks?.() || [];
         this.log(`🎙️ AUDIO TRACK COUNT: ${audioTracks.length}`);

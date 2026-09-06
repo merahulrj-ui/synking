@@ -8,29 +8,29 @@ import { RingtoneService } from '../services/ringtoneService';
 import { NativeRTCView } from '../services/webrtcCore';
 import { AudioRouteService } from '../services/audioRouteService';
 
-// 1. Live Self Video Component (PiP) - Real Hardware Front Camera
 const LiveSelfVideo: React.FC<{ isPip?: boolean }> = ({ isPip = true }) => {
   const videoRef = useRef<any>(null);
-
-  const attachSelf = () => {
-    if (Platform.OS === 'web') {
-      const stream = WebRTCService.getLocalStream();
-      if (stream && videoRef.current && videoRef.current.srcObject !== stream) {
-        videoRef.current.srcObject = stream;
-      }
-    }
-  };
+  const [stream, setStream] = useState<any>(() => WebRTCService.getLocalStream());
 
   useEffect(() => {
-    attachSelf();
-    const interval = setInterval(attachSelf, 400);
-    return () => clearInterval(interval);
+    const update = () => {
+      const s = WebRTCService.getLocalStream();
+      setStream(s);
+      if (Platform.OS === 'web' && s && videoRef.current && videoRef.current.srcObject !== s) {
+        videoRef.current.srcObject = s;
+      }
+    };
+    update();
+    const unsub = WebRTCService.subscribe(update);
+    const interval = setInterval(update, 300);
+    return () => {
+      unsub();
+      clearInterval(interval);
+    };
   }, []);
 
-  const stream = WebRTCService.getLocalStream();
-
   return (
-    <View style={[styles.selfVideoPlaceholder, { backgroundColor: '#000000', borderRadius: isPip ? 16 : 0 }]}>
+    <View style={[styles.selfVideoPlaceholder, { width: '100%', height: '100%', backgroundColor: '#000000', borderRadius: isPip ? 16 : 0 }]}>
       {Platform.OS === 'web' ? (
         // @ts-ignore
         <video
@@ -240,17 +240,17 @@ export const CallModal: React.FC<Props> = ({ session, isLockscreen, onEndCall, o
   const isIncomingRinging = isIncoming && session.status === 'ringing';
   const isConnected = session.status === 'connected';
   const durationText = WebRTCService.formatDuration(session.durationSeconds);
-  const localStream = WebRTCService.getLocalStream();
-
+  const [localStream, setLocalStream] = useState<any>(() => WebRTCService.getLocalStream());
   const [remoteStream, setRemoteStream] = useState<any>(() => WebRTCService.getRemoteStream());
 
   useEffect(() => {
-    const updateRemoteStream = () => {
+    const updateStreams = () => {
+      setLocalStream(WebRTCService.getLocalStream());
       setRemoteStream(WebRTCService.getRemoteStream());
     };
-    updateRemoteStream();
-    const unsub = WebRTCService.subscribe(updateRemoteStream);
-    const interval = setInterval(updateRemoteStream, 300);
+    updateStreams();
+    const unsub = WebRTCService.subscribe(updateStreams);
+    const interval = setInterval(updateStreams, 300);
     return () => {
       unsub();
       clearInterval(interval);
