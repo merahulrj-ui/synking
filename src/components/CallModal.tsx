@@ -266,8 +266,8 @@ export const CallModal: React.FC<Props> = ({ session, onEndCall, onAcceptCall, o
   const pipPan = useRef(new Animated.ValueXY()).current;
   const pipPanResponder = useRef(
     PanResponder.create({
-      onStartShouldSetPanResponder: () => true,
-      onMoveShouldSetPanResponder: () => true,
+      onStartShouldSetPanResponder: () => false,
+      onMoveShouldSetPanResponder: (_, gestureState) => Math.abs(gestureState.dx) > 3 || Math.abs(gestureState.dy) > 3,
       onPanResponderMove: Animated.event([null, { dx: pipPan.x, dy: pipPan.y }], { useNativeDriver: false }),
       onPanResponderRelease: () => {
         pipPan.extractOffset();

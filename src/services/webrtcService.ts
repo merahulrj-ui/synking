@@ -238,7 +238,7 @@ class WebRTCManager {
 
   // 2. Receive Incoming Call
   public receiveIncomingCall(callerUser: UserProfile, type: 'audio' | 'video' = 'audio', callId?: string, autoAccept: boolean = false): CallSession {
-    if (callId && this.currentSession && this.currentSession.id === callId && this.currentSession.status === 'ringing') {
+    if (callId && this.currentSession && this.currentSession.id === callId && (this.currentSession.status === 'ringing' || this.currentSession.status === 'connected')) {
       this.log(`📲 Duplicate call event ignored for callId=${callId}`);
       return this.currentSession;
     }
