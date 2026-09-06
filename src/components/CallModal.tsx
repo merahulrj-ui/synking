@@ -758,7 +758,7 @@ export const CallModal: React.FC<Props> = ({ session, isLockscreen, onEndCall, o
             </View>
           </View>
 
-          {/* Action Buttons Row */}
+          {/* Action Buttons Row (3 Buttons: Decline, Answer, Message) */}
           <View style={styles.bannerActionsRow}>
             {/* Colorful RED Decline Pill Button */}
             <TouchableOpacity
@@ -766,7 +766,7 @@ export const CallModal: React.FC<Props> = ({ session, isLockscreen, onEndCall, o
               onPress={handleDecline}
               activeOpacity={0.8}
             >
-              <Ionicons name="call" size={15} color="#FFFFFF" style={{ transform: [{ rotate: '135deg' }] }} />
+              <Ionicons name="call" size={14} color="#FFFFFF" style={{ transform: [{ rotate: '135deg' }] }} />
               <Text style={styles.bannerDeclineText}>Decline</Text>
             </TouchableOpacity>
 
@@ -778,12 +778,22 @@ export const CallModal: React.FC<Props> = ({ session, isLockscreen, onEndCall, o
             >
               <Ionicons
                 name={isVideo ? 'videocam' : 'call'}
-                size={16}
+                size={15}
                 color="#FFFFFF"
               />
               <Text style={styles.bannerAcceptText}>
                 {isVideo ? 'Video' : 'Answer'}
               </Text>
+            </TouchableOpacity>
+
+            {/* Dark Message / Reply Pill Button */}
+            <TouchableOpacity
+              style={styles.bannerMessageBtn}
+              onPress={handleIncomingMessage}
+              activeOpacity={0.8}
+            >
+              <Ionicons name="chatbubble-ellipses" size={14} color="#FFFFFF" />
+              <Text style={styles.bannerMessageText}>Message</Text>
             </TouchableOpacity>
           </View>
         </TouchableOpacity>
@@ -1366,17 +1376,17 @@ const styles = StyleSheet.create({
   },
   bannerActionsRow: {
     flexDirection: 'row',
-    gap: 10,
+    gap: 8,
   },
   bannerDeclineBtn: {
     flex: 1,
     backgroundColor: '#DC2626',
     borderRadius: 22,
-    paddingVertical: 10,
+    paddingVertical: 9,
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'center',
-    gap: 8,
+    gap: 6,
     shadowColor: '#DC2626',
     shadowOffset: { width: 0, height: 3 },
     shadowOpacity: 0.35,
@@ -1385,18 +1395,18 @@ const styles = StyleSheet.create({
   },
   bannerDeclineText: {
     color: '#FFFFFF',
-    fontSize: 14,
+    fontSize: 13,
     fontFamily: 'Poppins_600SemiBold',
   },
   bannerAcceptBtn: {
     flex: 1,
     backgroundColor: '#16A34A',
     borderRadius: 22,
-    paddingVertical: 10,
+    paddingVertical: 9,
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'center',
-    gap: 8,
+    gap: 6,
     shadowColor: '#16A34A',
     shadowOffset: { width: 0, height: 3 },
     shadowOpacity: 0.35,
@@ -1405,7 +1415,27 @@ const styles = StyleSheet.create({
   },
   bannerAcceptText: {
     color: '#FFFFFF',
-    fontSize: 14,
+    fontSize: 13,
+    fontFamily: 'Poppins_600SemiBold',
+  },
+  bannerMessageBtn: {
+    flex: 1,
+    backgroundColor: '#334155',
+    borderRadius: 22,
+    paddingVertical: 9,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 6,
+    shadowColor: '#334155',
+    shadowOffset: { width: 0, height: 3 },
+    shadowOpacity: 0.35,
+    shadowRadius: 6,
+    elevation: 4,
+  },
+  bannerMessageText: {
+    color: '#FFFFFF',
+    fontSize: 13,
     fontFamily: 'Poppins_600SemiBold',
   },
 });
