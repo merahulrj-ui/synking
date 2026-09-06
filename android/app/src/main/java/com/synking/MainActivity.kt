@@ -13,9 +13,6 @@ import expo.modules.ReactActivityDelegateWrapper
 import android.content.BroadcastReceiver
 import android.content.Context
 import android.content.IntentFilter
-import android.app.PictureInPictureParams
-import android.util.Rational
-
 class MainActivity : ReactActivity() {
 
   companion object {
@@ -100,19 +97,6 @@ class MainActivity : ReactActivity() {
 
   override fun onResume() {
     super.onResume()
-    if (TelecomModule.isCallActive && Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
-      try {
-        val aspectRatio = Rational(9, 16)
-        val params = PictureInPictureParams.Builder()
-          .setAspectRatio(aspectRatio)
-          .setAutoEnterEnabled(true)
-          .build()
-        setPictureInPictureParams(params)
-        android.util.Log.d("SYNKING_PIP", "[MainActivity] onResume: Auto-PiP pre-registered successfully")
-      } catch (e: Exception) {
-        android.util.Log.w("SYNKING_PIP", "[MainActivity] onResume setPictureInPictureParams failed: ${e.message}")
-      }
-    }
   }
 
   override fun onDestroy() {
@@ -223,46 +207,6 @@ class MainActivity : ReactActivity() {
         "[SYNKING_CALL_DEBUG] [OK] MAIN_ACTIVITY_INCOMING_CALL " +
         "callId=$callId caller=$callerName type=$callType autoAccept=$autoAccept"
     )
-  }
-
-  override fun onUserLeaveHint() {
-    super.onUserLeaveHint()
-    try {
-      if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
-        val aspectRatio = android.util.Rational(9, 16)
-        val builder = android.app.PictureInPictureParams.Builder()
-            .setAspectRatio(aspectRatio)
-        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
-            builder.setAutoEnterEnabled(true)
-        }
-        enterPictureInPictureMode(builder.build())
-        android.util.Log.d("SYNKING_PIP", "[MainActivity] Entered native Android Picture-in-Picture mode successfully!")
-      }
-    } catch (e: Exception) {
-      android.util.Log.w("SYNKING_PIP", "[MainActivity] enterPictureInPictureMode hint failed: ${e.message}")
-    }
-  }
-
-  override fun onPictureInPictureModeChanged(isInPictureInPictureMode: Boolean) {
-    super.onPictureInPictureModeChanged(isInPictureInPictureMode)
-    emitPipState(isInPictureInPictureMode)
-  }
-
-  override fun onPictureInPictureModeChanged(isInPictureInPictureMode: Boolean, newConfig: android.content.res.Configuration) {
-    super.onPictureInPictureModeChanged(isInPictureInPictureMode, newConfig)
-    emitPipState(isInPictureInPictureMode)
-  }
-
-  private fun emitPipState(isInPictureInPictureMode: Boolean) {
-    android.util.Log.d("SYNKING_PIP", "[MainActivity] onPictureInPictureModeChanged: isInPictureInPictureMode=$isInPictureInPictureMode")
-    try {
-      val map = com.facebook.react.bridge.Arguments.createMap().apply {
-        putBoolean("isInPictureInPictureMode", isInPictureInPictureMode)
-      }
-      val ctx = TelecomModule.reactContext ?: reactInstanceManager.currentReactContext
-      ctx?.getJSModule(com.facebook.react.modules.core.DeviceEventManagerModule.RCTDeviceEventEmitter::class.java)
-        ?.emit("onPictureInPictureModeChanged", map)
-    } catch (e: Exception) {}
   }
 }
 

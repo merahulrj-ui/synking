@@ -7,7 +7,6 @@ import { WebRTCService } from '../services/webrtcService';
 import { RingtoneService } from '../services/ringtoneService';
 import { NativeRTCView } from '../services/webrtcCore';
 import { AudioRouteService } from '../services/audioRouteService';
-import { DedicatedPipView } from './DedicatedPipView';
 
 // 1. Live Self Video Component (PiP) - Real Hardware Front Camera
 const LiveSelfVideo: React.FC<{ isPip?: boolean }> = ({ isPip = true }) => {
@@ -185,30 +184,6 @@ interface Props {
 export const CallModal: React.FC<Props> = ({ session, onEndCall, onAcceptCall, onMinimize }) => {
   if (!session) return null;
 
-  const [isNativePip, setIsNativePip] = useState(() => {
-    if (Platform.OS !== 'android') return false;
-    const { width } = Dimensions.get('window');
-    return width > 0 && width < 300;
-  });
-
-  // 📺 Native Picture-in-Picture mode listener & Dimension fallback (guaranteed clean PiP window)
-  useEffect(() => {
-    const sub = DeviceEventEmitter.addListener('onPictureInPictureModeChanged', (event: any) => {
-      setIsNativePip(Boolean(event?.isInPictureInPictureMode));
-    });
-
-    const dimSub = Dimensions.addEventListener('change', ({ window }) => {
-      if (Platform.OS === 'android') {
-        setIsNativePip(window.width > 0 && window.width < 300);
-      }
-    });
-
-    return () => {
-      sub.remove();
-      dimSub.remove();
-    };
-  }, []);
-
   useEffect(() => {
     // If it's an audio call and connected, turn on proximity sensor to turn screen black near ear
     if (session.status === 'connected' && session.type === 'audio' && !session.isSpeakerOn) {
@@ -221,18 +196,14 @@ export const CallModal: React.FC<Props> = ({ session, onEndCall, onAcceptCall, o
     };
   }, [session.status, session.type, session.isSpeakerOn]);
 
-  // 📱 Android Back Button Minimization Hook (WhatsApp / Meet Style)
+  // 📱 Android Back Button Minimization Hook (Minimizes to In-App PiP)
   useEffect(() => {
     if (Platform.OS !== 'android') return;
     const onBackPress = () => {
       if (session.status === 'connected' || session.status === 'calling') {
-        if (NativeModules.TelecomModule?.enterPipMode) {
-          NativeModules.TelecomModule.enterPipMode().catch(() => {});
-          return true;
-        }
         if (onMinimize) {
           onMinimize();
-          return true; // Handled, prevent app close
+          return true; // Handled, minimize in-app
         }
       }
       return false;
@@ -241,27 +212,6 @@ export const CallModal: React.FC<Props> = ({ session, onEndCall, onAcceptCall, o
     const sub = BackHandler.addEventListener('hardwareBackPress', onBackPress);
     return () => sub.remove();
   }, [session.status, onMinimize]);
-
-  // 🚀 Android Auto-PiP Sync: Tell Android OS to enable PiP on swipe-to-home whenever call is active
-  useEffect(() => {
-    if (Platform.OS === 'android' && NativeModules.TelecomModule?.setAutoPipEnabled) {
-      const isLive = session.status === 'connected' || session.status === 'calling';
-      NativeModules.TelecomModule.setAutoPipEnabled(isLive).catch(() => {});
-    }
-    return () => {
-      if (Platform.OS === 'android' && NativeModules.TelecomModule?.setAutoPipEnabled) {
-        NativeModules.TelecomModule.setAutoPipEnabled(false).catch(() => {});
-      }
-    };
-  }, [session.status]);
-
-  const handleTriggerPip = () => {
-    if (Platform.OS === 'android' && NativeModules.TelecomModule?.enterPipMode) {
-      NativeModules.TelecomModule.enterPipMode().catch(() => {});
-    } else if (onMinimize) {
-      onMinimize();
-    }
-  };
 
   const pipPan = useRef(new Animated.ValueXY()).current;
   const pipPanResponder = useRef(
@@ -562,20 +512,11 @@ Remote Video Tracks (${remoteVideo.length}): ${JSON.stringify(remoteVideo)}
     setTimeout(() => setCopied(false), 3000);
   };
 
-  // 📺 DEDICATED ISOLATED PIP VIEW (Zero buttons, Zero clutter, WhatsApp/Meet style)
-  if (isNativePip) {
-    return (
-      <View style={[StyleSheet.absoluteFill, { zIndex: 999999, elevation: 999999, backgroundColor: '#05060A' }]}>
-        <DedicatedPipView session={session} remoteStream={remoteStream} />
-      </View>
-    );
-  }
-
   const callContent = (
     <View style={styles.modalOverlay}>
       <LinearGradient
         colors={['#0F172A', '#05060A', '#020617']}
-        style={[styles.callingCard, isNativePip && { paddingVertical: 0, paddingHorizontal: 0, justifyContent: 'center' }]}
+        style={styles.callingCard}
         >
           {/* 1. CONNECTED VIDEO CALL: Fullscreen Remote Video + Draggable Self PiP */}
           {isConnected && (session.type === 'video' || session.isVideoEnabled) && (
@@ -594,42 +535,40 @@ Remote Video Tracks (${remoteVideo.length}): ${JSON.stringify(remoteVideo)}
                 )}
               </View>
 
-              {/* Draggable Self PiP Overlay (Hidden in Native PiP) */}
-              {!isNativePip && (
-                <Animated.View 
-                  style={[styles.pipSelfView, { transform: pipPan.getTranslateTransform(), zIndex: 20 }]}
-                  {...pipPanResponder.panHandlers}
-                >
-                  <View style={{ flex: 1, width: '100%', height: '100%', overflow: 'hidden', backgroundColor: '#000000' }}>
-                    <LiveSelfVideo isPip={true} />
-                    
-                    {/* 📸 Flip Camera Button Overlay */}
-                    <TouchableOpacity 
-                      style={{
-                        position: 'absolute',
-                        bottom: 10,
-                        right: 10,
-                        backgroundColor: 'rgba(0, 0, 0, 0.6)',
-                        width: 34,
-                        height: 34,
-                        borderRadius: 17,
-                        alignItems: 'center',
-                        justifyContent: 'center',
-                        borderWidth: 1,
-                        borderColor: 'rgba(255, 255, 255, 0.3)',
-                        zIndex: 100,
-                      }}
-                      onPress={(e) => { 
-                        e.stopPropagation(); 
-                        WebRTCService.switchCamera(); 
-                      }}
-                      activeOpacity={0.7}
-                    >
-                      <Ionicons name="camera-reverse" size={18} color="#00E5FF" />
-                    </TouchableOpacity>
-                  </View>
-                </Animated.View>
-              )}
+              {/* Draggable Self PiP Overlay */}
+              <Animated.View 
+                style={[styles.pipSelfView, { transform: pipPan.getTranslateTransform(), zIndex: 20 }]}
+                {...pipPanResponder.panHandlers}
+              >
+                <View style={{ flex: 1, width: '100%', height: '100%', overflow: 'hidden', backgroundColor: '#000000' }}>
+                  <LiveSelfVideo isPip={true} />
+                  
+                  {/* 📸 Flip Camera Button Overlay */}
+                  <TouchableOpacity 
+                    style={{
+                      position: 'absolute',
+                      bottom: 10,
+                      right: 10,
+                      backgroundColor: 'rgba(0, 0, 0, 0.6)',
+                      width: 34,
+                      height: 34,
+                      borderRadius: 17,
+                      alignItems: 'center',
+                      justifyContent: 'center',
+                      borderWidth: 1,
+                      borderColor: 'rgba(255, 255, 255, 0.3)',
+                      zIndex: 100,
+                    }}
+                    onPress={(e) => { 
+                      e.stopPropagation(); 
+                      WebRTCService.switchCamera(); 
+                    }}
+                    activeOpacity={0.7}
+                  >
+                    <Ionicons name="camera-reverse" size={18} color="#00E5FF" />
+                  </TouchableOpacity>
+                </View>
+              </Animated.View>
             </>
           )}
 
@@ -645,32 +584,8 @@ Remote Video Tracks (${remoteVideo.length}): ${JSON.stringify(remoteVideo)}
             </View>
           )}
 
-          {/* Universal 1-Click Guaranteed Flip Camera Button (Always on top during Video, hidden in PiP) */}
-          {!isNativePip && (session.type === 'video' || session.isVideoEnabled) && (
-            <TouchableOpacity 
-              style={styles.floatingFlipBtn}
-              onPress={() => WebRTCService.switchCamera()}
-              activeOpacity={0.7}
-              hitSlop={{ top: 20, bottom: 20, left: 20, right: 20 }}
-            >
-              <Ionicons name="camera-reverse" size={24} color="#FFFFFF" />
-            </TouchableOpacity>
-          )}
-
-          {/* Top Left 1: Minimize to Picture-in-Picture Button (WhatsApp / Meet Style) */}
-          {!isNativePip && ((session.type === 'video' || session.isVideoEnabled) || isConnected) && (
-            <TouchableOpacity
-              style={styles.pipMinimizeBtn}
-              onPress={handleTriggerPip}
-              activeOpacity={0.7}
-              hitSlop={{ top: 20, bottom: 20, left: 20, right: 20 }}
-            >
-              <Ionicons name="chevron-down" size={26} color="#FFFFFF" />
-            </TouchableOpacity>
-          )}
-
-          {/* Top Left 2: Chat Button (Always next to PiP on Video Call, hidden in PiP) */}
-          {!isNativePip && ((session.type === 'video' || session.isVideoEnabled) || isConnected) && (
+          {/* Top Left: Chat Button */}
+          {((session.type === 'video' || session.isVideoEnabled) || isConnected) && (
             <TouchableOpacity
               style={styles.chatMinimizeBtn}
               onPress={handleOpenChat}
@@ -682,37 +597,35 @@ Remote Video Tracks (${remoteVideo.length}): ${JSON.stringify(remoteVideo)}
           )}
 
           {/* 1. TOP STATUS HEADER (ALWAYS AT TOP, hidden in PiP) */}
-          {!isNativePip && (
-            <View style={[styles.topHeader, (session.type === 'video' || session.isVideoEnabled) && styles.topHeaderFloating]}>
-              <View style={styles.e2eeBadge}>
-                <Ionicons name="lock-closed" size={13} color="#38BDF8" />
-                <Text style={styles.e2eeText}>End-to-End Encrypted HD</Text>
-              </View>
-
-              <Text style={styles.callTypeTitle}>
-                {isIncomingRinging
-                  ? `Incoming ${session.type === 'video' ? 'Video' : 'Voice'} Call`
-                  : session.callerName}
-              </Text>
-
-              <Text style={[
-                styles.callStatus,
-                isConnected && styles.callStatusConnected,
-                session.status === 'rejected' && styles.callStatusRejected,
-                session.status === 'ended' && styles.callStatusEnded,
-              ]}>
-                {isIncomingRinging && 'Incoming Call...'}
-                {!isIncomingRinging && session.status === 'calling' && 'Calling...'}
-                {!isIncomingRinging && session.status === 'ringing' && 'Ringing...'}
-                {session.status === 'connected' && `Connected • ${durationText}`}
-                {session.status === 'ended' && 'Call Ended'}
-                {session.status === 'rejected' && '❌ Call Declined'}
-              </Text>
+          <View style={[styles.topHeader, (session.type === 'video' || session.isVideoEnabled) && styles.topHeaderFloating]}>
+            <View style={styles.e2eeBadge}>
+              <Ionicons name="lock-closed" size={13} color="#38BDF8" />
+              <Text style={styles.e2eeText}>End-to-End Encrypted HD</Text>
             </View>
-          )}
 
-          {/* 2. INCOMING CALL (RECEIVER DIALER) OR VOICE CALL: Center Avatar (Hidden in PiP) */}
-          {!isNativePip && ((session.type !== 'video' && !session.isVideoEnabled) || (isIncomingRinging && !isConnected)) ? (
+            <Text style={styles.callTypeTitle}>
+              {isIncomingRinging
+                ? `Incoming ${session.type === 'video' ? 'Video' : 'Voice'} Call`
+                : session.callerName}
+            </Text>
+
+            <Text style={[
+              styles.callStatus,
+              isConnected && styles.callStatusConnected,
+              session.status === 'rejected' && styles.callStatusRejected,
+              session.status === 'ended' && styles.callStatusEnded,
+            ]}>
+              {isIncomingRinging && 'Incoming Call...'}
+              {!isIncomingRinging && session.status === 'calling' && 'Calling...'}
+              {!isIncomingRinging && session.status === 'ringing' && 'Ringing...'}
+              {session.status === 'connected' && `Connected • ${durationText}`}
+              {session.status === 'ended' && 'Call Ended'}
+              {session.status === 'rejected' && '❌ Call Declined'}
+            </Text>
+          </View>
+
+          {/* 2. INCOMING CALL (RECEIVER DIALER) OR VOICE CALL: Center Avatar */}
+          {((session.type !== 'video' && !session.isVideoEnabled) || (isIncomingRinging && !isConnected)) ? (
             <View style={styles.centerSection}>
               <View style={styles.avatarContainer}>
                 <LinearGradient
@@ -774,29 +687,12 @@ Remote Video Tracks (${remoteVideo.length}): ${JSON.stringify(remoteVideo)}
                   : 'Connecting safely on Synkin'}
               </Text>
             </View>
-          ) : isNativePip && session.type !== 'video' && !session.isVideoEnabled ? (
-            <View style={{ flex: 1, alignItems: 'center', justifyContent: 'center', backgroundColor: '#05060A', width: '100%', height: '100%' }}>
-              <Image
-                source={{ uri: session.callerPhoto }}
-                style={{
-                  width: 72,
-                  height: 72,
-                  borderRadius: 36,
-                  borderWidth: 2,
-                  borderColor: '#10B981',
-                }}
-              />
-              <Text style={{ color: '#FFFFFF', fontSize: 13, fontFamily: 'Poppins_700Bold', marginTop: 8 }} numberOfLines={1}>
-                {session.callerName}
-              </Text>
-            </View>
           ) : (
             <View style={{ flex: 1 }} />
           )}
 
-          {/* 3. BOTTOM CONTROL BAR (Hidden in PiP) */}
-          {!isNativePip && (
-            session.status === 'rejected' || session.status === 'ended' ? (
+          {/* 3. BOTTOM CONTROL BAR */}
+          {session.status === 'rejected' || session.status === 'ended' ? (
               <View style={styles.declinedActionsRow}>
                 <TouchableOpacity
                   style={styles.declinedDismissBtn}
@@ -886,7 +782,7 @@ Remote Video Tracks (${remoteVideo.length}): ${JSON.stringify(remoteVideo)}
                 </TouchableOpacity>
               </View>
             )
-          )}
+          }
         </LinearGradient>
       </View>
   );
@@ -921,29 +817,10 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     position: 'relative',
   },
-  pipMinimizeBtn: {
-    position: 'absolute',
-    top: Platform.OS === 'web' ? 24 : 54,
-    left: 20,
-    width: 48,
-    height: 48,
-    borderRadius: 24,
-    backgroundColor: 'rgba(10, 14, 23, 0.72)',
-    borderWidth: 1,
-    borderColor: 'rgba(255, 255, 255, 0.2)',
-    alignItems: 'center',
-    justifyContent: 'center',
-    zIndex: 999999,
-    elevation: 999999,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 4 },
-    shadowOpacity: 0.45,
-    shadowRadius: 10,
-  },
   chatMinimizeBtn: {
     position: 'absolute',
     top: Platform.OS === 'web' ? 24 : 54,
-    left: 76,
+    left: 20,
     width: 48,
     height: 48,
     borderRadius: 24,
@@ -1237,25 +1114,6 @@ const styles = StyleSheet.create({
     color: '#FFFFFF',
     fontSize: 11,
     fontFamily: 'Poppins_800ExtraBold',
-  },
-  floatingFlipBtn: {
-    position: 'absolute',
-    top: Platform.OS === 'web' ? 24 : 54,
-    right: 20,
-    width: 48,
-    height: 48,
-    borderRadius: 24,
-    backgroundColor: 'rgba(10, 14, 23, 0.72)',
-    borderWidth: 1,
-    borderColor: 'rgba(255, 255, 255, 0.2)',
-    alignItems: 'center',
-    justifyContent: 'center',
-    zIndex: 999999,
-    elevation: 999999,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 4 },
-    shadowOpacity: 0.45,
-    shadowRadius: 10,
   },
   controlBar: {
     position: 'absolute',

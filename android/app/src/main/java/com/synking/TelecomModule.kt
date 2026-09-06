@@ -3,7 +3,6 @@ package com.synking
 import android.app.Activity
 import android.app.NotificationManager
 import android.app.KeyguardManager
-import android.app.PictureInPictureParams
 import android.content.Context
 import android.content.Intent
 import android.media.AudioManager
@@ -199,17 +198,6 @@ class TelecomModule(reactContext: ReactApplicationContext) : ReactContextBaseJav
                         act.window.addFlags(WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON)
                         Log.d("SYNKING_TELECOM", "[TelecomModule] FLAG_KEEP_SCREEN_ON added to ${act.javaClass.simpleName}")
                     } catch (e: Exception) {}
-                    if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
-                        try {
-                            val builder = PictureInPictureParams.Builder()
-                                .setAspectRatio(Rational(9, 16))
-                                .setAutoEnterEnabled(true)
-                            act.setPictureInPictureParams(builder.build())
-                            Log.d("SYNKING_PIP", "[TelecomModule] startOngoingCall: auto-PiP pre-registered on ${act.javaClass.simpleName}")
-                        } catch (e: Exception) {
-                            Log.w("SYNKING_PIP", "[TelecomModule] startOngoingCall setPictureInPictureParams error: ${e.message}")
-                        }
-                    }
                 }
             }
             promise.resolve(true)
@@ -273,60 +261,12 @@ class TelecomModule(reactContext: ReactApplicationContext) : ReactContextBaseJav
 
     @ReactMethod
     fun setAutoPipEnabled(enabled: Boolean, promise: Promise) {
-        try {
-            isCallActive = enabled
-            val activity: Activity? = CallActivity.currentCallActivity ?: reactApplicationContext.currentActivity
-            if (activity != null && Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
-                activity.runOnUiThread {
-                    try {
-                        val builder = PictureInPictureParams.Builder()
-                        if (enabled) {
-                            builder.setAspectRatio(Rational(9, 16))
-                            builder.setAutoEnterEnabled(true)
-                        } else {
-                            builder.setAutoEnterEnabled(false)
-                        }
-                        activity.setPictureInPictureParams(builder.build())
-                        Log.d("SYNKING_PIP", "[TelecomModule] setAutoPipEnabled=$enabled applied to ${activity.javaClass.simpleName}")
-                        promise.resolve(true)
-                    } catch (e: Exception) {
-                        Log.w("SYNKING_PIP", "[TelecomModule] setAutoPipEnabled error: ${e.message}")
-                        promise.resolve(false)
-                    }
-                }
-            } else {
-                promise.resolve(false)
-            }
-        } catch (e: Exception) {
-            promise.resolve(false)
-        }
+        promise.resolve(false)
     }
 
     @ReactMethod
     fun enterPipMode(promise: Promise) {
-        try {
-            val activity: Activity? = CallActivity.currentCallActivity ?: reactApplicationContext.currentActivity
-            if (activity != null && Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
-                activity.runOnUiThread {
-                    try {
-                        val aspectRatio = Rational(9, 16)
-                        val builder = PictureInPictureParams.Builder()
-                            .setAspectRatio(aspectRatio)
-                        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
-                            builder.setAutoEnterEnabled(true)
-                        }
-                        val success = activity.enterPictureInPictureMode(builder.build())
-                        promise.resolve(success)
-                    } catch (e: Exception) {
-                        promise.resolve(false)
-                    }
-                }
-            } else {
-                promise.resolve(false)
-            }
-        } catch (e: Exception) {
-            promise.resolve(false)
-        }
+        promise.resolve(false)
     }
 
     @ReactMethod
@@ -364,14 +304,6 @@ class TelecomModule(reactContext: ReactApplicationContext) : ReactContextBaseJav
                         act.window.clearFlags(WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON)
                         Log.d("SYNKING_TELECOM", "[TelecomModule] FLAG_KEEP_SCREEN_ON cleared on ${act.javaClass.simpleName}")
                     } catch (e: Exception) {}
-                    if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
-                        try {
-                            val builder = PictureInPictureParams.Builder()
-                                .setAutoEnterEnabled(false)
-                            act.setPictureInPictureParams(builder.build())
-                            Log.d("SYNKING_PIP", "[TelecomModule] endCall: auto-PiP disabled")
-                        } catch (e: Exception) {}
-                    }
                 }
             }
 
@@ -406,21 +338,9 @@ class TelecomModule(reactContext: ReactApplicationContext) : ReactContextBaseJav
             val km = ctx.getSystemService(Context.KEYGUARD_SERVICE) as? KeyguardManager
 
             val openChatAction: () -> Unit = {
-                // If running inside CallActivity, enter PiP so video call floats over chat!
+                // If running inside CallActivity, finish it so MainActivity shows chat with in-app floating pill
                 CallActivity.currentCallActivity?.let { act ->
-                    act.runOnUiThread {
-                        try {
-                            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
-                                val aspectRatio = Rational(9, 16)
-                                val params = PictureInPictureParams.Builder()
-                                    .setAspectRatio(aspectRatio)
-                                    .build()
-                                act.enterPictureInPictureMode(params)
-                            }
-                        } catch (e: Exception) {
-                            Log.w("SYNKING_DEBUG", "PiP enter on CallActivity failed: ${e.message}")
-                        }
-                    }
+                    act.finish()
                 }
 
                 val intent = Intent(ctx, MainActivity::class.java).apply {
