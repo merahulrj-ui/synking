@@ -246,6 +246,27 @@ export const CallModal: React.FC<Props> = ({ session, onEndCall, onAcceptCall, o
     return () => sub.remove();
   }, [session.status, onMinimize]);
 
+  // 🚀 Android Auto-PiP Sync: Tell Android OS to enable PiP on swipe-to-home whenever call is active
+  useEffect(() => {
+    if (Platform.OS === 'android' && NativeModules.TelecomModule?.setAutoPipEnabled) {
+      const isLive = session.status === 'connected' || session.status === 'calling';
+      NativeModules.TelecomModule.setAutoPipEnabled(isLive).catch(() => {});
+    }
+    return () => {
+      if (Platform.OS === 'android' && NativeModules.TelecomModule?.setAutoPipEnabled) {
+        NativeModules.TelecomModule.setAutoPipEnabled(false).catch(() => {});
+      }
+    };
+  }, [session.status]);
+
+  const handleTriggerPip = () => {
+    if (Platform.OS === 'android' && NativeModules.TelecomModule?.enterPipMode) {
+      NativeModules.TelecomModule.enterPipMode().catch(() => {});
+    } else if (onMinimize) {
+      onMinimize();
+    }
+  };
+
   const pipPan = useRef(new Animated.ValueXY()).current;
   const pipPanResponder = useRef(
     PanResponder.create({
@@ -640,7 +661,19 @@ Remote Video Tracks (${remoteVideo.length}): ${JSON.stringify(remoteVideo)}
             </TouchableOpacity>
           )}
 
-          {/* Top Left: Chat Button (Always at Top-Left on Video Call, hidden in PiP) */}
+          {/* Top Left 1: Minimize to Picture-in-Picture Button (WhatsApp / Meet Style) */}
+          {!isNativePip && ((session.type === 'video' || session.isVideoEnabled) || isConnected) && (
+            <TouchableOpacity
+              style={styles.pipMinimizeBtn}
+              onPress={handleTriggerPip}
+              activeOpacity={0.7}
+              hitSlop={{ top: 20, bottom: 20, left: 20, right: 20 }}
+            >
+              <Ionicons name="chevron-down" size={26} color="#FFFFFF" />
+            </TouchableOpacity>
+          )}
+
+          {/* Top Left 2: Chat Button (Always next to PiP on Video Call, hidden in PiP) */}
           {!isNativePip && ((session.type === 'video' || session.isVideoEnabled) || isConnected) && (
             <TouchableOpacity
               style={styles.chatMinimizeBtn}
@@ -892,10 +925,29 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     position: 'relative',
   },
-  chatMinimizeBtn: {
+  pipMinimizeBtn: {
     position: 'absolute',
     top: Platform.OS === 'web' ? 24 : 54,
     left: 20,
+    width: 48,
+    height: 48,
+    borderRadius: 24,
+    backgroundColor: 'rgba(10, 14, 23, 0.72)',
+    borderWidth: 1,
+    borderColor: 'rgba(255, 255, 255, 0.2)',
+    alignItems: 'center',
+    justifyContent: 'center',
+    zIndex: 999999,
+    elevation: 999999,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.45,
+    shadowRadius: 10,
+  },
+  chatMinimizeBtn: {
+    position: 'absolute',
+    top: Platform.OS === 'web' ? 24 : 54,
+    left: 76,
     width: 48,
     height: 48,
     borderRadius: 24,

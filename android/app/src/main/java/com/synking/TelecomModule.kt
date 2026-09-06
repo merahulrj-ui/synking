@@ -3,6 +3,7 @@ package com.synking
 import android.app.Activity
 import android.app.NotificationManager
 import android.app.KeyguardManager
+import android.app.PictureInPictureParams
 import android.content.Context
 import android.content.Intent
 import android.net.Uri
@@ -10,6 +11,7 @@ import android.os.Build
 import android.os.Handler
 import android.os.Looper
 import android.util.Log
+import android.util.Rational
 import com.facebook.react.bridge.Arguments
 import com.facebook.react.bridge.Promise
 import com.facebook.react.bridge.ReactApplicationContext
@@ -183,9 +185,24 @@ class TelecomModule(reactContext: ReactApplicationContext) : ReactContextBaseJav
     @ReactMethod
     fun startOngoingCall(callerName: String, promise: Promise) {
         try {
+            isCallActive = true
             CallState.markAnswered(reactApplicationContext)
             CallConnectionManager.answerCall()
             SynkingConnectionService.updateOngoingCallForeground(callerName)
+            val activity: Activity? = CallActivity.currentCallActivity ?: reactApplicationContext.currentActivity
+            if (activity != null && Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
+                activity.runOnUiThread {
+                    try {
+                        val builder = PictureInPictureParams.Builder()
+                            .setAspectRatio(Rational(9, 16))
+                            .setAutoEnterEnabled(true)
+                        activity.setPictureInPictureParams(builder.build())
+                        Log.d("SYNKING_PIP", "[TelecomModule] startOngoingCall: auto-PiP pre-registered on ${activity.javaClass.simpleName}")
+                    } catch (e: Exception) {
+                        Log.w("SYNKING_PIP", "[TelecomModule] startOngoingCall setPictureInPictureParams error: ${e.message}")
+                    }
+                }
+            }
             promise.resolve(true)
         } catch (e: Exception) {
             promise.resolve(false)
@@ -195,9 +212,41 @@ class TelecomModule(reactContext: ReactApplicationContext) : ReactContextBaseJav
     @ReactMethod
     fun answerCall(promise: Promise) {
         try {
+            isCallActive = true
             CallState.markAnswered(reactApplicationContext)
             CallConnectionManager.answerCall()
             promise.resolve(true)
+        } catch (e: Exception) {
+            promise.resolve(false)
+        }
+    }
+
+    @ReactMethod
+    fun setAutoPipEnabled(enabled: Boolean, promise: Promise) {
+        try {
+            isCallActive = enabled
+            val activity: Activity? = CallActivity.currentCallActivity ?: reactApplicationContext.currentActivity
+            if (activity != null && Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
+                activity.runOnUiThread {
+                    try {
+                        val builder = PictureInPictureParams.Builder()
+                        if (enabled) {
+                            builder.setAspectRatio(Rational(9, 16))
+                            builder.setAutoEnterEnabled(true)
+                        } else {
+                            builder.setAutoEnterEnabled(false)
+                        }
+                        activity.setPictureInPictureParams(builder.build())
+                        Log.d("SYNKING_PIP", "[TelecomModule] setAutoPipEnabled=$enabled applied to ${activity.javaClass.simpleName}")
+                        promise.resolve(true)
+                    } catch (e: Exception) {
+                        Log.w("SYNKING_PIP", "[TelecomModule] setAutoPipEnabled error: ${e.message}")
+                        promise.resolve(false)
+                    }
+                }
+            } else {
+                promise.resolve(false)
+            }
         } catch (e: Exception) {
             promise.resolve(false)
         }
@@ -210,8 +259,8 @@ class TelecomModule(reactContext: ReactApplicationContext) : ReactContextBaseJav
             if (activity != null && Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
                 activity.runOnUiThread {
                     try {
-                        val aspectRatio = android.util.Rational(9, 16)
-                        val builder = android.app.PictureInPictureParams.Builder()
+                        val aspectRatio = Rational(9, 16)
+                        val builder = PictureInPictureParams.Builder()
                             .setAspectRatio(aspectRatio)
                         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
                             builder.setAutoEnterEnabled(true)
@@ -252,10 +301,23 @@ class TelecomModule(reactContext: ReactApplicationContext) : ReactContextBaseJav
     @ReactMethod
     fun endCall(promise: Promise) {
         try {
+            isCallActive = false
             CallState.clear(reactApplicationContext)
             PendingCallStore.clear(reactApplicationContext)
             CallConnectionManager.endCall()
             IncomingCallActivity.stopRingtoneGlobally()
+
+            val activity: Activity? = CallActivity.currentCallActivity ?: reactApplicationContext.currentActivity
+            if (activity != null && Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
+                activity.runOnUiThread {
+                    try {
+                        val builder = PictureInPictureParams.Builder()
+                            .setAutoEnterEnabled(false)
+                        activity.setPictureInPictureParams(builder.build())
+                        Log.d("SYNKING_PIP", "[TelecomModule] endCall: auto-PiP disabled")
+                    } catch (e: Exception) {}
+                }
+            }
 
             val intent = Intent("com.synking.CALL_ENDED_FROM_JS")
             reactContextInstance?.sendBroadcast(intent)
@@ -340,6 +402,7 @@ class TelecomModule(reactContext: ReactApplicationContext) : ReactContextBaseJav
         var reactContextInstance: ReactContext? = null
         val reactContext: ReactContext?
             get() = reactContextInstance
+        @Volatile var isCallActive = false
 
         private val pendingEvents = ConcurrentLinkedQueue<PendingCall>()
         private val isJSBridgeReady = AtomicBoolean(false)

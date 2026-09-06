@@ -14,6 +14,8 @@ import com.facebook.react.ReactActivityDelegate
 import com.facebook.react.defaults.DefaultNewArchitectureEntryPoint.fabricEnabled
 import com.facebook.react.defaults.DefaultReactActivityDelegate
 import expo.modules.ReactActivityDelegateWrapper
+import android.app.PictureInPictureParams
+import android.util.Rational
 
 /**
  * Dedicated CallActivity: Activates strictly for incoming/active calls on Lock Screen.
@@ -124,6 +126,22 @@ class CallActivity : ReactActivity() {
         }
 
         Log.d("SYNKING_DEBUG", "[CallActivity] INCOMING_CALL handled: callId=$callId caller=$callerName autoAccept=$autoAccept")
+    }
+
+    override fun onResume() {
+        super.onResume()
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
+            try {
+                val params = PictureInPictureParams.Builder()
+                    .setAspectRatio(Rational(9, 16))
+                    .setAutoEnterEnabled(true)
+                    .build()
+                setPictureInPictureParams(params)
+                Log.d("SYNKING_PIP", "[CallActivity] onResume: Auto-PiP pre-registered on CallActivity")
+            } catch (e: Exception) {
+                Log.w("SYNKING_PIP", "[CallActivity] onResume setPictureInPictureParams failed: ${e.message}")
+            }
+        }
     }
 
     override fun onDestroy() {

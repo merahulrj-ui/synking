@@ -405,11 +405,22 @@ function GlobalCallOverlay() {
       setActiveCall(session);
       if (!session) {
         setIsMinimized(false);
+        if (Platform.OS === 'android' && NativeModules.TelecomModule?.setAutoPipEnabled) {
+          NativeModules.TelecomModule.setAutoPipEnabled(false).catch(() => {});
+        }
       } else if (session.status === 'rejected' || session.status === 'ended') {
         setIsMinimized(false);
+        if (Platform.OS === 'android' && NativeModules.TelecomModule?.setAutoPipEnabled) {
+          NativeModules.TelecomModule.setAutoPipEnabled(false).catch(() => {});
+        }
       } else if (session.status === 'connected') {
-        if (Platform.OS === 'android' && NativeModules.TelecomModule?.startOngoingCall) {
-          NativeModules.TelecomModule.startOngoingCall(session.callerName || 'Synkin Call').catch(() => {});
+        if (Platform.OS === 'android') {
+          if (NativeModules.TelecomModule?.startOngoingCall) {
+            NativeModules.TelecomModule.startOngoingCall(session.callerName || 'Synkin Call').catch(() => {});
+          }
+          if (NativeModules.TelecomModule?.setAutoPipEnabled) {
+            NativeModules.TelecomModule.setAutoPipEnabled(true).catch(() => {});
+          }
         }
       }
     });
@@ -444,8 +455,13 @@ function GlobalCallOverlay() {
       }
     }
     // Always notify native TelecomModule to end call & finish lockscreen task if needed
-    if (Platform.OS === 'android' && NativeModules.TelecomModule?.endCall) {
-      NativeModules.TelecomModule.endCall().catch(() => {});
+    if (Platform.OS === 'android') {
+      if (NativeModules.TelecomModule?.setAutoPipEnabled) {
+        NativeModules.TelecomModule.setAutoPipEnabled(false).catch(() => {});
+      }
+      if (NativeModules.TelecomModule?.endCall) {
+        NativeModules.TelecomModule.endCall().catch(() => {});
+      }
     }
   };
 

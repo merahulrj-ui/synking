@@ -13,6 +13,8 @@ import expo.modules.ReactActivityDelegateWrapper
 import android.content.BroadcastReceiver
 import android.content.Context
 import android.content.IntentFilter
+import android.app.PictureInPictureParams
+import android.util.Rational
 
 class MainActivity : ReactActivity() {
 
@@ -90,6 +92,23 @@ class MainActivity : ReactActivity() {
         registerReceiver(callEndedReceiver, filter)
       }
     } catch (e: Exception) {}
+  }
+
+  override fun onResume() {
+    super.onResume()
+    if (TelecomModule.isCallActive && Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
+      try {
+        val aspectRatio = Rational(9, 16)
+        val params = PictureInPictureParams.Builder()
+          .setAspectRatio(aspectRatio)
+          .setAutoEnterEnabled(true)
+          .build()
+        setPictureInPictureParams(params)
+        android.util.Log.d("SYNKING_PIP", "[MainActivity] onResume: Auto-PiP pre-registered successfully")
+      } catch (e: Exception) {
+        android.util.Log.w("SYNKING_PIP", "[MainActivity] onResume setPictureInPictureParams failed: ${e.message}")
+      }
+    }
   }
 
   override fun onDestroy() {
