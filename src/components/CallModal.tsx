@@ -1,5 +1,5 @@
 import React, { useRef, useEffect, useState } from 'react';
-import { View, Text, StyleSheet, Modal, TouchableOpacity, Image, Platform, ScrollView, Share, Animated, PanResponder, Vibration, NativeModules, BackHandler, DeviceEventEmitter, Dimensions } from 'react-native';
+import { View, Text, StyleSheet, Modal, TouchableOpacity, Image, Platform, ScrollView, Share, Animated, PanResponder, Vibration, NativeModules, BackHandler, DeviceEventEmitter, Dimensions, TextInput } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { LinearGradient } from 'expo-linear-gradient';
 import { CallSession } from '../types';
@@ -10,12 +10,50 @@ import { AudioRouteService } from '../services/audioRouteService';
 import { RealtimeBridge } from '../services/realtimeBridge';
 import { saveChatMessageToFirestore } from '../services/firebase';
 
-const QUICK_DECLINE_MESSAGES = [
-  "Can't talk now. What's up?",
-  "I'll call you right back.",
-  "I'll call you later.",
-  "Can't talk now. Call me later?",
-  "In a meeting. Will text you.",
+interface QuickDeclineOption {
+  id: string;
+  icon: keyof typeof Ionicons.glyphMap;
+  tag: string;
+  tagColor: string;
+  text: string;
+}
+
+const QUICK_DECLINE_OPTIONS: QuickDeclineOption[] = [
+  {
+    id: 'text_mode',
+    icon: 'chatbubbles',
+    tag: 'Text Mode',
+    tagColor: '#38BDF8',
+    text: "Can't talk out loud — let's text here! ✨",
+  },
+  {
+    id: 'call_back',
+    icon: 'time',
+    tag: 'Call Back',
+    tagColor: '#EC4899',
+    text: "On the move right now, calling you right back! 📞",
+  },
+  {
+    id: 'busy',
+    icon: 'cafe',
+    tag: 'Caught Up',
+    tagColor: '#F59E0B',
+    text: "Caught up in something, can we talk in a bit? ⏳",
+  },
+  {
+    id: 'quiet',
+    icon: 'volume-mute',
+    tag: 'Quiet Spot',
+    tagColor: '#8B5CF6',
+    text: "In a quiet spot, ping me what's up! 💬",
+  },
+  {
+    id: 'driving',
+    icon: 'car-sport',
+    tag: 'On The Road',
+    tagColor: '#10B981',
+    text: "On the road right now, catching you shortly! 🚗",
+  },
 ];
 
 const LiveSelfVideo: React.FC<{ isPip?: boolean }> = ({ isPip = true }) => {
@@ -199,6 +237,7 @@ export const CallModal: React.FC<Props> = ({ session, isLockscreen, onEndCall, o
     return !!isLockscreen || !session.isIncoming || session.status !== 'ringing';
   });
   const [showQuickMessages, setShowQuickMessages] = useState<boolean>(false);
+  const [customNote, setCustomNote] = useState<string>('');
 
   useEffect(() => {
     if (session.status === 'connected' || isLockscreen) {
@@ -773,38 +812,101 @@ export const CallModal: React.FC<Props> = ({ session, isLockscreen, onEndCall, o
               <TouchableOpacity
                 style={styles.quickMessagesBackdrop}
                 activeOpacity={1}
-                onPress={() => setShowQuickMessages(false)}
+                onPress={() => {
+                  setCustomNote('');
+                  setShowQuickMessages(false);
+                }}
               />
               <View style={styles.quickMessagesSheet}>
                 <View style={styles.quickMessagesHeader}>
                   <View style={styles.quickMessagesHandle} />
-                  <Text style={styles.quickMessagesTitle}>Reply with message</Text>
-                  <Text style={styles.quickMessagesSubtitle}>Call will decline and your message will be delivered</Text>
+                  <View style={styles.quickMessagesCallerRow}>
+                    <Image
+                      source={{ uri: session.callerPhoto || 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=800' }}
+                      style={styles.quickMessagesAvatar}
+                    />
+                    <View style={styles.quickMessagesCallerCol}>
+                      <Text style={styles.quickMessagesTitle} numberOfLines={1}>Reply to {session.callerName}</Text>
+                      <Text style={styles.quickMessagesSubtitle}>Declines call & delivers note instantly in background</Text>
+                    </View>
+                  </View>
                 </View>
 
-                <View style={styles.quickMessagesList}>
-                  {QUICK_DECLINE_MESSAGES.map((msg, index) => (
+                {/* Instant Custom Note Input Field (Direct Lockscreen Typing) */}
+                <View style={styles.customReplyBar}>
+                  <TextInput
+                    placeholder="Or type a quick custom note..."
+                    placeholderTextColor="#64748B"
+                    value={customNote}
+                    onChangeText={setCustomNote}
+                    style={styles.customReplyInput}
+                    returnKeyType="send"
+                    onSubmitEditing={() => {
+                      if (customNote.trim()) {
+                        const note = customNote.trim();
+                        setCustomNote('');
+                        handleSendQuickMessageAndDecline(note);
+                      }
+                    }}
+                  />
+                  {customNote.trim().length > 0 && (
                     <TouchableOpacity
-                      key={index}
-                      style={styles.quickMessageItem}
-                      onPress={() => handleSendQuickMessageAndDecline(msg)}
+                      style={styles.customReplySendBtn}
+                      onPress={() => {
+                        const note = customNote.trim();
+                        setCustomNote('');
+                        handleSendQuickMessageAndDecline(note);
+                      }}
+                      activeOpacity={0.8}
+                    >
+                      <LinearGradient
+                        colors={['#FD3A73', '#A855F7']}
+                        start={{ x: 0, y: 0 }}
+                        end={{ x: 1, y: 1 }}
+                        style={styles.customReplyGradient}
+                      >
+                        <Ionicons name="arrow-up" size={18} color="#FFFFFF" />
+                      </LinearGradient>
+                    </TouchableOpacity>
+                  )}
+                </View>
+
+                {/* Rich Categorized Presets with Tags and Icons */}
+                <ScrollView style={styles.quickMessagesScroll} contentContainerStyle={styles.quickMessagesList} showsVerticalScrollIndicator={false}>
+                  {QUICK_DECLINE_OPTIONS.map((item) => (
+                    <TouchableOpacity
+                      key={item.id}
+                      style={styles.quickMessageCard}
+                      onPress={() => handleSendQuickMessageAndDecline(item.text)}
                       activeOpacity={0.7}
                     >
-                      <View style={styles.quickMessageIconWrap}>
-                        <Ionicons name="chatbubble-ellipses" size={16} color="#38BDF8" />
+                      <View style={[styles.quickMessageIconBadge, { backgroundColor: `${item.tagColor}1F` }]}>
+                        <Ionicons name={item.icon} size={18} color={item.tagColor} />
                       </View>
-                      <Text style={styles.quickMessageText}>{msg}</Text>
-                      <Ionicons name="send" size={14} color="#64748B" />
+                      <View style={styles.quickMessageTextCol}>
+                        <View style={styles.quickMessageTagRow}>
+                          <View style={[styles.quickMessageTagPill, { borderColor: `${item.tagColor}44`, backgroundColor: `${item.tagColor}15` }]}>
+                            <Text style={[styles.quickMessageTagText, { color: item.tagColor }]}>{item.tag}</Text>
+                          </View>
+                        </View>
+                        <Text style={styles.quickMessageBodyText}>{item.text}</Text>
+                      </View>
+                      <Ionicons name="arrow-forward-circle" size={20} color="rgba(255, 255, 255, 0.3)" />
                     </TouchableOpacity>
                   ))}
-                </View>
+                </ScrollView>
 
+                {/* Return to Incoming Call Action */}
                 <TouchableOpacity
                   style={styles.quickMessagesCancelBtn}
-                  onPress={() => setShowQuickMessages(false)}
+                  onPress={() => {
+                    setCustomNote('');
+                    setShowQuickMessages(false);
+                  }}
                   activeOpacity={0.8}
                 >
-                  <Text style={styles.quickMessagesCancelText}>Cancel</Text>
+                  <Ionicons name="close" size={16} color="#94A3B8" style={{ marginRight: 6 }} />
+                  <Text style={styles.quickMessagesCancelText}>Return to call</Text>
                 </TouchableOpacity>
               </View>
             </View>
@@ -1565,80 +1667,150 @@ const styles = StyleSheet.create({
     backgroundColor: '#0F172A',
     borderTopLeftRadius: 28,
     borderTopRightRadius: 28,
-    paddingHorizontal: 20,
+    paddingHorizontal: 18,
     paddingTop: 12,
-    paddingBottom: Platform.OS === 'ios' ? 36 : 24,
+    paddingBottom: Platform.OS === 'ios' ? 36 : 20,
     borderWidth: 1,
     borderColor: 'rgba(255, 255, 255, 0.1)',
     shadowColor: '#000',
-    shadowOffset: { width: 0, height: -6 },
-    shadowOpacity: 0.4,
-    shadowRadius: 16,
-    elevation: 20,
+    shadowOffset: { width: 0, height: -8 },
+    shadowOpacity: 0.5,
+    shadowRadius: 20,
+    elevation: 24,
+    maxHeight: '85%',
   },
   quickMessagesHeader: {
     alignItems: 'center',
-    marginBottom: 16,
+    marginBottom: 12,
   },
   quickMessagesHandle: {
-    width: 40,
+    width: 44,
     height: 4,
     borderRadius: 2,
     backgroundColor: 'rgba(255, 255, 255, 0.25)',
     marginBottom: 12,
   },
+  quickMessagesCallerRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    width: '100%',
+    paddingHorizontal: 4,
+  },
+  quickMessagesAvatar: {
+    width: 38,
+    height: 38,
+    borderRadius: 19,
+    backgroundColor: '#1E293B',
+    marginRight: 10,
+    borderWidth: 1.5,
+    borderColor: '#FD3A73',
+  },
+  quickMessagesCallerCol: {
+    flex: 1,
+  },
   quickMessagesTitle: {
-    fontSize: 17,
+    fontSize: 15,
     fontFamily: 'Poppins_700Bold',
     color: '#FFFFFF',
-    marginBottom: 2,
   },
   quickMessagesSubtitle: {
-    fontSize: 12,
+    fontSize: 11,
     fontFamily: 'Poppins_400Regular',
     color: '#94A3B8',
-    textAlign: 'center',
+  },
+  customReplyBar: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: 'rgba(255, 255, 255, 0.08)',
+    borderRadius: 18,
+    paddingLeft: 14,
+    paddingRight: 6,
+    paddingVertical: 4,
+    borderWidth: 1,
+    borderColor: 'rgba(255, 255, 255, 0.14)',
+    marginBottom: 10,
+  },
+  customReplyInput: {
+    flex: 1,
+    fontSize: 13,
+    fontFamily: 'Poppins_400Regular',
+    color: '#FFFFFF',
+    paddingVertical: 8,
+  },
+  customReplySendBtn: {
+    marginLeft: 6,
+  },
+  customReplyGradient: {
+    width: 34,
+    height: 34,
+    borderRadius: 17,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  quickMessagesScroll: {
+    maxHeight: 290,
   },
   quickMessagesList: {
     gap: 8,
-    marginBottom: 14,
+    paddingBottom: 8,
   },
-  quickMessageItem: {
+  quickMessageCard: {
     flexDirection: 'row',
     alignItems: 'center',
-    backgroundColor: 'rgba(255, 255, 255, 0.06)',
+    backgroundColor: 'rgba(255, 255, 255, 0.05)',
     borderRadius: 16,
-    paddingVertical: 13,
-    paddingHorizontal: 14,
+    paddingVertical: 10,
+    paddingHorizontal: 12,
     borderWidth: 1,
     borderColor: 'rgba(255, 255, 255, 0.08)',
   },
-  quickMessageIconWrap: {
-    width: 32,
-    height: 32,
-    borderRadius: 16,
-    backgroundColor: 'rgba(56, 189, 248, 0.12)',
+  quickMessageIconBadge: {
+    width: 36,
+    height: 36,
+    borderRadius: 18,
     alignItems: 'center',
     justifyContent: 'center',
-    marginRight: 12,
+    marginRight: 10,
   },
-  quickMessageText: {
+  quickMessageTextCol: {
     flex: 1,
-    fontSize: 14,
+    marginRight: 8,
+  },
+  quickMessageTagRow: {
+    flexDirection: 'row',
+    marginBottom: 2,
+  },
+  quickMessageTagPill: {
+    borderRadius: 6,
+    paddingHorizontal: 6,
+    paddingVertical: 1,
+    borderWidth: 1,
+  },
+  quickMessageTagText: {
+    fontSize: 9,
+    fontFamily: 'Poppins_600SemiBold',
+    textTransform: 'uppercase',
+    letterSpacing: 0.5,
+  },
+  quickMessageBodyText: {
+    fontSize: 13,
     fontFamily: 'Poppins_500Medium',
     color: '#F1F5F9',
+    lineHeight: 18,
   },
   quickMessagesCancelBtn: {
-    backgroundColor: 'rgba(255, 255, 255, 0.1)',
-    borderRadius: 20,
-    paddingVertical: 12,
+    flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'center',
+    backgroundColor: 'rgba(255, 255, 255, 0.08)',
+    borderRadius: 16,
+    paddingVertical: 11,
+    marginTop: 4,
   },
   quickMessagesCancelText: {
-    fontSize: 14,
+    fontSize: 13,
     fontFamily: 'Poppins_600SemiBold',
-    color: '#E2E8F0',
+    color: '#94A3B8',
   },
 });
 
