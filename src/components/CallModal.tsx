@@ -239,6 +239,22 @@ export const CallModal: React.FC<Props> = ({ session, isLockscreen, onEndCall, o
   });
   const [showQuickMessages, setShowQuickMessages] = useState<boolean>(false);
   const [customNote, setCustomNote] = useState<string>('');
+  const [isBluetooth, setIsBluetooth] = useState<boolean>(false);
+
+  useEffect(() => {
+    let mounted = true;
+    const checkBt = () => {
+      AudioRouteService.isBluetoothConnected().then(connected => {
+        if (mounted) setIsBluetooth(connected);
+      }).catch(() => {});
+    };
+    checkBt();
+    const interval = setInterval(checkBt, 2000);
+    return () => {
+      mounted = false;
+      clearInterval(interval);
+    };
+  }, [session?.status, session?.isSpeakerOn]);
 
   useEffect(() => {
     if (session.status === 'connected' || isLockscreen) {
@@ -777,9 +793,9 @@ export const CallModal: React.FC<Props> = ({ session, isLockscreen, onEndCall, o
                   hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
                 >
                   <Ionicons
-                    name={session.isSpeakerOn ? 'volume-high' : 'volume-low'}
+                    name={session.isSpeakerOn ? 'volume-high' : (isBluetooth ? 'bluetooth' : 'volume-low')}
                     size={22}
-                    color={session.isSpeakerOn ? '#0A0E17' : '#FFFFFF'}
+                    color={session.isSpeakerOn ? '#0A0E17' : (isBluetooth ? '#38BDF8' : '#FFFFFF')}
                   />
                 </TouchableOpacity>
 

@@ -48,6 +48,11 @@ class AudioRouteModule(private val reactContext: ReactApplicationContext) : Reac
                         } else {
                             Log.w("SYNKING_AUDIO", "TYPE_BUILTIN_SPEAKER not found in availableCommunicationDevices")
                         }
+                    } else {
+                        try {
+                            audioManager.stopBluetoothSco()
+                            audioManager.isBluetoothScoOn = false
+                        } catch (e: Exception) {}
                     }
                     try {
                         val maxCallVol = audioManager.getStreamMaxVolume(AudioManager.STREAM_VOICE_CALL)
@@ -56,18 +61,38 @@ class AudioRouteModule(private val reactContext: ReactApplicationContext) : Reac
                         audioManager.setStreamVolume(AudioManager.STREAM_MUSIC, maxMusicVol, 0)
                     } catch (ve: Exception) {}
                 } else {
-                    // 2. Private Earpiece Mode (Voice Call Near Ear)
+                    // 2. Private Mode: Bluetooth (if connected) -> Wired Headset (if connected) -> Earpiece
                     audioManager.mode = AudioManager.MODE_IN_COMMUNICATION
                     audioManager.isSpeakerphoneOn = false
                     if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
+                        val btDevice = audioManager.availableCommunicationDevices.find {
+                            it.type == AudioDeviceInfo.TYPE_BLUETOOTH_SCO ||
+                            it.type == AudioDeviceInfo.TYPE_BLE_HEADSET
+                        }
+                        val wiredDevice = audioManager.availableCommunicationDevices.find {
+                            it.type == AudioDeviceInfo.TYPE_WIRED_HEADSET ||
+                            it.type == AudioDeviceInfo.TYPE_WIRED_HEADPHONES ||
+                            it.type == AudioDeviceInfo.TYPE_USB_HEADSET
+                        }
                         val earpieceDevice = audioManager.availableCommunicationDevices.find { 
                             it.type == AudioDeviceInfo.TYPE_BUILTIN_EARPIECE 
                         }
-                        if (earpieceDevice != null) {
-                            val success = audioManager.setCommunicationDevice(earpieceDevice)
-                            Log.d("SYNKING_AUDIO", "setCommunicationDevice (EARPIECE) success: $success")
+
+                        val targetDevice = btDevice ?: wiredDevice ?: earpieceDevice
+                        if (targetDevice != null) {
+                            val success = audioManager.setCommunicationDevice(targetDevice)
+                            Log.d("SYNKING_AUDIO", "setCommunicationDevice (${targetDevice.type}) success: $success")
                         } else {
                             audioManager.clearCommunicationDevice()
+                        }
+                    } else {
+                        val hasBluetooth = isBluetoothConnectedInternal()
+                        if (hasBluetooth) {
+                            try {
+                                audioManager.startBluetoothSco()
+                                audioManager.isBluetoothScoOn = true
+                                Log.d("SYNKING_AUDIO", "startBluetoothSco() enabled")
+                            } catch (e: Exception) {}
                         }
                     }
                 }
@@ -100,11 +125,46 @@ class AudioRouteModule(private val reactContext: ReactApplicationContext) : Reac
     }
 
     @ReactMethod
+    fun isBluetoothConnected(promise: Promise) {
+        mainHandler.post {
+            try {
+                promise.resolve(isBluetoothConnectedInternal())
+            } catch (e: Exception) {
+                promise.resolve(false)
+            }
+        }
+    }
+
+    private fun isBluetoothConnectedInternal(): Boolean {
+        return try {
+            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
+                audioManager.availableCommunicationDevices.any {
+                    it.type == AudioDeviceInfo.TYPE_BLUETOOTH_SCO ||
+                    it.type == AudioDeviceInfo.TYPE_BLE_HEADSET
+                }
+            } else {
+                val devices = audioManager.getDevices(AudioManager.GET_DEVICES_OUTPUTS)
+                devices.any {
+                    it.type == AudioDeviceInfo.TYPE_BLUETOOTH_SCO ||
+                    it.type == AudioDeviceInfo.TYPE_BLUETOOTH_A2DP
+                } || audioManager.isBluetoothA2dpOn || audioManager.isBluetoothScoOn
+            }
+        } catch (e: Exception) {
+            false
+        }
+    }
+
+    @ReactMethod
     fun resetAudioMode(promise: Promise) {
         mainHandler.post {
             try {
                 if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
                     audioManager.clearCommunicationDevice()
+                } else {
+                    try {
+                        audioManager.stopBluetoothSco()
+                        audioManager.isBluetoothScoOn = false
+                    } catch (e: Exception) {}
                 }
                 audioManager.isSpeakerphoneOn = false
                 audioManager.mode = AudioManager.MODE_NORMAL

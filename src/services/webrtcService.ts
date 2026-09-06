@@ -1029,8 +1029,11 @@ class WebRTCManager {
     if (!this.currentSession) return false;
     const isVideo = this.currentSession.type === 'video' || this.currentSession.isVideoEnabled;
     if (isVideo && !on) {
-      this.log('⚠️ setSpeaker(false) ignored: Video call permanently remains on Loudspeaker');
-      return true;
+      const isBt = await AudioRouteService.isBluetoothConnected();
+      if (!isBt) {
+        this.log('⚠️ setSpeaker(false) ignored: Video call without headset remains on Loudspeaker');
+        return true;
+      }
     }
     if (this.currentSession.isSpeakerOn === on) return on;
     this.currentSession.isSpeakerOn = on;
@@ -1041,7 +1044,7 @@ class WebRTCManager {
     if (this.currentSession.status === 'connected' && this.currentSession.type === 'audio') {
       AudioRouteService.setProximitySensorEnabled(!on).catch(() => {});
     }
-    this.log(on ? '🔊 SPEAKER SET: Loudspeaker active' : '🔈 EARPIECE SET: Internal receiver active');
+    this.log(on ? '🔊 SPEAKER SET: Loudspeaker active' : '🔈 HEADSET/EARPIECE SET: Active');
     this.notify();
     return on;
   }

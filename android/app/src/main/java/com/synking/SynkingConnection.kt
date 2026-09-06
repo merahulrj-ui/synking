@@ -210,7 +210,17 @@ class SynkingConnection(
         } catch (e: Exception) {}
         setActive()
         SynkingConnectionService.updateOngoingCallForeground(callerName, callerPhoto, callType == "video")
-        if (callType == "video") {
+        val supported = callAudioState?.supportedRouteMask ?: 0
+        val hasBluetooth = (supported and android.telecom.CallAudioState.ROUTE_BLUETOOTH) != 0
+        val hasHeadset = (supported and android.telecom.CallAudioState.ROUTE_WIRED_HEADSET) != 0
+
+        if (hasBluetooth) {
+            setAudioRoute(android.telecom.CallAudioState.ROUTE_BLUETOOTH)
+            Log.d("SYNKING_TELECOM", "[UI] ANSWER: Bluetooth headset detected -> setAudioRoute ROUTE_BLUETOOTH")
+        } else if (hasHeadset) {
+            setAudioRoute(android.telecom.CallAudioState.ROUTE_WIRED_HEADSET)
+            Log.d("SYNKING_TELECOM", "[UI] ANSWER: Wired headset detected -> setAudioRoute ROUTE_WIRED_HEADSET")
+        } else if (callType == "video") {
             setAudioRoute(android.telecom.CallAudioState.ROUTE_SPEAKER)
             Log.d("SYNKING_TELECOM", "[UI] ANSWER: Video call -> auto setAudioRoute ROUTE_SPEAKER")
         } else {

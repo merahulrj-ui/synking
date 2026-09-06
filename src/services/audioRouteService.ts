@@ -31,6 +31,17 @@ export const AudioRouteService = {
     return false;
   },
 
+  isBluetoothConnected: async (): Promise<boolean> => {
+    if (Platform.OS === 'android') {
+      try {
+        if (AudioRouteModule?.isBluetoothConnected) {
+          return await AudioRouteModule.isBluetoothConnected();
+        }
+      } catch (e) {}
+    }
+    return false;
+  },
+
   setProximitySensorEnabled: async (enabled: boolean): Promise<void> => {
     if (Platform.OS === 'android' && AudioRouteModule?.setProximitySensorEnabled) {
       try {
