@@ -479,10 +479,13 @@ class WebRTCManager {
     try {
       if (this.localStream) return;
       if (Platform.OS === 'android') {
-        const granted = await PermissionsAndroid.request(PermissionsAndroid.PERMISSIONS.CAMERA);
-        if (granted !== PermissionsAndroid.RESULTS.GRANTED) {
-          this.log('❌ Camera permission denied for incoming video preview.');
-          return;
+        const hasPermission = await PermissionsAndroid.check(PermissionsAndroid.PERMISSIONS.CAMERA);
+        if (!hasPermission) {
+          const granted = await PermissionsAndroid.request(PermissionsAndroid.PERMISSIONS.CAMERA);
+          if (granted !== PermissionsAndroid.RESULTS.GRANTED) {
+            this.log('❌ Camera permission denied for incoming video preview.');
+            return;
+          }
         }
       }
       if (MediaDevices && MediaDevices.getUserMedia) {
