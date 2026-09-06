@@ -148,7 +148,21 @@ class TelecomModule(reactContext: ReactApplicationContext) : ReactContextBaseJav
     fun showIncomingCallNotification(callId: String, callerId: String, callerName: String, callerPhoto: String, callType: String, promise: Promise) {
         try {
             val ctx = reactApplicationContext
+            if (lastNotifiedCallId == callId) {
+                Log.d("SYNKING_TELECOM", "[TelecomModule] Call notification already active for callId=$callId, skipping duplicate.")
+                promise.resolve(true)
+                return
+            }
+            val existing = CallConnectionManager.currentConnection
+            if (existing != null && (existing as? SynkingConnection)?.callId == callId) {
+                Log.d("SYNKING_TELECOM", "[TelecomModule] Call connection already active for callId=$callId, skipping duplicate.")
+                lastNotifiedCallId = callId
+                promise.resolve(true)
+                return
+            }
+            lastNotifiedCallId = callId
             val conn = SynkingConnection(ctx, callId, callerId, callerName, callType, callerPhoto)
+            CallConnectionManager.currentConnection = conn
             conn.onShowIncomingCallUi()
             promise.resolve(true)
         } catch (e: Exception) {
@@ -303,6 +317,7 @@ class TelecomModule(reactContext: ReactApplicationContext) : ReactContextBaseJav
     fun endCall(promise: Promise) {
         try {
             isCallActive = false
+            lastNotifiedCallId = null
             CallState.clear(reactApplicationContext)
             PendingCallStore.clear(reactApplicationContext)
             CallConnectionManager.endCall()
@@ -400,6 +415,7 @@ class TelecomModule(reactContext: ReactApplicationContext) : ReactContextBaseJav
         val reactContext: ReactContext?
             get() = reactContextInstance
         @Volatile var isCallActive = false
+        @Volatile var lastNotifiedCallId: String? = null
 
         private val pendingEvents = ConcurrentLinkedQueue<PendingCall>()
         private val isJSBridgeReady = AtomicBoolean(false)
@@ -491,6 +507,7 @@ class TelecomModule(reactContext: ReactApplicationContext) : ReactContextBaseJav
         }
 
         fun emitDeclineEvent(callId: String) {
+            lastNotifiedCallId = null
             val ctx = reactContext ?: return
             val params = Arguments.createMap().apply { putString("callId", callId) }
             ctx.getJSModule(DeviceEventManagerModule.RCTDeviceEventEmitter::class.java)
@@ -513,6 +530,7 @@ class TelecomModule(reactContext: ReactApplicationContext) : ReactContextBaseJav
         }
 
         fun emitEndCallEvent() {
+            lastNotifiedCallId = null
             reactContext?.getJSModule(DeviceEventManagerModule.RCTDeviceEventEmitter::class.java)
                 ?.emit("onTelecomEndCall", null)
         }

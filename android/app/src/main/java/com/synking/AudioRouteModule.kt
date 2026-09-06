@@ -188,16 +188,14 @@ class AudioRouteModule(private val reactContext: ReactApplicationContext) : Reac
         }
     }
 
-    private var incomingMediaPlayer: MediaPlayer? = null
-
     @ReactMethod
     fun startIncomingRingtone(promise: Promise) {
         mainHandler.post {
             try {
-                stopIncomingRingtoneInternal()
+                stopGlobalIncomingRingtone()
                 val resId = reactContext.resources.getIdentifier("synk_signature", "raw", reactContext.packageName)
                 if (resId != 0) {
-                    incomingMediaPlayer = MediaPlayer.create(reactContext, resId)?.apply {
+                    globalIncomingMediaPlayer = MediaPlayer.create(reactContext.applicationContext, resId)?.apply {
                         isLooping = true
                         setAudioAttributes(
                             AudioAttributes.Builder()
@@ -207,7 +205,7 @@ class AudioRouteModule(private val reactContext: ReactApplicationContext) : Reac
                         )
                         start()
                     }
-                    Log.i("SYNKING_AUDIO", "✅ Synk Signature incoming ringtone started playing")
+                    Log.i("SYNKING_AUDIO", "✅ Synk Signature incoming ringtone started playing globally")
                 } else {
                     Log.w("SYNKING_AUDIO", "⚠️ synk_signature raw resource not found")
                 }
@@ -222,31 +220,33 @@ class AudioRouteModule(private val reactContext: ReactApplicationContext) : Reac
     @ReactMethod
     fun stopIncomingRingtone(promise: Promise) {
         mainHandler.post {
-            stopIncomingRingtoneInternal()
+            stopGlobalIncomingRingtone()
             promise.resolve(true)
-        }
-    }
-
-    private fun stopIncomingRingtoneInternal() {
-        try {
-            incomingMediaPlayer?.let {
-                if (it.isPlaying) {
-                    it.stop()
-                }
-                it.release()
-            }
-            incomingMediaPlayer = null
-        } catch (e: Exception) {
-            Log.w("SYNKING_AUDIO", "stopIncomingRingtone error: ${e.message}")
         }
     }
 
     companion object {
         private var instance: AudioRouteModule? = null
+        @Volatile private var globalIncomingMediaPlayer: MediaPlayer? = null
+
+        @Synchronized
+        fun stopGlobalIncomingRingtone() {
+            try {
+                globalIncomingMediaPlayer?.let {
+                    if (it.isPlaying) {
+                        it.stop()
+                    }
+                    it.release()
+                }
+                globalIncomingMediaPlayer = null
+            } catch (e: Exception) {
+                Log.w("SYNKING_AUDIO", "stopGlobalIncomingRingtone error: ${e.message}")
+            }
+        }
 
         fun stopAllRingtones() {
+            stopGlobalIncomingRingtone()
             instance?.mainHandler?.post {
-                instance?.stopIncomingRingtoneInternal()
                 instance?.stopRingbackInternal()
             }
         }

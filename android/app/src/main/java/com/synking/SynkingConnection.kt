@@ -18,17 +18,18 @@ import java.net.URL
 
 class SynkingConnection(
     private val context: Context,
-    private val callId: String,
-    private val callerId: String = "",
-    private val callerName: String,
+    val callId: String,
+    val callerId: String = "",
+    val callerName: String,
     val callType: String,
-    private val callerPhoto: String = ""
+    val callerPhoto: String = ""
 ) : Connection() {
 
     init {
         // Essential properties for VoIP call
         connectionProperties = PROPERTY_SELF_MANAGED
         audioModeIsVoip = true
+        setRingbackRequested(false)
     }
 
     override fun onShowIncomingCallUi() {
@@ -173,6 +174,8 @@ class SynkingConnection(
     override fun onAnswer() {
         super.onAnswer()
         Log.d("SYNKING_TELECOM", "[UI] ANSWER: natively accepted")
+        IncomingCallActivity.stopRingtoneGlobally()
+        AudioRouteModule.stopAllRingtones()
         CallState.markAnswered(context)
         try {
             val nm = context.getSystemService(Context.NOTIFICATION_SERVICE) as NotificationManager
@@ -196,6 +199,12 @@ class SynkingConnection(
     override fun onReject() {
         super.onReject()
         Log.d("SYNKING_TELECOM", "[UI] REJECT: natively rejected")
+        IncomingCallActivity.stopRingtoneGlobally()
+        AudioRouteModule.stopAllRingtones()
+        try {
+            val nm = context.getSystemService(Context.NOTIFICATION_SERVICE) as NotificationManager
+            nm.cancel(MyFirebaseMessagingService.NOTIFICATION_ID)
+        } catch (e: Exception) {}
         setDisconnected(DisconnectCause(DisconnectCause.REJECTED))
         destroy()
     }
@@ -203,6 +212,12 @@ class SynkingConnection(
     override fun onDisconnect() {
         super.onDisconnect()
         Log.d("SYNKING_TELECOM", "[UI] DISCONNECT: natively disconnected")
+        IncomingCallActivity.stopRingtoneGlobally()
+        AudioRouteModule.stopAllRingtones()
+        try {
+            val nm = context.getSystemService(Context.NOTIFICATION_SERVICE) as NotificationManager
+            nm.cancel(MyFirebaseMessagingService.NOTIFICATION_ID)
+        } catch (e: Exception) {}
         setDisconnected(DisconnectCause(DisconnectCause.LOCAL))
         destroy()
     }

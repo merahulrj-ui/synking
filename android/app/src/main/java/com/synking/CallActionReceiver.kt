@@ -12,6 +12,7 @@ class CallActionReceiver : BroadcastReceiver() {
         if (action == "ACTION_DECLINE_CALL" || action == "ACTION_END_CALL") {
             Log.d("SYNKING_CALL", "Decline/End button tapped from notification: action=$action")
             IncomingCallActivity.stopRingtoneGlobally()
+            AudioRouteModule.stopAllRingtones()
             CallConnectionManager.rejectCall()
             TelecomModule.emitEndCallEvent()
             SynkingConnectionService.stopCallForeground()

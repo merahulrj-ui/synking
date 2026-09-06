@@ -13,6 +13,7 @@ if (Platform.OS !== 'web') {
 
 class NotificationServiceClass {
   private isInitialized = false;
+  private activeCallId: string | null = null;
 
   public async initialize() {
     if (this.isInitialized || Platform.OS === 'web' || !Notifications) return;
@@ -138,6 +139,11 @@ class NotificationServiceClass {
   }
 
   public async showIncomingCallNotification(callerName: string, callType: 'audio' | 'video', callId: string, callerId: string = '', callerPhoto: string = '') {
+    if (this.activeCallId === callId) {
+      return;
+    }
+    this.activeCallId = callId;
+
     if (Platform.OS === 'android') {
       if (NativeModules.TelecomModule?.showIncomingCallNotification) {
         NativeModules.TelecomModule.showIncomingCallNotification(callId, callerId, callerName, callerPhoto, callType).catch(() => {});
@@ -187,6 +193,13 @@ class NotificationServiceClass {
   }
 
   public async dismissCallNotification(callId?: string) {
+    this.activeCallId = null;
+    if (Platform.OS === 'android') {
+      if (NativeModules.TelecomModule?.endCall) {
+        NativeModules.TelecomModule.endCall().catch(() => {});
+      }
+      return;
+    }
     if (Platform.OS === 'web' || !Notifications) return;
 
     try {

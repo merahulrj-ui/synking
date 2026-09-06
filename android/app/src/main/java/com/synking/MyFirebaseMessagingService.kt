@@ -115,6 +115,7 @@ class MyFirebaseMessagingService : FirebaseMessagingService() {
 
             // 2. Stop native ringtone & vibration instantly for incoming call recipient!
             IncomingCallActivity.stopRingtoneGlobally()
+            AudioRouteModule.stopAllRingtones()
             CallConnectionManager.endCall()
 
             // 3. Directly dismiss open incoming call activity with zero latency
@@ -346,6 +347,7 @@ class MyFirebaseMessagingService : FirebaseMessagingService() {
         )
 
         // 3. TRY TELECOM MANAGER FIRST
+        var telecomSuccess = false
         try {
             Log.d("SYNKING_TELECOM", "[FCM] CALL_DATA_PARSED: Attempting TelecomManager...")
             val telecomManager = getSystemService(Context.TELECOM_SERVICE) as TelecomManager
@@ -362,6 +364,7 @@ class MyFirebaseMessagingService : FirebaseMessagingService() {
                 putString("callId", callId)
                 putString("callerId", callerId)
                 putString("callerName", callerName)
+                putString("callerPhoto", callerPhoto)
                 putString("callType", callType)
                 putString("call_type", callType)
             }
@@ -372,12 +375,14 @@ class MyFirebaseMessagingService : FirebaseMessagingService() {
             Log.d("SYNKING_TELECOM", "[TELECOM] ADD_NEW_INCOMING_CALL: Triggering...")
             telecomManager.addNewIncomingCall(phoneAccountHandle, telecomExtras)
             debug("TELECOM_LAUNCH", "OK", "callId=$callId")
+            telecomSuccess = true
         } catch (e: Exception) {
             Log.e("SYNKING_TELECOM", "[TELECOM] ERROR: ${e.message}", e)
             debug("TELECOM_LAUNCH", "FAIL", e.message ?: "")
         }
 
-        // --- LEGACY FALLBACK (Will retire once Telecom is proven 100%) ---
+        // --- FALLBACK: ONLY post manual notification if TelecomManager failed! ---
+        if (!telecomSuccess) {
 
         val piFlags = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.M) {
             PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE
@@ -517,6 +522,7 @@ class MyFirebaseMessagingService : FirebaseMessagingService() {
                 "SYNKING_FCM",
                 "DIRECT_START_ACTIVITY: Phone is open/unlocked; showing locked Heads-Up notification banner with colourful pills"
             )
+        }
         }
     }
 }

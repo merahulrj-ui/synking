@@ -676,14 +676,11 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
         }
       } else if (type === 'INCOMING_CALL' && payload) {
         if (payload.receiverId === currentUser?.id && payload.callerUser) {
-          const photo = payload.callerUser.photo || payload.callerUser.photos?.[0] || '';
-          NotificationService.showIncomingCallNotification(
-            payload.callerUser.name, 
-            payload.type, 
-            payload.callId,
-            payload.callerUser.id,
-            photo
-          );
+          const currentSession = WebRTCService.getCurrentSession();
+          if (currentSession && currentSession.id === payload.callId) {
+            // Already active/ringing for this callId, ignore 3.5s pulse
+            return;
+          }
           WebRTCService.receiveIncomingCall(payload.callerUser, payload.type, payload.callId);
         }
       } else if (type === 'CALL_ENDED' || type === 'CALL_REJECTED' || type === 'CALL_ACCEPTED') {

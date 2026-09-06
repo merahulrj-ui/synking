@@ -262,14 +262,6 @@ export const CallModal: React.FC<Props> = ({ session, isLockscreen, onEndCall, o
     const isInc = session.isIncoming === true;
     if (isInc && session.status === 'ringing') {
       RingtoneService.playIncomingRing();
-      // Repeating Vibration Pattern: wait 0ms, vibrate 1000ms, pause 1000ms (repeating loop)
-      if (Platform.OS !== 'web') {
-        Vibration.vibrate([0, 1000, 1000], true);
-      } else if (typeof navigator !== 'undefined' && 'vibrate' in navigator) {
-        try {
-          navigator.vibrate([1000, 1000]);
-        } catch (e) {}
-      }
     } else if (!isInc && (session.status === 'calling' || session.status === 'ringing')) {
       RingtoneService.playOutgoingRing();
       Vibration.cancel();
@@ -714,6 +706,11 @@ export const CallModal: React.FC<Props> = ({ session, isLockscreen, onEndCall, o
   );
 
   if (!isExpanded && isIncomingRinging) {
+    if (Platform.OS === 'android') {
+      // On Android, the native CallStyle Heads-Up Notification banner is displayed at the top
+      // by the system. Suppressing the in-app banner card prevents two banners stacking on Android.
+      return null;
+    }
     const isVideo = session.type === 'video' || session.isVideoEnabled;
     return (
       <View style={styles.bannerOuterWrapper} pointerEvents="box-none">
