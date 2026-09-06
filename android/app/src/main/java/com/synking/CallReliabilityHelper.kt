@@ -1,4 +1,4 @@
-﻿package com.synking
+package com.synking
 
 import android.content.ComponentName
 import android.content.Context
@@ -52,7 +52,6 @@ object CallReliabilityHelper {
     }
 
     fun runOnboardingReliabilityCheck(context: Context) {
-        requestBatteryOptimizationExemption(context)
-        openAutoStartSettings(context)
+        // Disabled: do not launch background OEM settings or battery optimization prompts automatically
     }
 }

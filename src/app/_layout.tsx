@@ -526,13 +526,10 @@ export default function RootLayout() {
   });
 
   useEffect(() => {
-    // 1. Register Telecom Phone Account for Lockscreen / VoIP & Request VoIP Permissions
+    // 1. Register Telecom Phone Account for Lockscreen / VoIP
     if (Platform.OS === 'android') {
       if (NativeModules.TelecomModule?.registerPhoneAccount) {
         NativeModules.TelecomModule.registerPhoneAccount().catch((e: any) => console.log('Telecom Register Error:', e));
-      }
-      if (NativeModules.TelecomModule?.requestVoipPermissions) {
-        NativeModules.TelecomModule.requestVoipPermissions().catch(() => {});
       }
     }
 
