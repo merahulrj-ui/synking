@@ -104,14 +104,22 @@ export function ensureTelecomBridgeReady() {
     WebRTCService.rejectCall();
   });
 
-  // 3. Mute Toggle
-  DeviceEventEmitter.addListener('onTelecomMuteToggled', () => {
-    WebRTCService.toggleMute();
+  // 3. Mute Toggle (Sync explicit state)
+  DeviceEventEmitter.addListener('onTelecomMuteToggled', (isMuted?: boolean) => {
+    if (typeof isMuted === 'boolean') {
+      WebRTCService.setMute(isMuted);
+    } else {
+      WebRTCService.toggleMute();
+    }
   });
 
-  // 4. Speaker Toggle
-  DeviceEventEmitter.addListener('onTelecomSpeakerToggled', () => {
-    WebRTCService.toggleSpeaker();
+  // 4. Speaker Toggle (Sync explicit state to prevent feedback loop)
+  DeviceEventEmitter.addListener('onTelecomSpeakerToggled', (isSpeakerOn?: boolean) => {
+    if (typeof isSpeakerOn === 'boolean') {
+      WebRTCService.setSpeaker(isSpeakerOn);
+    } else {
+      WebRTCService.toggleSpeaker();
+    }
   });
 
   // 4b. Video Camera Toggle

@@ -181,7 +181,7 @@ interface Props {
   onMinimize?: () => void;
 }
 
-export const CallModal: React.FC<Props> = ({ session, onEndCall, onAcceptCall, onMinimize }) => {
+export const CallModal: React.FC<Props> = ({ session, onEndCall, onAcceptCall, onToggleMute, onToggleVideo, onToggleSpeaker, onMinimize }) => {
   if (!session) return null;
 
   useEffect(() => {
@@ -300,14 +300,13 @@ export const CallModal: React.FC<Props> = ({ session, onEndCall, onAcceptCall, o
   };
 
   const handleOpenChat = () => {
-    const partnerId = session.callerId || session.receiverId;
     if (onMinimize) {
       onMinimize();
-    } else if (Platform.OS === 'web' && partnerId && typeof window !== 'undefined' && window.location) {
-      window.location.href = `/chat/${partnerId}`;
-    }
-    if (Platform.OS === 'android' && NativeModules.TelecomModule?.openChatFromCall && partnerId) {
-      NativeModules.TelecomModule.openChatFromCall(partnerId).catch(() => {});
+    } else {
+      const partnerId = session.callerId || session.receiverId;
+      if (Platform.OS === 'web' && partnerId && typeof window !== 'undefined' && window.location) {
+        window.location.href = `/chat/${partnerId}`;
+      }
     }
   };
   const callContent = (
@@ -542,7 +541,7 @@ export const CallModal: React.FC<Props> = ({ session, onEndCall, onAcceptCall, o
                 {/* Mute Button */}
                 <TouchableOpacity
                   style={[styles.controlBtn, session.isMuted && styles.controlBtnMuted]}
-                  onPress={() => WebRTCService.toggleMute()}
+                  onPress={() => (onToggleMute ? onToggleMute() : WebRTCService.toggleMute())}
                   activeOpacity={0.75}
                   hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
                 >
@@ -556,7 +555,7 @@ export const CallModal: React.FC<Props> = ({ session, onEndCall, onAcceptCall, o
                 {/* Speaker Button (Pearl White Active / Frosted Glass Inactive) */}
                 <TouchableOpacity
                   style={[styles.controlBtn, session.isSpeakerOn && styles.controlBtnActive]}
-                  onPress={() => WebRTCService.toggleSpeaker()}
+                  onPress={() => (onToggleSpeaker ? onToggleSpeaker() : WebRTCService.toggleSpeaker())}
                   activeOpacity={0.75}
                   hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
                 >
@@ -570,7 +569,7 @@ export const CallModal: React.FC<Props> = ({ session, onEndCall, onAcceptCall, o
                 {/* Video Toggle (Pearl White Active / Frosted Glass Inactive) */}
                 <TouchableOpacity
                   style={[styles.controlBtn, session.isVideoEnabled && styles.controlBtnActive]}
-                  onPress={() => WebRTCService.toggleVideo()}
+                  onPress={() => (onToggleVideo ? onToggleVideo() : WebRTCService.toggleVideo())}
                   activeOpacity={0.75}
                   hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
                 >

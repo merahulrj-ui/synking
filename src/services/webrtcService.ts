@@ -75,6 +75,9 @@ class WebRTCManager {
           this.log('📞 CALL_ACCEPTED received from peer. Initiating WebRTC SDP offer handshake...');
           this.notify();
           this.startTimer();
+          if (Platform.OS === 'android' && NativeModules.TelecomModule?.startOngoingCall) {
+            NativeModules.TelecomModule.startOngoingCall(this.currentSession.callerName || 'Synkin Call').catch(() => {});
+          }
 
           // Create SDP Offer if I am caller
           if (this.currentSession.id.startsWith('call_')) {
@@ -328,6 +331,9 @@ class WebRTCManager {
       this.currentSession.status = 'connected';
       this.notify();
       this.startTimer();
+      if (Platform.OS === 'android' && NativeModules.TelecomModule?.startOngoingCall) {
+        NativeModules.TelecomModule.startOngoingCall(this.currentSession.callerName || 'Synkin Call').catch(() => {});
+      }
 
       const peerId = this.getPeerUserId();
       this.log(`🚀 Broadcasting CALL_ACCEPTED for callId=${this.currentSession.id} to peerId=${peerId || 'ALL'}`);
@@ -644,18 +650,23 @@ class WebRTCManager {
     return this.remoteVideoFrame;
   }
 
-  public toggleMute(): boolean {
+  public setMute(on: boolean): boolean {
     if (!this.currentSession) return false;
-    this.currentSession.isMuted = !this.currentSession.isMuted;
-    const isMuted = this.currentSession.isMuted;
+    if (this.currentSession.isMuted === on) return on;
+    this.currentSession.isMuted = on;
     if (this.localStream) {
       this.localStream.getAudioTracks().forEach((track: any) => {
-        track.enabled = !isMuted;
+        track.enabled = !on;
       });
     }
-    this.log(isMuted ? '🔇 MUTE ON: Mic track disabled' : '🎙️ MUTE OFF: Mic track active');
+    this.log(on ? '🔇 MUTE ON: Mic track disabled' : '🎙️ MUTE OFF: Mic track active');
     this.notify();
-    return this.currentSession.isMuted;
+    return on;
+  }
+
+  public toggleMute(): boolean {
+    if (!this.currentSession) return false;
+    return this.setMute(!this.currentSession.isMuted);
   }
 
   public async toggleVideo(): Promise<boolean> {
@@ -810,14 +821,22 @@ class WebRTCManager {
     }
   }
 
+  public async setSpeaker(on: boolean): Promise<boolean> {
+    if (!this.currentSession) return false;
+    if (this.currentSession.isSpeakerOn === on) return on;
+    this.currentSession.isSpeakerOn = on;
+    AudioRouteService.setSpeakerOn(on).catch(() => {});
+    if (this.currentSession.status === 'connected' && this.currentSession.type === 'audio') {
+      AudioRouteService.setProximitySensorEnabled(!on).catch(() => {});
+    }
+    this.log(on ? '🔊 SPEAKER SET: Loudspeaker active' : '🔈 EARPIECE SET: Internal receiver active');
+    this.notify();
+    return on;
+  }
+
   public async toggleSpeaker(): Promise<boolean> {
     if (!this.currentSession) return false;
-    this.currentSession.isSpeakerOn = !this.currentSession.isSpeakerOn;
-    const isSpeaker = this.currentSession.isSpeakerOn;
-    AudioRouteService.setSpeakerOn(isSpeaker).catch(() => {});
-    this.log(isSpeaker ? '🔊 SPEAKER ON: Loudspeaker active' : '🔈 EARPIECE: Internal receiver active');
-    this.notify();
-    return this.currentSession.isSpeakerOn;
+    return this.setSpeaker(!this.currentSession.isSpeakerOn);
   }
   public formatDuration(sec: number): string {
     const mins = Math.floor(sec / 60);

@@ -381,19 +381,31 @@ function GlobalCallOverlay() {
   const { sendMessage, currentUser } = useApp();
   const router = useRouter();
 
+  const lastChatNavTimeRef = React.useRef<number>(0);
+
+  const navigateToChat = React.useCallback((partnerId: string) => {
+    const now = Date.now();
+    if (now - lastChatNavTimeRef.current < 1500) {
+      console.log('[GlobalCallOverlay] 🛑 Debouncing duplicate chat navigation for partnerId:', partnerId);
+      return;
+    }
+    lastChatNavTimeRef.current = now;
+    setIsMinimized(true);
+    router.push(`/chat/${partnerId}`);
+  }, [router]);
+
   React.useEffect(() => {
     const chatSub = DeviceEventEmitter.addListener('onOpenChatRequested', (event: any) => {
       const partnerId = event?.partnerId;
       if (partnerId) {
         console.log('[GlobalCallOverlay] 💬 onOpenChatRequested received for partnerId:', partnerId);
-        setIsMinimized(true);
-        router.push(`/chat/${partnerId}`);
+        navigateToChat(partnerId);
       }
     });
     return () => {
       chatSub.remove();
     };
-  }, []);
+  }, [navigateToChat]);
 
   React.useEffect(() => {
     // Pure UI Observer: listens to WebRTC session state changes
@@ -452,12 +464,10 @@ function GlobalCallOverlay() {
   const handleMinimizeToChat = () => {
     if (!activeCall) return;
     const partnerId = activeCall.callerId === currentUser?.id ? activeCall.receiverId : activeCall.callerId;
-    if (Platform.OS === 'android' && NativeModules.TelecomModule?.openChatFromCall && partnerId) {
-      NativeModules.TelecomModule.openChatFromCall(partnerId).catch(() => {});
-    }
-    setIsMinimized(true);
     if (partnerId && currentUser) {
-      router.push(`/chat/${partnerId}`);
+      navigateToChat(partnerId);
+    } else {
+      setIsMinimized(true);
     }
   };
 

@@ -69,8 +69,8 @@ export default function CallApp() {
 
   const handleAcceptCall = () => {
     WebRTCService.acceptCall();
-    if (Platform.OS === 'android' && NativeModules.TelecomModule?.dismissIncomingNotification) {
-      NativeModules.TelecomModule.dismissIncomingNotification().catch(() => {});
+    if (Platform.OS === 'android' && NativeModules.TelecomModule?.startOngoingCall) {
+      NativeModules.TelecomModule.startOngoingCall(session?.callerName || 'Synkin Call').catch(() => {});
     }
   };
 

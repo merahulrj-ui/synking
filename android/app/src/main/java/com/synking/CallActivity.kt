@@ -74,6 +74,7 @@ class CallActivity : ReactActivity() {
             )
         }
 
+        volumeControlStream = android.media.AudioManager.STREAM_VOICE_CALL
         handleIncomingCallIntent(intent)
 
         try {
@@ -115,7 +116,7 @@ class CallActivity : ReactActivity() {
             PendingCallStore.save(this, pending)
             if (autoAccept) {
                 CallState.markAnswered(this)
-                SynkingConnectionService.stopCallForeground()
+                SynkingConnectionService.updateOngoingCallForeground(callerName)
                 try {
                     val nm = getSystemService(Context.NOTIFICATION_SERVICE) as NotificationManager
                     nm.cancel(MyFirebaseMessagingService.NOTIFICATION_ID)

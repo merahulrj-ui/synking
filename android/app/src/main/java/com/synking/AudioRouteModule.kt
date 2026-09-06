@@ -28,11 +28,15 @@ class AudioRouteModule(private val reactContext: ReactApplicationContext) : Reac
     fun setSpeakerphoneOn(on: Boolean, promise: Promise) {
         mainHandler.post {
             try {
+                // Also update Telecom connection route:
+                CallConnectionManager.setSpeakerOn(on)
+
                 if (on) {
                     // 1. Loudspeaker Mode (Video Call OR Speaker Button ON)
                     audioManager.mode = AudioManager.MODE_IN_COMMUNICATION
                     audioManager.isSpeakerphoneOn = true
                     if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
+                        audioManager.clearCommunicationDevice()
                         val speakerDevice = audioManager.availableCommunicationDevices.find { 
                             it.type == AudioDeviceInfo.TYPE_BUILTIN_SPEAKER 
                         } ?: audioManager.getDevices(AudioManager.GET_DEVICES_OUTPUTS).find {
@@ -66,7 +70,7 @@ class AudioRouteModule(private val reactContext: ReactApplicationContext) : Reac
                     }
                 }
 
-                audioManager.isMicrophoneMute = false
+                reactContext.currentActivity?.volumeControlStream = AudioManager.STREAM_VOICE_CALL
                 promise.resolve(on)
             } catch (e: Exception) {
                 promise.reject("AUDIO_ROUTE_ERROR", e.message)
