@@ -221,6 +221,23 @@ export const CallModal: React.FC<Props> = ({ session, onEndCall, onAcceptCall, o
     };
   }, [session.status, session.type, session.isSpeakerOn]);
 
+  // 🔊 Video Call Loudspeaker Enforcement Hook:
+  // For ANY video call, guarantee audio is routed through the loudspeaker/speakerphone!
+  useEffect(() => {
+    const isVideo = session.type === 'video' || session.isVideoEnabled;
+    if (isVideo && (session.status === 'connected' || session.status === 'calling')) {
+      AudioRouteService.setSpeakerOn(true).catch(() => {});
+      const t1 = setTimeout(() => AudioRouteService.setSpeakerOn(true).catch(() => {}), 600);
+      const t2 = setTimeout(() => AudioRouteService.setSpeakerOn(true).catch(() => {}), 1500);
+      const t3 = setTimeout(() => AudioRouteService.setSpeakerOn(true).catch(() => {}), 3000);
+      return () => {
+        clearTimeout(t1);
+        clearTimeout(t2);
+        clearTimeout(t3);
+      };
+    }
+  }, [session.status, session.type, session.isVideoEnabled]);
+
   // 📱 Android Back Button Minimization Hook (WhatsApp / Meet Style)
   useEffect(() => {
     if (Platform.OS !== 'android') return;

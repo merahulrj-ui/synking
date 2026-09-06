@@ -6,6 +6,8 @@ import android.app.KeyguardManager
 import android.app.PictureInPictureParams
 import android.content.Context
 import android.content.Intent
+import android.media.AudioManager
+import android.media.AudioDeviceInfo
 import android.net.Uri
 import android.os.Build
 import android.os.Handler
@@ -224,6 +226,35 @@ class TelecomModule(reactContext: ReactApplicationContext) : ReactContextBaseJav
             CallConnectionManager.answerCall()
             promise.resolve(true)
         } catch (e: Exception) {
+            promise.resolve(false)
+        }
+    }
+
+    @ReactMethod
+    fun setSpeakerOn(on: Boolean, promise: Promise) {
+        try {
+            Log.d("SYNKING_TELECOM", "[TelecomModule] setSpeakerOn($on) requested from JS")
+            CallConnectionManager.setSpeakerOn(on)
+
+            val audioManager = reactApplicationContext.getSystemService(Context.AUDIO_SERVICE) as AudioManager
+            audioManager.mode = AudioManager.MODE_IN_COMMUNICATION
+            audioManager.isSpeakerphoneOn = on
+
+            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
+                val targetDevice = audioManager.availableCommunicationDevices.find { 
+                    if (on) it.type == AudioDeviceInfo.TYPE_BUILTIN_SPEAKER 
+                    else it.type == AudioDeviceInfo.TYPE_BUILTIN_EARPIECE 
+                }
+                if (targetDevice != null) {
+                    val res = audioManager.setCommunicationDevice(targetDevice)
+                    Log.d("SYNKING_TELECOM", "[TelecomModule] setCommunicationDevice (${targetDevice.type}) result: $res")
+                } else if (!on) {
+                    audioManager.clearCommunicationDevice()
+                }
+            }
+            promise.resolve(true)
+        } catch (e: Exception) {
+            Log.e("SYNKING_TELECOM", "[TelecomModule] setSpeakerOn error: ${e.message}")
             promise.resolve(false)
         }
     }

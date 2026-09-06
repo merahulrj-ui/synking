@@ -319,10 +319,13 @@ class WebRTCManager {
         await this.initLocalStream(isVideo);
       }
 
-      // FIX: Set speaker ON only AFTER WebRTC initializes the mic!
+      // FIX: Set speaker ON with multi-stage delays to overcome WebRTC C++ audio init
       setTimeout(() => {
         AudioRouteService.setSpeakerOn(isVideo).catch(() => {});
       }, 500);
+      setTimeout(() => {
+        AudioRouteService.setSpeakerOn(isVideo).catch(() => {});
+      }, 1500);
 
       this.currentSession.status = 'connected';
       this.notify();

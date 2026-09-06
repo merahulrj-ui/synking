@@ -42,7 +42,7 @@ export function ensureTelecomBridgeReady() {
             isVerified: true,
             isVip: false,
           },
-          data.callType || data.type || 'audio',
+          (String(data.callType || data.type || 'audio').toLowerCase() === 'video' ? 'video' : 'audio'),
           callId,
           true
         );
@@ -84,7 +84,7 @@ export function ensureTelecomBridgeReady() {
             isVerified: true,
             isVip: false,
           },
-          data.callType || data.type || 'audio',
+          (String(data.callType || data.type || 'audio').toLowerCase() === 'video' ? 'video' : 'audio'),
           callId,
           false
         );

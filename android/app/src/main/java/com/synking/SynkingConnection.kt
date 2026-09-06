@@ -16,7 +16,7 @@ class SynkingConnection(
     private val callId: String,
     private val callerId: String = "",
     private val callerName: String,
-    private val callType: String
+    val callType: String
 ) : Connection() {
 
     init {
@@ -125,6 +125,17 @@ class SynkingConnection(
             nm.cancel(MyFirebaseMessagingService.NOTIFICATION_ID)
         } catch (e: Exception) {}
         setActive()
+        if (callType == "video") {
+            setAudioRoute(android.telecom.CallAudioState.ROUTE_SPEAKER)
+            Log.d("SYNKING_TELECOM", "[UI] ANSWER: Video call -> auto setAudioRoute ROUTE_SPEAKER")
+        }
+    }
+
+    override fun onCallAudioStateChanged(state: android.telecom.CallAudioState?) {
+        super.onCallAudioStateChanged(state)
+        val isSpeaker = state?.route == android.telecom.CallAudioState.ROUTE_SPEAKER
+        Log.d("SYNKING_TELECOM", "[UI] onCallAudioStateChanged: route=${state?.route} (isSpeaker=$isSpeaker)")
+        TelecomModule.emitSpeakerToggled(isSpeaker)
     }
 
     override fun onReject() {

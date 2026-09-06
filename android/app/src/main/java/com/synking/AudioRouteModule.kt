@@ -27,6 +27,9 @@ class AudioRouteModule(private val reactContext: ReactApplicationContext) : Reac
 
     private fun applyAudioRoute(on: Boolean) {
         try {
+            // Synchronize Android Telecom Connection audio route
+            CallConnectionManager.setSpeakerOn(on)
+
             audioManager.mode = AudioManager.MODE_IN_COMMUNICATION
             
             // Request AudioFocus for Voice Communication on Android 8.0+ / Android 14/15
@@ -57,7 +60,8 @@ class AudioRouteModule(private val reactContext: ReactApplicationContext) : Reac
                     else it.type == AudioDeviceInfo.TYPE_BUILTIN_EARPIECE 
                 }
                 if (targetDevice != null) {
-                    audioManager.setCommunicationDevice(targetDevice)
+                    val res = audioManager.setCommunicationDevice(targetDevice)
+                    Log.d("SYNKING_AUDIO", "[AudioRouteModule] setCommunicationDevice target=${targetDevice.type} result=$res")
                 } else {
                     audioManager.clearCommunicationDevice()
                 }
