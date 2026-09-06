@@ -1,6 +1,6 @@
 import React, { useRef, useEffect, useState } from 'react';
 import { View, Text, StyleSheet, Modal, TouchableOpacity, Image, Platform, ScrollView, Share, Animated, PanResponder, Vibration, NativeModules, BackHandler, DeviceEventEmitter, Dimensions } from 'react-native';
-import { useKeepAwake } from 'expo-keep-awake';
+import { activateKeepAwakeAsync, deactivateKeepAwake } from 'expo-keep-awake';
 import { Ionicons } from '@expo/vector-icons';
 import { LinearGradient } from 'expo-linear-gradient';
 import { CallSession } from '../types';
@@ -187,7 +187,12 @@ export const CallModal: React.FC<Props> = ({ session, onEndCall, onAcceptCall, o
   if (!session) return null;
 
   // 💡 Keep Screen Awake throughout the entire call (Calling, Ringing, Connected)
-  useKeepAwake('synking-call-session');
+  useEffect(() => {
+    activateKeepAwakeAsync('synking-call-session').catch(() => {});
+    return () => {
+      deactivateKeepAwake('synking-call-session').catch(() => {});
+    };
+  }, []);
 
   const [isNativePip, setIsNativePip] = useState(() => {
     if (Platform.OS !== 'android') return false;
