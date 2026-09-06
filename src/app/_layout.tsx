@@ -416,22 +416,29 @@ function GlobalCallOverlay() {
     }
   }, [isMinimized, activeCall, navigateToChat]);
 
+  const hasStartedOngoingCallRef = React.useRef<boolean>(false);
+
   React.useEffect(() => {
     // Pure UI Observer: listens to WebRTC session state changes
     const unsubscribe = WebRTCService.subscribe(session => {
       setActiveCall(session);
       if (!session) {
         setIsMinimized(false);
+        hasStartedOngoingCallRef.current = false;
       } else if (session.status === 'rejected' || session.status === 'ended') {
         setIsMinimized(false);
+        hasStartedOngoingCallRef.current = false;
       } else {
         setIsMinimized(WebRTCService.getIsMinimized());
         if (session.status === 'connected') {
-          if (Platform.OS === 'android') {
-            if (NativeModules.TelecomModule?.startOngoingCall) {
+          if (!hasStartedOngoingCallRef.current) {
+            hasStartedOngoingCallRef.current = true;
+            if (Platform.OS === 'android' && NativeModules.TelecomModule?.startOngoingCall) {
               NativeModules.TelecomModule.startOngoingCall(session.callerName || 'Synkin Call').catch(() => {});
             }
           }
+        } else {
+          hasStartedOngoingCallRef.current = false;
         }
       }
     });

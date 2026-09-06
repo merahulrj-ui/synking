@@ -9,10 +9,13 @@ object CallConnectionManager {
 
     fun answerCall(isSpeaker: Boolean = false) {
         currentConnection?.let {
+            val isAlreadyActive = it.state == android.telecom.Connection.STATE_ACTIVE
             it.setActive()
-            if (isSpeaker || it.callType == "video") {
-                it.setAudioRoute(CallAudioState.ROUTE_SPEAKER)
-                Log.d("SYNKING_TELECOM", "[CallConnectionManager] answerCall: setAudioRoute ROUTE_SPEAKER")
+            if (!isAlreadyActive) {
+                if (isSpeaker || it.callType == "video") {
+                    it.setAudioRoute(CallAudioState.ROUTE_SPEAKER)
+                    Log.d("SYNKING_TELECOM", "[CallConnectionManager] initial answerCall: setAudioRoute ROUTE_SPEAKER")
+                }
             }
         }
     }

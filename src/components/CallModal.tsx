@@ -373,9 +373,13 @@ export const CallModal: React.FC<Props> = ({ session, onEndCall, onAcceptCall, o
               <Ionicons name="call" size={20} color="#FFFFFF" style={{ transform: [{ rotate: '135deg' }] }} />
             </TouchableOpacity>
 
-            {/* Sparkle Icon */}
-            <View style={styles.pipSparkleBtn}>
-              <Ionicons name="sparkles" size={16} color="rgba(255, 255, 255, 0.75)" />
+            {/* Synkin Official Logo Emblem */}
+            <View style={styles.pipLogoContainer} pointerEvents="none">
+              <Image
+                source={require('../../assets/images/logo_emblem.png')}
+                style={styles.pipLogoImg}
+                resizeMode="contain"
+              />
             </View>
           </View>
 
@@ -1160,10 +1164,15 @@ const styles = StyleSheet.create({
     marginTop: 3,
     opacity: 0.95,
   },
-  pipSparkleBtn: {
+  pipLogoContainer: {
     position: 'absolute',
     right: 16,
-    bottom: 4,
+    bottom: 6,
+  },
+  pipLogoImg: {
+    width: 22,
+    height: 22,
+    opacity: 0.9,
   },
 });
 

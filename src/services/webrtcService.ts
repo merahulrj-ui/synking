@@ -919,6 +919,9 @@ class WebRTCManager {
     if (this.currentSession.isSpeakerOn === on) return on;
     this.currentSession.isSpeakerOn = on;
     AudioRouteService.setSpeakerOn(on).catch(() => {});
+    if (Platform.OS === 'android' && NativeModules.TelecomModule?.setSpeakerOn) {
+      NativeModules.TelecomModule.setSpeakerOn(on).catch(() => {});
+    }
     if (this.currentSession.status === 'connected' && this.currentSession.type === 'audio') {
       AudioRouteService.setProximitySensorEnabled(!on).catch(() => {});
     }

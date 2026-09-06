@@ -97,6 +97,9 @@ export default function CallApp() {
         onEndCall={handleEndCall}
         onAcceptCall={handleAcceptCall}
         onMinimize={handleMinimizeToChat}
+        onToggleMute={() => WebRTCService.toggleMute()}
+        onToggleVideo={() => WebRTCService.toggleVideo()}
+        onToggleSpeaker={() => WebRTCService.toggleSpeaker()}
       />
     </View>
   );

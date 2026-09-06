@@ -171,7 +171,8 @@ class MainActivity : ReactActivity() {
   fun enterPipModeIfActive() {
     if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
       try {
-        val isCallActive = TelecomModule.isCallActive || (CallConnectionManager.currentConnection != null)
+        val conn = CallConnectionManager.currentConnection
+        val isCallActive = TelecomModule.isCallActive || (conn != null && conn.state == android.telecom.Connection.STATE_ACTIVE)
         if (isCallActive) {
           val aspectRatio = Rational(9, 16)
           val builder = PictureInPictureParams.Builder()
