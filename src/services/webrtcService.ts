@@ -53,6 +53,18 @@ class WebRTCManager {
   private isSwitchingCamera: boolean = false;
   private iceDisconnectTimer: any = null;
   private declineDismissTimer: any = null;
+  private ringingPulseTimer: any = null;
+  private connectionWatchdogTimer: any = null;
+  private isCallMinimized: boolean = false;
+
+  public setMinimized(minimized: boolean) {
+    this.isCallMinimized = minimized;
+    this.notify();
+  }
+
+  public getIsMinimized(): boolean {
+    return this.isCallMinimized;
+  }
 
   constructor() {
     // Listen for Targeted Real-Time Call Signaling from peer
@@ -74,6 +86,8 @@ class WebRTCManager {
           CallDebugger.logStage('WEBSOCKET', 'OK', { signal: 'CALL_ACCEPTED' });
           this.log('📞 CALL_ACCEPTED received from peer. Initiating WebRTC SDP offer handshake...');
           this.notify();
+          this.cleanupRingingPulse();
+          this.startConnectionWatchdog();
           this.startTimer();
           if (Platform.OS === 'android' && NativeModules.TelecomModule?.startOngoingCall) {
             NativeModules.TelecomModule.startOngoingCall(this.currentSession.callerName || 'Synkin Call').catch(() => {});
@@ -234,8 +248,31 @@ class WebRTCManager {
       params.targetUser.id
     );
 
-    // ⏱️ Auto-disconnect if unanswered in 35s
-    this.startRingingTimeout(35);
+    // ⏱️ Auto-disconnect if unanswered in 50s (WhatsApp/Telecom Standard)
+    this.startRingingTimeout(50);
+
+    // 💓 3.5s Continuous Ringing Pulse: ensures instant incoming call screen if recipient opens app mid-call after force close
+    if (this.ringingPulseTimer) clearInterval(this.ringingPulseTimer);
+    this.ringingPulseTimer = setInterval(() => {
+      if (this.currentSession && (this.currentSession.status === 'calling' || this.currentSession.status === 'ringing')) {
+        RealtimeBridge.broadcast(
+          'INCOMING_CALL',
+          {
+            callId: newSession.id,
+            callerUser: params.callerUser,
+            receiverId: params.targetUser.id,
+            type: params.type,
+            callType: params.type,
+          },
+          params.targetUser.id
+        );
+      } else {
+        if (this.ringingPulseTimer) {
+          clearInterval(this.ringingPulseTimer);
+          this.ringingPulseTimer = null;
+        }
+      }
+    }, 3500);
 
     return newSession;
   }
@@ -281,7 +318,7 @@ class WebRTCManager {
     } else {
       // Normal React Native incoming call flow
       RingtoneService.playIncomingRing();
-      this.startRingingTimeout(35);
+      this.startRingingTimeout(50);
       RealtimeBridge.broadcast(
         'CALL_RINGING',
         { callId: incomingSession.id },
@@ -330,6 +367,8 @@ class WebRTCManager {
 
       this.currentSession.status = 'connected';
       this.notify();
+      this.cleanupRingingPulse();
+      this.startConnectionWatchdog();
       this.startTimer();
       if (Platform.OS === 'android' && NativeModules.TelecomModule?.startOngoingCall) {
         NativeModules.TelecomModule.startOngoingCall(this.currentSession.callerName || 'Synkin Call').catch(() => {});
@@ -558,6 +597,10 @@ class WebRTCManager {
               }, 5000);
             }
           } else if (this.iceStatus === 'connected' || this.iceStatus === 'completed') {
+            if (this.connectionWatchdogTimer) {
+              clearTimeout(this.connectionWatchdogTimer);
+              this.connectionWatchdogTimer = null;
+            }
             if (this.iceDisconnectTimer) {
               clearTimeout(this.iceDisconnectTimer);
               this.iceDisconnectTimer = null;
@@ -844,19 +887,50 @@ class WebRTCManager {
     return `${mins.toString().padStart(2, '0')}:${remainingSecs.toString().padStart(2, '0')}`;
   }
 
-  private startRingingTimeout(seconds: number = 35) {
+  private startRingingTimeout(seconds: number = 50) {
     if (this.ringingTimeoutTimer) {
       clearTimeout(this.ringingTimeoutTimer);
     }
     this.ringingTimeoutTimer = setTimeout(() => {
       if (this.currentSession && (this.currentSession.status === 'calling' || this.currentSession.status === 'ringing')) {
-        this.log(`⏱️ 35s Call Timeout: No answer received within 35 seconds. Automatically ending call.`);
+        this.log(`⏱️ ${seconds}s Call Timeout: No answer received within ${seconds} seconds. Automatically ending call.`);
         this.endCall();
       }
     }, seconds * 1000);
   }
 
-  
+  private cleanupRingingPulse() {
+    if (this.ringingPulseTimer) {
+      clearInterval(this.ringingPulseTimer);
+      this.ringingPulseTimer = null;
+    }
+  }
+
+  private startConnectionWatchdog() {
+    if (this.connectionWatchdogTimer) {
+      clearTimeout(this.connectionWatchdogTimer);
+    }
+    this.connectionWatchdogTimer = setTimeout(async () => {
+      if (this.currentSession && this.currentSession.status === 'connected') {
+        const isIceActive = this.iceStatus === 'connected' || this.iceStatus === 'completed';
+        if (!isIceActive) {
+          this.log('🛡️ [3s WATCHDOG] WebRTC stream not yet active after 3s. Auto ICE restart triggered...');
+          try {
+            if (this.peerConnection && typeof this.peerConnection.restartIce === 'function') {
+              this.peerConnection.restartIce();
+            }
+            if (this.currentSession.id.startsWith('call_')) {
+              await this.createAndSendOffer();
+            }
+          } catch (e) {
+            this.log(`⚠️ Watchdog ICE restart error: ${e}`);
+          }
+        }
+      }
+      this.connectionWatchdogTimer = null;
+    }, 3000);
+  }
+
   private notifyNativeVideoStreams() {
     try {
       const { NativeModules, Platform } = require('react-native');
@@ -895,6 +969,14 @@ class WebRTCManager {
     if (this.iceDisconnectTimer) {
       clearTimeout(this.iceDisconnectTimer);
       this.iceDisconnectTimer = null;
+    }
+    if (this.ringingPulseTimer) {
+      clearInterval(this.ringingPulseTimer);
+      this.ringingPulseTimer = null;
+    }
+    if (this.connectionWatchdogTimer) {
+      clearTimeout(this.connectionWatchdogTimer);
+      this.connectionWatchdogTimer = null;
     }
   }
 
@@ -999,6 +1081,7 @@ class WebRTCManager {
     if (this.isCleaningUp) return;
     this.isCleaningUp = true;
     try {
+      this.isCallMinimized = false;
       this.cleanupTimers();
       RingtoneService.stop();
       AudioRouteService.resetAudioRoute().catch(() => {});

@@ -300,6 +300,7 @@ export const CallModal: React.FC<Props> = ({ session, onEndCall, onAcceptCall, o
   };
 
   const handleOpenChat = () => {
+    WebRTCService.setMinimized(true);
     if (onMinimize) {
       onMinimize();
     } else {

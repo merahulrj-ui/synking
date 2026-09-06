@@ -75,6 +75,7 @@ export default function CallApp() {
   };
 
   const handleMinimizeToChat = () => {
+    WebRTCService.setMinimized(true);
     const partnerId = session?.callerId || session?.receiverId;
     if (Platform.OS === 'android' && NativeModules.TelecomModule?.openChatFromCall && partnerId) {
       NativeModules.TelecomModule.openChatFromCall(partnerId).catch(() => {});

@@ -377,7 +377,7 @@ function FloatingInCallPill({
 
 function GlobalCallOverlay() {
   const [activeCall, setActiveCall] = React.useState<CallSession | null>(null);
-  const [isMinimized, setIsMinimized] = React.useState<boolean>(false);
+  const [isMinimized, setIsMinimized] = React.useState<boolean>(() => WebRTCService.getIsMinimized());
   const { sendMessage, currentUser } = useApp();
   const router = useRouter();
 
@@ -390,6 +390,7 @@ function GlobalCallOverlay() {
       return;
     }
     lastChatNavTimeRef.current = now;
+    WebRTCService.setMinimized(true);
     setIsMinimized(true);
     router.push(`/chat/${partnerId}`);
   }, [router]);
@@ -415,10 +416,13 @@ function GlobalCallOverlay() {
         setIsMinimized(false);
       } else if (session.status === 'rejected' || session.status === 'ended') {
         setIsMinimized(false);
-      } else if (session.status === 'connected') {
-        if (Platform.OS === 'android') {
-          if (NativeModules.TelecomModule?.startOngoingCall) {
-            NativeModules.TelecomModule.startOngoingCall(session.callerName || 'Synkin Call').catch(() => {});
+      } else {
+        setIsMinimized(WebRTCService.getIsMinimized());
+        if (session.status === 'connected') {
+          if (Platform.OS === 'android') {
+            if (NativeModules.TelecomModule?.startOngoingCall) {
+              NativeModules.TelecomModule.startOngoingCall(session.callerName || 'Synkin Call').catch(() => {});
+            }
           }
         }
       }
@@ -463,6 +467,7 @@ function GlobalCallOverlay() {
 
   const handleMinimizeToChat = () => {
     if (!activeCall) return;
+    WebRTCService.setMinimized(true);
     const partnerId = activeCall.callerId === currentUser?.id ? activeCall.receiverId : activeCall.callerId;
     if (partnerId && currentUser) {
       navigateToChat(partnerId);
@@ -477,7 +482,10 @@ function GlobalCallOverlay() {
       return (
         <FloatingVideoPiP
           session={activeCall}
-          onExpand={() => setIsMinimized(false)}
+          onExpand={() => {
+            WebRTCService.setMinimized(false);
+            setIsMinimized(false);
+          }}
           onEndCall={handleEndCall}
         />
       );
@@ -485,7 +493,10 @@ function GlobalCallOverlay() {
     return (
       <FloatingInCallPill
         session={activeCall}
-        onExpand={() => setIsMinimized(false)}
+        onExpand={() => {
+          WebRTCService.setMinimized(false);
+          setIsMinimized(false);
+        }}
         onEndCall={handleEndCall}
       />
     );

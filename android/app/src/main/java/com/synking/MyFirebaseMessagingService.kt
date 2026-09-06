@@ -312,8 +312,8 @@ class MyFirebaseMessagingService : FirebaseMessagingService() {
                 PowerManager.PARTIAL_WAKE_LOCK or PowerManager.ACQUIRE_CAUSES_WAKEUP or PowerManager.ON_AFTER_RELEASE,
                 "synking:fcm_call_cpu_wakeup"
             )
-            wl.acquire(35_000L)
-            debug("WAKELOCK_ACQUIRED", "OK", "35s CPU and screen wake active")
+            wl.acquire(50_000L)
+            debug("WAKELOCK_ACQUIRED", "OK", "50s CPU and screen wake active")
         } catch (e: Exception) {
             debug("WAKELOCK_ACQUIRED", "FAIL", e.message ?: "")
         }
