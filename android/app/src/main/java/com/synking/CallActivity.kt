@@ -1,13 +1,16 @@
 package com.synking
 
 import android.app.NotificationManager
+import android.app.PictureInPictureParams
 import android.content.BroadcastReceiver
 import android.content.Context
 import android.content.Intent
 import android.content.IntentFilter
+import android.content.res.Configuration
 import android.os.Build
 import android.os.Bundle
 import android.util.Log
+import android.util.Rational
 import android.view.WindowManager
 import com.facebook.react.ReactActivity
 import com.facebook.react.ReactActivityDelegate
@@ -91,6 +94,36 @@ class CallActivity : ReactActivity() {
         super.onNewIntent(intent)
         setIntent(intent)
         handleIncomingCallIntent(intent)
+    }
+
+    override fun onUserLeaveHint() {
+        super.onUserLeaveHint()
+        enterPipModeIfActive()
+    }
+
+    fun enterPipModeIfActive() {
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
+            try {
+                val isCallActive = TelecomModule.isCallActive || CallConnectionManager.isCallActive
+                if (isCallActive) {
+                    val aspectRatio = Rational(9, 16)
+                    val builder = PictureInPictureParams.Builder()
+                        .setAspectRatio(aspectRatio)
+                    if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
+                        builder.setAutoEnterEnabled(true)
+                    }
+                    enterPictureInPictureMode(builder.build())
+                }
+            } catch (e: Exception) {
+                Log.e("SYNKING_DEBUG", "CallActivity enterPictureInPictureMode error: ${e.message}")
+            }
+        }
+    }
+
+    override fun onPictureInPictureModeChanged(isInPictureInPictureMode: Boolean, newConfig: Configuration) {
+        super.onPictureInPictureModeChanged(isInPictureInPictureMode, newConfig)
+        Log.d("SYNKING_DEBUG", "CallActivity onPictureInPictureModeChanged: isInPictureInPictureMode=$isInPictureInPictureMode")
+        TelecomModule.emitPipModeChanged(isInPictureInPictureMode)
     }
 
     private fun handleIncomingCallIntent(intent: Intent?) {

@@ -1,5 +1,8 @@
 package com.synking
 
+import android.app.PictureInPictureParams
+import android.content.res.Configuration
+import android.util.Rational
 import android.os.Build
 import android.os.Bundle
 import android.content.Intent
@@ -158,6 +161,36 @@ class MainActivity : ReactActivity() {
         }
         handleIncomingCallIntent(intent)
     }
+  }
+
+  override fun onUserLeaveHint() {
+    super.onUserLeaveHint()
+    enterPipModeIfActive()
+  }
+
+  fun enterPipModeIfActive() {
+    if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
+      try {
+        val isCallActive = TelecomModule.isCallActive || CallConnectionManager.isCallActive
+        if (isCallActive) {
+          val aspectRatio = Rational(9, 16)
+          val builder = PictureInPictureParams.Builder()
+            .setAspectRatio(aspectRatio)
+          if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
+            builder.setAutoEnterEnabled(true)
+          }
+          enterPictureInPictureMode(builder.build())
+        }
+      } catch (e: Exception) {
+        android.util.Log.e("SYNKING_DEBUG", "MainActivity enterPictureInPictureMode error: ${e.message}")
+      }
+    }
+  }
+
+  override fun onPictureInPictureModeChanged(isInPictureInPictureMode: Boolean, newConfig: Configuration) {
+    super.onPictureInPictureModeChanged(isInPictureInPictureMode, newConfig)
+    android.util.Log.d("SYNKING_DEBUG", "MainActivity onPictureInPictureModeChanged: isInPictureInPictureMode=$isInPictureInPictureMode")
+    TelecomModule.emitPipModeChanged(isInPictureInPictureMode)
   }
 
   private fun handleIncomingCallIntent(intent: Intent?) {

@@ -2,6 +2,7 @@ package com.synking
 
 import android.app.Activity
 import android.app.NotificationManager
+import android.app.PictureInPictureParams
 import android.app.KeyguardManager
 import android.content.Context
 import android.content.Intent
@@ -382,6 +383,33 @@ class TelecomModule(reactContext: ReactApplicationContext) : ReactContextBaseJav
         }
     }
 
+    @ReactMethod
+    fun enterPipMode(promise: Promise) {
+        try {
+            val act = CallActivity.currentCallActivity ?: currentActivity
+            if (act != null && Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
+                act.runOnUiThread {
+                    try {
+                        val aspectRatio = Rational(9, 16)
+                        val builder = PictureInPictureParams.Builder()
+                            .setAspectRatio(aspectRatio)
+                        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
+                            builder.setAutoEnterEnabled(true)
+                        }
+                        val success = act.enterPictureInPictureMode(builder.build())
+                        promise.resolve(success)
+                    } catch (e: Exception) {
+                        promise.resolve(false)
+                    }
+                }
+            } else {
+                promise.resolve(false)
+            }
+        } catch (e: Exception) {
+            promise.resolve(false)
+        }
+    }
+
     companion object {
         var incomingActivityInstance: IncomingCallActivity? = null
         var globalReactContext: ReactApplicationContext? = null
@@ -515,6 +543,17 @@ class TelecomModule(reactContext: ReactApplicationContext) : ReactContextBaseJav
             Log.d("SYNKING_DEBUG", "📤 [BRIDGE] emitOpenChatEvent -> onOpenChatRequested: partnerId=$partnerId")
             ctx.getJSModule(DeviceEventManagerModule.RCTDeviceEventEmitter::class.java)
                 .emit("onOpenChatRequested", params)
+        }
+
+        fun emitPipModeChanged(isInPipMode: Boolean) {
+            val ctx = reactContext ?: return
+            if (!ctx.hasActiveCatalystInstance()) return
+            val params = Arguments.createMap().apply {
+                putBoolean("isInPictureInPictureMode", isInPipMode)
+            }
+            Log.d("SYNKING_DEBUG", "📤 [BRIDGE] emitPipModeChanged: isInPictureInPictureMode=$isInPipMode")
+            ctx.getJSModule(DeviceEventManagerModule.RCTDeviceEventEmitter::class.java)
+                .emit("onPictureInPictureModeChanged", params)
         }
 
         fun flushPendingEvents() {

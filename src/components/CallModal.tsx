@@ -246,6 +246,17 @@ export const CallModal: React.FC<Props> = ({ session, onEndCall, onAcceptCall, o
     };
   }, []);
 
+  const [isNativePipMode, setIsNativePipMode] = useState<boolean>(false);
+
+  useEffect(() => {
+    const sub = DeviceEventEmitter.addListener('onPictureInPictureModeChanged', (event: any) => {
+      const inPip = !!event?.isInPictureInPictureMode;
+      console.log('[CallModal] 🖼️ onPictureInPictureModeChanged received:', inPip);
+      setIsNativePipMode(inPip);
+    });
+    return () => sub.remove();
+  }, []);
+
   // Ringtone & Repeating Vibration Manager
   useEffect(() => {
     const isInc = session.isIncoming === true;
@@ -313,7 +324,71 @@ export const CallModal: React.FC<Props> = ({ session, onEndCall, onAcceptCall, o
       }
     }
   };
-  const callContent = (
+  const renderNativePipContent = () => {
+    const isVideo = session.type === 'video' || session.isVideoEnabled;
+    const durStr = durationText || '00:01';
+
+    return (
+      <View style={styles.nativePipContainer}>
+        {/* Full-bleed Remote Video */}
+        <View style={StyleSheet.absoluteFill}>
+          {Platform.OS !== 'web' && NativeRTCView && remoteStream ? (
+            <NativeRTCView
+              streamURL={typeof remoteStream.toURL === 'function' ? remoteStream.toURL() : remoteStream}
+              style={{ width: '100%', height: '100%', backgroundColor: '#000000' }}
+              objectFit="cover"
+              zOrder={0}
+            />
+          ) : (
+            <Image
+              source={{ uri: session.callerPhoto || 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=800' }}
+              style={{ width: '100%', height: '100%' }}
+              resizeMode="cover"
+            />
+          )}
+        </View>
+
+        {/* Top Gradient Vignette */}
+        <View style={styles.pipTopVignette} pointerEvents="none" />
+
+        {/* Top Center: Live Timer Capsule (🟢 00:48) */}
+        <View style={styles.pipTopCapsule} pointerEvents="none">
+          <View style={styles.pipPulseDot} />
+          <Text style={styles.pipTimerText}>{durStr}</Text>
+        </View>
+
+        {/* Bottom Gradient Vignette */}
+        <View style={styles.pipBottomVignette} pointerEvents="none" />
+
+        {/* Bottom Controls: Centered Red End Call Button + Label + Sparkle */}
+        <View style={styles.pipBottomControls}>
+          <View style={styles.pipEndRow}>
+            {/* Red End Call Button */}
+            <TouchableOpacity
+              style={styles.pipEndBtn}
+              onPress={onEndCall}
+              activeOpacity={0.8}
+              hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
+            >
+              <Ionicons name="call" size={20} color="#FFFFFF" style={{ transform: [{ rotate: '135deg' }] }} />
+            </TouchableOpacity>
+
+            {/* Sparkle Icon */}
+            <View style={styles.pipSparkleBtn}>
+              <Ionicons name="sparkles" size={16} color="rgba(255, 255, 255, 0.75)" />
+            </View>
+          </View>
+
+          {/* "End Call" Text Label Below Button */}
+          <Text style={styles.pipEndLabel}>End Call</Text>
+        </View>
+      </View>
+    );
+  };
+
+  const callContent = isNativePipMode ? (
+    renderNativePipContent()
+  ) : (
     <View style={styles.modalOverlay}>
       <LinearGradient
         colors={['#0F172A', '#05060A', '#020617']}
@@ -997,6 +1072,98 @@ const styles = StyleSheet.create({
     color: '#FFFFFF',
     fontSize: 11,
     fontFamily: 'Poppins_800ExtraBold',
+  },
+  nativePipContainer: {
+    flex: 1,
+    width: '100%',
+    height: '100%',
+    backgroundColor: '#000000',
+    position: 'relative',
+    overflow: 'hidden',
+  },
+  pipTopVignette: {
+    position: 'absolute',
+    top: 0,
+    left: 0,
+    right: 0,
+    height: 60,
+    backgroundColor: 'rgba(0, 0, 0, 0.4)',
+  },
+  pipTopCapsule: {
+    position: 'absolute',
+    top: 12,
+    alignSelf: 'center',
+    backgroundColor: 'rgba(0, 0, 0, 0.72)',
+    paddingHorizontal: 10,
+    paddingVertical: 4,
+    borderRadius: 14,
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+    borderWidth: 1,
+    borderColor: 'rgba(255, 255, 255, 0.15)',
+    zIndex: 20,
+  },
+  pipPulseDot: {
+    width: 6,
+    height: 6,
+    borderRadius: 3,
+    backgroundColor: '#22C55E',
+  },
+  pipTimerText: {
+    color: '#FFFFFF',
+    fontSize: 11,
+    fontFamily: 'Poppins_700Bold',
+  },
+  pipBottomVignette: {
+    position: 'absolute',
+    bottom: 0,
+    left: 0,
+    right: 0,
+    height: 90,
+    backgroundColor: 'rgba(0, 0, 0, 0.65)',
+  },
+  pipBottomControls: {
+    position: 'absolute',
+    bottom: 12,
+    left: 0,
+    right: 0,
+    alignItems: 'center',
+    justifyContent: 'center',
+    zIndex: 20,
+  },
+  pipEndRow: {
+    width: '100%',
+    alignItems: 'center',
+    justifyContent: 'center',
+    position: 'relative',
+  },
+  pipEndBtn: {
+    width: 46,
+    height: 46,
+    borderRadius: 23,
+    backgroundColor: '#EF4444',
+    alignItems: 'center',
+    justifyContent: 'center',
+    borderWidth: 1.5,
+    borderColor: 'rgba(255, 255, 255, 0.25)',
+    shadowColor: '#EF4444',
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.5,
+    shadowRadius: 8,
+    elevation: 6,
+  },
+  pipEndLabel: {
+    color: '#FFFFFF',
+    fontSize: 10,
+    fontFamily: 'Poppins_500Medium',
+    marginTop: 3,
+    opacity: 0.95,
+  },
+  pipSparkleBtn: {
+    position: 'absolute',
+    right: 16,
+    bottom: 4,
   },
 });
 
