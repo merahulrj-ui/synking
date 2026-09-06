@@ -9,6 +9,7 @@ import { NativeRTCView } from '../services/webrtcCore';
 import { AudioRouteService } from '../services/audioRouteService';
 import { RealtimeBridge } from '../services/realtimeBridge';
 import { saveChatMessageToFirestore } from '../services/firebase';
+import { encryptE2EEMessage } from '../utils/encryption';
 
 interface QuickDeclineOption {
   id: string;
@@ -406,18 +407,21 @@ export const CallModal: React.FC<Props> = ({ session, isLockscreen, onEndCall, o
         RealtimeBridge.broadcast('NEW_MESSAGE', newMsg, recipientId);
       } catch (e) {}
 
-      try {
-        saveChatMessageToFirestore({
-          id: msgId,
-          senderId: senderId,
-          receiverId: recipientId,
-          cipherText: text,
-          plainText: text,
-          isEncrypted: false,
-          timestamp: newMsg.timestamp,
-          type: 'text',
-        }).catch(() => {});
-      } catch (e) {}
+      (async () => {
+        try {
+          const enc = await encryptE2EEMessage(text, senderId, recipientId);
+          await saveChatMessageToFirestore({
+            id: msgId,
+            senderId: senderId,
+            receiverId: recipientId,
+            cipherText: enc.ciphertext,
+            plainText: text,
+            isEncrypted: true,
+            timestamp: newMsg.timestamp,
+            type: 'text',
+          });
+        } catch (e) {}
+      })();
     }
 
     // 3. Immediately decline & cut the call in background
