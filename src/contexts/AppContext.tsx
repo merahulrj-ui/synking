@@ -21,6 +21,7 @@ import { encryptE2EEMessage } from '../utils/encryption';
 import { RealtimeBridge } from '../services/realtimeBridge';
 import { WebRTCService } from '../services/webrtcService';
 import { NotificationService } from '../services/notificationService';
+import { activeChatTracker } from '../services/activeChatTracker';
 import * as Location from 'expo-location';
 
 interface AppContextType {
@@ -585,33 +586,39 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
         if (isIncoming || isOutgoing) {
           // Play Incoming Message Sound/Haptic if we are receiving it from someone else
           if (isIncoming) {
-            // Instantly mark sender as having an unread message
-            const senderKey = String(msg.senderId).trim();
-            setUnreadChatIds(prev => {
-              const next = new Set(prev);
-              next.add(senderKey);
-              const digits = senderKey.replace(/\D/g, '').slice(-10);
-              if (digits) next.add(digits);
-              return next;
-            });
+            const isChatCurrentlyOpen = activeChatTracker.isChatActive(msg.senderId);
+
+            // Instantly mark sender as having an unread message ONLY if not currently looking at this chat!
+            if (!isChatCurrentlyOpen) {
+              const senderKey = String(msg.senderId).trim();
+              setUnreadChatIds(prev => {
+                const next = new Set(prev);
+                next.add(senderKey);
+                const digits = senderKey.replace(/\D/g, '').slice(-10);
+                if (digits) next.add(digits);
+                return next;
+              });
+            }
 
             try {
-              if (Platform.OS !== 'web') {
-                const Haptics = require('expo-haptics');
-                Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success).catch(() => {});
-              }
-              const { RingtoneService } = require('../services/ringtoneService');
-              if (RingtoneService) RingtoneService.playMessageChime();
-
-              // Post notification banner on Web/iOS (Android is handled natively by MyFirebaseMessagingService to prevent duplicates)
-              if (Platform.OS !== 'android') {
-                const sender = profiles.find(p => p.id === msg.senderId || (p.phoneNumber && (p.phoneNumber.replace(/\D/g, '').slice(-10) === msg.senderId.replace(/\D/g, '').slice(-10))));
-                const senderTitle = sender?.name || 'New Message';
-                let bodyText = msg.text || 'Sent you a message';
-                if (bodyText.includes('|||AUDIO_DATA::')) {
-                  bodyText = '🎤 Voice note';
+              if (!isChatCurrentlyOpen) {
+                if (Platform.OS !== 'web') {
+                  const Haptics = require('expo-haptics');
+                  Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success).catch(() => {});
                 }
-                NotificationService.showMessageNotification(senderTitle, bodyText, msg.senderId);
+                const { RingtoneService } = require('../services/ringtoneService');
+                if (RingtoneService) RingtoneService.playMessageChime();
+
+                // Post notification banner on Web/iOS (Android is handled natively by MyFirebaseMessagingService to prevent duplicates)
+                if (Platform.OS !== 'android') {
+                  const sender = profiles.find(p => p.id === msg.senderId || (p.phoneNumber && (p.phoneNumber.replace(/\D/g, '').slice(-10) === msg.senderId.replace(/\D/g, '').slice(-10))));
+                  const senderTitle = sender?.name || 'New Message';
+                  let bodyText = msg.text || 'Sent you a message';
+                  if (bodyText.includes('|||AUDIO_DATA::')) {
+                    bodyText = '🎤 Voice note';
+                  }
+                  NotificationService.showMessageNotification(senderTitle, bodyText, msg.senderId);
+                }
               }
             } catch(e) {}
           }

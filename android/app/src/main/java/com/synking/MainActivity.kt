@@ -17,6 +17,7 @@ class MainActivity : ReactActivity() {
 
   companion object {
     @Volatile var isLockscreenCall = false
+    @Volatile var isAppInForeground = false
   }
 
   private var pendingIncomingCallIntent: Intent? = null
@@ -97,6 +98,12 @@ class MainActivity : ReactActivity() {
 
   override fun onResume() {
     super.onResume()
+    isAppInForeground = true
+  }
+
+  override fun onPause() {
+    super.onPause()
+    isAppInForeground = false
   }
 
   override fun onDestroy() {
@@ -105,6 +112,7 @@ class MainActivity : ReactActivity() {
       unregisterReceiver(callEndedReceiver)
     } catch (e: Exception) {}
     isLockscreenCall = false
+    isAppInForeground = false
   }
 
   /**

@@ -1,12 +1,13 @@
 import React, { useEffect, useState, useRef } from 'react';
 import { View, Text, StyleSheet, TouchableOpacity, Image, Animated, Platform } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
-import { useRouter, useSegments, useGlobalSearchParams } from 'expo-router';
+import { useRouter, useSegments } from 'expo-router';
 import { useApp } from '../contexts/AppContext';
 import { RealtimeBridge } from '../services/realtimeBridge';
 import { RingtoneService } from '../services/ringtoneService';
 import { decryptE2EEMessage } from '../utils/encryption';
 import { ChatMessage } from '../types';
+import { activeChatTracker } from '../services/activeChatTracker';
 
 interface NotificationState {
   id: string;
@@ -19,7 +20,6 @@ interface NotificationState {
 export const InAppNotificationBanner: React.FC = () => {
   const router = useRouter();
   const segments = useSegments();
-  const { id: activeChatId } = useGlobalSearchParams<{ id?: string }>();
   const { currentUser, profiles, matches, isDarkMode } = useApp();
   const [notification, setNotification] = useState<NotificationState | null>(null);
   const slideAnim = useRef(new Animated.Value(-120)).current;
@@ -60,13 +60,10 @@ export const InAppNotificationBanner: React.FC = () => {
         // ⛔ CRITICAL: Only show notification if this message is addressed to ME
         if (!isMe(msg.receiverId)) return;
 
-        // Check if user is currently inside the chat with this specific sender
-        const isCurrentlyInThisChat = Boolean(
-          activeChatId &&
-          (activeChatId === msg.senderId ||
-           (activeChatId.replace(/\D/g, '').slice(-10) &&
-            activeChatId.replace(/\D/g, '').slice(-10) === String(msg.senderId).replace(/\D/g, '').slice(-10)))
-        );
+        // ⛔ CRITICAL: Suppress notification completely if user is currently inside the chat with this sender!
+        if (activeChatTracker.isChatActive(msg.senderId)) {
+          return;
+        }
 
         // Decrypt text if E2EE encrypted
         const myId = currentUser?.id || 'my_user_id';
@@ -103,29 +100,27 @@ export const InAppNotificationBanner: React.FC = () => {
           }
         }
 
-        // 3. Show floating banner if not actively reading this chat
-        if (!isCurrentlyInThisChat) {
-          setNotification({
-            id: msg.id,
-            senderId: msg.senderId,
-            senderName,
-            senderPhoto,
-            previewText: readableText,
-          });
+        // 3. Show or update floating banner
+        setNotification({
+          id: msg.id,
+          senderId: msg.senderId,
+          senderName,
+          senderPhoto,
+          previewText: readableText,
+        });
 
-          // Slide Down Animation
-          Animated.spring(slideAnim, {
-            toValue: 12,
-            useNativeDriver: true,
-            bounciness: 8,
-          }).start();
+        // Slide Down Animation
+        Animated.spring(slideAnim, {
+          toValue: 12,
+          useNativeDriver: true,
+          bounciness: 8,
+        }).start();
 
-          // Auto-hide after 4.5 seconds
-          if (hideTimerRef.current) clearTimeout(hideTimerRef.current);
-          hideTimerRef.current = setTimeout(() => {
-            dismissBanner();
-          }, 4500);
-        }
+        // Auto-hide after 4.5 seconds
+        if (hideTimerRef.current) clearTimeout(hideTimerRef.current);
+        hideTimerRef.current = setTimeout(() => {
+          dismissBanner();
+        }, 4500);
       }
     });
 
@@ -146,7 +141,20 @@ export const InAppNotificationBanner: React.FC = () => {
     if (!notification) return;
     const targetSenderId = notification.senderId;
     dismissBanner();
-    router.push(`/chat/${targetSenderId}` as any);
+
+    // ⛔ Layer Safety:
+    // 1. If currently inside chat with this exact person, do nothing (already there!)
+    if (activeChatTracker.isChatActive(targetSenderId)) {
+      return;
+    }
+
+    // 2. If currently inside ANOTHER chat, replace current screen to prevent stack layering!
+    const currentChat = activeChatTracker.getActiveChat();
+    if (currentChat) {
+      router.replace(`/chat/${targetSenderId}` as any);
+    } else {
+      router.push(`/chat/${targetSenderId}` as any);
+    }
   };
 
   if (!notification) return null;

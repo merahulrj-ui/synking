@@ -13,7 +13,9 @@ import {
   Alert,
   Modal,
   Keyboard,
+  BackHandler,
 } from 'react-native';
+import { activeChatTracker } from '../../services/activeChatTracker';
 import {
   createAudioPlayer,
   AudioModule,
@@ -109,7 +111,11 @@ export default function ChatScreen() {
   useEffect(() => {
     if (id) {
       markChatAsRead(id);
+      activeChatTracker.setActiveChat(id);
     }
+    return () => {
+      activeChatTracker.setActiveChat(null);
+    };
   }, [id]);
   const [inputText, setInputText] = useState('');
   const [selectedMsgForAction, setSelectedMsgForAction] = useState<ChatMessage | null>(null);
@@ -1634,6 +1640,16 @@ const VOICE_COMPRESSED_CONFIG: any = {
       router.replace('/(tabs)/chats');
     }
   };
+
+  useEffect(() => {
+    if (Platform.OS !== 'android') return;
+    const onBackPress = () => {
+      handleBack();
+      return true;
+    };
+    const sub = BackHandler.addEventListener('hardwareBackPress', onBackPress);
+    return () => sub.remove();
+  }, [id]);
 
   const isUserCaller = useMemo(() => {
     // 1. Check callRequesterId

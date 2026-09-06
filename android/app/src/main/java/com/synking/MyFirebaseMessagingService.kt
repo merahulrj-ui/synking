@@ -223,9 +223,29 @@ class MyFirebaseMessagingService : FirebaseMessagingService() {
 
         // Handle chat message notifications
         if (data["type"] == "message" || data["type"] == "chat" || data["type"] == "NEW_MESSAGE") {
+            // 1. Suppress if app is in foreground (InAppNotificationBanner handles it inside the app)
+            if (MainActivity.isAppInForeground) {
+                debug("FCM_MESSAGE_FOREGROUND", "INFO", "App is in foreground. Suppressing system notification to prevent duplicate banners.")
+                return
+            }
+
+            val senderId = data["senderId"] ?: data["fromUserId"] ?: ""
+
+            // 2. Suppress if chat with this user is currently open
+            val prefs = getSharedPreferences("synking_call_state", Context.MODE_PRIVATE)
+            val activeChatUserId = prefs.getString("active_chat_user_id", null)
+            if (!activeChatUserId.isNullOrEmpty() && senderId.isNotEmpty()) {
+                val cleanActive = activeChatUserId.replace(Regex("\\D"), "").takeLast(10)
+                val cleanSender = senderId.replace(Regex("\\D"), "").takeLast(10)
+                if (activeChatUserId.equals(senderId, ignoreCase = true) ||
+                    (cleanActive.isNotEmpty() && cleanActive == cleanSender)) {
+                    debug("FCM_MESSAGE_ACTIVE_CHAT", "INFO", "Chat with $senderId is active. Suppressing notification.")
+                    return
+                }
+            }
+
             val title = data["title"] ?: data["senderName"] ?: "New Message"
             val body = data["body"] ?: data["text"] ?: "You received a message"
-            val senderId = data["senderId"] ?: data["fromUserId"] ?: ""
             val msgChannelId = "synking_messages"
 
             val nm = getSystemService(Context.NOTIFICATION_SERVICE) as NotificationManager

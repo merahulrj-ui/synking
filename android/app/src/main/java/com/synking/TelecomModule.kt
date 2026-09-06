@@ -66,6 +66,23 @@ class TelecomModule(reactContext: ReactApplicationContext) : ReactContextBaseJav
     }
 
     @ReactMethod
+    fun setActiveChatUserId(userId: String?, promise: Promise) {
+        try {
+            val prefs = reactApplicationContext.getSharedPreferences("synking_call_state", Context.MODE_PRIVATE)
+            if (userId.isNullOrEmpty()) {
+                prefs.edit().remove("active_chat_user_id").apply()
+                Log.d("SYNKING_DEBUG", "Active chat cleared from native state.")
+            } else {
+                prefs.edit().putString("active_chat_user_id", userId).apply()
+                Log.d("SYNKING_DEBUG", "Active chat set to $userId in native state.")
+            }
+            promise.resolve(true)
+        } catch (e: Exception) {
+            promise.resolve(false)
+        }
+    }
+
+    @ReactMethod
     fun getPendingIncomingCall(promise: Promise) {
         try {
             val call = PendingCallStore.get(reactApplicationContext)
