@@ -192,6 +192,11 @@ class AudioRouteModule(private val reactContext: ReactApplicationContext) : Reac
     fun startIncomingRingtone(promise: Promise) {
         mainHandler.post {
             try {
+                if (globalIncomingMediaPlayer?.isPlaying == true) {
+                    Log.i("SYNKING_AUDIO", "Synk Signature incoming ringtone already playing globally, ignoring restart")
+                    promise.resolve(true)
+                    return@post
+                }
                 stopGlobalIncomingRingtone()
                 val resId = reactContext.resources.getIdentifier("synk_signature", "raw", reactContext.packageName)
                 if (resId != 0) {

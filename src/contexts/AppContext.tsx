@@ -681,6 +681,14 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
             // Already active/ringing for this callId, ignore 3.5s pulse
             return;
           }
+          const photo = payload.callerUser.photo || payload.callerUser.photos?.[0] || '';
+          NotificationService.showIncomingCallNotification(
+            payload.callerUser.name, 
+            payload.type, 
+            payload.callId,
+            payload.callerUser.id,
+            photo
+          );
           WebRTCService.receiveIncomingCall(payload.callerUser, payload.type, payload.callId);
         }
       } else if (type === 'CALL_ENDED' || type === 'CALL_REJECTED' || type === 'CALL_ACCEPTED') {
