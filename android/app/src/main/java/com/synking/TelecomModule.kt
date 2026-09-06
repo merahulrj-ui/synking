@@ -190,16 +190,22 @@ class TelecomModule(reactContext: ReactApplicationContext) : ReactContextBaseJav
             CallConnectionManager.answerCall()
             SynkingConnectionService.updateOngoingCallForeground(callerName)
             val activity: Activity? = CallActivity.currentCallActivity ?: reactApplicationContext.currentActivity
-            if (activity != null && Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
-                activity.runOnUiThread {
+            activity?.let { act ->
+                act.runOnUiThread {
                     try {
-                        val builder = PictureInPictureParams.Builder()
-                            .setAspectRatio(Rational(9, 16))
-                            .setAutoEnterEnabled(true)
-                        activity.setPictureInPictureParams(builder.build())
-                        Log.d("SYNKING_PIP", "[TelecomModule] startOngoingCall: auto-PiP pre-registered on ${activity.javaClass.simpleName}")
-                    } catch (e: Exception) {
-                        Log.w("SYNKING_PIP", "[TelecomModule] startOngoingCall setPictureInPictureParams error: ${e.message}")
+                        act.window.addFlags(WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON)
+                        Log.d("SYNKING_TELECOM", "[TelecomModule] FLAG_KEEP_SCREEN_ON added to ${act.javaClass.simpleName}")
+                    } catch (e: Exception) {}
+                    if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
+                        try {
+                            val builder = PictureInPictureParams.Builder()
+                                .setAspectRatio(Rational(9, 16))
+                                .setAutoEnterEnabled(true)
+                            act.setPictureInPictureParams(builder.build())
+                            Log.d("SYNKING_PIP", "[TelecomModule] startOngoingCall: auto-PiP pre-registered on ${act.javaClass.simpleName}")
+                        } catch (e: Exception) {
+                            Log.w("SYNKING_PIP", "[TelecomModule] startOngoingCall setPictureInPictureParams error: ${e.message}")
+                        }
                     }
                 }
             }
@@ -308,14 +314,20 @@ class TelecomModule(reactContext: ReactApplicationContext) : ReactContextBaseJav
             IncomingCallActivity.stopRingtoneGlobally()
 
             val activity: Activity? = CallActivity.currentCallActivity ?: reactApplicationContext.currentActivity
-            if (activity != null && Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
-                activity.runOnUiThread {
+            activity?.let { act ->
+                act.runOnUiThread {
                     try {
-                        val builder = PictureInPictureParams.Builder()
-                            .setAutoEnterEnabled(false)
-                        activity.setPictureInPictureParams(builder.build())
-                        Log.d("SYNKING_PIP", "[TelecomModule] endCall: auto-PiP disabled")
+                        act.window.clearFlags(WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON)
+                        Log.d("SYNKING_TELECOM", "[TelecomModule] FLAG_KEEP_SCREEN_ON cleared on ${act.javaClass.simpleName}")
                     } catch (e: Exception) {}
+                    if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
+                        try {
+                            val builder = PictureInPictureParams.Builder()
+                                .setAutoEnterEnabled(false)
+                            act.setPictureInPictureParams(builder.build())
+                            Log.d("SYNKING_PIP", "[TelecomModule] endCall: auto-PiP disabled")
+                        } catch (e: Exception) {}
+                    }
                 }
             }
 
