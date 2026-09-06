@@ -30,6 +30,10 @@ class SynkingConnection(
         connectionProperties = PROPERTY_SELF_MANAGED
         audioModeIsVoip = true
         setRingbackRequested(false)
+        if (callType == "video") {
+            setAudioRoute(android.telecom.CallAudioState.ROUTE_SPEAKER)
+            Log.d("SYNKING_TELECOM", "[INIT] Video call -> initial setAudioRoute ROUTE_SPEAKER")
+        }
     }
 
     override fun onShowIncomingCallUi() {
@@ -217,8 +221,18 @@ class SynkingConnection(
 
     override fun onCallAudioStateChanged(state: android.telecom.CallAudioState?) {
         super.onCallAudioStateChanged(state)
-        val isSpeaker = state?.route == android.telecom.CallAudioState.ROUTE_SPEAKER
-        Log.d("SYNKING_TELECOM", "[UI] onCallAudioStateChanged: route=${state?.route} (isSpeaker=$isSpeaker)")
+        val route = state?.route ?: android.telecom.CallAudioState.ROUTE_EARPIECE
+        val isSpeaker = route == android.telecom.CallAudioState.ROUTE_SPEAKER
+        val isHeadset = route == android.telecom.CallAudioState.ROUTE_BLUETOOTH || 
+                        route == android.telecom.CallAudioState.ROUTE_WIRED_HEADSET
+        Log.d("SYNKING_TELECOM", "[UI] onCallAudioStateChanged: route=$route (isSpeaker=$isSpeaker, callType=$callType)")
+
+        if (callType == "video" && !isSpeaker && !isHeadset) {
+            Log.d("SYNKING_TELECOM", "[UI] onCallAudioStateChanged: Video call detected non-speaker route ($route). Re-forcing ROUTE_SPEAKER!")
+            setAudioRoute(android.telecom.CallAudioState.ROUTE_SPEAKER)
+            return
+        }
+
         TelecomModule.emitSpeakerToggled(isSpeaker)
     }
 

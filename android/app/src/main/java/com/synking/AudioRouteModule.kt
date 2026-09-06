@@ -39,14 +39,14 @@ class AudioRouteModule(private val reactContext: ReactApplicationContext) : Reac
                     audioManager.mode = AudioManager.MODE_IN_COMMUNICATION
                     audioManager.isSpeakerphoneOn = true
                     if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
-                        audioManager.clearCommunicationDevice()
                         val speakerDevice = audioManager.availableCommunicationDevices.find { 
                             it.type == AudioDeviceInfo.TYPE_BUILTIN_SPEAKER 
-                        } ?: audioManager.getDevices(AudioManager.GET_DEVICES_OUTPUTS).find {
-                            it.type == AudioDeviceInfo.TYPE_BUILTIN_SPEAKER
                         }
                         if (speakerDevice != null) {
-                            audioManager.setCommunicationDevice(speakerDevice)
+                            val success = audioManager.setCommunicationDevice(speakerDevice)
+                            Log.d("SYNKING_AUDIO", "setCommunicationDevice (SPEAKER) success: $success")
+                        } else {
+                            Log.w("SYNKING_AUDIO", "TYPE_BUILTIN_SPEAKER not found in availableCommunicationDevices")
                         }
                     }
                     try {
@@ -62,11 +62,10 @@ class AudioRouteModule(private val reactContext: ReactApplicationContext) : Reac
                     if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
                         val earpieceDevice = audioManager.availableCommunicationDevices.find { 
                             it.type == AudioDeviceInfo.TYPE_BUILTIN_EARPIECE 
-                        } ?: audioManager.getDevices(AudioManager.GET_DEVICES_OUTPUTS).find {
-                            it.type == AudioDeviceInfo.TYPE_BUILTIN_EARPIECE
                         }
                         if (earpieceDevice != null) {
-                            audioManager.setCommunicationDevice(earpieceDevice)
+                            val success = audioManager.setCommunicationDevice(earpieceDevice)
+                            Log.d("SYNKING_AUDIO", "setCommunicationDevice (EARPIECE) success: $success")
                         } else {
                             audioManager.clearCommunicationDevice()
                         }
@@ -76,6 +75,7 @@ class AudioRouteModule(private val reactContext: ReactApplicationContext) : Reac
                 reactContext.currentActivity?.volumeControlStream = AudioManager.STREAM_VOICE_CALL
                 promise.resolve(on)
             } catch (e: Exception) {
+                Log.e("SYNKING_AUDIO", "setSpeakerphoneOn error: ${e.message}")
                 promise.reject("AUDIO_ROUTE_ERROR", e.message)
             }
         }
@@ -149,25 +149,42 @@ class AudioRouteModule(private val reactContext: ReactApplicationContext) : Reac
     @ReactMethod
     fun startRingbackTone(promise: Promise) {
         mainHandler.post {
-            try {
-                stopRingbackInternal()
-                toneGenerator = ToneGenerator(AudioManager.STREAM_VOICE_CALL, 80)
-                val playTone = object : Runnable {
-                    override fun run() {
-                        try {
-                            toneGenerator?.startTone(ToneGenerator.TONE_SUP_RINGTONE, 1000)
-                            mainHandler.postDelayed(this, 3000)
-                        } catch (e: Exception) {
-                            Log.w("SYNKING_AUDIO", "Ringback tone error: ${e.message}")
-                        }
+            val isSpeaker = audioManager.isSpeakerphoneOn || (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S && audioManager.communicationDevice?.type == AudioDeviceInfo.TYPE_BUILTIN_SPEAKER)
+            startRingbackToneInternal(isSpeaker, promise)
+        }
+    }
+
+    @ReactMethod
+    fun startRingbackToneWithSpeaker(isSpeaker: Boolean, promise: Promise) {
+        mainHandler.post {
+            startRingbackToneInternal(isSpeaker, promise)
+        }
+    }
+
+    private fun startRingbackToneInternal(isSpeaker: Boolean, promise: Promise) {
+        try {
+            stopRingbackInternal()
+            // STREAM_MUSIC guarantees loud speaker playback and NEVER falls back to earpiece
+            val streamType = if (isSpeaker) AudioManager.STREAM_MUSIC else AudioManager.STREAM_VOICE_CALL
+            val volume = if (isSpeaker) 85 else 80
+            toneGenerator = ToneGenerator(streamType, volume)
+            val playTone = object : Runnable {
+                override fun run() {
+                    try {
+                        toneGenerator?.startTone(ToneGenerator.TONE_SUP_RINGTONE, 1000)
+                        mainHandler.postDelayed(this, 3000)
+                    } catch (e: Exception) {
+                        Log.w("SYNKING_AUDIO", "Ringback tone error: ${e.message}")
                     }
                 }
-                ringbackRunnable = playTone
-                playTone.run()
-                promise.resolve(true)
-            } catch (e: Exception) {
-                promise.reject("RINGBACK_ERROR", e.message)
             }
+            ringbackRunnable = playTone
+            playTone.run()
+            Log.d("SYNKING_AUDIO", "startRingbackToneInternal started with isSpeaker=$isSpeaker (streamType=$streamType)")
+            promise.resolve(true)
+        } catch (e: Exception) {
+            Log.e("SYNKING_AUDIO", "startRingbackToneInternal error: ${e.message}")
+            promise.reject("RINGBACK_ERROR", e.message)
         }
     }
 
@@ -232,8 +249,6 @@ class AudioRouteModule(private val reactContext: ReactApplicationContext) : Reac
                         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
                             val speakerDevice = am.availableCommunicationDevices.find { 
                                 it.type == AudioDeviceInfo.TYPE_BUILTIN_SPEAKER 
-                            } ?: am.getDevices(AudioManager.GET_DEVICES_OUTPUTS).find {
-                                it.type == AudioDeviceInfo.TYPE_BUILTIN_SPEAKER
                             }
                             if (speakerDevice != null) {
                                 am.setCommunicationDevice(speakerDevice)

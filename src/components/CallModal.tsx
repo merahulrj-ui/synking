@@ -7,6 +7,16 @@ import { WebRTCService } from '../services/webrtcService';
 import { RingtoneService } from '../services/ringtoneService';
 import { NativeRTCView } from '../services/webrtcCore';
 import { AudioRouteService } from '../services/audioRouteService';
+import { RealtimeBridge } from '../services/realtimeBridge';
+import { saveChatMessageToFirestore } from '../services/firebase';
+
+const QUICK_DECLINE_MESSAGES = [
+  "Can't talk now. What's up?",
+  "I'll call you right back.",
+  "I'll call you later.",
+  "Can't talk now. Call me later?",
+  "In a meeting. Will text you.",
+];
 
 const LiveSelfVideo: React.FC<{ isPip?: boolean }> = ({ isPip = true }) => {
   const videoRef = useRef<any>(null);
@@ -188,6 +198,7 @@ export const CallModal: React.FC<Props> = ({ session, isLockscreen, onEndCall, o
   const [isExpanded, setIsExpanded] = useState<boolean>(() => {
     return !!isLockscreen || !session.isIncoming || session.status !== 'ringing';
   });
+  const [showQuickMessages, setShowQuickMessages] = useState<boolean>(false);
 
   useEffect(() => {
     if (session.status === 'connected' || isLockscreen) {
@@ -263,7 +274,7 @@ export const CallModal: React.FC<Props> = ({ session, isLockscreen, onEndCall, o
     if (isInc && session.status === 'ringing') {
       RingtoneService.playIncomingRing();
     } else if (!isInc && (session.status === 'calling' || session.status === 'ringing')) {
-      RingtoneService.playOutgoingRing();
+      RingtoneService.playOutgoingRing(session.type === 'video' || session.isVideoEnabled);
       Vibration.cancel();
     } else {
       RingtoneService.stop();
@@ -274,7 +285,7 @@ export const CallModal: React.FC<Props> = ({ session, isLockscreen, onEndCall, o
       RingtoneService.stop();
       Vibration.cancel();
     };
-  }, [session.status, session.isIncoming]);
+  }, [session.status, session.isIncoming, session.type, session.isVideoEnabled]);
 
   const handleAccept = () => {
     RingtoneService.stop();
@@ -318,8 +329,62 @@ export const CallModal: React.FC<Props> = ({ session, isLockscreen, onEndCall, o
   };
 
   const handleIncomingMessage = () => {
-    handleDecline();
-    handleOpenChat();
+    setIsExpanded(true);
+    setShowQuickMessages(true);
+  };
+
+  const handleSendQuickMessageAndDecline = (text: string) => {
+    setShowQuickMessages(false);
+
+    // 1. Instantly stop ringtone and vibration
+    RingtoneService.stop();
+    try {
+      Vibration.cancel();
+      if (Platform.OS !== 'web') {
+        const Haptics = require('expo-haptics');
+        Haptics?.impactAsync?.(Haptics.ImpactFeedbackStyle.Medium)?.catch?.(() => {});
+      }
+    } catch (e) {}
+
+    // 2. Deliver message in background to caller (Zero app opening, stays on Lock Screen)
+    const recipientId = session.callerId;
+    const senderId = (session.receiverId && session.receiverId !== 'my_user_id')
+      ? session.receiverId
+      : (RealtimeBridge.myUserId || 'user_me');
+
+    if (recipientId) {
+      const msgId = `msg_${Date.now()}_${Math.random().toString(36).substring(2, 6)}`;
+      const newMsg: any = {
+        id: msgId,
+        senderId: senderId,
+        receiverId: recipientId,
+        text: text,
+        timestamp: new Date().toISOString(),
+        type: 'text',
+      };
+
+      try {
+        RealtimeBridge.broadcast('NEW_MESSAGE', newMsg, recipientId);
+      } catch (e) {}
+
+      try {
+        saveChatMessageToFirestore({
+          id: msgId,
+          senderId: senderId,
+          receiverId: recipientId,
+          cipherText: text,
+          plainText: text,
+          isEncrypted: false,
+          timestamp: newMsg.timestamp,
+          type: 'text',
+        }).catch(() => {});
+      } catch (e) {}
+    }
+
+    // 3. Immediately decline & cut the call in background
+    WebRTCService.log(`💬 DECLINED WITH QUICK MESSAGE: "${text}". Dismissing call on screen.`);
+    WebRTCService.rejectCall();
+    onEndCall();
   };
 
   const isVideoCall = session.type === 'video' || session.isVideoEnabled;
@@ -701,6 +766,49 @@ export const CallModal: React.FC<Props> = ({ session, isLockscreen, onEndCall, o
               </View>
             )
           }
+
+          {/* Quick Reply Message Sheet (Stays on Screen, cuts call & delivers in background) */}
+          {showQuickMessages && (
+            <View style={styles.quickMessagesOverlay}>
+              <TouchableOpacity
+                style={styles.quickMessagesBackdrop}
+                activeOpacity={1}
+                onPress={() => setShowQuickMessages(false)}
+              />
+              <View style={styles.quickMessagesSheet}>
+                <View style={styles.quickMessagesHeader}>
+                  <View style={styles.quickMessagesHandle} />
+                  <Text style={styles.quickMessagesTitle}>Reply with message</Text>
+                  <Text style={styles.quickMessagesSubtitle}>Call will decline and your message will be delivered</Text>
+                </View>
+
+                <View style={styles.quickMessagesList}>
+                  {QUICK_DECLINE_MESSAGES.map((msg, index) => (
+                    <TouchableOpacity
+                      key={index}
+                      style={styles.quickMessageItem}
+                      onPress={() => handleSendQuickMessageAndDecline(msg)}
+                      activeOpacity={0.7}
+                    >
+                      <View style={styles.quickMessageIconWrap}>
+                        <Ionicons name="chatbubble-ellipses" size={16} color="#38BDF8" />
+                      </View>
+                      <Text style={styles.quickMessageText}>{msg}</Text>
+                      <Ionicons name="send" size={14} color="#64748B" />
+                    </TouchableOpacity>
+                  ))}
+                </View>
+
+                <TouchableOpacity
+                  style={styles.quickMessagesCancelBtn}
+                  onPress={() => setShowQuickMessages(false)}
+                  activeOpacity={0.8}
+                >
+                  <Text style={styles.quickMessagesCancelText}>Cancel</Text>
+                </TouchableOpacity>
+              </View>
+            </View>
+          )}
         </LinearGradient>
       </View>
   );
@@ -1434,6 +1542,103 @@ const styles = StyleSheet.create({
     color: '#FFFFFF',
     fontSize: 13,
     fontFamily: 'Poppins_600SemiBold',
+  },
+  quickMessagesOverlay: {
+    position: 'absolute',
+    top: 0,
+    left: 0,
+    right: 0,
+    bottom: 0,
+    zIndex: 9999999,
+    elevation: 9999999,
+    justifyContent: 'flex-end',
+  },
+  quickMessagesBackdrop: {
+    position: 'absolute',
+    top: 0,
+    left: 0,
+    right: 0,
+    bottom: 0,
+    backgroundColor: 'rgba(0, 0, 0, 0.75)',
+  },
+  quickMessagesSheet: {
+    backgroundColor: '#0F172A',
+    borderTopLeftRadius: 28,
+    borderTopRightRadius: 28,
+    paddingHorizontal: 20,
+    paddingTop: 12,
+    paddingBottom: Platform.OS === 'ios' ? 36 : 24,
+    borderWidth: 1,
+    borderColor: 'rgba(255, 255, 255, 0.1)',
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: -6 },
+    shadowOpacity: 0.4,
+    shadowRadius: 16,
+    elevation: 20,
+  },
+  quickMessagesHeader: {
+    alignItems: 'center',
+    marginBottom: 16,
+  },
+  quickMessagesHandle: {
+    width: 40,
+    height: 4,
+    borderRadius: 2,
+    backgroundColor: 'rgba(255, 255, 255, 0.25)',
+    marginBottom: 12,
+  },
+  quickMessagesTitle: {
+    fontSize: 17,
+    fontFamily: 'Poppins_700Bold',
+    color: '#FFFFFF',
+    marginBottom: 2,
+  },
+  quickMessagesSubtitle: {
+    fontSize: 12,
+    fontFamily: 'Poppins_400Regular',
+    color: '#94A3B8',
+    textAlign: 'center',
+  },
+  quickMessagesList: {
+    gap: 8,
+    marginBottom: 14,
+  },
+  quickMessageItem: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: 'rgba(255, 255, 255, 0.06)',
+    borderRadius: 16,
+    paddingVertical: 13,
+    paddingHorizontal: 14,
+    borderWidth: 1,
+    borderColor: 'rgba(255, 255, 255, 0.08)',
+  },
+  quickMessageIconWrap: {
+    width: 32,
+    height: 32,
+    borderRadius: 16,
+    backgroundColor: 'rgba(56, 189, 248, 0.12)',
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginRight: 12,
+  },
+  quickMessageText: {
+    flex: 1,
+    fontSize: 14,
+    fontFamily: 'Poppins_500Medium',
+    color: '#F1F5F9',
+  },
+  quickMessagesCancelBtn: {
+    backgroundColor: 'rgba(255, 255, 255, 0.1)',
+    borderRadius: 20,
+    paddingVertical: 12,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  quickMessagesCancelText: {
+    fontSize: 14,
+    fontFamily: 'Poppins_600SemiBold',
+    color: '#E2E8F0',
   },
 });
 

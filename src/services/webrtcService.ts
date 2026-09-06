@@ -95,12 +95,13 @@ class WebRTCManager {
           RingtoneService.stop();
           CallDebugger.logStage('WEBSOCKET', 'OK', { signal: 'CALL_ACCEPTED' });
           this.log('📞 CALL_ACCEPTED received from peer. Initiating WebRTC SDP offer handshake...');
+          const isVideo = this.currentSession.type === 'video' || this.currentSession.isVideoEnabled;
+          AudioRouteService.setSpeakerOn(!!isVideo).catch(() => {});
           this.notify();
           this.cleanupRingingPulse();
           this.startConnectionWatchdog();
           this.startTimer();
           if (Platform.OS === 'android' && NativeModules.TelecomModule?.startOngoingCall) {
-            const isVideo = this.currentSession.type === 'video' || this.currentSession.isVideoEnabled;
             const photo = this.currentSession.callerPhoto || '';
             if (NativeModules.TelecomModule.startOngoingCallWithDetails) {
               NativeModules.TelecomModule.startOngoingCallWithDetails(this.currentSession.callerName || 'Synkin Call', photo, !!isVideo).catch(() => {});
@@ -239,14 +240,21 @@ class WebRTCManager {
     this.log(`🚀 Starting outgoing ${params.type} call to ${params.targetUser.name}...`);
     this.notify();
 
+    // Route audio: Loudspeaker for video call, In-ear Handset Earpiece for voice call
+    const isVideo = params.type === 'video';
+    if (isVideo) {
+      AudioRouteService.setSpeakerOn(true).catch(() => {});
+    }
+
     // Play Outgoing Ringtone (Tring... Tring...)
-    RingtoneService.playOutgoingRing();
+    RingtoneService.playOutgoingRing(isVideo);
 
     // Capture Local Hardware Microphone & Camera (This resets the audio route)
     await this.initLocalStream(params.type === 'video');
 
-    // Route audio: Loudspeaker for video call, In-ear Handset Earpiece for voice call
-    const isVideo = params.type === 'video';
+    if (isVideo) {
+      AudioRouteService.setSpeakerOn(true).catch(() => {});
+    }
     setTimeout(() => {
         AudioRouteService.setSpeakerOn(isVideo).catch(() => {});
     }, 500);
@@ -978,6 +986,11 @@ class WebRTCManager {
 
   public async setSpeaker(on: boolean): Promise<boolean> {
     if (!this.currentSession) return false;
+    const isVideo = this.currentSession.type === 'video' || this.currentSession.isVideoEnabled;
+    if (isVideo && !on) {
+      this.log('⚠️ setSpeaker(false) ignored: Video call permanently remains on Loudspeaker');
+      return true;
+    }
     if (this.currentSession.isSpeakerOn === on) return on;
     this.currentSession.isSpeakerOn = on;
     AudioRouteService.setSpeakerOn(on).catch(() => {});

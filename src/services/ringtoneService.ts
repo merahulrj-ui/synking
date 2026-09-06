@@ -40,7 +40,7 @@ class RingtoneServiceClass {
   }
 
   // 1. OUTGOING CALL: Pleasant Ringback Tone (looping "Tuuu... Tuuu...")
-  public async playOutgoingRing() {
+  public async playOutgoingRing(isVideo: boolean = false) {
     if ((globalThis as any).__SYNKING_RINGTONE_PLAYING__ && (globalThis as any).__SYNKING_RINGTONE_MODE__ === 'outgoing') {
       return;
     }
@@ -49,13 +49,16 @@ class RingtoneServiceClass {
     this.currentMode = 'outgoing';
     (globalThis as any).__SYNKING_RINGTONE_PLAYING__ = true;
     (globalThis as any).__SYNKING_RINGTONE_MODE__ = 'outgoing';
-    CallDebugger.logStage('RINGTONE', 'OK', { mode: 'outgoing' });
+    CallDebugger.logStage('RINGTONE', 'OK', { mode: 'outgoing', isVideo });
 
     // Use native Android ToneGenerator for reliable ringback
     if (Platform.OS === 'android') {
       try {
         const { NativeModules } = require('react-native');
-        if (NativeModules.AudioRouteModule?.startRingbackTone) {
+        if (isVideo && NativeModules.AudioRouteModule?.startRingbackToneWithSpeaker) {
+          NativeModules.AudioRouteModule.startRingbackToneWithSpeaker(true);
+          return;
+        } else if (NativeModules.AudioRouteModule?.startRingbackTone) {
           NativeModules.AudioRouteModule.startRingbackTone();
           return;
         }

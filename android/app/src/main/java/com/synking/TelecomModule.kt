@@ -285,8 +285,6 @@ class TelecomModule(reactContext: ReactApplicationContext) : ReactContextBaseJav
                 if (on) {
                     val targetDevice = audioManager.availableCommunicationDevices.find { 
                         it.type == AudioDeviceInfo.TYPE_BUILTIN_SPEAKER 
-                    } ?: audioManager.getDevices(AudioManager.GET_DEVICES_OUTPUTS).find {
-                        it.type == AudioDeviceInfo.TYPE_BUILTIN_SPEAKER
                     }
                     if (targetDevice != null) {
                         val res = audioManager.setCommunicationDevice(targetDevice)
@@ -295,8 +293,6 @@ class TelecomModule(reactContext: ReactApplicationContext) : ReactContextBaseJav
                 } else {
                     val targetDevice = audioManager.availableCommunicationDevices.find { 
                         it.type == AudioDeviceInfo.TYPE_BUILTIN_EARPIECE 
-                    } ?: audioManager.getDevices(AudioManager.GET_DEVICES_OUTPUTS).find {
-                        it.type == AudioDeviceInfo.TYPE_BUILTIN_EARPIECE
                     }
                     if (targetDevice != null) {
                         audioManager.setCommunicationDevice(targetDevice)
