@@ -225,8 +225,6 @@ export const CallModal: React.FC<Props> = ({ session, onEndCall, onAcceptCall, o
     })
   ).current;
 
-  const [showDebugger, setShowDebugger] = useState(false);
-  const [isLocalExpanded, setIsLocalExpanded] = useState(false);
   const isIncoming = session.isIncoming === true;
   const isIncomingRinging = isIncoming && session.status === 'ringing';
   const isConnected = session.status === 'connected';
@@ -246,17 +244,6 @@ export const CallModal: React.FC<Props> = ({ session, onEndCall, onAcceptCall, o
       unsub();
       clearInterval(interval);
     };
-  }, []);
-
-  const [actionLogs, setActionLogs] = useState<string[]>([
-    `[${new Date().toLocaleTimeString()}] 🚀 Call session initialized: ${session.type.toUpperCase()} call.`
-  ]);
-
-  useEffect(() => {
-    const unsubscribe = WebRTCService.onLog((entry: string) => {
-      setActionLogs(prev => [entry, ...prev].slice(0, 30));
-    });
-    return () => unsubscribe();
   }, []);
 
   // Ringtone & Repeating Vibration Manager
@@ -323,195 +310,6 @@ export const CallModal: React.FC<Props> = ({ session, onEndCall, onAcceptCall, o
       NativeModules.TelecomModule.openChatFromCall(partnerId).catch(() => {});
     }
   };
-
-  const [copied, setCopied] = useState(false);
-  const [debugReportText, setDebugReportText] = useState('');
-  const [micLevel, setMicLevel] = useState(0);
-  const [isLoopbackActive, setIsLoopbackActive] = useState(false);
-
-  // Real-Time Microphone Level Analyzer (0% to 100%)
-  useEffect(() => {
-    // [DISABLED] Connecting WebAudio API (AudioContext) to a local MediaStream 
-    // can cause Safari/Chrome to silently mute the outgoing WebRTC audio track!
-    /*
-    let animationId: any = null;
-    let audioCtx: any = null;
-
-    try {
-      if (typeof window !== 'undefined' && localStream) {
-        const AudioContext = window.AudioContext || (window as any).webkitAudioContext;
-        if (AudioContext) {
-          audioCtx = new AudioContext();
-          const source = audioCtx.createMediaStreamSource(localStream);
-          const analyser = audioCtx.createAnalyser();
-          analyser.fftSize = 128;
-          source.connect(analyser);
-
-          const dataArray = new Uint8Array(analyser.frequencyBinCount);
-          const checkVolume = () => {
-            analyser.getByteFrequencyData(dataArray);
-            let sum = 0;
-            for (let i = 0; i < dataArray.length; i++) {
-              sum += dataArray[i];
-            }
-            const avg = sum / dataArray.length;
-            const percentage = Math.min(100, Math.round((avg / 128) * 100));
-            setMicLevel(percentage);
-            animationId = requestAnimationFrame(checkVolume);
-          };
-          checkVolume();
-        }
-      }
-    } catch (e) {}
-
-    return () => {
-      if (animationId) cancelAnimationFrame(animationId);
-      if (audioCtx) {
-        try { audioCtx.close(); } catch (e) {}
-      }
-    };
-    */
-  }, [localStream]);
-
-  // Test Mic Loopback (Hear your own voice live from speaker)
-  const handleTestMicLoopback = () => {
-    WebRTCService.log('🎙️ MIC LOOPBACK TEST: Routing local mic directly to speaker for 4s! Speak into your phone now...');
-    try {
-      if (typeof window !== 'undefined') {
-        const AudioContext = window.AudioContext || (window as any).webkitAudioContext;
-        if (AudioContext && localStream) {
-          const ctx = new AudioContext();
-          const source = ctx.createMediaStreamSource(localStream);
-          source.connect(ctx.destination);
-          setIsLoopbackActive(true);
-          setTimeout(() => {
-            try {
-              source.disconnect();
-              ctx.close();
-            } catch (e) {}
-            setIsLoopbackActive(false);
-            WebRTCService.log('✅ MIC LOOPBACK COMPLETE: Verified local microphone hardware.');
-          }, 4000);
-        }
-      }
-    } catch (e) {
-      WebRTCService.log(`❌ MIC TEST FAILED: ${e}`);
-    }
-  };
-
-  // Test speaker sound beep (440Hz test tone via Web Audio)
-  const handleTestSpeakerBeep = () => {
-    WebRTCService.log('🧪 SPEAKER TEST: Generating 520Hz WebAudio test tone directly to speaker...');
-    try {
-      if (typeof window !== 'undefined') {
-        const AudioContext = window.AudioContext || (window as any).webkitAudioContext;
-        if (AudioContext) {
-          const ctx = new AudioContext();
-          const osc = ctx.createOscillator();
-          const gain = ctx.createGain();
-          osc.type = 'sine';
-          osc.frequency.value = 520;
-          gain.gain.value = 0.4;
-          osc.connect(gain);
-          gain.connect(ctx.destination);
-          osc.start();
-          setTimeout(() => {
-            osc.stop();
-            ctx.close();
-            WebRTCService.log('✅ SPEAKER TEST COMPLETE: 520Hz tone played to audio destination.');
-          }, 500);
-        }
-      }
-    } catch (e) {
-      WebRTCService.log(`❌ SPEAKER TEST FAILED: ${e}`);
-    }
-  };
-
-  const generateReport = () => {
-    const localAudio = localStream?.getAudioTracks().map((t: any) => ({ label: t.label, enabled: t.enabled, readyState: t.readyState })) || [];
-    const localVideo = localStream?.getVideoTracks().map((t: any) => ({ label: t.label, enabled: t.enabled, readyState: t.readyState })) || [];
-    const remoteAudio = remoteStream?.getAudioTracks().map((t: any) => ({ label: t.label, enabled: t.enabled, readyState: t.readyState })) || [];
-    const remoteVideo = remoteStream?.getVideoTracks().map((t: any) => ({ label: t.label, enabled: t.enabled, readyState: t.readyState })) || [];
-
-    return `=== SYNKING WEBRTC CALL DIAGNOSTICS ===
-Timestamp: ${new Date().toISOString()}
-Session ID: ${session.id}
-Call Type: ${session.type}
-Status: ${session.status}
-Duration: ${session.durationSeconds}s
-ICE Connection: ${WebRTCService.iceStatus}
-Platform: ${Platform.OS}
-UserAgent: ${typeof navigator !== 'undefined' ? navigator.userAgent : 'Unknown'}
-
---- LOCAL MEDIA STREAM ---
-Local Stream Active: ${!!localStream}
-Local Mic Tracks (${localAudio.length}): ${JSON.stringify(localAudio)}
-Local Cam Tracks (${localVideo.length}): ${JSON.stringify(localVideo)}
-
---- REMOTE MEDIA STREAM ---
-Remote Stream Active: ${!!remoteStream}
-Remote Audio Tracks (${remoteAudio.length}): ${JSON.stringify(remoteAudio)}
-Remote Video Tracks (${remoteVideo.length}): ${JSON.stringify(remoteVideo)}
-=======================================`;
-  };
-
-  const handleCopyDebugReport = async () => {
-    const report = generateReport();
-    setDebugReportText(report);
-
-    let success = false;
-    // 1. Try Modern Clipboard API (Web)
-    try {
-      if (typeof navigator !== 'undefined' && navigator.clipboard && navigator.clipboard.writeText) {
-        await navigator.clipboard.writeText(report);
-        success = true;
-      }
-    } catch (e) {}
-
-    // 2. Fallback to execCommand (Works on Mobile Web / HTTP)
-    if (!success && typeof document !== 'undefined') {
-      try {
-        const textarea = document.createElement('textarea');
-        textarea.value = report;
-        textarea.style.position = 'fixed';
-        textarea.style.left = '-9999px';
-        document.body.appendChild(textarea);
-        textarea.focus();
-        textarea.select();
-        document.execCommand('copy');
-        document.body.removeChild(textarea);
-        success = true;
-      } catch (e) {}
-    }
-
-    // 3. React Native Native Share / Copy Sheet (Android APK & iOS)
-    if (Platform.OS !== 'web') {
-      try {
-        await Share.share({
-          message: report,
-          title: 'SYNKING WebRTC Debug Report',
-        });
-        success = true;
-      } catch (e) {}
-    }
-
-    // 4. Auto send report directly to Local Server Logger
-    try {
-      let host = '127.0.0.1';
-      if (typeof window !== 'undefined' && window.location && window.location.hostname) {
-        host = window.location.hostname;
-      }
-      fetch(`http://${host}:8082/api/debug-log`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'text/plain' },
-        body: report,
-      }).catch(() => {});
-    } catch (e) {}
-
-    setCopied(true);
-    setTimeout(() => setCopied(false), 3000);
-  };
-
   const callContent = (
     <View style={styles.modalOverlay}>
       <LinearGradient
@@ -891,37 +689,6 @@ const styles = StyleSheet.create({
     letterSpacing: 0.5,
     flexShrink: 0,
   },
-  debugToggleBtn: {
-    display: 'none',
-  },
-  debugToggleText: {
-    color: '#00E5FF',
-    fontSize: 10,
-    fontFamily: 'Poppins_900Black',
-  },
-  debugPanel: {
-    display: 'none',
-  },
-  debugTitle: {
-    color: '#00E5FF',
-    fontSize: 10.5,
-    fontFamily: 'Poppins_900Black',
-    marginBottom: 4,
-  },
-  debugLine: {
-    color: '#E2E8F0',
-    fontSize: 10,
-    fontFamily: 'Poppins_600SemiBold',
-    lineHeight: 14,
-  },
-  testSoundBtn: {
-    display: 'none',
-  },
-  testSoundText: {
-    color: '#FFF',
-    fontSize: 10,
-    fontFamily: 'Poppins_800ExtraBold',
-  },
   callTypeTitle: {
     color: '#FFFFFF',
     fontSize: 22,
@@ -1227,53 +994,6 @@ const styles = StyleSheet.create({
     color: '#FFFFFF',
     fontSize: 11,
     fontFamily: 'Poppins_800ExtraBold',
-  },
-  terminalBox: {
-    backgroundColor: '#020617',
-    borderRadius: 8,
-    padding: 8,
-    marginTop: 8,
-    borderWidth: 1,
-    borderColor: 'rgba(255, 255, 255, 0.1)',
-  },
-  terminalTitle: {
-    color: '#38BDF8',
-    fontSize: 9.5,
-    fontFamily: 'Poppins_900Black',
-    marginBottom: 4,
-    letterSpacing: 0.5,
-  },
-  terminalLine: {
-    color: '#A7F3D0',
-    fontSize: 9,
-    fontFamily: Platform.OS === 'ios' ? 'Menlo' : 'monospace',
-    lineHeight: 13,
-  },
-  micLevelBox: {
-    backgroundColor: '#020617',
-    borderRadius: 8,
-    padding: 8,
-    marginTop: 6,
-    borderWidth: 1,
-    borderColor: 'rgba(0, 229, 255, 0.2)',
-  },
-  micLevelLabel: {
-    color: '#00E5FF',
-    fontSize: 9.5,
-    fontFamily: 'Poppins_900Black',
-    marginBottom: 4,
-  },
-  micLevelTrack: {
-    width: '100%',
-    height: 8,
-    backgroundColor: '#1E293B',
-    borderRadius: 4,
-    overflow: 'hidden',
-  },
-  micLevelFill: {
-    height: '100%',
-    backgroundColor: '#22C55E',
-    borderRadius: 4,
   },
 });
 
