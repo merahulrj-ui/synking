@@ -1,5 +1,5 @@
 import React from 'react';
-import { View, Text, StyleSheet, FlatList, TouchableOpacity, Image } from 'react-native';
+import { View, Text, StyleSheet, FlatList, TouchableOpacity, Image, Modal, Platform } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
 import { useApp } from '../../contexts/AppContext';
@@ -15,23 +15,21 @@ function formatLastMessageSnippet(msg?: ChatMessage): string {
   if (raw.includes('|||AUDIO_DATA::') || raw.startsWith('🎙️') || msg.type === 'voice') {
     return '🎤 Voice note';
   }
-  if (raw.includes('Video Call') || raw.startsWith('📹')) {
-    return '📹 Video Call';
+  if (raw.startsWith('⚡ Date Planned!')) {
+    return '⚡ Date Invite Sent';
   }
-  if (raw.includes('Voice Call') || raw.startsWith('📞')) {
-    return '📞 Voice Call';
-  }
-  if (raw.startsWith('E2EE::')) {
-    return '🔒 Encrypted message';
+  if (raw.startsWith('📞') || raw.startsWith('📹')) {
+    return raw;
   }
   return raw;
 }
 
 function formatChatTime(timestamp?: string): string {
-  if (!timestamp) return 'New';
+  if (!timestamp) return '';
+  if (timestamp === 'Just now') return 'Just now';
   try {
     const d = new Date(timestamp);
-    if (isNaN(d.getTime())) return 'New';
+    if (isNaN(d.getTime())) return timestamp;
     const now = new Date();
     const isToday = d.toDateString() === now.toDateString();
     if (isToday) {
@@ -39,7 +37,7 @@ function formatChatTime(timestamp?: string): string {
     }
     return d.toLocaleDateString([], { month: 'short', day: 'numeric' });
   } catch (e) {
-    return 'New';
+    return timestamp;
   }
 }
 
@@ -84,9 +82,47 @@ function getLastMessageForUser(
 }
 
 export default function ChatsScreen() {
-  const { matches, profiles, messages, currentUser, isDarkMode, unreadChatIds, markChatAsRead } = useApp();
+  const { matches, profiles, messages, currentUser, isDarkMode, unreadChatIds, markChatAsRead, deleteChat, clearChat } = useApp();
   const router = useRouter();
   const [recentChatMap, setRecentChatMap] = React.useState<Record<string, ChatMessage>>({});
+  const [isSelectionMode, setIsSelectionMode] = React.useState(false);
+  const [selectedChatIds, setSelectedChatIds] = React.useState<Set<string>>(new Set());
+  const [isDeleteModalVisible, setIsDeleteModalVisible] = React.useState(false);
+
+  const toggleSelectChat = (chatId: string) => {
+    setSelectedChatIds(prev => {
+      const next = new Set(prev);
+      if (next.has(chatId)) {
+        next.delete(chatId);
+        if (next.size === 0) {
+          setIsSelectionMode(false);
+        }
+      } else {
+        next.add(chatId);
+      }
+      return next;
+    });
+    if (Platform.OS !== 'web') {
+      const Haptics = require('expo-haptics');
+      Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light).catch(() => {});
+    }
+  };
+
+  const handleDeleteSelected = () => {
+    selectedChatIds.forEach(id => {
+      deleteChat(id);
+      clearChat(id, false);
+      AsyncStorage.removeItem(`synking_cached_msgs_${id}`).catch(() => {});
+      AsyncStorage.removeItem(`synking_deleted_${id}`).catch(() => {});
+    });
+    setSelectedChatIds(new Set());
+    setIsSelectionMode(false);
+    setIsDeleteModalVisible(false);
+    if (Platform.OS !== 'web') {
+      const Haptics = require('expo-haptics');
+      Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success).catch(() => {});
+    }
+  };
 
   const bg = isDarkMode ? '#05060A' : '#F9FAFB';
   const textColor = isDarkMode ? '#FFFFFF' : '#111827';
@@ -200,14 +236,85 @@ export default function ChatsScreen() {
       <Header />
 
       <View style={styles.container}>
-        {/* Title Bar with E2EE Shield */}
-        <View style={styles.titleRow}>
-          <Text style={[styles.screenTitle, { color: textColor }]}>Messages</Text>
-          <View style={styles.e2eeBadge}>
-            <Ionicons name="lock-closed" size={12} color="#22C55E" />
-            <Text style={styles.e2eeText}>AES-256 Encrypted</Text>
+        {/* Title Bar with E2EE Shield or Selection Controls */}
+        {isSelectionMode ? (
+          <View style={styles.titleRow}>
+            <View style={{ flexDirection: 'row', alignItems: 'center', gap: 10 }}>
+              <TouchableOpacity
+                onPress={() => {
+                  setIsSelectionMode(false);
+                  setSelectedChatIds(new Set());
+                }}
+                style={{ padding: 4 }}
+                hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
+              >
+                <Ionicons name="close" size={24} color={textColor} />
+              </TouchableOpacity>
+              <Text style={[styles.screenTitle, { color: textColor, fontSize: 18, fontFamily: 'Poppins_700Bold' }]}>
+                {selectedChatIds.size} Selected
+              </Text>
+            </View>
+
+            <View style={{ flexDirection: 'row', alignItems: 'center', gap: 10 }}>
+              <TouchableOpacity
+                onPress={() => {
+                  if (selectedChatIds.size === uniqueMatches.length) {
+                    setSelectedChatIds(new Set());
+                  } else {
+                    setSelectedChatIds(new Set(uniqueMatches.map(m => m.id)));
+                  }
+                }}
+                style={{ paddingVertical: 5, paddingHorizontal: 10, borderRadius: 12, backgroundColor: isDarkMode ? 'rgba(255,255,255,0.08)' : '#F1F5F9' }}
+              >
+                <Text style={{ fontSize: 12, fontFamily: 'Poppins_700Bold', color: textColor }}>
+                  {selectedChatIds.size === uniqueMatches.length ? 'Deselect All' : 'Select All'}
+                </Text>
+              </TouchableOpacity>
+
+              <TouchableOpacity
+                onPress={() => {
+                  if (selectedChatIds.size > 0) {
+                    setIsDeleteModalVisible(true);
+                  }
+                }}
+                disabled={selectedChatIds.size === 0}
+                style={{
+                  width: 36,
+                  height: 36,
+                  borderRadius: 18,
+                  backgroundColor: selectedChatIds.size > 0 ? '#EF4444' : (isDarkMode ? 'rgba(255,255,255,0.08)' : '#E2E8F0'),
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  opacity: selectedChatIds.size > 0 ? 1 : 0.4,
+                }}
+              >
+                <Ionicons name="trash" size={18} color="#FFFFFF" />
+              </TouchableOpacity>
+            </View>
           </View>
-        </View>
+        ) : (
+          <View style={styles.titleRow}>
+            <Text style={[styles.screenTitle, { color: textColor }]}>Messages</Text>
+            <View style={{ flexDirection: 'row', alignItems: 'center', gap: 10 }}>
+              <View style={styles.e2eeBadge}>
+                <Ionicons name="lock-closed" size={12} color="#22C55E" />
+                <Text style={styles.e2eeText}>AES-256 Encrypted</Text>
+              </View>
+              {uniqueMatches.length > 0 && (
+                <TouchableOpacity
+                  onPress={() => {
+                    setIsSelectionMode(true);
+                  }}
+                  style={{ padding: 4 }}
+                  activeOpacity={0.7}
+                  hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
+                >
+                  <Ionicons name="checkbox-outline" size={20} color="#FD3A73" />
+                </TouchableOpacity>
+              )}
+            </View>
+          </View>
+        )}
 
         {uniqueMatches.length === 0 ? (
           <View style={styles.emptyContainer}>
@@ -236,6 +343,7 @@ export default function ChatsScreen() {
               const lastMsg = getLastMessageForUser(item, messages, recentChatMap);
               const displayLastText = formatLastMessageSnippet(lastMsg);
               const timeDisplay = formatChatTime(lastMsg?.timestamp);
+              const isSelected = selectedChatIds.has(item.id);
 
               // 1. Detect if this conversation has an unread message
               const myId = currentUser?.id;
@@ -251,6 +359,7 @@ export default function ChatsScreen() {
 
               const isUnread = Boolean(
                 !isSentByMe &&
+                !isSelected &&
                 !!lastMsg &&
                 (unreadChatIds.has(cleanItemId) ||
                   (cleanItemDigits ? unreadChatIds.has(cleanItemDigits) : false) ||
@@ -265,20 +374,20 @@ export default function ChatsScreen() {
                   style={[
                     styles.chatCard,
                     {
-                      backgroundColor: isUnread
-                        ? isDarkMode
-                          ? 'rgba(253, 58, 115, 0.08)'
-                          : '#FFF1F2'
+                      backgroundColor: isSelected
+                        ? (isDarkMode ? 'rgba(253, 58, 115, 0.18)' : '#FFE4E6')
+                        : isUnread
+                        ? (isDarkMode ? 'rgba(253, 58, 115, 0.08)' : '#FFF1F2')
                         : cardBg,
-                      borderColor: isUnread
-                        ? isDarkMode
-                          ? 'rgba(253, 58, 115, 0.55)'
-                          : '#FD3A73'
+                      borderColor: isSelected
+                        ? '#FD3A73'
+                        : isUnread
+                        ? (isDarkMode ? 'rgba(253, 58, 115, 0.55)' : '#FD3A73')
                         : isDarkMode
                         ? 'rgba(253, 58, 115, 0.22)'
                         : borderColor,
                     },
-                    isUnread && {
+                    (isUnread || isSelected) && {
                       shadowColor: '#FD3A73',
                       shadowOffset: { width: 0, height: 4 },
                       shadowOpacity: 0.35,
@@ -287,12 +396,39 @@ export default function ChatsScreen() {
                     },
                   ]}
                   onPress={() => {
-                    markChatAsRead(item.id);
-                    if (item.phoneNumber) markChatAsRead(item.phoneNumber);
-                    router.push(`/chat/${item.id}`);
+                    if (isSelectionMode) {
+                      toggleSelectChat(item.id);
+                    } else {
+                      markChatAsRead(item.id);
+                      if (item.phoneNumber) markChatAsRead(item.phoneNumber);
+                      router.push(`/chat/${item.id}`);
+                    }
+                  }}
+                  onLongPress={() => {
+                    if (Platform.OS !== 'web') {
+                      const Haptics = require('expo-haptics');
+                      Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium).catch(() => {});
+                    }
+                    if (!isSelectionMode) {
+                      setIsSelectionMode(true);
+                      setSelectedChatIds(new Set([item.id]));
+                    } else {
+                      toggleSelectChat(item.id);
+                    }
                   }}
                   activeOpacity={0.75}
                 >
+                  {/* Selection Checkbox */}
+                  {isSelectionMode && (
+                    <View style={{ marginRight: 6 }}>
+                      <Ionicons
+                        name={isSelected ? "checkmark-circle" : "ellipse-outline"}
+                        size={22}
+                        color={isSelected ? "#FD3A73" : subText}
+                      />
+                    </View>
+                  )}
+
                   {/* Avatar with Online Indicator */}
                   <View style={styles.avatarWrapper}>
                     <Image
@@ -382,9 +518,9 @@ export default function ChatsScreen() {
                   </View>
 
                   <Ionicons
-                    name="chevron-forward"
+                    name={isSelectionMode ? (isSelected ? "checkbox" : "square-outline") : "chevron-forward"}
                     size={16}
-                    color={isUnread ? '#FD3A73' : subText}
+                    color={isSelected ? '#FD3A73' : isUnread ? '#FD3A73' : subText}
                   />
                 </TouchableOpacity>
               );
@@ -392,6 +528,84 @@ export default function ChatsScreen() {
           />
         )}
       </View>
+
+      {/* Delete Confirmation Modal */}
+      <Modal
+        visible={isDeleteModalVisible}
+        transparent
+        animationType="fade"
+        onRequestClose={() => setIsDeleteModalVisible(false)}
+      >
+        <TouchableOpacity
+          style={{
+            flex: 1,
+            backgroundColor: 'rgba(0, 0, 0, 0.7)',
+            justifyContent: 'center',
+            alignItems: 'center',
+            padding: 24,
+          }}
+          activeOpacity={1}
+          onPress={() => setIsDeleteModalVisible(false)}
+        >
+          <View
+            style={{
+              width: 300,
+              backgroundColor: isDarkMode ? '#141522' : '#FFFFFF',
+              borderRadius: 22,
+              paddingVertical: 18,
+              paddingHorizontal: 18,
+              borderWidth: 1.5,
+              borderColor: '#EF4444',
+              shadowColor: '#EF4444',
+              shadowOffset: { width: 0, height: 8 },
+              shadowOpacity: 0.35,
+              shadowRadius: 20,
+              elevation: 12,
+              alignItems: 'center',
+            }}
+          >
+            <View style={{ width: 50, height: 50, borderRadius: 25, backgroundColor: 'rgba(239, 68, 68, 0.15)', alignItems: 'center', justifyContent: 'center', marginBottom: 12 }}>
+              <Ionicons name="trash" size={26} color="#EF4444" />
+            </View>
+
+            <Text style={{ fontSize: 17, fontFamily: 'Poppins_800ExtraBold', color: textColor, textAlign: 'center', marginBottom: 6 }}>
+              Delete {selectedChatIds.size} Conversation{selectedChatIds.size > 1 ? 's' : ''}?
+            </Text>
+            <Text style={{ fontSize: 12.5, color: subText, textAlign: 'center', marginBottom: 18, lineHeight: 18, fontFamily: 'Poppins_400Regular' }}>
+              This will permanently delete the selected conversations and their message history for you.
+            </Text>
+
+            <View style={{ width: '100%', gap: 8 }}>
+              <TouchableOpacity
+                style={{
+                  backgroundColor: '#EF4444',
+                  paddingVertical: 12,
+                  borderRadius: 14,
+                  alignItems: 'center',
+                }}
+                onPress={handleDeleteSelected}
+              >
+                <Text style={{ color: '#FFFFFF', fontFamily: 'Poppins_800ExtraBold', fontSize: 14 }}>
+                  Delete Conversations
+                </Text>
+              </TouchableOpacity>
+
+              <TouchableOpacity
+                style={{
+                  paddingVertical: 10,
+                  borderRadius: 14,
+                  alignItems: 'center',
+                }}
+                onPress={() => setIsDeleteModalVisible(false)}
+              >
+                <Text style={{ color: subText, fontFamily: 'Poppins_600SemiBold', fontSize: 13 }}>
+                  Cancel
+                </Text>
+              </TouchableOpacity>
+            </View>
+          </View>
+        </TouchableOpacity>
+      </Modal>
     </SafeAreaView>
   );
 }

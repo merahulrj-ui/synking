@@ -106,7 +106,28 @@ export default function ChatScreen() {
   const insets = useSafeAreaInsets();
   const { id } = useLocalSearchParams<{ id: string }>();
   const router = useRouter();
-  const { matches, profiles, messages, sendMessage, deleteMessage, activeBookings, currentUser, isDarkMode, markChatAsRead, vipPlansEnabled } = useApp();
+  const {
+    matches,
+    profiles,
+    messages,
+    sendMessage,
+    deleteMessage,
+    clearChat,
+    deleteMultipleMessages,
+    addMessageReaction,
+    activeBookings,
+    currentUser,
+    isDarkMode,
+    markChatAsRead,
+    vipPlansEnabled
+  } = useApp();
+
+  const [isOptionsMenuVisible, setIsOptionsMenuVisible] = useState(false);
+  const [isSelectionMode, setIsSelectionMode] = useState(false);
+  const [selectedMessageIds, setSelectedMessageIds] = useState<Set<string>>(new Set());
+  const [isEmojiPickerOpen, setIsEmojiPickerOpen] = useState(false);
+  const [isClearChatModalVisible, setIsClearChatModalVisible] = useState(false);
+  const [isDeleteSelectedModalVisible, setIsDeleteSelectedModalVisible] = useState(false);
 
   useEffect(() => {
     if (id) {
@@ -210,6 +231,46 @@ export default function ChatScreen() {
       return next;
     });
     setCloudMessages(prev => prev.filter(m => m && m.id !== msgId));
+  };
+
+  const markMessagesDeletedLocally = (msgIds: string[]) => {
+    const idSet = new Set(msgIds);
+    setDeletedMsgIds(prev => {
+      const next = new Set(prev);
+      msgIds.forEach(mId => next.add(mId));
+      if (id) {
+        AsyncStorage.setItem(`synking_deleted_${id}`, JSON.stringify(Array.from(next))).catch(() => {});
+      }
+      return next;
+    });
+    setCloudMessages(prev => prev.filter(m => m && !idSet.has(m.id)));
+  };
+
+  const clearChatLocally = () => {
+    setCloudMessages([]);
+    if (id) {
+      AsyncStorage.removeItem(`synking_cached_msgs_${id}`).catch(() => {});
+      AsyncStorage.removeItem(`synking_deleted_${id}`).catch(() => {});
+    }
+  };
+
+  const toggleSelectMessage = (msgId: string) => {
+    setSelectedMessageIds(prev => {
+      const next = new Set(prev);
+      if (next.has(msgId)) {
+        next.delete(msgId);
+        if (next.size === 0) {
+          setIsSelectionMode(false);
+        }
+      } else {
+        next.add(msgId);
+      }
+      return next;
+    });
+    if (Platform.OS !== 'web') {
+      const Haptics = require('expo-haptics');
+      Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light).catch(() => {});
+    }
   };
 
   const addAudioLog = (msg: string) => {
@@ -1078,6 +1139,16 @@ const VOICE_COMPRESSED_CONFIG: any = {
         addAudioLog(`🗑️ [DELETE_RECEIVED] Message ${payload.messageId.substring(0, 10)} deleted`);
       }
 
+      if (type === 'DELETE_MESSAGES' && Array.isArray(payload?.messageIds)) {
+        markMessagesDeletedLocally(payload.messageIds);
+        addAudioLog(`🗑️ [DELETE_BATCH_RECEIVED] ${payload.messageIds.length} messages deleted`);
+      }
+
+      if (type === 'CLEAR_CHAT' && (payload?.partnerId === id || payload?.clearedBy === id)) {
+        clearChatLocally();
+        addAudioLog(`🧹 [CLEAR_CHAT_RECEIVED] Chat cleared`);
+      }
+
       if (type === 'MESSAGES_READ') {
         const rId = String(payload?.readerId || '');
         const pId = String(payload?.partnerId || '');
@@ -1234,6 +1305,8 @@ const VOICE_COMPRESSED_CONFIG: any = {
     for (const m of all) {
       if (!m || !m.id) continue;
       if (deletedMsgIds.has(m.id)) continue;
+      if (m.deletedForEveryone) continue;
+      if (m.deletedFor && Array.isArray(m.deletedFor) && m.deletedFor.includes(myId)) continue;
       const isForThisThread =
         (m.senderId === id && m.receiverId === myId) ||
         (m.senderId === myId && m.receiverId === id);
@@ -1771,88 +1844,155 @@ const VOICE_COMPRESSED_CONFIG: any = {
 
   return (
     <View style={[styles.safeArea, { backgroundColor: bg, paddingTop: insets.top }]}>
-      {/* 1. TOP APP BAR WITH WHATSAPP-STYLE CALLING ICONS */}
-      <View style={[styles.header, { backgroundColor: headerBg, borderBottomColor: borderCol }]}>
-        {/* Back Button */}
-        <TouchableOpacity
-          style={styles.backBtn}
-          onPress={handleBack}
-          activeOpacity={0.7}
-        >
-          <Ionicons name="chevron-back" size={26} color={textColor} />
-        </TouchableOpacity>
+      {/* 1. TOP APP BAR (NORMAL OR MULTI-SELECTION MODE) */}
+      {isSelectionMode ? (
+        <View style={[styles.header, { backgroundColor: headerBg, borderBottomColor: borderCol }]}>
+          <TouchableOpacity
+            style={styles.backBtn}
+            onPress={() => {
+              setIsSelectionMode(false);
+              setSelectedMessageIds(new Set());
+            }}
+            activeOpacity={0.7}
+          >
+            <Ionicons name="close" size={24} color={textColor} />
+          </TouchableOpacity>
 
-        {/* User Avatar + Name + Status */}
-        <TouchableOpacity
-          style={styles.userHeaderInfo}
-          activeOpacity={0.8}
-          onPress={() => Alert.alert(targetUser.name, `${targetUser.occupation} • ${targetUser.distance || 'Nearby'}`)}
-        >
-          <View style={styles.avatarWrapper}>
-            <Image
-              source={{ uri: targetUser.photo || targetUser.photos?.[0] || 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=800' }}
-              style={styles.avatar}
-            />
-            <View style={styles.onlineDot} />
+          <View style={{ flex: 1, paddingLeft: 8 }}>
+            <Text style={[styles.userName, { color: textColor, fontFamily: 'Poppins_700Bold' }]}>
+              {selectedMessageIds.size} Selected
+            </Text>
           </View>
 
-          <View style={{ flex: 1 }}>
-            <View style={{ flexDirection: 'row', alignItems: 'center', gap: 4 }}>
-              <Text style={[styles.userName, { color: textColor }]} numberOfLines={1}>
-                {targetUser.name}
+          <View style={{ flexDirection: 'row', alignItems: 'center', gap: 12 }}>
+            <TouchableOpacity
+              onPress={() => {
+                if (selectedMessageIds.size === userMessages.length) {
+                  setSelectedMessageIds(new Set());
+                } else {
+                  setSelectedMessageIds(new Set(userMessages.map(m => m.id)));
+                }
+              }}
+              style={{ paddingVertical: 6, paddingHorizontal: 10, borderRadius: 12, backgroundColor: isDarkMode ? 'rgba(255,255,255,0.08)' : '#F1F5F9' }}
+            >
+              <Text style={{ fontSize: 12, fontFamily: 'Poppins_700Bold', color: textColor }}>
+                {selectedMessageIds.size === userMessages.length ? 'Deselect All' : 'Select All'}
               </Text>
-              {targetUser.isVerified && (
-                <Ionicons name="shield-checkmark" size={14} color="#00E5FF" />
-              )}
-            </View>
-            <View style={{ flexDirection: 'row', alignItems: 'center', gap: 4 }}>
-              <Ionicons name="lock-closed" size={10} color="#22C55E" />
-              <Text style={[styles.userStatus, { color: '#22C55E' }]}>P2P WebRTC</Text>
-            </View>
+            </TouchableOpacity>
+
+            <TouchableOpacity
+              onPress={() => {
+                if (selectedMessageIds.size > 0) {
+                  setIsDeleteSelectedModalVisible(true);
+                }
+              }}
+              disabled={selectedMessageIds.size === 0}
+              style={{
+                width: 36,
+                height: 36,
+                borderRadius: 18,
+                backgroundColor: selectedMessageIds.size > 0 ? '#EF4444' : (isDarkMode ? 'rgba(255,255,255,0.08)' : '#E2E8F0'),
+                alignItems: 'center',
+                justifyContent: 'center',
+                opacity: selectedMessageIds.size > 0 ? 1 : 0.5,
+              }}
+            >
+              <Ionicons name="trash" size={18} color="#FFFFFF" />
+            </TouchableOpacity>
           </View>
-        </TouchableOpacity>
-
-        {/* Action Buttons: Video Call + Voice Call + Plan Date */}
-        <View style={styles.headerActions}>
-          {/* Video Call Icon */}
-          <TouchableOpacity
-            style={styles.callIconBtn}
-            onPress={() => handleStartCall('video')}
-            activeOpacity={0.75}
-          >
-            <Ionicons name="videocam" size={20} color="#FD3A73" />
-            {vipPlansEnabled && !currentUser?.isVip && (
-              <View style={styles.vipMiniBadge}>
-                <Text style={styles.vipMiniBadgeText}>VIP</Text>
-              </View>
-            )}
-          </TouchableOpacity>
-
-          {/* Voice Call Icon */}
-          <TouchableOpacity
-            style={styles.callIconBtn}
-            onPress={() => handleStartCall('audio')}
-            activeOpacity={0.75}
-          >
-            <Ionicons name="call" size={18} color="#FD3A73" />
-            {vipPlansEnabled && !currentUser?.isVip && (
-              <View style={styles.vipMiniBadge}>
-                <Text style={styles.vipMiniBadgeText}>VIP</Text>
-              </View>
-            )}
-          </TouchableOpacity>
-
-          {/* Plan Date Action */}
-          <TouchableOpacity
-            style={styles.planDateBtn}
-            onPress={() => router.push(`/plan-date/${id}`)}
-            activeOpacity={0.8}
-          >
-            <Ionicons name="calendar" size={13} color="#FFF" />
-            <Text style={styles.planDateBtnText}>Date</Text>
-          </TouchableOpacity>
         </View>
-      </View>
+      ) : (
+        <View style={[styles.header, { backgroundColor: headerBg, borderBottomColor: borderCol }]}>
+          {/* Back Button */}
+          <TouchableOpacity
+            style={styles.backBtn}
+            onPress={handleBack}
+            activeOpacity={0.7}
+          >
+            <Ionicons name="chevron-back" size={26} color={textColor} />
+          </TouchableOpacity>
+
+          {/* User Avatar + Name + Status */}
+          <TouchableOpacity
+            style={styles.userHeaderInfo}
+            activeOpacity={0.8}
+            onPress={() => Alert.alert(targetUser.name, `${targetUser.occupation} • ${targetUser.distance || 'Nearby'}`)}
+          >
+            <View style={styles.avatarWrapper}>
+              <Image
+                source={{ uri: targetUser.photo || targetUser.photos?.[0] || 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=800' }}
+                style={styles.avatar}
+              />
+              <View style={styles.onlineDot} />
+            </View>
+
+            <View style={{ flex: 1 }}>
+              <View style={{ flexDirection: 'row', alignItems: 'center', gap: 4 }}>
+                <Text style={[styles.userName, { color: textColor }]} numberOfLines={1}>
+                  {targetUser.name}
+                </Text>
+                {targetUser.isVerified && (
+                  <Ionicons name="shield-checkmark" size={14} color="#00E5FF" />
+                )}
+              </View>
+              <View style={{ flexDirection: 'row', alignItems: 'center', gap: 4 }}>
+                <Ionicons name="lock-closed" size={10} color="#22C55E" />
+                <Text style={[styles.userStatus, { color: '#22C55E' }]}>P2P WebRTC</Text>
+              </View>
+            </View>
+          </TouchableOpacity>
+
+          {/* Action Buttons: Video Call + Voice Call + Plan Date + 3-Dots Menu */}
+          <View style={styles.headerActions}>
+            {/* Video Call Icon */}
+            <TouchableOpacity
+              style={styles.callIconBtn}
+              onPress={() => handleStartCall('video')}
+              activeOpacity={0.75}
+            >
+              <Ionicons name="videocam" size={20} color="#FD3A73" />
+              {vipPlansEnabled && !currentUser?.isVip && (
+                <View style={styles.vipMiniBadge}>
+                  <Text style={styles.vipMiniBadgeText}>VIP</Text>
+                </View>
+              )}
+            </TouchableOpacity>
+
+            {/* Voice Call Icon */}
+            <TouchableOpacity
+              style={styles.callIconBtn}
+              onPress={() => handleStartCall('audio')}
+              activeOpacity={0.75}
+            >
+              <Ionicons name="call" size={18} color="#FD3A73" />
+              {vipPlansEnabled && !currentUser?.isVip && (
+                <View style={styles.vipMiniBadge}>
+                  <Text style={styles.vipMiniBadgeText}>VIP</Text>
+                </View>
+              )}
+            </TouchableOpacity>
+
+            {/* Plan Date Action */}
+            <TouchableOpacity
+              style={styles.planDateBtn}
+              onPress={() => router.push(`/plan-date/${id}`)}
+              activeOpacity={0.8}
+            >
+              <Ionicons name="calendar" size={13} color="#FFF" />
+              <Text style={styles.planDateBtnText}>Date</Text>
+            </TouchableOpacity>
+
+            {/* 3-Dots Options Menu */}
+            <TouchableOpacity
+              style={[styles.callIconBtn, { width: 32 }]}
+              onPress={() => setIsOptionsMenuVisible(true)}
+              activeOpacity={0.75}
+            >
+              <Ionicons name="ellipsis-vertical" size={18} color={textColor} />
+            </TouchableOpacity>
+          </View>
+        </View>
+      )}
 
       {/* 2. SUBTLE SECURITY NOTICE */}
       <View style={[styles.e2eePillWrapper, { backgroundColor: bg }]}>
@@ -2163,12 +2303,241 @@ const VOICE_COMPRESSED_CONFIG: any = {
               const progress = totalSeconds > 0 ? Math.min(1, currentPlaySec / totalSeconds) : 0;
               const filledBars = Math.floor(progress * 12);
 
+              const isSelected = selectedMessageIds.has(item.id);
+
               return (
+                <View
+                  key={item.id}
+                  style={[
+                    {
+                      flexDirection: isMine ? 'row-reverse' : 'row',
+                      alignItems: 'center',
+                      marginVertical: 2,
+                      paddingHorizontal: 6,
+                      borderRadius: 16,
+                    },
+                    isSelected && { backgroundColor: 'rgba(253, 58, 115, 0.15)' },
+                  ]}
+                >
+                  {isSelectionMode && (
+                    <TouchableOpacity
+                      onPress={() => toggleSelectMessage(item.id)}
+                      style={{ paddingHorizontal: 6 }}
+                      hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
+                    >
+                      <Ionicons
+                        name={isSelected ? 'checkmark-circle' : 'ellipse-outline'}
+                        size={22}
+                        color={isSelected ? '#FD3A73' : subText}
+                      />
+                    </TouchableOpacity>
+                  )}
+                  <TouchableOpacity
+                    activeOpacity={0.9}
+                    onPress={isSelectionMode ? () => toggleSelectMessage(item.id) : undefined}
+                    onLongPress={() => {
+                      if (Platform.OS !== 'web') {
+                        const Haptics = require('expo-haptics');
+                        Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium).catch(() => {});
+                      }
+                      if (isSelectionMode) {
+                        toggleSelectMessage(item.id);
+                      } else {
+                        setSelectedMsgForAction(item);
+                      }
+                    }}
+                    style={[
+                      styles.bubble,
+                      isMine
+                        ? [
+                            styles.myBubble,
+                            {
+                              shadowColor: '#FD3A73',
+                              shadowOffset: { width: 0, height: 2 },
+                              shadowOpacity: 0.45,
+                              shadowRadius: 10,
+                              elevation: 5,
+                            }
+                          ]
+                        : [
+                            styles.theirBubble,
+                            {
+                              backgroundColor: isDarkMode ? '#11121F' : '#FFFFFF',
+                              borderColor: isDarkMode ? 'rgba(0, 229, 255, 0.45)' : borderCol,
+                              shadowColor: isDarkMode ? '#00E5FF' : '#000000',
+                              shadowOffset: { width: 0, height: 2 },
+                              shadowOpacity: isDarkMode ? 0.35 : 0.05,
+                              shadowRadius: isDarkMode ? 8 : 2,
+                              elevation: isDarkMode ? 4 : 1,
+                            },
+                          ],
+                      { width: 215, paddingVertical: 6, paddingHorizontal: 10, borderRadius: 15 }
+                    ]}
+                  >
+                    <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
+                      <TouchableOpacity
+                        onPress={() => togglePlayVoiceNote(item.id, effectiveAudioUrl)}
+                        style={{
+                          width: 32,
+                          height: 32,
+                          borderRadius: 16,
+                          backgroundColor: isMine ? '#FFFFFF' : '#FD3A73',
+                          alignItems: 'center',
+                          justifyContent: 'center',
+                        }}
+                        activeOpacity={0.8}
+                      >
+                        <Ionicons
+                          name={isPlaying ? 'pause' : 'play'}
+                          size={16}
+                          color={isMine ? '#FD3A73' : '#FFFFFF'}
+                          style={{ marginLeft: isPlaying ? 0 : 1.5 }}
+                        />
+                      </TouchableOpacity>
+
+                      {/* Compact Animated Sound Waves */}
+                      <View style={{ flex: 1, gap: 3 }}>
+                        <View style={{ flexDirection: 'row', alignItems: 'center', gap: 2 }}>
+                          {[5, 11, 16, 9, 14, 10, 18, 13, 7, 15, 11, 5].map((h, i) => {
+                            const isFilled = isPlaying && i <= filledBars;
+                            return (
+                              <View
+                                key={i}
+                                style={{
+                                  width: 2.2,
+                                  height: isPlaying ? Math.min(18, h + (i % 2 === 0 ? 4 : -3)) : h,
+                                  borderRadius: 1.5,
+                                  backgroundColor: isMine
+                                    ? (isFilled || !isPlaying ? '#FFFFFF' : 'rgba(255, 255, 255, 0.4)')
+                                    : (isFilled ? '#FD3A73' : (isPlaying ? 'rgba(253, 58, 115, 0.3)' : subText)),
+                                }}
+                              />
+                            );
+                          })}
+                        </View>
+                        <View style={{ flexDirection: 'row', alignItems: 'center', gap: 3 }}>
+                          {isPlaying && (
+                            <View style={{ width: 5, height: 5, borderRadius: 2.5, backgroundColor: isMine ? '#FFFFFF' : '#22C55E' }} />
+                          )}
+                          <Text style={{ fontSize: 10.5, fontFamily: 'Poppins_700Bold', color: isMine ? 'rgba(255, 255, 255, 0.95)' : (isPlaying ? '#FD3A73' : subText) }}>
+                            {isPlaying ? `▶ ${playTimerStr}` : displayText.replace('🎙️ ', '').replace('🎵 ', '')}
+                          </Text>
+                        </View>
+                      </View>
+                    </View>
+
+                    {/* Compact Error Alert Badge (Only shown if error occurs) */}
+                    {audioMsgStatus[item.id]?.status === 'ERROR' && (
+                      <View style={{
+                        marginTop: 3,
+                        paddingVertical: 1.5,
+                        paddingHorizontal: 6,
+                        borderRadius: 4,
+                        backgroundColor: isMine ? 'rgba(0, 0, 0, 0.45)' : '#FEE2E2',
+                        alignSelf: 'flex-start',
+                        maxWidth: '100%',
+                      }}>
+                        <Text style={{
+                          fontSize: 9,
+                          fontFamily: 'Poppins_800ExtraBold',
+                          color: isMine ? '#FCA5A5' : '#DC2626',
+                        }} numberOfLines={1}>
+                          ❌ {audioMsgStatus[item.id].error}
+                        </Text>
+                      </View>
+                    )}
+
+                    {item.extraData?.reaction && (
+                      <View style={{ position: 'absolute', bottom: -8, right: isMine ? 25 : -8, backgroundColor: isDarkMode ? '#1E293B' : '#FFFFFF', borderRadius: 12, paddingHorizontal: 4, paddingVertical: 2, elevation: 3, shadowColor: '#000', shadowOffset: { width: 0, height: 1 }, shadowOpacity: 0.2, shadowRadius: 2, borderWidth: 1, borderColor: isDarkMode ? 'rgba(255,255,255,0.1)' : '#E2E8F0' }}>
+                        <Text style={{ fontSize: 12 }}>{item.extraData.reaction}</Text>
+                      </View>
+                    )}
+
+                    <View style={styles.bubbleFooter}>
+                      <Text style={[styles.timestamp, { color: isMine ? 'rgba(255, 255, 255, 0.75)' : subText }]}>
+                        {formatWhatsAppTime(item.timestamp)}
+                      </Text>
+                      {isMine && (
+                        (item.status === 'read' || item.read) ? (
+                          <Ionicons
+                            name="checkmark-done"
+                            size={13}
+                            color="#00E5FF"
+                            style={{ marginLeft: 2 }}
+                          />
+                        ) : (item.status === 'delivered' || (item.status !== 'sending' && item.timestamp !== 'Just now')) ? (
+                          <Ionicons
+                            name="checkmark-done"
+                            size={13}
+                            color="rgba(255, 255, 255, 0.75)"
+                            style={{ marginLeft: 2 }}
+                          />
+                        ) : (
+                          <Ionicons
+                            name="checkmark"
+                            size={13}
+                            color="rgba(255, 255, 255, 0.65)"
+                            style={{ marginLeft: 2 }}
+                          />
+                        )
+                      )}
+                      {!isSelectionMode && (
+                        <TouchableOpacity
+                          onPress={() => setSelectedMsgForAction(item)}
+                          style={{ marginLeft: 4, paddingHorizontal: 2 }}
+                          hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
+                        >
+                          <Text style={{ fontSize: 12, color: isMine ? 'rgba(255, 255, 255, 0.7)' : subText, fontFamily: 'Poppins_900Black' }}>⋮</Text>
+                        </TouchableOpacity>
+                      )}
+                    </View>
+                  </TouchableOpacity>
+                </View>
+              );
+            }
+
+            const isSelected = selectedMessageIds.has(item.id);
+
+            return (
+              <View
+                key={item.id}
+                style={[
+                  {
+                    flexDirection: isMine ? 'row-reverse' : 'row',
+                    alignItems: 'center',
+                    marginVertical: 2,
+                    paddingHorizontal: 6,
+                    borderRadius: 16,
+                  },
+                  isSelected && { backgroundColor: 'rgba(253, 58, 115, 0.15)' },
+                ]}
+              >
+                {isSelectionMode && (
+                  <TouchableOpacity
+                    onPress={() => toggleSelectMessage(item.id)}
+                    style={{ paddingHorizontal: 6 }}
+                    hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
+                  >
+                    <Ionicons
+                      name={isSelected ? 'checkmark-circle' : 'ellipse-outline'}
+                      size={22}
+                      color={isSelected ? '#FD3A73' : subText}
+                    />
+                  </TouchableOpacity>
+                )}
                 <TouchableOpacity
                   activeOpacity={0.9}
+                  onPress={isSelectionMode ? () => toggleSelectMessage(item.id) : undefined}
                   onLongPress={() => {
-                    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium).catch(() => {});
-                    setSelectedMsgForAction(item);
+                    if (Platform.OS !== 'web') {
+                      const Haptics = require('expo-haptics');
+                      Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium).catch(() => {});
+                    }
+                    if (isSelectionMode) {
+                      toggleSelectMessage(item.id);
+                    } else {
+                      setSelectedMsgForAction(item);
+                    }
                   }}
                   style={[
                     styles.bubble,
@@ -2195,88 +2564,11 @@ const VOICE_COMPRESSED_CONFIG: any = {
                             elevation: isDarkMode ? 4 : 1,
                           },
                         ],
-                    { width: 215, paddingVertical: 6, paddingHorizontal: 10, borderRadius: 15 }
                   ]}
                 >
-                  <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
-                    <TouchableOpacity
-                      onPress={() => togglePlayVoiceNote(item.id, effectiveAudioUrl)}
-                      style={{
-                        width: 32,
-                        height: 32,
-                        borderRadius: 16,
-                        backgroundColor: isMine ? '#FFFFFF' : '#FD3A73',
-                        alignItems: 'center',
-                        justifyContent: 'center',
-                      }}
-                      activeOpacity={0.8}
-                    >
-                      <Ionicons
-                        name={isPlaying ? 'pause' : 'play'}
-                        size={16}
-                        color={isMine ? '#FD3A73' : '#FFFFFF'}
-                        style={{ marginLeft: isPlaying ? 0 : 1.5 }}
-                      />
-                    </TouchableOpacity>
-
-                    {/* Compact Animated Sound Waves */}
-                    <View style={{ flex: 1, gap: 3 }}>
-                      <View style={{ flexDirection: 'row', alignItems: 'center', gap: 2 }}>
-                        {[5, 11, 16, 9, 14, 10, 18, 13, 7, 15, 11, 5].map((h, i) => {
-                          const isFilled = isPlaying && i <= filledBars;
-                          return (
-                            <View
-                              key={i}
-                              style={{
-                                width: 2.2,
-                                height: isPlaying ? Math.min(18, h + (i % 2 === 0 ? 4 : -3)) : h,
-                                borderRadius: 1.5,
-                                backgroundColor: isMine
-                                  ? (isFilled || !isPlaying ? '#FFFFFF' : 'rgba(255, 255, 255, 0.4)')
-                                  : (isFilled ? '#FD3A73' : (isPlaying ? 'rgba(253, 58, 115, 0.3)' : subText)),
-                              }}
-                            />
-                          );
-                        })}
-                      </View>
-                      <View style={{ flexDirection: 'row', alignItems: 'center', gap: 3 }}>
-                        {isPlaying && (
-                          <View style={{ width: 5, height: 5, borderRadius: 2.5, backgroundColor: isMine ? '#FFFFFF' : '#22C55E' }} />
-                        )}
-                        <Text style={{ fontSize: 10.5, fontWeight: '700', color: isMine ? 'rgba(255, 255, 255, 0.95)' : (isPlaying ? '#FD3A73' : subText) }}>
-                          {isPlaying ? `▶ ${playTimerStr}` : displayText.replace('🎙️ ', '').replace('🎵 ', '')}
-                        </Text>
-                      </View>
-                    </View>
-                  </View>
-
-                  {/* Compact Error Alert Badge (Only shown if error occurs) */}
-                  {audioMsgStatus[item.id]?.status === 'ERROR' && (
-                    <View style={{
-                      marginTop: 3,
-                      paddingVertical: 1.5,
-                      paddingHorizontal: 6,
-                      borderRadius: 4,
-                      backgroundColor: isMine ? 'rgba(0, 0, 0, 0.45)' : '#FEE2E2',
-                      alignSelf: 'flex-start',
-                      maxWidth: '100%',
-                    }}>
-                      <Text style={{
-                        fontSize: 9,
-                        fontWeight: '800',
-                        color: isMine ? '#FCA5A5' : '#DC2626',
-                      }} numberOfLines={1}>
-                        ❌ {audioMsgStatus[item.id].error}
-                      </Text>
-                    </View>
-                  )}
-
-                  {item.extraData?.reaction && (
-                    <View style={{ position: 'absolute', bottom: -8, right: isMine ? 25 : -8, backgroundColor: isDarkMode ? '#1E293B' : '#FFFFFF', borderRadius: 12, paddingHorizontal: 4, paddingVertical: 2, elevation: 3, shadowColor: '#000', shadowOffset: { width: 0, height: 1 }, shadowOpacity: 0.2, shadowRadius: 2, borderWidth: 1, borderColor: isDarkMode ? 'rgba(255,255,255,0.1)' : '#E2E8F0' }}>
-                      <Text style={{ fontSize: 12 }}>{item.extraData.reaction}</Text>
-                    </View>
-                  )}
-
+                  <Text style={[styles.bubbleText, isMine ? styles.myText : { color: textColor }]}>
+                    {item.text}
+                  </Text>
                   <View style={styles.bubbleFooter}>
                     <Text style={[styles.timestamp, { color: isMine ? 'rgba(255, 255, 255, 0.75)' : subText }]}>
                       {formatWhatsAppTime(item.timestamp)}
@@ -2305,92 +2597,18 @@ const VOICE_COMPRESSED_CONFIG: any = {
                         />
                       )
                     )}
-                    <TouchableOpacity
-                      onPress={() => setSelectedMsgForAction(item)}
-                      style={{ marginLeft: 4, paddingHorizontal: 2 }}
-                      hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
-                    >
-                      <Text style={{ fontSize: 12, color: isMine ? 'rgba(255, 255, 255, 0.7)' : subText, fontWeight: '900' }}>⋮</Text>
-                    </TouchableOpacity>
+                    {!isSelectionMode && (
+                      <TouchableOpacity
+                        onPress={() => setSelectedMsgForAction(item)}
+                        style={{ marginLeft: 4, paddingHorizontal: 2 }}
+                        hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
+                      >
+                        <Text style={{ fontSize: 12, color: isMine ? 'rgba(255, 255, 255, 0.7)' : subText, fontFamily: 'Poppins_900Black' }}>⋮</Text>
+                      </TouchableOpacity>
+                    )}
                   </View>
                 </TouchableOpacity>
-              );
-            }
-
-            return (
-              <TouchableOpacity
-                activeOpacity={0.9}
-                onLongPress={() => {
-                  Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium).catch(() => {});
-                  setSelectedMsgForAction(item);
-                }}
-                style={[
-                  styles.bubble,
-                  isMine
-                    ? [
-                        styles.myBubble,
-                        {
-                          shadowColor: '#FD3A73',
-                          shadowOffset: { width: 0, height: 2 },
-                          shadowOpacity: 0.45,
-                          shadowRadius: 10,
-                          elevation: 5,
-                        }
-                      ]
-                    : [
-                        styles.theirBubble,
-                        {
-                          backgroundColor: isDarkMode ? '#11121F' : '#FFFFFF',
-                          borderColor: isDarkMode ? 'rgba(0, 229, 255, 0.45)' : borderCol,
-                          shadowColor: isDarkMode ? '#00E5FF' : '#000000',
-                          shadowOffset: { width: 0, height: 2 },
-                          shadowOpacity: isDarkMode ? 0.35 : 0.05,
-                          shadowRadius: isDarkMode ? 8 : 2,
-                          elevation: isDarkMode ? 4 : 1,
-                        },
-                      ],
-                ]}
-              >
-                <Text style={[styles.bubbleText, isMine ? styles.myText : { color: textColor }]}>
-                  {item.text}
-                </Text>
-                <View style={styles.bubbleFooter}>
-                  <Text style={[styles.timestamp, { color: isMine ? 'rgba(255, 255, 255, 0.75)' : subText }]}>
-                    {formatWhatsAppTime(item.timestamp)}
-                  </Text>
-                  {isMine && (
-                    (item.status === 'read' || item.read) ? (
-                      <Ionicons
-                        name="checkmark-done"
-                        size={13}
-                        color="#00E5FF"
-                        style={{ marginLeft: 2 }}
-                      />
-                    ) : (item.status === 'delivered' || (item.status !== 'sending' && item.timestamp !== 'Just now')) ? (
-                      <Ionicons
-                        name="checkmark-done"
-                        size={13}
-                        color="rgba(255, 255, 255, 0.75)"
-                        style={{ marginLeft: 2 }}
-                      />
-                    ) : (
-                      <Ionicons
-                        name="checkmark"
-                        size={13}
-                        color="rgba(255, 255, 255, 0.65)"
-                        style={{ marginLeft: 2 }}
-                      />
-                    )
-                  )}
-                  <TouchableOpacity
-                    onPress={() => setSelectedMsgForAction(item)}
-                    style={{ marginLeft: 4, paddingHorizontal: 2 }}
-                    hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
-                  >
-                    <Text style={{ fontSize: 12, color: isMine ? 'rgba(255, 255, 255, 0.7)' : subText, fontWeight: '900' }}>⋮</Text>
-                  </TouchableOpacity>
-                </View>
-              </TouchableOpacity>
+              </View>
             );
           }}
         />
@@ -2484,53 +2702,104 @@ const VOICE_COMPRESSED_CONFIG: any = {
             </TouchableOpacity>
           </View>
         ) : (
-          <View style={[styles.inputBar, { backgroundColor: inputBg, borderTopColor: borderCol, paddingBottom: isKeyboardOpen ? 8 : Math.max(Platform.OS === 'android' ? 18 : 10, insets.bottom + 4) }]}>
-            {/* Plan Date Quick Icon */}
-            <TouchableOpacity
-              style={styles.actionIconBtn}
-              onPress={() => router.push(`/plan-date/${id}`)}
-              activeOpacity={0.7}
-            >
-              <Ionicons name="calendar-outline" size={22} color="#FD3A73" />
-            </TouchableOpacity>
-
-            {/* Text Input */}
-            <TextInput
-              style={[
-                styles.input,
-                {
-                  backgroundColor: inputFieldBg,
-                  borderColor: borderCol,
-                  color: textColor,
-                },
-              ]}
-              value={inputText}
-              onChangeText={handleTyping}
-              placeholder="Type a message..."
-              placeholderTextColor={subText}
-              multiline
-              maxLength={2000}
-            />
-
-            {/* Mic or Send Button depending on inputText */}
-            {inputText.trim() ? (
-              <TouchableOpacity
-                style={styles.sendBtn}
-                onPress={() => handleSend()}
-                activeOpacity={0.8}
-              >
-                <Ionicons name="send" size={16} color="#FFFFFF" />
-              </TouchableOpacity>
-            ) : (
-              <TouchableOpacity
-                style={[styles.sendBtn, { backgroundColor: '#FD3A73' }]}
-                onPress={startRecording}
-                activeOpacity={0.8}
-              >
-                <Ionicons name="mic" size={20} color="#FFFFFF" />
-              </TouchableOpacity>
+          <>
+            {/* Quick Horizontal Emoji Drawer */}
+            {isEmojiPickerOpen && (
+              <View style={{
+                backgroundColor: isDarkMode ? '#11121F' : '#FFFFFF',
+                borderTopWidth: 1,
+                borderTopColor: borderCol,
+                paddingVertical: 10,
+                paddingHorizontal: 8,
+              }}>
+                <ScrollView
+                  horizontal
+                  showsHorizontalScrollIndicator={false}
+                  keyboardShouldPersistTaps="always"
+                  contentContainerStyle={{ gap: 10, paddingHorizontal: 6, alignItems: 'center' }}
+                >
+                  {['❤️', '🔥', '😂', '😍', '👍', '🥺', '🌹', '✨', '🥂', '🎉', '💯', '😘', '😜', '🙈', '💖', '🙌', '👏', '🥳', '☕', '🍕', '🎵', '💋', '🤩', '🌸', '💫'].map((emoji) => (
+                    <TouchableOpacity
+                      key={emoji}
+                      onPress={() => {
+                        setInputText(prev => prev + emoji);
+                        if (Platform.OS !== 'web') {
+                          const Haptics = require('expo-haptics');
+                          Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light).catch(() => {});
+                        }
+                      }}
+                      style={{
+                        paddingVertical: 6,
+                        paddingHorizontal: 9,
+                        backgroundColor: isDarkMode ? 'rgba(255,255,255,0.06)' : '#F1F5F9',
+                        borderRadius: 14,
+                      }}
+                      activeOpacity={0.7}
+                    >
+                      <Text style={{ fontSize: 22 }}>{emoji}</Text>
+                    </TouchableOpacity>
+                  ))}
+                </ScrollView>
+              </View>
             )}
-          </View>
+
+            <View style={[styles.inputBar, { backgroundColor: inputBg, borderTopColor: borderCol, paddingBottom: isKeyboardOpen ? 8 : Math.max(Platform.OS === 'android' ? 18 : 10, insets.bottom + 4) }]}>
+              {/* Plan Date Quick Icon */}
+              <TouchableOpacity
+                style={styles.actionIconBtn}
+                onPress={() => router.push(`/plan-date/${id}`)}
+                activeOpacity={0.7}
+              >
+                <Ionicons name="calendar-outline" size={22} color="#FD3A73" />
+              </TouchableOpacity>
+
+              {/* Emoji Drawer Toggle Button */}
+              <TouchableOpacity
+                style={[styles.actionIconBtn, { width: 34 }]}
+                onPress={() => setIsEmojiPickerOpen(prev => !prev)}
+                activeOpacity={0.7}
+              >
+                <Text style={{ fontSize: 20 }}>{isEmojiPickerOpen ? '⌨️' : '😊'}</Text>
+              </TouchableOpacity>
+
+              {/* Text Input */}
+              <TextInput
+                style={[
+                  styles.input,
+                  {
+                    backgroundColor: inputFieldBg,
+                    borderColor: borderCol,
+                    color: textColor,
+                  },
+                ]}
+                value={inputText}
+                onChangeText={handleTyping}
+                placeholder="Type a message..."
+                placeholderTextColor={subText}
+                multiline
+                maxLength={2000}
+              />
+
+              {/* Mic or Send Button depending on inputText */}
+              {inputText.trim() ? (
+                <TouchableOpacity
+                  style={styles.sendBtn}
+                  onPress={() => handleSend()}
+                  activeOpacity={0.8}
+                >
+                  <Ionicons name="send" size={16} color="#FFFFFF" />
+                </TouchableOpacity>
+              ) : (
+                <TouchableOpacity
+                  style={[styles.sendBtn, { backgroundColor: '#FD3A73' }]}
+                  onPress={startRecording}
+                  activeOpacity={0.8}
+                >
+                  <Ionicons name="mic" size={20} color="#FFFFFF" />
+                </TouchableOpacity>
+              )}
+            </View>
+          </>
         )}
       </KeyboardAvoidingView>
 
@@ -2554,7 +2823,7 @@ const VOICE_COMPRESSED_CONFIG: any = {
         >
           <View
             style={{
-              width: 280,
+              width: 290,
               backgroundColor: isDarkMode ? '#141522' : '#FFFFFF',
               borderRadius: 20,
               paddingVertical: 14,
@@ -2571,18 +2840,20 @@ const VOICE_COMPRESSED_CONFIG: any = {
             {/* Header Badge */}
             <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 6, paddingBottom: 10, borderBottomWidth: 1, borderBottomColor: isDarkMode ? 'rgba(255, 255, 255, 0.08)' : '#F1F5F9' }}>
               <Ionicons name="chatbubble-ellipses" size={14} color="#FD3A73" />
-              <Text style={{ fontSize: 12, fontWeight: '800', color: isDarkMode ? '#FD3A73' : '#E11D48', letterSpacing: 0.5 }}>
+              <Text style={{ fontSize: 12, fontFamily: 'Poppins_800ExtraBold', color: isDarkMode ? '#FD3A73' : '#E11D48', letterSpacing: 0.5 }}>
                 MESSAGE OPTIONS
               </Text>
             </View>
 
-            {/* Emoji Reactions Row */}
+            {/* Emoji Reactions Row (Instant local + synced) */}
             <View style={{ flexDirection: 'row', justifyContent: 'space-between', paddingVertical: 12, paddingHorizontal: 4, borderBottomWidth: 1, borderBottomColor: isDarkMode ? 'rgba(255, 255, 255, 0.08)' : '#F1F5F9' }}>
               {['❤️', '😂', '🔥', '👍', '😢'].map((emoji) => (
                  <TouchableOpacity
                    key={emoji}
                    onPress={() => {
                       if (selectedMsgForAction && id) {
+                         addMessageReaction(selectedMsgForAction.id, id, emoji);
+                         setCloudMessages(prev => prev.map(m => m.id === selectedMsgForAction.id ? { ...m, extraData: { ...(m.extraData || {}), reaction: emoji } } : m));
                          RealtimeBridge.broadcast('MESSAGE_REACTION', { messageId: selectedMsgForAction.id, threadKey: id, emoji }, id);
                          if (Platform.OS !== 'web') {
                            const Haptics = require('expo-haptics');
@@ -2600,6 +2871,31 @@ const VOICE_COMPRESSED_CONFIG: any = {
 
             {/* Actions List */}
             <View style={{ marginTop: 8, gap: 4 }}>
+              {/* Select Messages */}
+              <TouchableOpacity
+                style={{
+                  flexDirection: 'row',
+                  alignItems: 'center',
+                  gap: 12,
+                  paddingVertical: 10,
+                  paddingHorizontal: 12,
+                  borderRadius: 12,
+                  backgroundColor: isDarkMode ? 'rgba(255, 255, 255, 0.04)' : '#F8FAFC',
+                }}
+                onPress={() => {
+                  if (selectedMsgForAction) {
+                    setSelectedMessageIds(new Set([selectedMsgForAction.id]));
+                    setIsSelectionMode(true);
+                  }
+                  setSelectedMsgForAction(null);
+                }}
+              >
+                <Ionicons name="checkbox-outline" size={18} color="#FD3A73" />
+                <Text style={{ fontSize: 13, fontFamily: 'Poppins_700Bold', color: isDarkMode ? '#FFFFFF' : '#0F172A' }}>
+                  Select Messages
+                </Text>
+              </TouchableOpacity>
+
               {/* Copy Text */}
               <TouchableOpacity
                 style={{
@@ -2616,13 +2912,16 @@ const VOICE_COMPRESSED_CONFIG: any = {
                     if (Platform.OS === 'web' && typeof navigator !== 'undefined' && navigator.clipboard) {
                       navigator.clipboard.writeText(selectedMsgForAction.text);
                     }
-                    Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success).catch(() => {});
+                    if (Platform.OS !== 'web') {
+                      const Haptics = require('expo-haptics');
+                      Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success).catch(() => {});
+                    }
                   }
                   setSelectedMsgForAction(null);
                 }}
               >
                 <Ionicons name="copy-outline" size={18} color="#00E5FF" />
-                <Text style={{ fontSize: 13, fontWeight: '700', color: isDarkMode ? '#FFFFFF' : '#0F172A' }}>
+                <Text style={{ fontSize: 13, fontFamily: 'Poppins_700Bold', color: isDarkMode ? '#FFFFFF' : '#0F172A' }}>
                   Copy Text
                 </Text>
               </TouchableOpacity>
@@ -2643,13 +2942,16 @@ const VOICE_COMPRESSED_CONFIG: any = {
                     const targetMsgId = selectedMsgForAction.id;
                     markMessageDeletedLocally(targetMsgId);
                     deleteMessage(id, targetMsgId, false);
-                    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium).catch(() => {});
+                    if (Platform.OS !== 'web') {
+                      const Haptics = require('expo-haptics');
+                      Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium).catch(() => {});
+                    }
                   }
                   setSelectedMsgForAction(null);
                 }}
               >
                 <Ionicons name="trash-outline" size={18} color="#EF4444" />
-                <Text style={{ fontSize: 13, fontWeight: '700', color: '#EF4444' }}>
+                <Text style={{ fontSize: 13, fontFamily: 'Poppins_700Bold', color: '#EF4444' }}>
                   Delete for Me
                 </Text>
               </TouchableOpacity>
@@ -2671,13 +2973,16 @@ const VOICE_COMPRESSED_CONFIG: any = {
                       const targetMsgId = selectedMsgForAction.id;
                       markMessageDeletedLocally(targetMsgId);
                       deleteMessage(id, targetMsgId, true);
-                      Haptics.notificationAsync(Haptics.NotificationFeedbackType.Warning).catch(() => {});
+                      if (Platform.OS !== 'web') {
+                        const Haptics = require('expo-haptics');
+                        Haptics.notificationAsync(Haptics.NotificationFeedbackType.Warning).catch(() => {});
+                      }
                     }
                     setSelectedMsgForAction(null);
                   }}
                 >
                   <Ionicons name="flame-outline" size={18} color="#EF4444" />
-                  <Text style={{ fontSize: 13, fontWeight: '800', color: '#EF4444' }}>
+                  <Text style={{ fontSize: 13, fontFamily: 'Poppins_800ExtraBold', color: '#EF4444' }}>
                     Delete for Everyone
                   </Text>
                 </TouchableOpacity>
@@ -2693,7 +2998,321 @@ const VOICE_COMPRESSED_CONFIG: any = {
                 }}
                 onPress={() => setSelectedMsgForAction(null)}
               >
-                <Text style={{ fontSize: 12, fontWeight: '600', color: subText }}>
+                <Text style={{ fontSize: 12, fontFamily: 'Poppins_600SemiBold', color: subText }}>
+                  Cancel
+                </Text>
+              </TouchableOpacity>
+            </View>
+          </View>
+        </TouchableOpacity>
+      </Modal>
+
+      {/* 7. CHAT 3-DOTS OPTIONS DROPDOWN MODAL */}
+      <Modal
+        visible={isOptionsMenuVisible}
+        transparent
+        animationType="fade"
+        onRequestClose={() => setIsOptionsMenuVisible(false)}
+      >
+        <TouchableOpacity
+          style={{
+            flex: 1,
+            backgroundColor: 'rgba(0, 0, 0, 0.65)',
+            justifyContent: 'center',
+            alignItems: 'center',
+            padding: 24,
+          }}
+          activeOpacity={1}
+          onPress={() => setIsOptionsMenuVisible(false)}
+        >
+          <View
+            style={{
+              width: 280,
+              backgroundColor: isDarkMode ? '#141522' : '#FFFFFF',
+              borderRadius: 20,
+              paddingVertical: 16,
+              paddingHorizontal: 14,
+              borderWidth: 1.5,
+              borderColor: isDarkMode ? 'rgba(255, 255, 255, 0.12)' : '#E2E8F0',
+              shadowColor: '#000',
+              shadowOffset: { width: 0, height: 8 },
+              shadowOpacity: 0.3,
+              shadowRadius: 16,
+              elevation: 10,
+            }}
+          >
+            <View style={{ paddingBottom: 12, borderBottomWidth: 1, borderBottomColor: isDarkMode ? 'rgba(255, 255, 255, 0.08)' : '#F1F5F9', alignItems: 'center' }}>
+              <Text style={{ fontSize: 13, fontFamily: 'Poppins_800ExtraBold', color: textColor, letterSpacing: 0.5 }}>
+                CHAT OPTIONS
+              </Text>
+            </View>
+
+            <View style={{ marginTop: 10, gap: 6 }}>
+              {/* Select Messages */}
+              <TouchableOpacity
+                style={{
+                  flexDirection: 'row',
+                  alignItems: 'center',
+                  gap: 12,
+                  paddingVertical: 12,
+                  paddingHorizontal: 12,
+                  borderRadius: 12,
+                  backgroundColor: isDarkMode ? 'rgba(255, 255, 255, 0.04)' : '#F8FAFC',
+                }}
+                onPress={() => {
+                  setIsOptionsMenuVisible(false);
+                  setIsSelectionMode(true);
+                }}
+              >
+                <Ionicons name="checkbox-outline" size={20} color="#00E5FF" />
+                <Text style={{ fontSize: 14, fontFamily: 'Poppins_700Bold', color: isDarkMode ? '#FFFFFF' : '#0F172A' }}>
+                  Select Messages
+                </Text>
+              </TouchableOpacity>
+
+              {/* Clear Chat History */}
+              <TouchableOpacity
+                style={{
+                  flexDirection: 'row',
+                  alignItems: 'center',
+                  gap: 12,
+                  paddingVertical: 12,
+                  paddingHorizontal: 12,
+                  borderRadius: 12,
+                  backgroundColor: isDarkMode ? 'rgba(239, 68, 68, 0.08)' : '#FEF2F2',
+                }}
+                onPress={() => {
+                  setIsOptionsMenuVisible(false);
+                  setIsClearChatModalVisible(true);
+                }}
+              >
+                <Ionicons name="trash-outline" size={20} color="#EF4444" />
+                <Text style={{ fontSize: 14, fontFamily: 'Poppins_700Bold', color: '#EF4444' }}>
+                  Clear Chat History
+                </Text>
+              </TouchableOpacity>
+
+              {/* Cancel Button */}
+              <TouchableOpacity
+                style={{
+                  alignItems: 'center',
+                  paddingVertical: 10,
+                  marginTop: 6,
+                  borderRadius: 10,
+                }}
+                onPress={() => setIsOptionsMenuVisible(false)}
+              >
+                <Text style={{ fontSize: 13, fontFamily: 'Poppins_600SemiBold', color: subText }}>
+                  Close
+                </Text>
+              </TouchableOpacity>
+            </View>
+          </View>
+        </TouchableOpacity>
+      </Modal>
+
+      {/* 8. CLEAR CHAT CONFIRMATION MODAL */}
+      <Modal
+        visible={isClearChatModalVisible}
+        transparent
+        animationType="fade"
+        onRequestClose={() => setIsClearChatModalVisible(false)}
+      >
+        <TouchableOpacity
+          style={{
+            flex: 1,
+            backgroundColor: 'rgba(0, 0, 0, 0.7)',
+            justifyContent: 'center',
+            alignItems: 'center',
+            padding: 24,
+          }}
+          activeOpacity={1}
+          onPress={() => setIsClearChatModalVisible(false)}
+        >
+          <View
+            style={{
+              width: 300,
+              backgroundColor: isDarkMode ? '#141522' : '#FFFFFF',
+              borderRadius: 22,
+              paddingVertical: 18,
+              paddingHorizontal: 18,
+              borderWidth: 1.5,
+              borderColor: '#EF4444',
+              shadowColor: '#EF4444',
+              shadowOffset: { width: 0, height: 8 },
+              shadowOpacity: 0.35,
+              shadowRadius: 20,
+              elevation: 12,
+              alignItems: 'center',
+            }}
+          >
+            <View style={{ width: 50, height: 50, borderRadius: 25, backgroundColor: 'rgba(239, 68, 68, 0.15)', alignItems: 'center', justifyContent: 'center', marginBottom: 12 }}>
+              <Ionicons name="trash" size={26} color="#EF4444" />
+            </View>
+
+            <Text style={{ fontSize: 17, fontFamily: 'Poppins_800ExtraBold', color: textColor, textAlign: 'center', marginBottom: 6 }}>
+              Clear this chat?
+            </Text>
+            <Text style={{ fontSize: 12.5, color: subText, textAlign: 'center', marginBottom: 18, lineHeight: 18, fontFamily: 'Poppins_400Regular' }}>
+              This will permanently delete all messages and media in this conversation for you.
+            </Text>
+
+            <View style={{ width: '100%', gap: 8 }}>
+              <TouchableOpacity
+                style={{
+                  backgroundColor: '#EF4444',
+                  paddingVertical: 12,
+                  borderRadius: 14,
+                  alignItems: 'center',
+                }}
+                onPress={() => {
+                  if (id) {
+                    clearChat(id, false);
+                    clearChatLocally();
+                    if (Platform.OS !== 'web') {
+                      const Haptics = require('expo-haptics');
+                      Haptics.notificationAsync(Haptics.NotificationFeedbackType.Warning).catch(() => {});
+                    }
+                  }
+                  setIsClearChatModalVisible(false);
+                }}
+              >
+                <Text style={{ color: '#FFFFFF', fontFamily: 'Poppins_800ExtraBold', fontSize: 14 }}>
+                  Clear Chat
+                </Text>
+              </TouchableOpacity>
+
+              <TouchableOpacity
+                style={{
+                  paddingVertical: 10,
+                  borderRadius: 14,
+                  alignItems: 'center',
+                }}
+                onPress={() => setIsClearChatModalVisible(false)}
+              >
+                <Text style={{ color: subText, fontFamily: 'Poppins_600SemiBold', fontSize: 13 }}>
+                  Cancel
+                </Text>
+              </TouchableOpacity>
+            </View>
+          </View>
+        </TouchableOpacity>
+      </Modal>
+
+      {/* 9. DELETE SELECTED MESSAGES MODAL */}
+      <Modal
+        visible={isDeleteSelectedModalVisible}
+        transparent
+        animationType="fade"
+        onRequestClose={() => setIsDeleteSelectedModalVisible(false)}
+      >
+        <TouchableOpacity
+          style={{
+            flex: 1,
+            backgroundColor: 'rgba(0, 0, 0, 0.7)',
+            justifyContent: 'center',
+            alignItems: 'center',
+            padding: 24,
+          }}
+          activeOpacity={1}
+          onPress={() => setIsDeleteSelectedModalVisible(false)}
+        >
+          <View
+            style={{
+              width: 300,
+              backgroundColor: isDarkMode ? '#141522' : '#FFFFFF',
+              borderRadius: 22,
+              paddingVertical: 18,
+              paddingHorizontal: 18,
+              borderWidth: 1.5,
+              borderColor: '#EF4444',
+              shadowColor: '#EF4444',
+              shadowOffset: { width: 0, height: 8 },
+              shadowOpacity: 0.35,
+              shadowRadius: 20,
+              elevation: 12,
+              alignItems: 'center',
+            }}
+          >
+            <View style={{ width: 50, height: 50, borderRadius: 25, backgroundColor: 'rgba(239, 68, 68, 0.15)', alignItems: 'center', justifyContent: 'center', marginBottom: 12 }}>
+              <Ionicons name="trash-bin" size={26} color="#EF4444" />
+            </View>
+
+            <Text style={{ fontSize: 17, fontFamily: 'Poppins_800ExtraBold', color: textColor, textAlign: 'center', marginBottom: 6 }}>
+              Delete {selectedMessageIds.size} Message{selectedMessageIds.size > 1 ? 's' : ''}?
+            </Text>
+            <Text style={{ fontSize: 12.5, color: subText, textAlign: 'center', marginBottom: 18, lineHeight: 18, fontFamily: 'Poppins_400Regular' }}>
+              Choose how you would like to delete the selected messages.
+            </Text>
+
+            <View style={{ width: '100%', gap: 8 }}>
+              {/* Delete For Me */}
+              <TouchableOpacity
+                style={{
+                  backgroundColor: isDarkMode ? 'rgba(239, 68, 68, 0.15)' : '#FEE2E2',
+                  borderWidth: 1,
+                  borderColor: '#EF4444',
+                  paddingVertical: 12,
+                  borderRadius: 14,
+                  alignItems: 'center',
+                }}
+                onPress={() => {
+                  if (id && selectedMessageIds.size > 0) {
+                    const idsArr = Array.from(selectedMessageIds);
+                    markMessagesDeletedLocally(idsArr);
+                    deleteMultipleMessages(id, idsArr, false);
+                    setSelectedMessageIds(new Set());
+                    setIsSelectionMode(false);
+                    if (Platform.OS !== 'web') {
+                      const Haptics = require('expo-haptics');
+                      Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium).catch(() => {});
+                    }
+                  }
+                  setIsDeleteSelectedModalVisible(false);
+                }}
+              >
+                <Text style={{ color: '#EF4444', fontFamily: 'Poppins_800ExtraBold', fontSize: 14 }}>
+                  Delete for Me
+                </Text>
+              </TouchableOpacity>
+
+              {/* Delete For Everyone */}
+              <TouchableOpacity
+                style={{
+                  backgroundColor: '#EF4444',
+                  paddingVertical: 12,
+                  borderRadius: 14,
+                  alignItems: 'center',
+                }}
+                onPress={() => {
+                  if (id && selectedMessageIds.size > 0) {
+                    const idsArr = Array.from(selectedMessageIds);
+                    markMessagesDeletedLocally(idsArr);
+                    deleteMultipleMessages(id, idsArr, true);
+                    setSelectedMessageIds(new Set());
+                    setIsSelectionMode(false);
+                    if (Platform.OS !== 'web') {
+                      const Haptics = require('expo-haptics');
+                      Haptics.notificationAsync(Haptics.NotificationFeedbackType.Warning).catch(() => {});
+                    }
+                  }
+                  setIsDeleteSelectedModalVisible(false);
+                }}
+              >
+                <Text style={{ color: '#FFFFFF', fontFamily: 'Poppins_800ExtraBold', fontSize: 14 }}>
+                  Delete for Everyone
+                </Text>
+              </TouchableOpacity>
+
+              <TouchableOpacity
+                style={{
+                  paddingVertical: 10,
+                  borderRadius: 14,
+                  alignItems: 'center',
+                }}
+                onPress={() => setIsDeleteSelectedModalVisible(false)}
+              >
+                <Text style={{ color: subText, fontFamily: 'Poppins_600SemiBold', fontSize: 13 }}>
                   Cancel
                 </Text>
               </TouchableOpacity>
