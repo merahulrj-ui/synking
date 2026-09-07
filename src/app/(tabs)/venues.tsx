@@ -43,12 +43,12 @@ export default function VenuesScreen() {
   const [selectedVenueForModal, setSelectedVenueForModal] = useState<Venue | null>(null);
   const [isModalOpen, setIsModalOpen] = useState(false);
 
-  const bg = isDarkMode ? '#05060A' : '#F8F9FB';
+  const bg = isDarkMode ? '#000000' : '#F8F9FB';
   const textColor = isDarkMode ? '#FFFFFF' : '#0F172A';
   const subText = isDarkMode ? '#9CA3AF' : '#64748B';
-  const pillBg = isDarkMode ? '#13141E' : '#FFFFFF';
-  const cardBg = isDarkMode ? '#11121E' : '#FFFFFF';
-  const pillBorder = isDarkMode ? 'rgba(255, 255, 255, 0.08)' : 'rgba(0, 0, 0, 0.08)';
+  const pillBg = isDarkMode ? '#000000' : '#FFFFFF';
+  const cardBg = isDarkMode ? '#000000' : '#FFFFFF';
+  const pillBorder = isDarkMode ? 'rgba(255, 255, 255, 0.12)' : 'rgba(0, 0, 0, 0.08)';
 
   // Filtered venues based on tab, vibe, and search query
   const filteredVenues = useMemo(() => {
@@ -119,8 +119,8 @@ export default function VenuesScreen() {
         style={[
           styles.searchBar,
           {
-            backgroundColor: isDarkMode ? '#131422' : '#FFFFFF',
-            borderColor: isDarkMode ? 'rgba(255, 255, 255, 0.08)' : 'rgba(0, 0, 0, 0.08)',
+            backgroundColor: isDarkMode ? '#000000' : '#FFFFFF',
+            borderColor: isDarkMode ? 'rgba(255, 255, 255, 0.12)' : 'rgba(0, 0, 0, 0.08)',
           },
         ]}
       >
@@ -146,7 +146,9 @@ export default function VenuesScreen() {
         style={[
           styles.tabBar,
           {
-            backgroundColor: isDarkMode ? '#10111A' : '#E2E8F0',
+            backgroundColor: isDarkMode ? '#000000' : '#E2E8F0',
+            borderColor: isDarkMode ? 'rgba(255, 255, 255, 0.12)' : 'rgba(0, 0, 0, 0.08)',
+            borderWidth: 1,
           },
         ]}
       >
@@ -155,7 +157,7 @@ export default function VenuesScreen() {
             styles.tabButton,
             activeTab === 'all' && [
               styles.tabButtonActive,
-              { backgroundColor: isDarkMode ? '#1E2032' : '#FFFFFF' },
+              { backgroundColor: isDarkMode ? '#141414' : '#FFFFFF' },
             ],
           ]}
           onPress={() => setActiveTab('all')}
@@ -184,7 +186,7 @@ export default function VenuesScreen() {
             styles.tabButton,
             activeTab === 'wishlist' && [
               styles.tabButtonActive,
-              { backgroundColor: isDarkMode ? '#1E2032' : '#FFFFFF' },
+              { backgroundColor: isDarkMode ? '#141414' : '#FFFFFF' },
             ],
           ]}
           onPress={() => setActiveTab('wishlist')}

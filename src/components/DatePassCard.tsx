@@ -13,7 +13,7 @@ export const DatePassCard: React.FC<Props> = ({ booking }) => {
   const router = useRouter();
   const { isDarkMode } = useApp();
 
-  const cardBg = isDarkMode ? '#1E121B' : '#FFF1F2';
+  const cardBg = isDarkMode ? '#000000' : '#FFF1F2';
   const borderCol = isDarkMode ? 'rgba(253, 58, 115, 0.4)' : '#FECDD3';
   const textColor = isDarkMode ? '#FFFFFF' : '#881337';
   const metaColor = isDarkMode ? '#E2E8F0' : '#4C0519';

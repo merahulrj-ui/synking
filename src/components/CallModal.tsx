@@ -499,7 +499,7 @@ export const CallModal: React.FC<Props> = ({ session, isLockscreen, onEndCall, o
   const callContent = (
     <View style={styles.modalOverlay}>
       <LinearGradient
-        colors={['#0F172A', '#05060A', '#020617']}
+        colors={['#080406', '#000000', '#000000']}
         style={styles.callingCard}
         >
           {/* 1. CONNECTED VIDEO CALL: Fullscreen Remote Video + Draggable Self PiP */}
@@ -1096,7 +1096,7 @@ export const CallModal: React.FC<Props> = ({ session, isLockscreen, onEndCall, o
 const styles = StyleSheet.create({
   modalOverlay: {
     flex: 1,
-    backgroundColor: '#05060A',
+    backgroundColor: '#000000',
   },
   callingCard: {
     flex: 1,

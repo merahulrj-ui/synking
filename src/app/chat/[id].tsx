@@ -1346,14 +1346,14 @@ const VOICE_COMPRESSED_CONFIG: any = {
     return () => unsubscribe();
   }, []);
 
-  const bg = isDarkMode ? '#05060A' : '#F8F9FB';
-  const headerBg = isDarkMode ? '#05060A' : '#FFFFFF';
+  const bg = isDarkMode ? '#000000' : '#F8F9FB';
+  const headerBg = isDarkMode ? '#000000' : '#FFFFFF';
   const textColor = isDarkMode ? '#FFFFFF' : '#0F172A';
   const subText = isDarkMode ? '#94A3B8' : '#64748B';
   const borderCol = isDarkMode ? 'rgba(255, 255, 255, 0.08)' : 'rgba(0, 0, 0, 0.06)';
-  const cardBg = isDarkMode ? '#13141F' : '#FFFFFF';
-  const inputBg = isDarkMode ? '#0E0F17' : '#FFFFFF';
-  const inputFieldBg = isDarkMode ? '#181926' : '#F1F5F9';
+  const cardBg = isDarkMode ? '#000000' : '#FFFFFF';
+  const inputBg = isDarkMode ? '#000000' : '#FFFFFF';
+  const inputFieldBg = isDarkMode ? '#111111' : '#F1F5F9';
 
   const handleForceSync = async () => {
     if (!id || !currentUser) return;
@@ -3655,7 +3655,7 @@ const styles = StyleSheet.create({
     paddingHorizontal: 3,
     paddingVertical: 0.5,
     borderWidth: 1,
-    borderColor: '#05060A',
+    borderColor: '#000000',
     alignItems: 'center',
     justifyContent: 'center',
   },
@@ -3748,7 +3748,7 @@ const styles = StyleSheet.create({
     padding: 3,
     borderWidth: 2,
     borderColor: '#FD3A73',
-    backgroundColor: '#05060A',
+    backgroundColor: '#000000',
     shadowColor: '#FD3A73',
     shadowOffset: { width: 0, height: 4 },
     shadowOpacity: 0.2,
@@ -3771,7 +3771,7 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
     borderWidth: 2,
-    borderColor: '#05060A',
+    borderColor: '#000000',
   },
   heroTitle: {
     fontFamily: 'Poppins_900Black',

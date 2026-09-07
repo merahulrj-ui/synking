@@ -1,6 +1,6 @@
 import '../services/telecomBridge';
 import React, { useEffect } from 'react';
-import { View, StyleSheet, Platform, Alert, NativeModules, TouchableOpacity, Text, Animated, PanResponder, Dimensions, Image, DeviceEventEmitter } from 'react-native';
+import { View, StyleSheet, Platform, Alert, NativeModules, TouchableOpacity, Text, Animated, PanResponder, Dimensions, Image, DeviceEventEmitter, StatusBar as RNStatusBar } from 'react-native';
 import { Stack, useRouter } from 'expo-router';
 import { StatusBar } from 'expo-status-bar';
 import { Ionicons } from '@expo/vector-icons';
@@ -555,60 +555,32 @@ function GlobalCallOverlay() {
   );
 }
 
-export default function RootLayout() {
-  const [fontsLoaded] = useFonts({
-    Poppins_400Regular,
-    Poppins_500Medium,
-    Poppins_600SemiBold,
-    Poppins_700Bold,
-    Poppins_800ExtraBold,
-    Poppins_900Black,
-  });
+function RootLayoutContent() {
+  const { isDarkMode } = useApp();
 
   useEffect(() => {
-    // 1. Register Telecom Phone Account for Lockscreen / VoIP
     if (Platform.OS === 'android') {
-      if (NativeModules.TelecomModule?.registerPhoneAccount) {
-        NativeModules.TelecomModule.registerPhoneAccount().catch((e: any) => console.log('Telecom Register Error:', e));
-      }
-    }
-
-    async function checkOTA() {
-      if (__DEV__) return;
       try {
-        if (Updates && Updates.isEnabled && typeof Updates.checkForUpdateAsync === 'function') {
-          const update = await Updates.checkForUpdateAsync().catch(() => null);
-          if (update && update.isAvailable) {
-            await Updates.fetchUpdateAsync().catch(() => null);
-            await Updates.reloadAsync().catch(() => null);
-          }
-        }
+        RNStatusBar.setBackgroundColor(isDarkMode ? '#000000' : '#FFFFFF', true);
+        RNStatusBar.setBarStyle(isDarkMode ? 'light-content' : 'dark-content', true);
       } catch (e) {}
     }
-    checkOTA();
-
-    // Web Font Injection: Ensure Poppins is immediately active across all web browsers
-    if (Platform.OS === 'web' && typeof document !== 'undefined') {
-      const fontId = 'poppins-web-font';
-      if (!document.getElementById(fontId)) {
-        const link = document.createElement('link');
-        link.id = fontId;
-        link.href = 'https://fonts.googleapis.com/css2?family=Poppins:ital,wght@0,300;0,400;0,500;0,600;0,700;0,800;0,900&display=swap';
-        link.rel = 'stylesheet';
-        document.head.appendChild(link);
-      }
-    }
-  }, []);
+  }, [isDarkMode]);
 
   return (
-    <AppProvider>
-      <StatusBar style="auto" />
-      <View style={styles.outerContainer}>
-        <View style={styles.mobileFrame}>
+    <>
+      <RNStatusBar
+        barStyle={isDarkMode ? 'light-content' : 'dark-content'}
+        backgroundColor={isDarkMode ? '#000000' : '#FFFFFF'}
+        translucent={false}
+      />
+      <StatusBar style={isDarkMode ? 'light' : 'dark'} />
+      <View style={[styles.outerContainer, { backgroundColor: isDarkMode ? '#000000' : '#F8FAFC' }]}>
+        <View style={[styles.mobileFrame, { backgroundColor: isDarkMode ? '#000000' : '#FFFFFF' }]}>
           <Stack
             screenOptions={{
               headerShown: false,
-              contentStyle: { backgroundColor: Colors.background },
+              contentStyle: { backgroundColor: isDarkMode ? '#000000' : '#F8FAFC' },
               animation: 'fade_from_bottom',
             }}
           >
@@ -661,6 +633,58 @@ export default function RootLayout() {
           <InAppNotificationBanner />
         </View>
       </View>
+    </>
+  );
+}
+
+export default function RootLayout() {
+  const [fontsLoaded] = useFonts({
+    Poppins_400Regular,
+    Poppins_500Medium,
+    Poppins_600SemiBold,
+    Poppins_700Bold,
+    Poppins_800ExtraBold,
+    Poppins_900Black,
+  });
+
+  useEffect(() => {
+    // 1. Register Telecom Phone Account for Lockscreen / VoIP
+    if (Platform.OS === 'android') {
+      if (NativeModules.TelecomModule?.registerPhoneAccount) {
+        NativeModules.TelecomModule.registerPhoneAccount().catch((e: any) => console.log('Telecom Register Error:', e));
+      }
+    }
+
+    async function checkOTA() {
+      if (__DEV__) return;
+      try {
+        if (Updates && Updates.isEnabled && typeof Updates.checkForUpdateAsync === 'function') {
+          const update = await Updates.checkForUpdateAsync().catch(() => null);
+          if (update && update.isAvailable) {
+            await Updates.fetchUpdateAsync().catch(() => null);
+            await Updates.reloadAsync().catch(() => null);
+          }
+        }
+      } catch (e) {}
+    }
+    checkOTA();
+
+    // Web Font Injection: Ensure Poppins is immediately active across all web browsers
+    if (Platform.OS === 'web' && typeof document !== 'undefined') {
+      const fontId = 'poppins-web-font';
+      if (!document.getElementById(fontId)) {
+        const link = document.createElement('link');
+        link.id = fontId;
+        link.href = 'https://fonts.googleapis.com/css2?family=Poppins:ital,wght@0,300;0,400;0,500;0,600;0,700;0,800;0,900&display=swap';
+        link.rel = 'stylesheet';
+        document.head.appendChild(link);
+      }
+    }
+  }, []);
+
+  return (
+    <AppProvider>
+      <RootLayoutContent />
     </AppProvider>
   );
 }
@@ -676,7 +700,7 @@ const styles = StyleSheet.create({
     flex: 1,
     width: '100%',
     maxWidth: Platform.OS === 'web' ? 440 : '100%',
-    backgroundColor: '#05060A',
+    backgroundColor: '#000000',
     overflow: 'hidden',
     borderLeftWidth: Platform.OS === 'web' ? 1 : 0,
     borderRightWidth: Platform.OS === 'web' ? 1 : 0,

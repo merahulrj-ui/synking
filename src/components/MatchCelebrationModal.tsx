@@ -24,7 +24,7 @@ export const MatchCelebrationModal: React.FC<Props> = ({ matchedUser, onClose })
     <Modal visible={!!matchedUser} animationType="fade" transparent>
       <View style={styles.overlay}>
         <LinearGradient
-          colors={['#1E1017', '#0F172A', '#05060A']}
+          colors={['#14080F', '#000000', '#000000']}
           style={styles.card}
         >
           <View style={styles.sparkleIconBox}>

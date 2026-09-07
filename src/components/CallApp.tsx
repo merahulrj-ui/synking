@@ -109,6 +109,6 @@ export default function CallApp() {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: '#05060A',
+    backgroundColor: '#000000',
   },
 });

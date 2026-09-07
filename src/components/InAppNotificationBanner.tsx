@@ -284,7 +284,7 @@ export const InAppNotificationBanner: React.FC = () => {
 
   if (!notification) return null;
 
-  const bg = isDarkMode ? '#13141F' : '#FFFFFF';
+  const bg = isDarkMode ? '#000000' : '#FFFFFF';
   const textCol = isDarkMode ? '#FFFFFF' : '#0F172A';
   const subText = isDarkMode ? '#94A3B8' : '#64748B';
   const borderCol = isDarkMode ? 'rgba(255, 255, 255, 0.12)' : 'rgba(0, 0, 0, 0.08)';

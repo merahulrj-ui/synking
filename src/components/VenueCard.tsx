@@ -13,7 +13,7 @@ export const VenueCard: React.FC<Props> = ({ venue, onReserve }) => {
   const { isDarkMode, wishlistVenueIds, toggleVenueWishlist } = useApp();
   const isWishlisted = wishlistVenueIds.has(venue.id);
 
-  const cardBg = isDarkMode ? '#11121E' : '#FFFFFF';
+  const cardBg = isDarkMode ? '#000000' : '#FFFFFF';
   const textColor = isDarkMode ? '#FFFFFF' : '#0F172A';
   const subText = isDarkMode ? '#9CA3AF' : '#64748B';
   const borderCol = isDarkMode ? 'rgba(255, 255, 255, 0.08)' : 'rgba(0, 0, 0, 0.08)';
