@@ -541,7 +541,7 @@ const VOICE_COMPRESSED_CONFIG: any = {
     // 👑 VIP ONLY: Gated only when VIP Plans are enabled by admin
     if (vipPlansEnabled && !currentUser?.isVip) {
       const title = '✨ 👑 VIP Exclusive Feature 👑 ✨';
-      const msg = `⭐ Voice Notes & Audio Messages are reserved exclusively for SYNKING Black VIP members.\n\n🔒 For member safety and anti-fraud protection, audio messages are locked on standard accounts.\n\n✨ Upgrade to VIP to unlock unlimited voice notes & private calling!`;
+      const msg = `⭐ Voice Notes & Audio Messages are reserved exclusively for Synkin Black VIP members.\n\n🔒 For member safety and anti-fraud protection, audio messages are locked on standard accounts.\n\n✨ Upgrade to VIP to unlock unlimited voice notes & private calling!`;
       if (Platform.OS === 'web') {
         const upgrade = window.confirm(`${title}\n\n${msg}\n\nWould you like to upgrade to VIP now?`);
         if (upgrade) {
@@ -1689,7 +1689,7 @@ const VOICE_COMPRESSED_CONFIG: any = {
   const handleVoiceNote = () => {
     if (vipPlansEnabled && !currentUser?.isVip) {
       const title = '✨ 👑 VIP Exclusive Feature 👑 ✨';
-      const msg = `⭐ Voice Notes & Audio Messages are reserved exclusively for SYNKING Black VIP members.\n\n✨ Upgrade to VIP to unlock unlimited voice notes & private calling!`;
+      const msg = `⭐ Voice Notes & Audio Messages are reserved exclusively for Synkin Black VIP members.\n\n✨ Upgrade to VIP to unlock unlimited voice notes & private calling!`;
       if (Platform.OS === 'web') {
         const upgrade = window.confirm(`${title}\n\n${msg}\n\nWould you like to upgrade to VIP now?`);
         if (upgrade) router.push('/vip-membership');
@@ -2181,9 +2181,6 @@ const VOICE_COMPRESSED_CONFIG: any = {
           data={userMessages}
           keyExtractor={item => item.id}
           removeClippedSubviews={Platform.OS === 'android'}
-          initialNumToRender={15}
-          maxToRenderPerBatch={10}
-          windowSize={5}
           contentContainerStyle={[
             styles.messagesList,
             userMessages.length === 0 && { flexGrow: 1, justifyContent: 'flex-end', paddingTop: 20 }

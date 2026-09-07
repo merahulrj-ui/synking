@@ -376,18 +376,14 @@ export default function ChatsScreen() {
                     {
                       backgroundColor: isSelected
                         ? (isDarkMode ? 'rgba(253, 58, 115, 0.18)' : '#FFE4E6')
-                        : isUnread
-                        ? (isDarkMode ? 'rgba(253, 58, 115, 0.08)' : '#FFF1F2')
                         : cardBg,
                       borderColor: isSelected
                         ? '#FD3A73'
-                        : isUnread
-                        ? (isDarkMode ? 'rgba(253, 58, 115, 0.55)' : '#FD3A73')
                         : isDarkMode
                         ? 'rgba(253, 58, 115, 0.22)'
                         : borderColor,
                     },
-                    (isUnread || isSelected) && {
+                    isSelected && {
                       shadowColor: '#FD3A73',
                       shadowOffset: { width: 0, height: 4 },
                       shadowOpacity: 0.35,
@@ -436,12 +432,10 @@ export default function ChatsScreen() {
                       style={[
                         styles.avatar,
                         {
-                          borderColor: isUnread
-                            ? '#FD3A73'
-                            : isDarkMode
+                          borderColor: isDarkMode
                             ? 'rgba(253, 58, 115, 0.4)'
                             : 'transparent',
-                          borderWidth: isUnread ? 2.5 : 2,
+                          borderWidth: 2,
                         },
                       ]}
                     />
@@ -456,9 +450,9 @@ export default function ChatsScreen() {
                           style={[
                             styles.userName,
                             {
-                              color: isUnread ? (isDarkMode ? '#FFFFFF' : '#0F172A') : textColor,
-                              fontFamily: isUnread ? 'Poppins_900Black' : 'Poppins_700Bold',
-                              fontSize: isUnread ? 16.5 : 16,
+                              color: textColor,
+                              fontFamily: isUnread ? 'Poppins_700Bold' : 'Poppins_600SemiBold',
+                              fontSize: 16,
                             },
                           ]}
                           numberOfLines={1}
@@ -475,18 +469,13 @@ export default function ChatsScreen() {
                           style={[
                             styles.timeText,
                             {
-                              color: isUnread ? '#FD3A73' : subText,
-                              fontFamily: isUnread ? 'Poppins_700Bold' : 'Poppins_500Medium',
+                              color: subText,
+                              fontFamily: isUnread ? 'Poppins_600SemiBold' : 'Poppins_500Medium',
                             },
                           ]}
                         >
                           {timeDisplay}
                         </Text>
-                        {isUnread && (
-                          <View style={styles.unreadBadgePill}>
-                            <Text style={styles.unreadBadgePillText}>NEW</Text>
-                          </View>
-                        )}
                       </View>
                     </View>
 

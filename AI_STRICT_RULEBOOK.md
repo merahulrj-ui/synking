@@ -1,45 +1,44 @@
-﻿# 🛡️ AI STRICT RULEBOOK & ARCHITECTURE FREEZE PROTOCOL
+﻿# 🛡️ SYNKIN AI MASTER RULEBOOK (POINTWISE)
 **App Name:** Synkin (`com.synking`)  
-**Strict Enforcement:** Active 100%
+**Strictness Level:** Absolute (100% Locked)
 
 ---
 
-## 🚫 1. PERMANENTLY FROZEN MODULES (STRICTLY DO NOT TOUCH - 0% MODIFICATION)
-
-The following modules, files, and architectures are completely stable, tested, and FROZEN. 
-The AI assistant is strictly forbidden from modifying, refactoring, renaming, or touching these:
-
-### 🔴 Core Layer 1: Central Backend
-- `realtime-server.js` (AWS EC2 WebSocket signaling, Turso SQLite REST pipeline, FCM VoIP dispatch)
-- Any backend routing, token management, or signaling logic.
-
-### 🔴 Core Layer 2: Calling & Audio/Video Engine
-- `src/services/webrtcService.ts` (WebRTC signaling, ICE candidates, call state machine)
-- `src/services/webrtcCore.ts` (Native WebRTC drivers)
-- `src/services/audioRouteService.ts` (Earpiece vs Loudspeaker audio routing)
-- `src/services/telecomBridge.ts` (Native Telecom Android event bridge)
-- `src/services/ringtoneService.ts` (In-call sound effects and ringtones)
-- `android/app/src/main/java/com/synking/CallActivity.kt`
-- `android/app/src/main/java/com/synking/IncomingCallActivity.kt`
-- `android/app/src/main/java/com/synking/AudioRouteModule.kt`
-- `android/app/src/main/java/com/synking/TelecomModule.kt`
-- `android/app/src/main/java/com/synking/SynkingConnectionService.kt`
-- `android/app/src/main/java/com/synking/SynkingConnection.kt`
-- `android/app/src/main/java/com/synking/CallConnectionManager.kt`
-- `android/app/src/main/java/com/synking/MyFirebaseMessagingService.kt`
-
-### 🔴 Core Layer 3: Chat Engine, Encryption & Database
-- `src/services/firebase.ts` (Turso REST wrapper and cloud profile sync)
-- `src/services/realtimeBridge.ts` (Live WebSocket client bridge)
-- `src/services/notificationService.ts` (FCM v1 & Expo Push Notification dispatch)
-- `src/utils/encryption.ts` & `src/utils/crypto.ts` (End-to-End Encryption engines)
-- `Turso Database & Schemas` (Cloud SQLite single source of truth)
+### [POINT 1] 🚫 ZERO-TOUCH ARCHITECTURE (PERMANENTLY FROZEN)
+In modules aur files ko 0% touch karna hai — koi refactor, rename, ya edit strictly forbidden hai:
+1.1 Backend Core: 'realtime-server.js' (AWS EC2 WebSocket signaling, Turso SQLite pipeline, FCM VoIP dispatch).
+1.2 Calling Engine: 'src/services/webrtcService.ts', 'webrtcCore.ts', 'audioRouteService.ts', 'telecomBridge.ts', 'ringtoneService.ts'.
+1.3 Native Android Call Modules: 'CallActivity.kt', 'IncomingCallActivity.kt', 'AudioRouteModule.kt', 'TelecomModule.kt', 'SynkingConnectionService.kt', 'SynkingConnection.kt', 'CallConnectionManager.kt', 'MyFirebaseMessagingService.kt'.
+1.4 Chat & Security Engine: 'src/services/firebase.ts', 'realtimeBridge.ts', 'notificationService.ts', 'encryption.ts', 'crypto.ts'.
+1.5 Database: Turso Cloud SQLite schemas aur database queries.
 
 ---
 
-## ⚡ 2. AI TOKEN / CREDIT EFFICIENCY RULES (ZERO WASTE)
+### [POINT 2] ⚡ AI CREDITS OPTIMIZATION (ZERO TOKEN WASTE)
+2.1 No Redundant Scans: Kabhi bhi poore codebase par faaltoo deep scans ya repetitive searches nahi chalane hain.
+2.2 Targeted Reads Only: Sirf wahi exact file read hogi jisme user ne change karne ko bola hai.
+2.3 Concise Responses: Lamhe lambe faaltoo bhashan band, seedhe to-the-point baat aur kaam ka result dena hai.
+2.4 No Idle Background Tasks: Background processes ko faaltoo chalu karke credits waste nahi karna.
 
-1. **No Redundant Searches or Loops:** Never run repetitive file scans or unnecessary searches.
-2. **Direct Action Only:** Execute only what is explicitly requested by the user.
-3. **Frontend Display Only:** Work is restricted strictly to UI/UX, styling, text, and visual presentation unless explicitly instructed otherwise.
-4. **Mandatory Header:** Every assistant response must display the frozen status guard at the very top.
+---
+
+### [POINT 3] 🎯 ALLOWED WORK SCOPE (FRONTEND UI & BRAND ONLY)
+3.1 Sirf Frontend UI/UX, styling, screens, modals, aur text visual updates allowed hain.
+3.2 Brand name strictly 'Synkin' use hoga har jagah.
+3.3 Theme hamesha Pure OLED Black (#000000) aur Poppins Font Family rahegi.
+
+---
+
+### [POINT 4] 🔒 GIT SAFETY RULE
+4.1 User ki explicit permission ke bina 'git push' kabhi nahi chalana.
+4.2 Har change ko pehle locally test aur verify karna hai.
+
+---
+
+### [POINT 5] 📌 MANDATORY TOP BANNER
+Har response ke sabse top par ye 4-line status confirmation mandatory rahega:
+🔒 [CORE ARCHITECTURE FROZEN — 0% TOUCHED]
+• Backend (realtime-server.js): UNTOUCHED (0%)
+• Calling Engine (webrtcService.ts, WebRTC, Audio/Video routes): UNTOUCHED (0%)
+• Chat Engine, Encryption, Push Notifications, Turso Database: UNTOUCHED (0%)
+• AI Credits Optimization: Active (Zero Waste — Sirf direct aur requested frontend kaam)
