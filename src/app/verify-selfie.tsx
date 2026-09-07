@@ -441,7 +441,7 @@ export default function VerifySelfieScreen() {
             </View>
 
             <GradientButton
-              title="Enter SYNKING 🔥"
+              title="Enter Synkin 🔥"
               onPress={() => router.replace('/(tabs)')}
               style={{ width: '100%', marginTop: 16 }}
             />

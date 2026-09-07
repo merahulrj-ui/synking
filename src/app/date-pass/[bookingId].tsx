@@ -32,7 +32,7 @@ export default function DatePassScreen() {
 
   const handleShareDate = async () => {
     try {
-      const message = `✨ SYNKING Date Details:\n\nHey! I'm meeting ${booking.userName} for a date planned on SYNKING.\n📍 Venue: ${booking.venue.name} (${booking.venue.address})\n⏰ Time: ${booking.dateTime}\n🎟️ Pass: ${booking.qrCode}\n🛡️ (Verified Safe Partner)`;
+      const message = `✨ Synkin Date Details:\n\nHey! I'm meeting ${booking.userName} for a date planned on Synkin.\n📍 Venue: ${booking.venue.name} (${booking.venue.address})\n⏰ Time: ${booking.dateTime}\n🎟️ Pass: ${booking.qrCode}\n🛡️ (Verified Safe Partner)`;
       await Share.share({ message });
     } catch (e) {
       console.warn('Share error:', e);
@@ -83,7 +83,7 @@ export default function DatePassScreen() {
       <View style={[styles.header, { backgroundColor: headerBg, borderBottomColor: borderCol }]}>
         <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
           <Ionicons name="ticket" size={20} color="#FD3A73" />
-          <Text style={[styles.headerTitle, { color: textColor }]}>SYNKING Date Pass</Text>
+          <Text style={[styles.headerTitle, { color: textColor }]}>Synkin Date Pass</Text>
         </View>
         <TouchableOpacity
           style={styles.closeBtn}

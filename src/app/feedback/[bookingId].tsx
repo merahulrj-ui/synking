@@ -37,7 +37,7 @@ export default function FeedbackScreen() {
     }
     Alert.alert(
       'Thank you! 🛡️',
-      'Your feedback is 100% anonymous and helps keep the SYNKING community safe for everyone.',
+      'Your feedback is 100% anonymous and helps keep the Synkin community safe for everyone.',
       [{ text: 'Done', onPress: handleClose }]
     );
   };

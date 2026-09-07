@@ -200,7 +200,7 @@ export default function VipMembershipScreen() {
         <TouchableOpacity style={styles.backBtn} onPress={handleClose}>
           <Ionicons name="close" size={24} color={textColor} />
         </TouchableOpacity>
-        <Text style={[styles.headerTitle, { color: textColor }]}>SYNKING VIP</Text>
+        <Text style={[styles.headerTitle, { color: textColor }]}>Synkin VIP</Text>
         <View style={{ width: 36 }} />
       </View>
 
@@ -215,7 +215,7 @@ export default function VipMembershipScreen() {
           <View style={styles.crownCircle}>
             <MaterialCommunityIcons name="crown" size={38} color="#FFF" />
           </View>
-          <Text style={styles.bannerTitle}>SYNKING BLACK VIP</Text>
+          <Text style={styles.bannerTitle}>Synkin Black VIP</Text>
           <Text style={styles.bannerSub}>
             Level up your dating experience with unlimited access, high-priority discovery & exclusive cafe perks.
           </Text>

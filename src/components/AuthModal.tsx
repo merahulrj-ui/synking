@@ -105,7 +105,7 @@ export const AuthModal: React.FC<Props> = ({ visible, onClose, targetUserName })
           // If new user, ensure name is entered
           if (!name || name.trim().length < 2) {
             setIsLoading(false);
-            Alert.alert('Welcome to SYNKING! 🎉', 'Please enter your Full Name and Age to set up your profile.');
+            Alert.alert('Welcome to Synkin! 🎉', 'Please enter your Full Name and Age to set up your profile.');
             return;
           }
         }
@@ -184,7 +184,7 @@ export const AuthModal: React.FC<Props> = ({ visible, onClose, targetUserName })
       setIsLoading(false);
       onClose();
       if (Platform.OS !== 'web') Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
-      Alert.alert('Welcome to SYNKING! 🎉', `Welcome, ${newUser.name}! Your verified profile is active.`);
+      Alert.alert('Welcome to Synkin! 🎉', `Welcome, ${newUser.name}! Your verified profile is active.`);
     } catch (e) {
       setIsLoading(false);
       Alert.alert('Login Error', 'Unable to complete sign-in. Please try again.');
@@ -227,7 +227,7 @@ export const AuthModal: React.FC<Props> = ({ visible, onClose, targetUserName })
                 ? `Sign In to Synk with ${targetUserName} 💖`
                 : otpSent
                 ? 'Verify Your Mobile 📲'
-                : 'Welcome to SYNKING. Meet IRL. 🔥'}
+                : 'Welcome to Synkin. Meet IRL. 🔥'}
             </Text>
             <Text style={[styles.subtitle, { color: subText }]}>
               {otpSent
@@ -332,7 +332,7 @@ export const AuthModal: React.FC<Props> = ({ visible, onClose, targetUserName })
                     color={ageVerified ? '#00E5FF' : subText}
                   />
                   <Text style={[styles.safetyText, { color: isDarkMode ? '#E5E7EB' : '#0369A1' }]}>
-                    I am 18+ and agree to SYNKING's <Text style={{ fontFamily: 'Poppins_800ExtraBold' }}>Terms of Service</Text> & safe dating rules.
+                    I am 18+ and agree to Synkin's <Text style={{ fontFamily: 'Poppins_800ExtraBold' }}>Terms of Service</Text> & safe dating rules.
                   </Text>
                 </TouchableOpacity>
 
@@ -396,7 +396,7 @@ export const AuthModal: React.FC<Props> = ({ visible, onClose, targetUserName })
                   <ActivityIndicator size="large" color="#FD3A73" style={{ marginVertical: 14 }} />
                 ) : (
                   <GradientButton
-                    title="Verify & Enter SYNKING 🔥"
+                    title="Verify & Enter Synkin 🔥"
                     onPress={handleVerifyOtp}
                     style={{ marginTop: 14 }}
                   />

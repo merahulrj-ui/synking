@@ -188,7 +188,7 @@ export default function DiscoverScreen() {
     // 👑 20 Daily Free Likes Gate for Non-VIP (Pass is 100% UNLIMITED!)
     if (action !== 'pass' && !currentUser?.isVip && dailySwipesRemaining <= 0) {
       const title = '👑 20 Daily Likes Finished!';
-      const msg = 'You have used all 20 of your free daily likes.\n\nUpgrade to SYNKING VIP to unlock UNLIMITED likes & Super Synks and match with everyone!';
+      const msg = 'You have used all 20 of your free daily likes.\n\nUpgrade to Synkin VIP to unlock UNLIMITED likes & Super Synks and match with everyone!';
       if (Platform.OS === 'web') {
         const upgrade = window.confirm(`${title}\n\n${msg}\n\nUpgrade to VIP now?`);
         if (upgrade) router.push('/vip-membership');
@@ -232,7 +232,7 @@ export default function DiscoverScreen() {
       if (!currentUser?.isVip && dailySwipesRemaining <= 0) {
         isProcessingSwipe.current = false;
         const title = '👑 20 Daily Likes Finished!';
-        const msg = 'You have used all 20 of your free daily likes.\n\nUpgrade to SYNKING VIP to unlock UNLIMITED likes and match with everyone!';
+        const msg = 'You have used all 20 of your free daily likes.\n\nUpgrade to Synkin VIP to unlock UNLIMITED likes and match with everyone!';
         if (Platform.OS === 'web') {
           const upgrade = window.confirm(`${title}\n\n${msg}\n\nUpgrade to VIP now?`);
           if (upgrade) router.push('/vip-membership');
@@ -297,7 +297,7 @@ export default function DiscoverScreen() {
 
     if (!currentUser?.isVip && freeRewindsRemaining <= 0) {
       const title = '✨ 👑 VIP Exclusive Feature 👑 ✨';
-      const msg = `⭐ You have used your 1 Free Daily Rewind.\n\n👑 Upgrade to SYNKING Black VIP to unlock 100% UNLIMITED Rewinds & undo accidental passes anytime!`;
+      const msg = `⭐ You have used your 1 Free Daily Rewind.\n\n👑 Upgrade to Synkin Black VIP to unlock 100% UNLIMITED Rewinds & undo accidental passes anytime!`;
       if (Platform.OS === 'web') {
         const upgrade = window.confirm(`${title}\n\n${msg}\n\nWould you like to upgrade to VIP now?`);
         if (upgrade) router.push('/vip-membership');
@@ -333,7 +333,7 @@ export default function DiscoverScreen() {
       const title = '✨ ⭐ Out of Super Synks! ⭐ ✨';
       const msg = currentUser?.isVip
         ? '⭐ You have used all 5 of your daily Super Synks! Your quota resets tomorrow at midnight.'
-        : '⭐ You have used your 1 Free Daily Super Synk.\n\n👑 Upgrade to SYNKING Black VIP to get 5 Super Synks every single day and 3x your matches!';
+        : '⭐ You have used your 1 Free Daily Super Synk.\n\n👑 Upgrade to Synkin Black VIP to get 5 Super Synks every single day and 3x your matches!';
       if (Platform.OS === 'web') {
         if (!currentUser?.isVip) {
           const upgrade = window.confirm(`${title}\n\n${msg}\n\nWould you like to upgrade to VIP now?`);
@@ -377,7 +377,7 @@ export default function DiscoverScreen() {
 
     if (!currentUser?.isVip) {
       const title = '✨ 👑 VIP Profile Boost 👑 ✨';
-      const msg = '⭐ Profile Boost places you at the #1 top spot in your city for 30 minutes, getting you up to 5x more profile views!\n\n👑 Upgrade to SYNKING Black VIP to unlock free monthly boosts!';
+      const msg = '⭐ Profile Boost places you at the #1 top spot in your city for 30 minutes, getting you up to 5x more profile views!\n\n👑 Upgrade to Synkin Black VIP to unlock free monthly boosts!';
       if (Platform.OS === 'web') {
         const upgrade = window.confirm(`${title}\n\n${msg}\n\nWould you like to upgrade to VIP now?`);
         if (upgrade) router.push('/vip-membership');
