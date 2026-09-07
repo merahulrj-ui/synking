@@ -20,7 +20,7 @@ try {
   
   let serviceAccount = null;
   
-  // Option 1: Load from environment variable (Render production deployment)
+  // Option 1: Load from environment variable (Cloud/EC2 production deployment)
   if (process.env.FIREBASE_SERVICE_ACCOUNT_JSON) {
     serviceAccount = JSON.parse(process.env.FIREBASE_SERVICE_ACCOUNT_JSON);
     console.log('[FIREBASE_ADMIN] Loaded service account from ENV variable');
@@ -2260,7 +2260,7 @@ async function sendCallPushNotification(targetUserId, callPayload, isEndCall = f
     let pushToken = db.pushTokens?.[targetUserId] || db.profiles[targetUserId]?.pushToken;
     let nativeFcmToken = db.fcmTokens?.[targetUserId] || db.profiles?.[targetUserId]?.fcmPushToken;
 
-    // Turso Resilience: If RAM was wiped by Render restart/sleep, recover token from Turso Cloud SQLite!
+    // Turso Resilience: If RAM was wiped by server restart/sleep, recover token from Turso Cloud SQLite!
     if (!pushToken && !nativeFcmToken) {
       try {
         const tokenQuery = await queryTurso('SELECT * FROM push_tokens WHERE user_id = ?', [{ type: 'text', value: String(targetUserId) }]);

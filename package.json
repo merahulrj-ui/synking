@@ -54,6 +54,7 @@
     "@react-native/debugger-frontend": "^0.87.1",
     "@types/react": "~19.2.2",
     "babel-preset-expo": "~57.0.0",
+    "dotenv": "^17.4.2",
     "typescript": "~6.0.3"
   },
   "private": true
