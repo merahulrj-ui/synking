@@ -50,11 +50,11 @@ class CallActivity : ReactActivity() {
         super.onCreate(null)
         currentCallActivity = this
 
-        // Temporarily disabled for screenshots during development/testing:
-        // window.setFlags(
-        //     WindowManager.LayoutParams.FLAG_SECURE,
-        //     WindowManager.LayoutParams.FLAG_SECURE
-        // )
+        // 🔒 Privacy DRM: Block screenshots and recording during calls
+        window.setFlags(
+            WindowManager.LayoutParams.FLAG_SECURE,
+            WindowManager.LayoutParams.FLAG_SECURE
+        )
 
         // 🔒 Lock orientation strictly to Portrait (no rotation during calls)
         try {

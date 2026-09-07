@@ -90,6 +90,12 @@ class IncomingCallActivity : Activity() {
         setTheme(R.style.AppTheme)
         super.onCreate(savedInstanceState)
 
+        // 🔒 Privacy DRM: Block screenshots and screen recording on incoming calls
+        window.setFlags(
+            android.view.WindowManager.LayoutParams.FLAG_SECURE,
+            android.view.WindowManager.LayoutParams.FLAG_SECURE
+        )
+
         TelecomModule.incomingActivityInstance = this
 
         // Hold CPU WakeLock so Android OS/Realme UI Freezer does NOT freeze the process

@@ -154,7 +154,6 @@ export default function ChatScreen() {
   const [liveMicLevel, setLiveMicLevel] = useState<number>(0);
   const [supportedMimes, setSupportedMimes] = useState<string>('default');
   const [lastAudioSize, setLastAudioSize] = useState<string>('');
-  const [visualLogs, setVisualLogs] = useState<string[]>([]);
   const [playingMessageId, setPlayingMessageId] = useState<string | null>(null);
   const [playbackCurrentSeconds, setPlaybackCurrentSeconds] = useState<number>(0);
   const [audioMsgStatus, setAudioMsgStatus] = useState<Record<string, { status: string; error?: string; timestamp: string; payloadLen: number }>>({});
@@ -308,10 +307,8 @@ export default function ChatScreen() {
     }
   };
 
-  const addAudioLog = (msg: string) => {
-    const entry = `[${new Date().toLocaleTimeString()}] ${msg}`;
-    console.log(`[AUDIO_DEBUG] ${entry}`);
-    setVisualLogs(prev => [entry, ...prev].slice(0, 5));
+  const addAudioLog = (_msg: string) => {
+    // Silent in production
   };
 
   useEffect(() => {

@@ -1003,6 +1003,19 @@ export default function ProfileScreen() {
               <Text style={{ color: subText, fontSize: 10.5, fontFamily: 'Poppins_500Medium', letterSpacing: 0.3, opacity: 0.8 }}>
                 Forging Next-Gen High-Frequency Human Connections
               </Text>
+
+              {/* 🔒 Copyright & Screenshot Privacy DRM Notice */}
+              <View style={{ marginTop: 14, alignItems: 'center', gap: 4 }}>
+                <Text style={{ color: subText, fontSize: 10.5, fontFamily: 'Poppins_600SemiBold', letterSpacing: 0.3 }}>
+                  © 2026 SYNKING. All rights reserved.
+                </Text>
+                <View style={{ flexDirection: 'row', alignItems: 'center', gap: 5, opacity: 0.75 }}>
+                  <Ionicons name="shield-checkmark" size={12} color="#00E5FF" />
+                  <Text style={{ color: subText, fontSize: 9.5, fontFamily: 'Poppins_500Medium' }}>
+                    Protected by End-to-End Encryption & Screenshot DRM
+                  </Text>
+                </View>
+              </View>
             </View>
 
             <View style={{ height: 40 }} />
