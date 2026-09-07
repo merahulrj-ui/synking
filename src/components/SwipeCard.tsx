@@ -8,8 +8,7 @@ import { UserProfile } from '../types';
 import { Colors } from '../constants/theme';
 
 const { width: SCREEN_WIDTH, height: SCREEN_HEIGHT } = Dimensions.get('window');
-const CARD_WIDTH = Math.min(SCREEN_WIDTH - 8, 440);
-const CARD_HEIGHT = Math.min(SCREEN_HEIGHT * 0.74, 700);
+const CARD_WIDTH = SCREEN_WIDTH <= 480 ? (SCREEN_WIDTH - 8) : 440;
 // Reduced threshold so it's much easier to physically swipe without it bouncing back
 const SWIPE_THRESHOLD = CARD_WIDTH * 0.15;
 
@@ -180,9 +179,10 @@ export const SwipeCard = React.forwardRef(({ profile, isFirst = true, onSwipe, o
 
       {/* Subtle Vignette Gradient Overlay */}
       <LinearGradient
-        colors={['transparent', 'rgba(0,0,0,0.8)', '#000000']}
-        locations={[0, 0.6, 1]}
+        colors={['transparent', 'rgba(0,0,0,0.35)', 'rgba(0,0,0,0.75)', '#000000']}
+        locations={[0, 0.45, 0.75, 1]}
         style={styles.gradientOverlay}
+        pointerEvents="none"
       />
 
       {/* BRAND-SPECIFIC SYNK STAMP */}
@@ -200,7 +200,7 @@ export const SwipeCard = React.forwardRef(({ profile, isFirst = true, onSwipe, o
       )}
 
       {/* Ultra-Clean Modern Profile Details */}
-      <View style={styles.infoContainer}>
+      <View style={styles.infoContainer} pointerEvents="box-none">
         {/* Sleek Pull Handle Bar ("danda") for viewing profile */}
         <TouchableOpacity 
           style={styles.handleContainer} 
@@ -263,8 +263,8 @@ export const SwipeCard = React.forwardRef(({ profile, isFirst = true, onSwipe, o
 const styles = StyleSheet.create({
   card: {
     width: CARD_WIDTH,
-    height: CARD_HEIGHT,
-    borderRadius: 28,
+    height: '98.5%',
+    borderRadius: 20,
     overflow: 'hidden',
     backgroundColor: '#0F1017',
     position: 'relative',
@@ -302,18 +302,18 @@ const styles = StyleSheet.create({
   },
   tapLeft: {
     flex: 1,
-    height: '75%',
+    height: '70%',
   },
   tapRight: {
     flex: 1,
-    height: '75%',
+    height: '70%',
   },
   gradientOverlay: {
     position: 'absolute',
     left: 0,
     right: 0,
     bottom: 0,
-    height: '60%',
+    height: '58%',
   },
   stamp: {
     position: 'absolute',
@@ -354,8 +354,8 @@ const styles = StyleSheet.create({
     bottom: 0,
     left: 0,
     right: 0,
-    paddingHorizontal: 22,
-    paddingBottom: 20,
+    paddingHorizontal: 20,
+    paddingBottom: 94,
     gap: 6,
     zIndex: 20,
   },
@@ -401,11 +401,11 @@ const styles = StyleSheet.create({
   nameRow: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: 10,
+    gap: 8,
   },
   nameText: {
     color: '#FFFFFF',
-    fontSize: 32,
+    fontSize: 28,
     fontFamily: 'Poppins_900Black',
     letterSpacing: -0.5,
     textShadowColor: 'rgba(0, 0, 0, 0.75)',
@@ -414,11 +414,11 @@ const styles = StyleSheet.create({
   },
   ageText: {
     color: '#FFFFFF',
-    fontSize: 28,
+    fontSize: 26,
     fontFamily: 'Poppins_400Regular',
   },
   verifiedBadge: {
-    marginTop: 4,
+    marginTop: 2,
   },
   subtitleText: {
     color: '#D1D5DB',
@@ -430,7 +430,7 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     flexWrap: 'wrap',
     gap: 6,
-    marginTop: 6,
+    marginTop: 4,
   },
   chip: {
     backgroundColor: 'rgba(255, 255, 255, 0.12)',

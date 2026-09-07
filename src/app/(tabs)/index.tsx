@@ -434,7 +434,7 @@ export default function DiscoverScreen() {
             </View>
             
             {/* SLEEK GLASS FLOATING ACTION BUTTONS */}
-            <View style={styles.actionControls}>
+            <View style={styles.actionControls} pointerEvents="box-none">
               {/* 1. Tinder-Style Single-Card Rewind / Undo */}
               <TouchableOpacity
                 style={[
@@ -622,37 +622,39 @@ const styles = StyleSheet.create({
   },
   container: {
     flex: 1,
-    alignItems: 'center',
-    justifyContent: 'center',
     width: '100%',
-    alignSelf: 'center',
-    paddingBottom: 20,
+    position: 'relative',
   },
   cardStack: {
     flex: 1,
     width: '100%',
+    height: '100%',
+    position: 'relative',
     alignItems: 'center',
     justifyContent: 'center',
-    position: 'relative',
-    marginTop: 10,
   },
   nextCardWrapper: {
-    position: 'absolute',
-    top: 4,
+    ...(StyleSheet.absoluteFill as any),
+    alignItems: 'center',
+    justifyContent: 'center',
     zIndex: 1,
   },
   topCardWrapper: {
-    position: 'absolute',
-    top: 4,
+    ...(StyleSheet.absoluteFill as any),
+    alignItems: 'center',
+    justifyContent: 'center',
     zIndex: 2,
   },
   actionControls: {
+    position: 'absolute',
+    bottom: 14,
+    left: 0,
+    right: 0,
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'center',
-    gap: 14,
-    paddingTop: 10,
-    zIndex: 10,
+    gap: 12,
+    zIndex: 30,
   },
   actionBtn: {
     backgroundColor: '#22232B',
@@ -677,8 +679,10 @@ const styles = StyleSheet.create({
     borderRadius: 34,
   },
   emptyState: {
+    flex: 1,
     padding: 30,
     alignItems: 'center',
+    justifyContent: 'center',
     gap: 12,
   },
   emptyTitle: {
