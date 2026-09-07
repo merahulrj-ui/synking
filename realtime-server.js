@@ -344,7 +344,14 @@ async function initTursoTables() {
           console.log('⚡ [VIP_CONFIG_HYDRATED] Custom VIP Plans & Pricing Loaded From Turso Cloud!');
         } catch (pe) {}
       } else {
-      // Hydrate Blocked Users Table
+        await queryTurso("INSERT OR REPLACE INTO app_settings (key, value) VALUES ('vip_plans_config', ?)", [{ type: 'text', value: JSON.stringify(DEFAULT_VIP_CONFIG) }]);
+      }
+    } catch (cfgErr) {
+      console.warn('[TURSO_CONFIG_HYDRATE_WARN]', cfgErr.message);
+    }
+
+    // Hydrate Blocked Users Table
+    try {
       await queryTurso(`
         CREATE TABLE IF NOT EXISTS blocked_users (
           blocker_id TEXT,
@@ -353,21 +360,20 @@ async function initTursoTables() {
           PRIMARY KEY (blocker_id, blocked_id)
         );
       `);
-      try {
-        const blkRes = await queryTurso('SELECT * FROM blocked_users');
-        const blkRows = blkRes?.results?.[0]?.response?.result?.rows || [];
-        if (!db.blockedUsers) db.blockedUsers = [];
-        blkRows.forEach(r => {
-          const blockerId = r[0]?.value;
-          const blockedId = r[1]?.value;
-          if (blockerId && blockedId) {
-            db.blockedUsers.push({ blockerId, blockedId });
-          }
-        });
-        console.log(`⚡ [TURSO_BLOCKED_USERS_HYDRATED] Restored ${db.blockedUsers.length} blocked user relations`);
-      } catch (be) {}
+      const blkRes = await queryTurso('SELECT * FROM blocked_users');
+      const blkRows = blkRes?.results?.[0]?.response?.result?.rows || [];
+      if (!db.blockedUsers) db.blockedUsers = [];
+      blkRows.forEach(r => {
+        const blockerId = r[0]?.value;
+        const blockedId = r[1]?.value;
+        if (blockerId && blockedId) {
+          db.blockedUsers.push({ blockerId, blockedId });
+        }
+      });
+      console.log(`⚡ [TURSO_BLOCKED_USERS_HYDRATED] Restored ${db.blockedUsers.length} blocked user relations`);
+    } catch (be) {}
 
-      console.log('⚡ [TURSO_SQLITE_CONNECTED] 9 GB Cloud Database Initialized & Synchronized.');
+    console.log('⚡ [TURSO_SQLITE_CONNECTED] 9 GB Cloud Database Initialized & Synchronized.');
     } catch (e) {
       console.warn('[TURSO_INIT_WARN]', e.message);
     }
@@ -2490,6 +2496,236 @@ async function sendMessagePushNotification(targetUserId, msgPayload) {
   }
 }
 
+async function sendSwipePushNotification(targetUserId, reqPayload) {
+  try {
+    let pushToken = db.pushTokens?.[targetUserId] || db.profiles?.[targetUserId]?.pushToken;
+    let nativeFcmToken = db.fcmTokens?.[targetUserId] || db.profiles?.[targetUserId]?.fcmPushToken;
+
+    if (!pushToken && !nativeFcmToken) {
+      try {
+        const tokenQuery = await queryTurso('SELECT * FROM push_tokens WHERE user_id = ?', [{ type: 'text', value: String(targetUserId) }]);
+        const rows = tokenQuery?.results?.[0]?.response?.result?.rows;
+        const cols = tokenQuery?.results?.[0]?.response?.result?.cols?.map(c => (typeof c === 'object' && c.name) ? c.name : String(c));
+        if (Array.isArray(rows) && rows.length > 0 && Array.isArray(cols)) {
+          const item = {};
+          cols.forEach((col, idx) => {
+            const rawVal = rows[0][idx]?.value !== undefined ? rows[0][idx].value : rows[0][idx];
+            item[col] = extractPlain(rawVal);
+          });
+          if (item.fcm_token) {
+            nativeFcmToken = item.fcm_token;
+            if (!db.fcmTokens) db.fcmTokens = {};
+            db.fcmTokens[targetUserId] = nativeFcmToken;
+          }
+          if (item.push_token) {
+            pushToken = item.push_token;
+            if (!db.pushTokens) db.pushTokens = {};
+            db.pushTokens[targetUserId] = pushToken;
+          }
+        }
+      } catch (tursoErr) {}
+    }
+
+    if (!pushToken && !nativeFcmToken) {
+      const cleanTarget = String(targetUserId).replace(/\D/g, '').slice(-10);
+      for (const [uid, prof] of Object.entries(db.profiles || {})) {
+        const profPhone = (prof?.phoneNumber || '').replace(/\D/g, '').slice(-10);
+        if ((cleanTarget && profPhone === cleanTarget) || prof?.id === targetUserId) {
+          nativeFcmToken = db.fcmTokens?.[uid] || prof?.fcmPushToken;
+          pushToken = db.pushTokens?.[uid] || prof?.pushToken;
+          if (nativeFcmToken || pushToken) break;
+        }
+      }
+    }
+
+    if (!pushToken && !nativeFcmToken) {
+      console.log(`[SWIPE_PUSH_SKIP] No push token registered for target ${targetUserId}`);
+      return;
+    }
+
+    const senderName = reqPayload?.fromUser?.name || 'Someone';
+    const isSuper = reqPayload?.type === 'supersynk';
+    const title = isSuper ? `⚡ SuperSynk from ${senderName}!` : `💖 New Like from ${senderName}!`;
+    const bodyText = isSuper
+      ? `${senderName} sent you a Super Like on SYNKING! Tap to see them.`
+      : `${senderName} swiped right on your profile! Tap to see your match.`;
+
+    const dataPayload = {
+      type: 'NEW_SWIPE',
+      title: String(title),
+      body: String(bodyText),
+      senderId: String(reqPayload?.fromUser?.id || ''),
+      requestId: String(reqPayload?.id || Date.now()),
+      isSuperSynk: String(isSuper),
+      timestamp: String(Date.now()),
+    };
+
+    if (fcmMessaging && nativeFcmToken) {
+      try {
+        const response = await fcmMessaging.send({
+          token: nativeFcmToken,
+          notification: {
+            title: String(title),
+            body: String(bodyText),
+          },
+          data: dataPayload,
+          android: {
+            priority: 'high',
+            notification: {
+              channelId: 'synking_messages',
+              priority: 'high',
+              defaultSound: true,
+              defaultVibrateTimings: true,
+            }
+          }
+        });
+        console.log(`✅ [FCM_SWIPE_PUSH_SUCCESS] ID: ${response} to ${targetUserId}`);
+        return;
+      } catch (fcmErr) {
+        console.error(`❌ [FCM_SWIPE_PUSH_ERROR]`, fcmErr.message);
+      }
+    }
+
+    // Fallback to Expo Push
+    if (pushToken) {
+      const pushBody = JSON.stringify({
+        to: pushToken,
+        title: title,
+        body: bodyText,
+        data: dataPayload,
+        priority: 'high',
+        channelId: 'synking_messages',
+        sound: 'default'
+      });
+
+      const req = https.request('https://exp.host/--/api/v2/push/send', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Content-Length': Buffer.byteLength(pushBody),
+        },
+      }, (res) => {});
+      req.on('error', () => {});
+      req.write(pushBody);
+      req.end();
+    }
+  } catch (err) {
+    console.error('[SWIPE_PUSH_EXCEPTION]', err.message);
+  }
+}
+
+async function sendMatchPushNotification(targetUserId, matchPayload) {
+  try {
+    let pushToken = db.pushTokens?.[targetUserId] || db.profiles?.[targetUserId]?.pushToken;
+    let nativeFcmToken = db.fcmTokens?.[targetUserId] || db.profiles?.[targetUserId]?.fcmPushToken;
+
+    if (!pushToken && !nativeFcmToken) {
+      try {
+        const tokenQuery = await queryTurso('SELECT * FROM push_tokens WHERE user_id = ?', [{ type: 'text', value: String(targetUserId) }]);
+        const rows = tokenQuery?.results?.[0]?.response?.result?.rows;
+        const cols = tokenQuery?.results?.[0]?.response?.result?.cols?.map(c => (typeof c === 'object' && c.name) ? c.name : String(c));
+        if (Array.isArray(rows) && rows.length > 0 && Array.isArray(cols)) {
+          const item = {};
+          cols.forEach((col, idx) => {
+            const rawVal = rows[0][idx]?.value !== undefined ? rows[0][idx].value : rows[0][idx];
+            item[col] = extractPlain(rawVal);
+          });
+          if (item.fcm_token) {
+            nativeFcmToken = item.fcm_token;
+            if (!db.fcmTokens) db.fcmTokens = {};
+            db.fcmTokens[targetUserId] = nativeFcmToken;
+          }
+          if (item.push_token) {
+            pushToken = item.push_token;
+            if (!db.pushTokens) db.pushTokens = {};
+            db.pushTokens[targetUserId] = pushToken;
+          }
+        }
+      } catch (tursoErr) {}
+    }
+
+    if (!pushToken && !nativeFcmToken) {
+      const cleanTarget = String(targetUserId).replace(/\D/g, '').slice(-10);
+      for (const [uid, prof] of Object.entries(db.profiles || {})) {
+        const profPhone = (prof?.phoneNumber || '').replace(/\D/g, '').slice(-10);
+        if ((cleanTarget && profPhone === cleanTarget) || prof?.id === targetUserId) {
+          nativeFcmToken = db.fcmTokens?.[uid] || prof?.fcmPushToken;
+          pushToken = db.pushTokens?.[uid] || prof?.pushToken;
+          if (nativeFcmToken || pushToken) break;
+        }
+      }
+    }
+
+    if (!pushToken && !nativeFcmToken) {
+      console.log(`[MATCH_PUSH_SKIP] No push token registered for target ${targetUserId}`);
+      return;
+    }
+
+    const partnerName = matchPayload?.acceptedBy?.name || 'Someone';
+    const title = `🎉 It's a Match!`;
+    const bodyText = `You and ${partnerName} liked each other! Tap to chat.`;
+
+    const dataPayload = {
+      type: 'NEW_MATCH',
+      title: String(title),
+      body: String(bodyText),
+      partnerId: String(matchPayload?.acceptedBy?.id || ''),
+      timestamp: String(Date.now()),
+    };
+
+    if (fcmMessaging && nativeFcmToken) {
+      try {
+        const response = await fcmMessaging.send({
+          token: nativeFcmToken,
+          notification: {
+            title: String(title),
+            body: String(bodyText),
+          },
+          data: dataPayload,
+          android: {
+            priority: 'high',
+            notification: {
+              channelId: 'synking_messages',
+              priority: 'high',
+              defaultSound: true,
+              defaultVibrateTimings: true,
+            }
+          }
+        });
+        console.log(`✅ [FCM_MATCH_PUSH_SUCCESS] ID: ${response} to ${targetUserId}`);
+        return;
+      } catch (fcmErr) {
+        console.error(`❌ [FCM_MATCH_PUSH_ERROR]`, fcmErr.message);
+      }
+    }
+
+    if (pushToken) {
+      const pushBody = JSON.stringify({
+        to: pushToken,
+        title: title,
+        body: bodyText,
+        data: dataPayload,
+        priority: 'high',
+        channelId: 'synking_messages',
+        sound: 'default'
+      });
+
+      const req = https.request('https://exp.host/--/api/v2/push/send', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Content-Length': Buffer.byteLength(pushBody),
+        },
+      }, (res) => {});
+      req.on('error', () => {});
+      req.write(pushBody);
+      req.end();
+    }
+  } catch (err) {
+    console.error('[MATCH_PUSH_EXCEPTION]', err.message);
+  }
+}
+
 // WebSocket Protocol Handshake
 server.on('upgrade', (req, socket, head) => {
   const key = req.headers['sec-websocket-key'];
@@ -2760,6 +2996,10 @@ server.on('upgrade', (req, socket, head) => {
             }
           } else if (parsed.type === 'NEW_MESSAGE' && parsed.payload) {
             sendMessagePushNotification(targetUserId, parsed.payload);
+          } else if (parsed.type === 'SYNK_REQUEST' && parsed.payload) {
+            sendSwipePushNotification(targetUserId, parsed.payload);
+          } else if (parsed.type === 'REQUEST_ACCEPTED' && parsed.payload) {
+            sendMatchPushNotification(targetUserId, parsed.payload);
           }
           continue;
         }
