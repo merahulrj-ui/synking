@@ -1,29 +1,27 @@
-# Node modules
+# Dependencies
 node_modules/
-.npm
-package-lock.json
-
-# Expo & Next
 .expo/
 dist/
-web-build/
+build/
+android/
+ios/
 
-# Android Native Build Outputs
-android/app/build/
-android/.gradle/
-android/build/
-android/local.properties
-*.apk
-*.aab
-
-# OS & Environment
-.DS_Store
-*.log
+# Environment variables - NEVER commit these
 .env
 .env.local
+.env.production
+.env.staging
 firebase-service-account.json
-frames/
-wa_frame_*.png
+google-services.json
 
-artifacts/
-scratch/
+# Logs
+*.log
+npm-debug.log*
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Expo
+*.orig.*
+web-build/

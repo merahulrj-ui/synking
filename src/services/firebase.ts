@@ -5,11 +5,11 @@
 import { UserProfile, SynkRequest, ChatMessage } from '../types';
 import { decryptE2EEMessage } from '../utils/encryption';
 
-const PROJECT_ID = "synking-apk";
-const API_KEY = "AIzaSyA3ieppicAwwe0jx4SAKhD4meSdSBkOjCs";
+const PROJECT_ID = process.env.EXPO_PUBLIC_FIREBASE_PROJECT_ID ?? "synking-apk";
+const API_KEY = process.env.EXPO_PUBLIC_FIREBASE_API_KEY ?? "";
 const FIRESTORE_BASE_URL = `https://firestore.googleapis.com/v1/projects/${PROJECT_ID}/databases/(default)/documents`;
 
-export const CLOUD_BACKEND_URL = 'http://3.108.217.155:8082';
+export const CLOUD_BACKEND_URL = process.env.EXPO_PUBLIC_CLOUD_BACKEND_URL ?? 'http://3.108.217.155:8082';
 
 export function getLocalBackendUrl(): string {
   // Connected to Central Live AWS EC2 Cloud Backend (Mumbai ap-south-1)
