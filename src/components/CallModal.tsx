@@ -60,28 +60,32 @@ const QUICK_DECLINE_OPTIONS: QuickDeclineOption[] = [
 
 const LiveSelfVideo: React.FC<{ isPip?: boolean }> = ({ isPip = true }) => {
   const videoRef = useRef<any>(null);
+  const streamRef = useRef<any>(WebRTCService.getLocalStream());
   const [stream, setStream] = useState<any>(() => WebRTCService.getLocalStream());
-  const [renderKey, setRenderKey] = useState<number>(0);
+  const [mountKey, setMountKey] = useState<number>(0);
 
   useEffect(() => {
     const update = () => {
       const s = WebRTCService.getLocalStream();
-      setStream(s);
-      setRenderKey(prev => prev + 1);
+      const prevUrl = typeof streamRef.current?.toURL === 'function' ? streamRef.current.toURL() : streamRef.current;
+      const nextUrl = typeof s?.toURL === 'function' ? s.toURL() : s;
+      if (prevUrl !== nextUrl || (!streamRef.current && s)) {
+        streamRef.current = s;
+        setStream(s);
+      }
       if (Platform.OS === 'web' && s && videoRef.current && videoRef.current.srcObject !== s) {
         videoRef.current.srcObject = s;
       }
     };
     update();
     const unsub = WebRTCService.subscribe(update);
-    const interval = setInterval(update, 500);
+    const interval = setInterval(update, 2000);
 
-    // 📱 When returning from background / multitasking, force SurfaceView re-mount
+    // 📱 When returning from background / multitasking, re-mount SurfaceView once cleanly
     const appStateSub = AppState.addEventListener('change', (state) => {
       if (state === 'active') {
         update();
-        setTimeout(update, 250);
-        setTimeout(update, 650);
+        setMountKey(k => k + 1);
       }
     });
 
@@ -115,7 +119,7 @@ const LiveSelfVideo: React.FC<{ isPip?: boolean }> = ({ isPip = true }) => {
       ) : (
         (NativeRTCView && stream) ? (
           <NativeRTCView
-            key={`self_pip_${renderKey}_${streamUrl || 'stream'}`}
+            key={`self_pip_${mountKey}_${streamUrl || 'stream'}`}
             streamURL={streamUrl}
             style={{ width: '100%', height: '100%', borderRadius: isPip ? 16 : 0, backgroundColor: '#000000' }}
             objectFit="cover"
