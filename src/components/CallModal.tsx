@@ -81,11 +81,15 @@ const LiveSelfVideo: React.FC<{ isPip?: boolean }> = ({ isPip = true }) => {
     const unsub = WebRTCService.subscribe(update);
     const interval = setInterval(update, 2000);
 
-    // 📱 When returning from background / multitasking, re-mount SurfaceView once cleanly
+    // 📱 When returning from background / multitasking, re-mount SurfaceView cleanly
     const appStateSub = AppState.addEventListener('change', (state) => {
       if (state === 'active') {
         update();
         setMountKey(k => k + 1);
+        setTimeout(() => {
+          update();
+          setMountKey(k => k + 1);
+        }, 300);
       }
     });
 
