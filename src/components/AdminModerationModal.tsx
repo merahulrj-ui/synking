@@ -437,28 +437,10 @@ export const AdminModerationModal: React.FC<AdminModerationModalProps> = ({
                             </Text>
                           )}
                         </View>
-                      ) : (
-                        <View style={{ paddingVertical: 6 }}>
-                          <Text style={{ color: subText, fontSize: 11, fontFamily: 'Poppins_400Regular', fontStyle: 'italic' }}>
-                            ℹ️ Is user ne abhi unlock request submit nahi kiya hai.
-                          </Text>
-                        </View>
-                      )}
+                      ) : null}
 
-                      {/* 🟢 ADMIN ACTION BUTTONS: BLOCK OPEN KARNE KA OPTION */}
-                      {(!report.reportedByUserId || report.reportedByUserId !== 'system_shield') && !report.reason.toLowerCase().includes('contact sharing') ? (
-                        <View style={{ backgroundColor: 'rgba(148, 163, 184, 0.08)', borderRadius: 10, padding: 10, borderWidth: 1, borderColor: borderCol, marginTop: 4 }}>
-                          <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
-                            <Ionicons name="information-circle-outline" size={16} color={subText} />
-                            <Text style={{ color: subText, fontSize: 11.5, fontFamily: 'Poppins_600SemiBold' }}>
-                              Users Ka Aapas Ka Private Block
-                            </Text>
-                          </View>
-                          <Text style={{ color: subText, fontSize: 11, fontFamily: 'Poppins_400Regular', marginTop: 2 }}>
-                            Ye do users ke beech ka aapas ka personal block hai. Isme Admin se unblock karne ka koi matter nahi hai.
-                          </Text>
-                        </View>
-                      ) : (
+                      {/* 🟢 ADMIN ACTION BUTTONS: ONLY FOR SYSTEM SAFETY SUSPENSIONS */}
+                      {(report.reportedByUserId === 'system_shield' || report.reason.toLowerCase().includes('contact sharing')) && (
                         <View style={styles.actionBtnRow}>
                           {!isUnblocked ? (
                             <TouchableOpacity
