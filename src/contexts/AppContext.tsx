@@ -94,7 +94,7 @@ interface AppContextType {
   triggerSafetyViolation: (customMsg?: string) => boolean;
   blockReports: BlockReport[];
   submitBlockReport: (report: Omit<BlockReport, 'id' | 'timestamp' | 'status'> & { reason: string; appealNote?: string }) => Promise<void>;
-  submitUnlockRequest: (userId: string, appealNote: string) => Promise<boolean>;
+  submitUnlockRequest: (userId: string, appealNote: string, violationReason?: string) => Promise<boolean>;
   adminUnblockUser: (reportId: string, userId: string) => Promise<boolean>;
   adminDismissAppeal: (reportId: string) => Promise<boolean>;
   deleteBlockReport: (reportId: string) => Promise<boolean>;
@@ -385,28 +385,28 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       const initialSeed: BlockReport[] = [
         {
           id: 'report_sample_1',
+          blockedUserId: 'user_aman_77',
+          blockedUserName: 'Aman Gupta',
+          blockedUserPhone: '+91 98111 22334',
+          blockedUserPhoto: 'https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?w=500',
+          reportedByUserId: 'system_shield',
+          reportedByUserName: 'Synkin Safety Shield 🛡️',
+          reason: 'Contact Sharing Violation: Attempted to share Instagram ID & Phone number in chat',
+          timestamp: Date.now() - 3600000 * 5,
+          status: 'appeal_pending',
+          appealNote: 'Galti se chat me Instagram handle type ho gaya tha, aage se rules strictly follow karunga. Please account unblock kar dijiye.',
+          appealTimestamp: Date.now() - 3600000 * 2,
+        },
+        {
+          id: 'report_sample_2',
           blockedUserId: 'user_rahul_99',
           blockedUserName: 'Rahul Sharma',
           blockedUserPhone: '+91 98765 43210',
-          blockedUserPhoto: 'https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?w=500',
+          blockedUserPhoto: 'https://images.unsplash.com/photo-1500648767791-00dcc994a43e?w=500',
           reportedByUserId: 'user_ananya_22',
           reportedByUserName: 'Ananya Verma',
           reason: 'Inappropriate / Abusive messages in chat',
           timestamp: Date.now() - 3600000 * 24,
-          status: 'appeal_pending',
-          appealNote: 'I apologize for the misunderstanding during the conversation. I will strictly follow all safety guidelines. Please open my block.',
-          appealTimestamp: Date.now() - 3600000 * 3,
-        },
-        {
-          id: 'report_sample_2',
-          blockedUserId: 'user_simran_44',
-          blockedUserName: 'Simran Kaur',
-          blockedUserPhone: '+91 98123 45678',
-          blockedUserPhoto: 'https://images.unsplash.com/photo-1494790108377-be9c29b29330?w=500',
-          reportedByUserId: 'user_vikram_11',
-          reportedByUserName: 'Vikram Singh',
-          reason: 'Suspected fake profile / Catfish identity',
-          timestamp: Date.now() - 3600000 * 48,
           status: 'blocked',
           appealNote: undefined,
         },
@@ -441,7 +441,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     await blockUser(reportData.blockedUserId);
   }, [blockUser]);
 
-  const submitUnlockRequest = useCallback(async (userId: string, appealNote: string): Promise<boolean> => {
+  const submitUnlockRequest = useCallback(async (userId: string, appealNote: string, violationReason?: string): Promise<boolean> => {
     if (!userId || !appealNote.trim()) return false;
     let found = false;
     setBlockReports(prev => {
@@ -450,6 +450,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
           found = true;
           return {
             ...r,
+            reason: violationReason ? `Contact Sharing: ${violationReason}` : r.reason,
             status: 'appeal_pending' as const,
             appealNote: appealNote.trim(),
             appealTimestamp: Date.now(),
@@ -465,9 +466,9 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
           blockedUserName: currentUser?.name || 'Blocked Member',
           blockedUserPhoto: currentUser?.photo,
           blockedUserPhone: currentUser?.phoneNumber,
-          reportedByUserId: 'system_moderation',
-          reportedByUserName: 'System / User Report',
-          reason: 'Account Restriction / Community Guideline Review',
+          reportedByUserId: 'system_shield',
+          reportedByUserName: 'Synkin Safety Shield 🛡️',
+          reason: violationReason ? `Contact Sharing: ${violationReason}` : 'Contact Sharing Violation (Phone / Instagram ID)',
           timestamp: Date.now(),
           status: 'appeal_pending',
           appealNote: appealNote.trim(),
@@ -484,6 +485,14 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
 
   const adminUnblockUser = useCallback(async (reportId: string, userId: string): Promise<boolean> => {
     await unblockUser(userId);
+
+    // Unsuspend account and reset safety strikes
+    setIsSuspended(false);
+    setSuspendedUntil(null);
+    setStrikeCount(0);
+    AsyncStorage.removeItem('synking_suspended_until').catch(() => {});
+    AsyncStorage.removeItem('synking_phone_strikes').catch(() => {});
+
     setBlockReports(prev => {
       const updated = prev.map(r => {
         if (r.id === reportId || r.blockedUserId === userId) {
@@ -851,6 +860,17 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       const banTitle = '🚫 ENTIRE ACCOUNT BLOCKED FOR 3 DAYS (Strike 2/2)';
       const banMsg = `You repeatedly attempted to share contact details.\n\nAs per community safety policy, your ENTIRE ACCOUNT (Swiping, Calls, Messages, & InSynk) is SUSPENDED FOR 3 DAYS (72 Hours).\n\n🔒 Unlock Time: ${unlockDateStr}`;
       
+      // Auto-log suspension to Admin Block Reports
+      submitBlockReport({
+        blockedUserId: currentUser?.id || 'my_account_id',
+        blockedUserName: currentUser?.name || 'Member',
+        blockedUserPhoto: currentUser?.photo,
+        blockedUserPhone: currentUser?.phoneNumber,
+        reportedByUserId: 'system_shield',
+        reportedByUserName: 'Synkin Safety Shield 🛡️',
+        reason: customMsg ? `Contact Sharing: ${customMsg}` : 'Contact Sharing Violation (Attempted to send Phone Number / Instagram ID)',
+      }).catch(() => {});
+
       if (Platform.OS === 'web') {
         window.alert(`${banTitle}\n\n${banMsg}`);
       } else {

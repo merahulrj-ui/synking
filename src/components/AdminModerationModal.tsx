@@ -446,46 +446,60 @@ export const AdminModerationModal: React.FC<AdminModerationModalProps> = ({
                       )}
 
                       {/* 🟢 ADMIN ACTION BUTTONS: BLOCK OPEN KARNE KA OPTION */}
-                      <View style={styles.actionBtnRow}>
-                        {!isUnblocked ? (
-                          <TouchableOpacity
-                            style={styles.unblockBtn}
-                            onPress={() => handleUnblock(report)}
-                            activeOpacity={0.85}
-                          >
-                            <LinearGradient
-                              colors={['#10B981', '#059669']}
-                              start={{ x: 0, y: 0 }}
-                              end={{ x: 1, y: 0 }}
-                              style={styles.unblockBtnGrad}
-                            >
-                              <Ionicons name="lock-open-outline" size={16} color="#FFF" style={{ marginRight: 6 }} />
-                              <Text style={styles.unblockBtnText}>
-                                🔓 Unblock User (Block Open Karein)
-                              </Text>
-                            </LinearGradient>
-                          </TouchableOpacity>
-                        ) : (
-                          <View style={styles.unblockedBanner}>
-                            <Ionicons name="checkmark-circle" size={16} color="#10B981" />
-                            <Text style={styles.unblockedBannerText}>
-                              Block Open Ho Chuka Hai (Active)
+                      {(!report.reportedByUserId || report.reportedByUserId !== 'system_shield') && !report.reason.toLowerCase().includes('contact sharing') ? (
+                        <View style={{ backgroundColor: 'rgba(148, 163, 184, 0.08)', borderRadius: 10, padding: 10, borderWidth: 1, borderColor: borderCol, marginTop: 4 }}>
+                          <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
+                            <Ionicons name="information-circle-outline" size={16} color={subText} />
+                            <Text style={{ color: subText, fontSize: 11.5, fontFamily: 'Poppins_600SemiBold' }}>
+                              Users Ka Aapas Ka Private Block
                             </Text>
                           </View>
-                        )}
+                          <Text style={{ color: subText, fontSize: 11, fontFamily: 'Poppins_400Regular', marginTop: 2 }}>
+                            Ye do users ke beech ka aapas ka personal block hai. Isme Admin se unblock karne ka koi matter nahi hai.
+                          </Text>
+                        </View>
+                      ) : (
+                        <View style={styles.actionBtnRow}>
+                          {!isUnblocked ? (
+                            <TouchableOpacity
+                              style={styles.unblockBtn}
+                              onPress={() => handleUnblock(report)}
+                              activeOpacity={0.85}
+                            >
+                              <LinearGradient
+                                colors={['#10B981', '#059669']}
+                                start={{ x: 0, y: 0 }}
+                                end={{ x: 1, y: 0 }}
+                                style={styles.unblockBtnGrad}
+                              >
+                                <Ionicons name="lock-open-outline" size={16} color="#FFF" style={{ marginRight: 6 }} />
+                                <Text style={styles.unblockBtnText}>
+                                  🔓 Open Block (Unsuspend User)
+                                </Text>
+                              </LinearGradient>
+                            </TouchableOpacity>
+                          ) : (
+                            <View style={styles.unblockedBanner}>
+                              <Ionicons name="checkmark-circle" size={16} color="#10B981" />
+                              <Text style={styles.unblockedBannerText}>
+                                Block Open Ho Chuka Hai (Active)
+                              </Text>
+                            </View>
+                          )}
 
-                        {isPending && (
-                          <TouchableOpacity
-                            style={[styles.dismissBtn, { borderColor: borderCol }]}
-                            onPress={() => handleDismiss(report)}
-                            activeOpacity={0.8}
-                          >
-                            <Text style={[styles.dismissBtnText, { color: '#EF4444' }]}>
-                              Reject Appeal
-                            </Text>
-                          </TouchableOpacity>
-                        )}
-                      </View>
+                          {isPending && (
+                            <TouchableOpacity
+                              style={[styles.dismissBtn, { borderColor: borderCol }]}
+                              onPress={() => handleDismiss(report)}
+                              activeOpacity={0.8}
+                            >
+                              <Text style={[styles.dismissBtnText, { color: '#EF4444' }]}>
+                                Reject Appeal
+                              </Text>
+                            </TouchableOpacity>
+                          )}
+                        </View>
+                      )}
                     </View>
                   );
                 })

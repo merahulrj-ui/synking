@@ -20,7 +20,8 @@ interface UnlockAppealModalProps {
   userId: string;
   userName?: string;
   userPhone?: string;
-  onSubmitAppeal: (userId: string, appealNote: string) => Promise<boolean>;
+  violationReason?: string;
+  onSubmitAppeal: (userId: string, appealNote: string, violationReason?: string) => Promise<boolean>;
   isDarkMode?: boolean;
 }
 
@@ -30,6 +31,7 @@ export const UnlockAppealModal: React.FC<UnlockAppealModalProps> = ({
   userId,
   userName = 'Member',
   userPhone,
+  violationReason,
   onSubmitAppeal,
   isDarkMode = true,
 }) => {
@@ -50,7 +52,7 @@ export const UnlockAppealModal: React.FC<UnlockAppealModalProps> = ({
 
     setIsSubmitting(true);
     try {
-      const ok = await onSubmitAppeal(userId, appealText.trim());
+      const ok = await onSubmitAppeal(userId, appealText.trim(), violationReason);
       setIsSubmitting(false);
       if (ok) {
         Alert.alert(
@@ -99,7 +101,7 @@ export const UnlockAppealModal: React.FC<UnlockAppealModalProps> = ({
               <View>
                 <Text style={[styles.title, { color: textColor }]}>Request to Unlock Account</Text>
                 <Text style={[styles.subTitle, { color: subText }]}>
-                  Unblock Appeal & Moderation Review
+                  Safety Suspension Appeal to Admin
                 </Text>
               </View>
             </View>
@@ -109,23 +111,26 @@ export const UnlockAppealModal: React.FC<UnlockAppealModalProps> = ({
           </View>
 
           <ScrollView style={styles.body} showsVerticalScrollIndicator={false}>
-            {/* Notice Card */}
+            {/* Notice Card: What you did */}
             <View
               style={[
                 styles.infoCard,
                 {
-                  backgroundColor: isDarkMode ? 'rgba(239, 68, 68, 0.08)' : '#FEF2F2',
-                  borderColor: isDarkMode ? 'rgba(239, 68, 68, 0.3)' : '#FCA5A5',
+                  backgroundColor: isDarkMode ? 'rgba(239, 68, 68, 0.12)' : '#FEF2F2',
+                  borderColor: '#EF4444',
                 },
               ]}
             >
-              <Ionicons name="lock-closed" size={18} color="#EF4444" style={{ marginTop: 2 }} />
+              <Ionicons name="warning-outline" size={20} color="#EF4444" style={{ marginTop: 2 }} />
               <View style={{ flex: 1 }}>
-                <Text style={[styles.infoTitle, { color: textColor }]}>
-                  Account or Contact Restricted
+                <Text style={[styles.infoTitle, { color: '#EF4444' }]}>
+                  AAPNE KYA KIYA (SAFETY VIOLATION):
                 </Text>
-                <Text style={[styles.infoDesc, { color: subText }]}>
-                  Agar aapka profile ya number block ho gaya hai, to aap yahan se apna karan aur clarification bhej sakte hain. Ye direct Admin Dashboard me report banke submit hoga.
+                <Text style={[styles.infoDesc, { color: textColor, fontFamily: 'Poppins_600SemiBold', marginTop: 2 }]}>
+                  {violationReason || 'Chat me Mobile Number ya Instagram / Social ID share karne ki koshish ki.'}
+                </Text>
+                <Text style={[styles.infoDesc, { color: subText, fontSize: 11, marginTop: 4 }]}>
+                  Community safety rules ke tahat account 3 din suspend hua hai. Admin review karke unblock kar sakta hai.
                 </Text>
               </View>
             </View>

@@ -158,6 +158,7 @@ export default function ProfileScreen() {
     loginUser,
     logoutUser,
     deleteAccount,
+    isSuspended,
     blockReports,
     submitUnlockRequest,
     adminUnblockUser,
@@ -517,6 +518,31 @@ export default function ProfileScreen() {
           // 💎 LUXURY PREMIUM DATING PROFILE VIEW (TINDER PLATINUM / RAYA STYLE)
           // =========================================================================
           <View style={styles.contentWrap}>
+            {/* ⚠️ System Suspension Banner (Only visible if account is suspended) */}
+            {isSuspended && (
+              <View style={{ backgroundColor: 'rgba(239, 68, 68, 0.12)', borderWidth: 1, borderColor: '#EF4444', borderRadius: 16, padding: 16, marginBottom: 16, gap: 8 }}>
+                <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
+                  <Ionicons name="lock-closed" size={20} color="#EF4444" />
+                  <Text style={{ color: '#EF4444', fontSize: 14, fontFamily: 'Poppins_700Bold' }}>
+                    Account Suspended for 3 Days (Strike 2/2)
+                  </Text>
+                </View>
+                <Text style={{ color: isDarkMode ? '#FCA5A5' : '#991B1B', fontSize: 12, fontFamily: 'Poppins_400Regular', lineHeight: 17 }}>
+                  Aapka account chat me Phone Number ya Instagram ID share karne ki wajah se temporarily suspend kiya gaya hai.
+                </Text>
+                <TouchableOpacity
+                  style={{ backgroundColor: '#EF4444', paddingVertical: 9, paddingHorizontal: 14, borderRadius: 10, alignSelf: 'flex-start', flexDirection: 'row', alignItems: 'center', gap: 6, marginTop: 4 }}
+                  onPress={() => setAppealModalVisible(true)}
+                  activeOpacity={0.8}
+                >
+                  <Ionicons name="mail" size={14} color="#FFF" />
+                  <Text style={{ color: '#FFF', fontSize: 12, fontFamily: 'Poppins_700Bold' }}>
+                    Appeal to Admin for Unblock ⚖️
+                  </Text>
+                </TouchableOpacity>
+              </View>
+            )}
+
             {/* 1. HERO AVATAR & GLOWING PRECISION RING */}
             <View style={styles.heroSection}>
               {/* Background Ambient Glow */}
@@ -983,28 +1009,6 @@ export default function ProfileScreen() {
                   )}
                   <Feather name="chevron-right" size={16} color={subText} />
                 </View>
-              </TouchableOpacity>
-
-              <View style={[styles.settingDivider, { backgroundColor: borderColor }]} />
-
-              {/* ⚖️ Account Appeal / Request Unlock */}
-              <TouchableOpacity
-                style={styles.settingItem}
-                onPress={() => setAppealModalVisible(true)}
-                activeOpacity={0.7}
-              >
-                <View style={styles.settingItemLeft}>
-                  <View style={[styles.settingIconBox, { backgroundColor: 'rgba(0, 229, 255, 0.15)' }]}>
-                    <Ionicons name="key-outline" size={16} color="#00E5FF" />
-                  </View>
-                  <View>
-                    <Text style={[styles.settingItemTitle, { color: textColor }]}>Account Appeal / Request Unlock</Text>
-                    <Text style={{ fontSize: 10.5, color: subText, fontFamily: 'Poppins_400Regular' }}>
-                      Blocked or restricted? Request admin unblock
-                    </Text>
-                  </View>
-                </View>
-                <Feather name="chevron-right" size={16} color={subText} />
               </TouchableOpacity>
 
               <View style={[styles.settingDivider, { backgroundColor: borderColor }]} />

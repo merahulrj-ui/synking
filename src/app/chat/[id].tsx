@@ -31,6 +31,7 @@ import { LinearGradient } from 'expo-linear-gradient';
 import { useApp } from '../../contexts/AppContext';
 import { WebRTCService } from '../../services/webrtcService';
 import { CallModal } from '../../components/CallModal';
+import { UnlockAppealModal } from '../../components/UnlockAppealModal';
 import { CallSession, ChatMessage, UserProfile } from '../../types';
 import { fetchChatMessagesFromFirestore, getLocalBackendUrl } from '../../services/firebase';
 import { RealtimeBridge } from '../../services/realtimeBridge';
@@ -124,6 +125,7 @@ export default function ChatScreen() {
     isUserBlocked,
     blockUser,
     unblockUser,
+    submitUnlockRequest,
   } = useApp();
 
   const [isOptionsMenuVisible, setIsOptionsMenuVisible] = useState(false);
@@ -133,6 +135,8 @@ export default function ChatScreen() {
   const [isClearChatModalVisible, setIsClearChatModalVisible] = useState(false);
   const [isDeleteSelectedModalVisible, setIsDeleteSelectedModalVisible] = useState(false);
   const [isBlockModalVisible, setIsBlockModalVisible] = useState(false);
+  const [appealModalVisible, setAppealModalVisible] = useState(false);
+  const [appealViolationType, setAppealViolationType] = useState('Contact Sharing Violation (Phone / Instagram ID)');
   const isPartnerBlocked = id ? isUserBlocked(id) : false;
 
   useEffect(() => {
@@ -1607,7 +1611,16 @@ const VOICE_COMPRESSED_CONFIG: any = {
         if (Platform.OS === 'web') {
           window.alert(`${banTitle}\n\n${banMsg}`);
         } else {
-          Alert.alert(banTitle, banMsg, [{ text: 'I Understand' }]);
+          Alert.alert(banTitle, banMsg, [
+            { text: 'I Understand' },
+            {
+              text: 'Appeal to Admin ⚖️',
+              onPress: () => {
+                setAppealViolationType(violationType);
+                setAppealModalVisible(true);
+              },
+            },
+          ]);
         }
       }
       return true;
@@ -2856,16 +2869,38 @@ const VOICE_COMPRESSED_CONFIG: any = {
 
         {/* 6. BOTTOM INPUT BAR (WHATSAPP STYLE RECORDING / SUSPENSION LOCK) */}
         {isSuspended ? (
-          <View style={[styles.inputBar, { backgroundColor: isDarkMode ? '#200D11' : '#FEE2E2', borderTopColor: '#EF4444', paddingVertical: 14, paddingHorizontal: 16, alignItems: 'center', justifyContent: 'center', gap: 4, paddingBottom: isKeyboardOpen ? 14 : Math.max(Platform.OS === 'android' ? 20 : 14, insets.bottom + 6) }]}>
+          <View style={[styles.inputBar, { backgroundColor: isDarkMode ? '#200D11' : '#FEE2E2', borderTopColor: '#EF4444', paddingVertical: 14, paddingHorizontal: 16, alignItems: 'center', justifyContent: 'center', gap: 6, paddingBottom: isKeyboardOpen ? 14 : Math.max(Platform.OS === 'android' ? 20 : 14, insets.bottom + 6) }]}>
             <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
               <Ionicons name="lock-closed" size={18} color="#EF4444" />
-              <Text style={{ color: '#EF4444', fontWeight: '900', fontSize: 13, letterSpacing: 0.3 }}>
+              <Text style={{ color: '#EF4444', fontFamily: 'Poppins_800ExtraBold', fontSize: 13, letterSpacing: 0.3 }}>
                 ACCOUNT BLOCKED FOR 3 DAYS (STRIKE 2/2)
               </Text>
             </View>
-            <Text style={{ color: isDarkMode ? '#FCA5A5' : '#991B1B', fontSize: 11, fontWeight: '600', textAlign: 'center' }}>
+            <Text style={{ color: isDarkMode ? '#FCA5A5' : '#991B1B', fontSize: 11, fontFamily: 'Poppins_600SemiBold', textAlign: 'center' }}>
               Restricted from messaging due to repeated contact sharing violations. Unlocks on {suspendedUntil ? new Date(suspendedUntil).toLocaleDateString() : '3 days'}.
             </Text>
+            <TouchableOpacity
+              style={{
+                backgroundColor: '#EF4444',
+                paddingVertical: 7,
+                paddingHorizontal: 14,
+                borderRadius: 8,
+                flexDirection: 'row',
+                alignItems: 'center',
+                gap: 6,
+                marginTop: 4,
+              }}
+              onPress={() => {
+                setAppealViolationType('Contact Sharing Violation (Phone / Instagram ID)');
+                setAppealModalVisible(true);
+              }}
+              activeOpacity={0.8}
+            >
+              <Ionicons name="mail" size={13} color="#FFF" />
+              <Text style={{ color: '#FFF', fontSize: 11.5, fontFamily: 'Poppins_700Bold' }}>
+                Appeal to Admin ⚖️
+              </Text>
+            </TouchableOpacity>
           </View>
         ) : isRecording ? (
           <View style={[styles.inputBar, { backgroundColor: isDarkMode ? '#1E1218' : '#FFF1F2', borderTopColor: '#FECDD3', paddingHorizontal: 16, paddingBottom: isKeyboardOpen ? 8 : Math.max(Platform.OS === 'android' ? 18 : 10, insets.bottom + 4) }]}>
@@ -3907,6 +3942,18 @@ const VOICE_COMPRESSED_CONFIG: any = {
           )}
         </View>
       </Modal>
+
+      {/* 13. UNLOCK APPEAL MODAL */}
+      <UnlockAppealModal
+        visible={appealModalVisible}
+        onClose={() => setAppealModalVisible(false)}
+        userId={currentUser?.id || 'my_account_id'}
+        userName={currentUser?.name}
+        userPhone={currentUser?.phoneNumber}
+        violationReason={appealViolationType}
+        onSubmitAppeal={submitUnlockRequest}
+        isDarkMode={isDarkMode}
+      />
     </View>
   );
 }
