@@ -61,7 +61,7 @@ export const OTAUpdateBanner: React.FC = () => {
             </View>
           </View>
           <Text style={styles.subText} numberOfLines={1}>
-            {updateInfo?.notes || 'Zomato-speed instant live update ready!'}
+            {updateInfo?.notes || 'Lightning-fast update ready!'}
           </Text>
         </View>
 
