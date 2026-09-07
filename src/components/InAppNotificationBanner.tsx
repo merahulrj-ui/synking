@@ -15,6 +15,9 @@ interface NotificationState {
   senderName: string;
   senderPhoto: string;
   previewText: string;
+  type?: 'message' | 'swipe' | 'match';
+  badgeTitle?: string;
+  badgeColor?: string;
 }
 
 export const InAppNotificationBanner: React.FC = () => {
@@ -38,21 +41,21 @@ export const InAppNotificationBanner: React.FC = () => {
 
   useEffect(() => {
     const unsubscribe = RealtimeBridge.subscribe(async ({ type, payload }) => {
+      function isMe(targetId?: string) {
+        if (!targetId || !currentUser) return false;
+        if (currentUser.id === targetId) return true;
+        const myPhone = (currentUser.phoneNumber || '').replace(/\D/g, '').slice(-10);
+        const tPhone = String(targetId).replace(/\D/g, '').slice(-10);
+        if (myPhone && tPhone && myPhone === tPhone) return true;
+        return false;
+      }
+
       if (type === 'NEW_MESSAGE' && payload) {
         const msg = payload as ChatMessage;
         
         // ⛔ Deduplicate notifications
         if (seenMessageIds.current.has(msg.id)) return;
         seenMessageIds.current.add(msg.id);
-
-        function isMe(targetId?: string) {
-          if (!targetId || !currentUser) return false;
-          if (currentUser.id === targetId) return true;
-          const myPhone = (currentUser.phoneNumber || '').replace(/\D/g, '').slice(-10);
-          const tPhone = String(targetId).replace(/\D/g, '').slice(-10);
-          if (myPhone && tPhone && myPhone === tPhone) return true;
-          return false;
-        }
 
         // Ignore messages sent by ourselves
         if (isMe(msg.senderId)) return;
@@ -107,6 +110,9 @@ export const InAppNotificationBanner: React.FC = () => {
           senderName,
           senderPhoto,
           previewText: readableText,
+          type: 'message',
+          badgeTitle: '💬 New Message',
+          badgeColor: '#00E5FF',
         });
 
         // Slide Down Animation
@@ -121,6 +127,72 @@ export const InAppNotificationBanner: React.FC = () => {
         hideTimerRef.current = setTimeout(() => {
           dismissBanner();
         }, 4500);
+      } else if (type === 'SYNK_REQUEST' && payload) {
+        const req = payload as any;
+        if (!req || !currentUser) return;
+        if (!isMe(req.toUserId)) return;
+        if (isMe(req.fromUser?.id)) return;
+
+        const isSuper = req.type === 'supersynk';
+        const senderName = req.fromUser?.name || 'Someone';
+        const senderPhoto = req.fromUser?.photo || req.fromUser?.photos?.[0] || 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=200';
+        const preview = isSuper ? 'Sent you a SuperSynk! ⚡ Tap to view' : 'Swiped right on your profile! 💖 Tap to view';
+
+        RingtoneService.playMessageChime();
+
+        setNotification({
+          id: req.id || `req_${Date.now()}`,
+          senderId: req.fromUser?.id || '',
+          senderName,
+          senderPhoto,
+          previewText: preview,
+          type: 'swipe',
+          badgeTitle: isSuper ? '⚡ SuperSynk' : '💖 New Like',
+          badgeColor: isSuper ? '#00E5FF' : '#FF2D55',
+        });
+
+        Animated.spring(slideAnim, {
+          toValue: 12,
+          useNativeDriver: true,
+          bounciness: 8,
+        }).start();
+
+        if (hideTimerRef.current) clearTimeout(hideTimerRef.current);
+        hideTimerRef.current = setTimeout(() => {
+          dismissBanner();
+        }, 5000);
+      } else if (type === 'REQUEST_ACCEPTED' && payload) {
+        if (!payload || !currentUser) return;
+        if (!isMe(payload.fromUserId)) return;
+        const acceptedBy = payload.acceptedBy;
+        if (!acceptedBy) return;
+
+        const partnerName = acceptedBy.name || 'Someone';
+        const partnerPhoto = acceptedBy.photo || acceptedBy.photos?.[0] || 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=200';
+
+        RingtoneService.playMessageChime();
+
+        setNotification({
+          id: `match_${Date.now()}`,
+          senderId: acceptedBy.id || '',
+          senderName: partnerName,
+          senderPhoto: partnerPhoto,
+          previewText: "It's a Match! You both liked each other 🎉",
+          type: 'match',
+          badgeTitle: "🎉 It's a Match!",
+          badgeColor: '#10B981',
+        });
+
+        Animated.spring(slideAnim, {
+          toValue: 12,
+          useNativeDriver: true,
+          bounciness: 8,
+        }).start();
+
+        if (hideTimerRef.current) clearTimeout(hideTimerRef.current);
+        hideTimerRef.current = setTimeout(() => {
+          dismissBanner();
+        }, 5000);
       }
     });
 
@@ -139,21 +211,29 @@ export const InAppNotificationBanner: React.FC = () => {
 
   const handlePress = () => {
     if (!notification) return;
-    const targetSenderId = notification.senderId;
+    const { senderId, type } = notification;
     dismissBanner();
 
-    // ⛔ Layer Safety:
-    // 1. If currently inside chat with this exact person, do nothing (already there!)
-    if (activeChatTracker.isChatActive(targetSenderId)) {
+    if (type === 'swipe') {
+      router.push('/(tabs)/matches');
       return;
     }
 
-    // 2. If currently inside ANOTHER chat, replace current screen to prevent stack layering!
+    if (type === 'match') {
+      router.push(`/chat/${senderId}` as any);
+      return;
+    }
+
+    // Default: chat message
+    if (activeChatTracker.isChatActive(senderId)) {
+      return;
+    }
+
     const currentChat = activeChatTracker.getActiveChat();
     if (currentChat) {
-      router.replace(`/chat/${targetSenderId}` as any);
+      router.replace(`/chat/${senderId}` as any);
     } else {
-      router.push(`/chat/${targetSenderId}` as any);
+      router.push(`/chat/${senderId}` as any);
     }
   };
 
@@ -196,7 +276,9 @@ export const InAppNotificationBanner: React.FC = () => {
             <Text style={[styles.senderName, { color: textCol }]} numberOfLines={1}>
               {notification.senderName}
             </Text>
-            <Text style={styles.badgeText}>💬 New Message</Text>
+            <Text style={[styles.badgeText, notification.badgeColor ? { color: notification.badgeColor } : null]}>
+              {notification.badgeTitle || '💬 New Message'}
+            </Text>
           </View>
           <Text style={[styles.previewText, { color: subText }]} numberOfLines={1}>
             {notification.previewText}

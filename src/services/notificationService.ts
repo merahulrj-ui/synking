@@ -95,6 +95,24 @@ class NotificationServiceClass {
           return;
         }
 
+        // Direct tap on Swipe / Like Notification opens matches tab
+        if (callData?.type === 'NEW_SWIPE') {
+          try {
+            const { router } = require('expo-router');
+            router.push('/(tabs)/matches');
+          } catch (e) {}
+          return;
+        }
+
+        // Direct tap on Match Notification opens chat with that match
+        if (callData?.type === 'NEW_MATCH' && callData?.partnerId) {
+          try {
+            const { router } = require('expo-router');
+            router.push(`/chat/${callData.partnerId}`);
+          } catch (e) {}
+          return;
+        }
+
         if (actionId === 'ACCEPT_CALL' || actionId === Notifications.DEFAULT_ACTION_IDENTIFIER) {
           this.dismissCallNotification(callData?.callId);
           try {
@@ -183,6 +201,52 @@ class NotificationServiceClass {
           title: senderName,
           body: messageText,
           data: { senderId, type: 'NEW_MESSAGE' },
+          sound: 'default',
+          priority: Notifications.AndroidNotificationPriority.HIGH,
+          channelId: 'synking_messages',
+        },
+        trigger: null,
+      });
+    } catch (e) {}
+  }
+
+  public async showSwipeNotification(fromName: string, isSuper: boolean, fromUserId: string, photo?: string) {
+    if (Platform.OS === 'web' || !Notifications) return;
+    try {
+      await this.initialize();
+      const title = isSuper ? `⚡ SuperSynk from ${fromName}!` : `💖 New Like from ${fromName}!`;
+      const body = isSuper
+        ? `${fromName} sent you a Super Like on SYNKING! Tap to see them.`
+        : `${fromName} swiped right on your profile! Tap to see your match.`;
+
+      await Notifications.scheduleNotificationAsync({
+        identifier: `swipe_${Date.now()}`,
+        content: {
+          title,
+          body,
+          data: { fromUserId, type: 'NEW_SWIPE' },
+          sound: 'default',
+          priority: Notifications.AndroidNotificationPriority.HIGH,
+          channelId: 'synking_messages',
+        },
+        trigger: null,
+      });
+    } catch (e) {}
+  }
+
+  public async showMatchNotification(partnerName: string, partnerId: string, photo?: string) {
+    if (Platform.OS === 'web' || !Notifications) return;
+    try {
+      await this.initialize();
+      const title = `🎉 It's a Match!`;
+      const body = `You and ${partnerName} liked each other! Tap to send a message.`;
+
+      await Notifications.scheduleNotificationAsync({
+        identifier: `match_${Date.now()}`,
+        content: {
+          title,
+          body,
+          data: { partnerId, type: 'NEW_MATCH' },
           sound: 'default',
           priority: Notifications.AndroidNotificationPriority.HIGH,
           channelId: 'synking_messages',

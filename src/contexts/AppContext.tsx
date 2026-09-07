@@ -851,11 +851,23 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
         }
       } else if (type === 'SYNK_REQUEST' && payload) {
         const req = payload as SynkRequest;
-        if (req.toUserId === currentUser?.id && req.fromUser?.id !== currentUser?.id) {
+        const myId = currentUser?.id;
+        const myPhone = (currentUser?.phoneNumber || '').replace(/\D/g, '').slice(-10);
+        const toPhone = String(req.toUserId || '').replace(/\D/g, '').slice(-10);
+        const isForMe = req.toUserId === myId || (myPhone && toPhone && myPhone === toPhone);
+        const isFromMe = req.fromUser?.id === myId;
+
+        if (isForMe && !isFromMe) {
           setIncomingRequests(prev => {
             if (prev.some(r => r.id === req.id)) return prev;
             return [req, ...prev];
           });
+
+          // 🔔 Trigger local phone tray notification for incoming swipe / like
+          const fromName = req.fromUser?.name || 'Someone';
+          const isSuper = req.type === 'supersynk';
+          const photo = req.fromUser?.photo || req.fromUser?.photos?.[0] || '';
+          NotificationService.showSwipeNotification(fromName, isSuper, req.fromUser?.id || '', photo);
         }
       } else if (type === 'REQUEST_ACCEPTED' && payload) {
         if (payload.fromUserId === currentUser?.id && payload.acceptedBy) {
@@ -873,6 +885,9 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
                 JSON.stringify(Array.from(seenMatchAlerts.current))
               ).catch(() => {});
               setAcceptedMatchAlert(acceptedUser);
+
+              // 🔔 Trigger match celebration push notification
+              NotificationService.showMatchNotification(acceptedUser.name, acceptedUser.id, acceptedUser.photo);
             }
           }
         }
@@ -1198,7 +1213,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
           return [newReq, ...prev];
         });
         
-        RealtimeBridge.broadcast('SYNK_REQUEST', newReq);
+        RealtimeBridge.broadcast('SYNK_REQUEST', newReq, swipedUser.id);
         saveSynkRequestToFirestore(newReq);
 
         return { success: true, requestSent: true, profile: swipedUser };
