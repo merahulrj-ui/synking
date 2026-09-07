@@ -5,7 +5,7 @@ import { RealtimeBridge } from './realtimeBridge';
 import { RingtoneService } from './ringtoneService';
 import { AudioRouteService } from './audioRouteService';
 import { UserProfile, CallSession } from '../types';
-import { PermissionsAndroid, Platform, NativeModules, Alert, AppState, AppStateStatus } from 'react-native';
+import { PermissionsAndroid, Platform, NativeModules, Alert, AppState, AppStateStatus, DeviceEventEmitter } from 'react-native';
 import { MediaDevices, PeerConnection, SessionDescription, IceCandidate } from './webrtcCore';
 import { NotificationService } from './notificationService';
 import { CallDebugger } from './callDebugger';
@@ -178,6 +178,12 @@ class WebRTCManager {
       } else if (type === 'CALL_ENDED' && payload) {
         if (this.currentSession && (!payload.callId || this.currentSession.id === payload.callId)) {
           this.handleCallEnded();
+        }
+      } else if (type === 'CALL_NO_ANSWER' && payload) {
+        if (this.currentSession && (!payload.callId || this.currentSession.id === payload.callId)) {
+          const sessionCopy = { ...this.currentSession, status: 'missed' as const };
+          DeviceEventEmitter.emit('CALL_TIMEOUT_NO_ANSWER', { session: sessionCopy });
+          this.cleanup();
         }
       } else if (type === 'CALL_UPGRADED_TO_VIDEO' && payload) {
         if (this.currentSession && this.currentSession.id === payload.callId) {
@@ -1156,8 +1162,22 @@ class WebRTCManager {
     }
     this.ringingTimeoutTimer = setTimeout(() => {
       if (this.currentSession && (this.currentSession.status === 'calling' || this.currentSession.status === 'ringing')) {
-        this.log(`⏱️ ${seconds}s Call Timeout: No answer received within ${seconds} seconds. Automatically ending call.`);
-        this.endCall();
+        this.log(`⏱️ ${seconds}s Call Timeout: No answer received within ${seconds} seconds. Gracefully terminating.`);
+        const sessionCopy = { ...this.currentSession, status: 'missed' as const };
+        const peerId = this.getPeerUserId();
+        
+        this.currentSession.status = 'missed';
+        this.notify();
+        RingtoneService.stop();
+
+        RealtimeBridge.broadcast('CALL_NO_ANSWER', { callId: sessionCopy.id, callerId: sessionCopy.callerId }, peerId);
+        DeviceEventEmitter.emit('CALL_TIMEOUT_NO_ANSWER', { session: sessionCopy });
+
+        if (this.declineDismissTimer) clearTimeout(this.declineDismissTimer);
+        this.declineDismissTimer = setTimeout(() => {
+          this.declineDismissTimer = null;
+          this.cleanup();
+        }, 1800);
       }
     }, seconds * 1000);
   }

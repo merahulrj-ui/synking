@@ -19,6 +19,7 @@ export interface DiscoveryFilter {
   minAge: number;
   maxAge: number;
   verifiedOnly: boolean;
+  lookingFor?: string; // 'all' or goal key
 }
 
 export const DEFAULT_DISCOVERY_FILTER: DiscoveryFilter = {
@@ -27,6 +28,7 @@ export const DEFAULT_DISCOVERY_FILTER: DiscoveryFilter = {
   minAge: 18,
   maxAge: 50,
   verifiedOnly: false,
+  lookingFor: 'all',
 };
 
 interface Props {
@@ -59,6 +61,19 @@ const AGE_PRESETS = [
   { label: '18 - 50 (All Singles 🌍)', min: 18, max: 50 },
 ];
 
+const LOOKING_FOR_FILTER_OPTIONS = [
+  { label: '🌟 All Goals', value: 'all' },
+  { label: '💘 Long-term partner', value: 'long_term' },
+  { label: '💍 Marriage / Serious', value: 'marriage' },
+  { label: '✨ Deep soulmate', value: 'soulmate' },
+  { label: '☕ Coffee & casual', value: 'coffee_dates' },
+  { label: '✈️ Travel buddy', value: 'travel_buddy' },
+  { label: '🎭 Activity companion', value: 'activity_buddy' },
+  { label: '🤝 New friends', value: 'friends' },
+  { label: '💼 Networking vibes', value: 'networking' },
+  { label: '💭 Going with flow', value: 'figuring_out' },
+];
+
 export const DiscoveryFilterModal: React.FC<Props> = ({
   visible,
   onClose,
@@ -73,6 +88,7 @@ export const DiscoveryFilterModal: React.FC<Props> = ({
   const [minAge, setMinAge] = useState(filter.minAge);
   const [maxAge, setMaxAge] = useState(filter.maxAge);
   const [verifiedOnly, setVerifiedOnly] = useState(filter.verifiedOnly);
+  const [lookingFor, setLookingFor] = useState<string>(filter.lookingFor || 'all');
 
   // Sync state when filter prop changes
   useEffect(() => {
@@ -81,6 +97,7 @@ export const DiscoveryFilterModal: React.FC<Props> = ({
     setMinAge(filter.minAge);
     setMaxAge(filter.maxAge);
     setVerifiedOnly(filter.verifiedOnly);
+    setLookingFor(filter.lookingFor || 'all');
   }, [filter, visible]);
 
   const handleApply = () => {
@@ -93,6 +110,7 @@ export const DiscoveryFilterModal: React.FC<Props> = ({
       minAge,
       maxAge,
       verifiedOnly,
+      lookingFor,
     });
     onClose();
   };
@@ -106,6 +124,7 @@ export const DiscoveryFilterModal: React.FC<Props> = ({
     setMinAge(DEFAULT_DISCOVERY_FILTER.minAge);
     setMaxAge(DEFAULT_DISCOVERY_FILTER.maxAge);
     setVerifiedOnly(DEFAULT_DISCOVERY_FILTER.verifiedOnly);
+    setLookingFor(DEFAULT_DISCOVERY_FILTER.lookingFor || 'all');
     onReset();
   };
 
@@ -320,6 +339,49 @@ export const DiscoveryFilterModal: React.FC<Props> = ({
                   trackColor={{ false: '#334155', true: '#FD3A73' }}
                   thumbColor="#FFFFFF"
                 />
+              </View>
+            </View>
+
+            {/* 5. RELATIONSHIP INTENT / LOOKING FOR */}
+            <View style={[styles.sectionCard, { backgroundColor: cardBg, borderColor: borderCol }]}>
+              <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
+                <Ionicons name="sparkles" size={16} color="#FD3A73" />
+                <Text style={[styles.sectionTitle, { color: textColor }]}>Looking For Intent</Text>
+              </View>
+              <Text style={[styles.sectionHint, { color: subText, marginTop: 4, marginBottom: 12 }]}>
+                Only show matches looking for the same relationship vibe.
+              </Text>
+
+              <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 8 }}>
+                {LOOKING_FOR_FILTER_OPTIONS.map(opt => {
+                  const isSelected = lookingFor === opt.value;
+                  return (
+                    <TouchableOpacity
+                      key={opt.value}
+                      style={{
+                        paddingHorizontal: 12,
+                        paddingVertical: 8,
+                        borderRadius: 14,
+                        backgroundColor: isSelected ? '#FD3A73' : (isDarkMode ? '#13141F' : '#F1F5F9'),
+                        borderWidth: 1,
+                        borderColor: isSelected ? '#FD3A73' : (isDarkMode ? 'rgba(255,255,255,0.1)' : 'rgba(0,0,0,0.08)'),
+                      }}
+                      onPress={() => {
+                        if (Platform.OS !== 'web') Haptics.selectionAsync().catch(() => {});
+                        setLookingFor(opt.value);
+                      }}
+                      activeOpacity={0.8}
+                    >
+                      <Text style={{
+                        fontSize: 12,
+                        color: isSelected ? '#FFFFFF' : textColor,
+                        fontFamily: isSelected ? 'Poppins_700Bold' : 'Poppins_500Medium',
+                      }}>
+                        {opt.label}
+                      </Text>
+                    </TouchableOpacity>
+                  );
+                })}
               </View>
             </View>
 

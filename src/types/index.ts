@@ -48,7 +48,7 @@ export interface EncryptedChatMessageRecord {
   receiverId: string;
   cipherText: string;
   isEncrypted: boolean;
-  type: 'text' | 'date_invite' | 'voice' | 'call' | 'system' | 'call_request';
+  type: 'text' | 'date_invite' | 'voice' | 'call' | 'system' | 'call_request' | 'image';
   extraData?: ChatMessage['extraData'];
   timestamp: string;
 }
@@ -104,7 +104,7 @@ export interface ChatMessage {
   receiverId: string;
   text: string;
   timestamp: string;
-  type: 'text' | 'date_invite' | 'voice' | 'call' | 'system' | 'call_request';
+  type: 'text' | 'date_invite' | 'voice' | 'call' | 'system' | 'call_request' | 'image';
   read?: boolean;
   readAt?: string;
   status?: 'sending' | 'sent' | 'delivered' | 'read';
@@ -120,6 +120,9 @@ export interface ChatMessage {
     status?: 'pending' | 'approved' | 'declined' | string;
     audioUrl?: string;
     audioDuration?: number;
+    imageUrl?: string;
+    imageWidth?: number;
+    imageHeight?: number;
     reaction?: string;
     requestedBy?: string;
     requestedByName?: string;

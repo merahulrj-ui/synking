@@ -1,5 +1,5 @@
 import React from 'react';
-import { View, Text, StyleSheet, TouchableOpacity, Share, ScrollView } from 'react-native';
+import { View, Text, StyleSheet, TouchableOpacity, Share, ScrollView, Linking, Alert, Platform } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
@@ -9,7 +9,7 @@ import { GradientButton } from '../../components/GradientButton';
 export default function DatePassScreen() {
   const { bookingId } = useLocalSearchParams<{ bookingId: string }>();
   const router = useRouter();
-  const { activeBookings, isDarkMode } = useApp();
+  const { activeBookings, cancelBooking, isDarkMode } = useApp();
 
   const booking = activeBookings.find(b => b.id === bookingId) || activeBookings[0];
 
@@ -28,6 +28,8 @@ export default function DatePassScreen() {
     );
   }
 
+  const isCancelled = booking.status === 'cancelled';
+
   const handleShareDate = async () => {
     try {
       const message = `✨ SYNKING Date Details:\n\nHey! I'm meeting ${booking.userName} for a date planned on SYNKING.\n📍 Venue: ${booking.venue.name} (${booking.venue.address})\n⏰ Time: ${booking.dateTime}\n🎟️ Pass: ${booking.qrCode}\n🛡️ (Verified Safe Partner)`;
@@ -35,6 +37,37 @@ export default function DatePassScreen() {
     } catch (e) {
       console.warn('Share error:', e);
     }
+  };
+
+  const handleOpenMaps = () => {
+    const query = encodeURIComponent(`${booking.venue.name}, ${booking.venue.address}`);
+    const mapUrl = Platform.select({
+      ios: `maps:0,0?q=${query}`,
+      android: `geo:0,0?q=${query}`,
+      default: `https://www.google.com/maps/search/?api=1&query=${query}`,
+    });
+    Linking.openURL(mapUrl).catch(() => {
+      Linking.openURL(`https://www.google.com/maps/search/?api=1&query=${query}`).catch(() => {});
+    });
+  };
+
+  const handleCancelReservation = () => {
+    Alert.alert(
+      'Cancel Date Reservation?',
+      `Are you sure you want to cancel your date with ${booking.userName} at ${booking.venue.name}?`,
+      [
+        { text: 'Keep Date', style: 'cancel' },
+        {
+          text: 'Cancel Reservation',
+          style: 'destructive',
+          onPress: async () => {
+            await cancelBooking(booking.id);
+            Alert.alert('Reservation Cancelled', 'Your date pass has been cancelled.');
+            router.back();
+          },
+        },
+      ]
+    );
   };
 
   const handleClose = () => {
@@ -62,9 +95,11 @@ export default function DatePassScreen() {
       </View>
 
       <ScrollView style={styles.container} showsVerticalScrollIndicator={false}>
-        <View style={[styles.passCard, { backgroundColor: cardBg, borderColor: borderCol }]}>
-          <Text style={styles.passEmoji}>🎟️</Text>
-          <Text style={styles.passStatus}>PROTECTED & CONFIRMED</Text>
+        <View style={[styles.passCard, { backgroundColor: cardBg, borderColor: isCancelled ? '#EF4444' : borderCol }]}>
+          <Text style={styles.passEmoji}>{isCancelled ? '❌' : '🎟️'}</Text>
+          <Text style={[styles.passStatus, isCancelled && { color: '#EF4444' }]}>
+            {isCancelled ? 'RESERVATION CANCELLED' : 'PROTECTED & CONFIRMED'}
+          </Text>
 
           <View style={styles.ticketDetails}>
             <View style={styles.detailRow}>
@@ -101,13 +136,17 @@ export default function DatePassScreen() {
               </Text>
             </View>
 
-            {/* QR Pass Box */}
-            <View style={[styles.qrContainer, { backgroundColor: isDarkMode ? '#1A1B28' : '#F1F5F9', borderColor: borderCol }]}>
-              <View style={styles.qrBox}>
-                <Text style={styles.qrCodeText}>{booking.qrCode}</Text>
+            {/* QR Pass Box (Pure OLED Black) */}
+            <View style={[styles.qrContainer, { backgroundColor: isDarkMode ? '#000000' : '#F1F5F9', borderColor: isCancelled ? '#EF4444' : borderCol }]}>
+              <View style={[styles.qrBox, isCancelled && { opacity: 0.4 }]}>
+                <Text style={[styles.qrCodeText, isCancelled && { color: '#94A3B8', textDecorationLine: 'line-through' }]}>
+                  {booking.qrCode}
+                </Text>
               </View>
               <Text style={[styles.qrHelpText, { color: subText }]}>
-                Show this pass at venue counter for table & dessert perk.
+                {isCancelled
+                  ? 'This pass has been cancelled and is no longer valid at venue counter.'
+                  : 'Show this pass at venue counter for table & dessert perk.'}
               </Text>
             </View>
           </View>
@@ -115,10 +154,22 @@ export default function DatePassScreen() {
 
         {/* Action Buttons */}
         <View style={styles.btnStack}>
-          <GradientButton
-            title="Share Date Details 📤"
-            onPress={handleShareDate}
-          />
+          {/* 1. Google Maps Navigation */}
+          <TouchableOpacity
+            style={[styles.mapBtn, { backgroundColor: isDarkMode ? '#000000' : '#FFFFFF', borderColor: '#00E5FF' }]}
+            onPress={handleOpenMaps}
+            activeOpacity={0.8}
+          >
+            <Ionicons name="map-outline" size={18} color="#00E5FF" />
+            <Text style={[styles.mapBtnText, { color: '#00E5FF' }]}>Get Directions in Google Maps 🗺️</Text>
+          </TouchableOpacity>
+
+          {!isCancelled && (
+            <GradientButton
+              title="Share Date Details 📤"
+              onPress={handleShareDate}
+            />
+          )}
 
           <TouchableOpacity
             style={[styles.feedbackBtn, { backgroundColor: cardBg, borderColor: borderCol }]}
@@ -128,6 +179,17 @@ export default function DatePassScreen() {
             <Ionicons name="chatbox-ellipses-outline" size={16} color="#FD3A73" />
             <Text style={[styles.feedbackBtnText, { color: textColor }]}>Leave Post-Date Feedback ⭐</Text>
           </TouchableOpacity>
+
+          {!isCancelled && (
+            <TouchableOpacity
+              style={styles.cancelBtn}
+              onPress={handleCancelReservation}
+              activeOpacity={0.7}
+            >
+              <Ionicons name="close-circle-outline" size={16} color="#EF4444" />
+              <Text style={styles.cancelBtnText}>Cancel Date Reservation</Text>
+            </TouchableOpacity>
+          )}
         </View>
       </ScrollView>
     </SafeAreaView>
@@ -243,5 +305,35 @@ const styles = StyleSheet.create({
   feedbackBtnText: {
     fontSize: 13,
     fontFamily: 'Poppins_800ExtraBold',
+  },
+  mapBtn: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 8,
+    paddingVertical: 14,
+    borderRadius: 16,
+    borderWidth: 1.5,
+  },
+  mapBtnText: {
+    fontSize: 13,
+    fontFamily: 'Poppins_800ExtraBold',
+  },
+  cancelBtn: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 6,
+    paddingVertical: 12,
+    borderRadius: 14,
+    backgroundColor: 'rgba(239, 68, 68, 0.12)',
+    borderWidth: 1,
+    borderColor: 'rgba(239, 68, 68, 0.3)',
+    marginTop: 4,
+  },
+  cancelBtnText: {
+    color: '#EF4444',
+    fontSize: 12.5,
+    fontFamily: 'Poppins_700Bold',
   },
 });

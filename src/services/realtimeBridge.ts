@@ -148,7 +148,9 @@ class RealtimeBridgeManager {
       | 'MESSAGE_DELIVERED'
       | 'USER_BLOCKED'
       | 'USER_UNBLOCKED'
-      | 'DATE_BOOKED',
+      | 'DATE_BOOKED'
+      | 'DATE_CANCELLED'
+      | 'CALL_NO_ANSWER',
     payload: any,
     targetUserId?: string
   ) {

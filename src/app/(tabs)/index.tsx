@@ -79,7 +79,8 @@ export default function DiscoverScreen() {
       discoveryFilter.gender !== 'all' ||
       discoveryFilter.minAge > 18 ||
       discoveryFilter.maxAge < 50 ||
-      discoveryFilter.verifiedOnly === true
+      discoveryFilter.verifiedOnly === true ||
+      (Boolean(discoveryFilter.lookingFor) && discoveryFilter.lookingFor !== 'all')
     );
   }, [discoveryFilter]);
 
@@ -93,10 +94,10 @@ export default function DiscoverScreen() {
   }, [currentUser?.location]);
 
   // Filter & Proximity Sort (Closest profiles appear first in Discover feed)
-  // 1. Own profile (by ID)
-  // 2. Already matched users (by ID)
-  // 3. Already liked users with active pending sent request (by ID)
-  // 4. Profiles passed during this session (by ID)
+  // 1. Not self
+  // 2. Not already matched (connected in InSynk)
+  // 3. Not already sent pending request to
+  // 4. Not passed in this session
   // 5. Gender & Age & Verified & Distance preferences
   const availableProfiles = useMemo(() => {
     const filtered = profiles.filter(p => {
@@ -122,6 +123,25 @@ export default function DiscoverScreen() {
 
       // Filter by Verified Badge
       if (discoveryFilter.verifiedOnly && !p.isVerified) return false;
+
+      // Filter by Relationship Intent / Looking For
+      if (discoveryFilter.lookingFor && discoveryFilter.lookingFor !== 'all') {
+        const goalKey = discoveryFilter.lookingFor.toLowerCase();
+        const pGoal = (p.lookingFor || '').toLowerCase();
+        if (pGoal) {
+          const matches =
+            (goalKey === 'long_term' && (pGoal.includes('long-term') || pGoal.includes('partner'))) ||
+            (goalKey === 'marriage' && (pGoal.includes('marriage') || pGoal.includes('serious'))) ||
+            (goalKey === 'soulmate' && (pGoal.includes('soulmate') || pGoal.includes('deep'))) ||
+            (goalKey === 'coffee_dates' && (pGoal.includes('coffee') || pGoal.includes('casual'))) ||
+            (goalKey === 'travel_buddy' && (pGoal.includes('travel') || pGoal.includes('adventure'))) ||
+            (goalKey === 'activity_buddy' && (pGoal.includes('activity') || pGoal.includes('companion'))) ||
+            (goalKey === 'friends' && (pGoal.includes('friend') || pGoal.includes('hangout'))) ||
+            (goalKey === 'networking' && (pGoal.includes('network') || pGoal.includes('creative'))) ||
+            (goalKey === 'figuring_out' && (pGoal.includes('figuring') || pGoal.includes('flow')));
+          if (!matches && !pGoal.includes(goalKey)) return false;
+        }
+      }
 
       return true;
     });

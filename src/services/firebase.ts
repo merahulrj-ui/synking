@@ -42,7 +42,7 @@ export interface EncryptedChatMessageRecord {
   receiverId: string;
   cipherText: string;
   isEncrypted: boolean;
-  type: 'text' | 'date_invite' | 'voice' | 'call' | 'system' | 'call_request';
+  type: 'text' | 'date_invite' | 'voice' | 'call' | 'system' | 'call_request' | 'image';
   extraData?: any;
   timestamp: string;
 }

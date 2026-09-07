@@ -37,6 +37,7 @@ import { RealtimeBridge } from '../../services/realtimeBridge';
 
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { decryptE2EEMessage } from '../../utils/encryption';
+import * as ImagePicker from 'expo-image-picker';
 
 function formatWhatsAppTime(timestamp?: string): string {
   if (!timestamp) return '';
@@ -307,6 +308,53 @@ export default function ChatScreen() {
     };
     loadSuspension();
   }, []);
+
+  // 📸 Chat Photo Attachment & Image Viewer State
+  const [isPhotoPickerOpen, setIsPhotoPickerOpen] = useState<boolean>(false);
+  const [fullScreenImageUri, setFullScreenImageUri] = useState<string | null>(null);
+
+  const handlePickChatImage = async (useCamera: boolean = false) => {
+    setIsPhotoPickerOpen(false);
+    try {
+      if (Platform.OS !== 'web') {
+        const perm = useCamera
+          ? await ImagePicker.requestCameraPermissionsAsync()
+          : await ImagePicker.requestMediaLibraryPermissionsAsync();
+        if (perm.status !== 'granted') {
+          Alert.alert('Permission Required', `Please allow access to your ${useCamera ? 'camera' : 'photos'} to share images.`);
+          return;
+        }
+      }
+
+      const options: ImagePicker.ImagePickerOptions = {
+        mediaTypes: ['images'],
+        allowsEditing: true,
+        quality: 0.6,
+        base64: true,
+      };
+
+      const result = useCamera
+        ? await ImagePicker.launchCameraAsync(options)
+        : await ImagePicker.launchImageLibraryAsync(options);
+
+      if (!result.canceled && result.assets?.[0]) {
+        const asset = result.assets[0];
+        const imagePayload = asset.base64 ? `data:image/jpeg;base64,${asset.base64}` : asset.uri;
+        if (id) {
+          sendMessage(id, '📷 Photo', 'image', {
+            imageUrl: imagePayload,
+            imageWidth: asset.width,
+            imageHeight: asset.height,
+          });
+          if (Platform.OS !== 'web') {
+            Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success).catch(() => {});
+          }
+        }
+      }
+    } catch (err: any) {
+      console.warn('Image picker error:', err);
+    }
+  };
 
   // ⏱️ 15-Minute Calling Window State & Persistence
   const [callWindowActiveUntil, setCallWindowActiveUntil] = useState<number | null>(null);
@@ -2132,7 +2180,7 @@ const VOICE_COMPRESSED_CONFIG: any = {
             const isFromPartner = id ? isSameUser(item.senderId, id) : false;
             const isMine = !isFromPartner;
             const isCallRequestMsg = item.type === 'call_request' || (typeof item.text === 'string' && item.text.includes('[Call Request'));
-            const isCallLog = !isCallRequestMsg && (item.text.startsWith('📞') || item.text.startsWith('📹'));
+            const isCallLog = !isCallRequestMsg && (item.type === 'call' || item.text.startsWith('📞') || item.text.startsWith('📹'));
 
             if (item.type === 'date_invite') {
               return (
@@ -2513,6 +2561,96 @@ const VOICE_COMPRESSED_CONFIG: any = {
               );
             }
 
+            // Image Message Bubble (Tappable Full-Screen Preview)
+            if (item.type === 'image' || item.extraData?.imageUrl) {
+              const imageUri = item.extraData?.imageUrl || (item.text.startsWith('data:image') ? item.text : null);
+              const isSelected = selectedMessageIds.has(item.id);
+
+              return (
+                <View
+                  key={item.id}
+                  style={[
+                    {
+                      flexDirection: isMine ? 'row-reverse' : 'row',
+                      alignItems: 'center',
+                      marginVertical: 4,
+                      paddingHorizontal: 6,
+                      borderRadius: 16,
+                    },
+                    isSelected && { backgroundColor: 'rgba(253, 58, 115, 0.15)' },
+                  ]}
+                >
+                  {isSelectionMode && (
+                    <TouchableOpacity
+                      onPress={() => toggleSelectMessage(item.id)}
+                      style={{ paddingHorizontal: 6 }}
+                      hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
+                    >
+                      <Ionicons
+                        name={isSelected ? 'checkmark-circle' : 'ellipse-outline'}
+                        size={22}
+                        color={isSelected ? '#FD3A73' : subText}
+                      />
+                    </TouchableOpacity>
+                  )}
+                  <TouchableOpacity
+                    activeOpacity={0.9}
+                    onPress={() => {
+                      if (isSelectionMode) {
+                        toggleSelectMessage(item.id);
+                      } else if (imageUri) {
+                        setFullScreenImageUri(imageUri);
+                      }
+                    }}
+                    onLongPress={() => {
+                      if (Platform.OS !== 'web') {
+                        const Haptics = require('expo-haptics');
+                        Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium).catch(() => {});
+                      }
+                      if (isSelectionMode) {
+                        toggleSelectMessage(item.id);
+                      } else {
+                        setSelectedMsgForAction(item);
+                      }
+                    }}
+                    style={[
+                      styles.imageBubble,
+                      isMine ? styles.myImageBubble : styles.theirImageBubble,
+                      { borderColor: isMine ? '#FD3A73' : (isDarkMode ? 'rgba(255, 255, 255, 0.14)' : 'rgba(0, 0, 0, 0.08)') },
+                    ]}
+                  >
+                    {imageUri ? (
+                      <Image
+                        source={{ uri: imageUri }}
+                        style={styles.chatMediaImage}
+                        resizeMode="cover"
+                      />
+                    ) : (
+                      <View style={styles.imagePlaceholder}>
+                        <Ionicons name="image-outline" size={32} color={subText} />
+                        <Text style={{ color: subText, fontSize: 11, fontFamily: 'Poppins_600SemiBold' }}>Photo</Text>
+                      </View>
+                    )}
+
+                    <View style={styles.imageMetaOverlay}>
+                      <Text style={styles.imageTimestamp}>
+                        {formatWhatsAppTime(item.timestamp)}
+                      </Text>
+                      {isMine && (
+                        (item.status === 'read' || item.read) ? (
+                          <Ionicons name="checkmark-done" size={13} color="#00E5FF" style={{ marginLeft: 2 }} />
+                        ) : (item.status === 'delivered' || (item.status !== 'sending' && item.timestamp !== 'Just now')) ? (
+                          <Ionicons name="checkmark-done" size={13} color="rgba(255, 255, 255, 0.75)" style={{ marginLeft: 2 }} />
+                        ) : (
+                          <Ionicons name="checkmark" size={13} color="rgba(255, 255, 255, 0.65)" style={{ marginLeft: 2 }} />
+                        )
+                      )}
+                    </View>
+                  </TouchableOpacity>
+                </View>
+              );
+            }
+
             const isSelected = selectedMessageIds.has(item.id);
 
             return (
@@ -2824,6 +2962,15 @@ const VOICE_COMPRESSED_CONFIG: any = {
                   activeOpacity={0.7}
                 >
                   <Ionicons name="calendar-outline" size={22} color="#FD3A73" />
+                </TouchableOpacity>
+
+                {/* Camera / Photo Attachment Icon */}
+                <TouchableOpacity
+                  style={styles.actionIconBtn}
+                  onPress={() => setIsPhotoPickerOpen(true)}
+                  activeOpacity={0.7}
+                >
+                  <Ionicons name="camera-outline" size={22} color="#00E5FF" />
                 </TouchableOpacity>
 
                 {/* Emoji Drawer Toggle Button */}
@@ -3580,6 +3727,140 @@ const VOICE_COMPRESSED_CONFIG: any = {
           </View>
         </TouchableOpacity>
       </Modal>
+
+      {/* 11. PHOTO PICKER ACTION MODAL */}
+      <Modal
+        visible={isPhotoPickerOpen}
+        transparent
+        animationType="fade"
+        onRequestClose={() => setIsPhotoPickerOpen(false)}
+      >
+        <TouchableOpacity
+          style={{
+            flex: 1,
+            backgroundColor: 'rgba(0, 0, 0, 0.7)',
+            justifyContent: 'flex-end',
+            alignItems: 'center',
+          }}
+          activeOpacity={1}
+          onPress={() => setIsPhotoPickerOpen(false)}
+        >
+          <View
+            style={{
+              width: '100%',
+              backgroundColor: isDarkMode ? '#13141F' : '#FFFFFF',
+              borderTopLeftRadius: 24,
+              borderTopRightRadius: 24,
+              paddingVertical: 20,
+              paddingHorizontal: 20,
+              gap: 12,
+              borderTopWidth: 1,
+              borderTopColor: isDarkMode ? 'rgba(255, 255, 255, 0.1)' : 'rgba(0, 0, 0, 0.08)',
+              paddingBottom: Math.max(insets.bottom + 12, 24),
+            }}
+          >
+            <View style={{ alignItems: 'center', marginBottom: 4 }}>
+              <View style={{ width: 40, height: 4, borderRadius: 2, backgroundColor: isDarkMode ? 'rgba(255,255,255,0.2)' : '#CBD5E1' }} />
+              <Text style={{ fontSize: 16, fontFamily: 'Poppins_700Bold', color: textColor, marginTop: 12 }}>
+                Share Photo 📸
+              </Text>
+            </View>
+
+            <TouchableOpacity
+              style={{
+                flexDirection: 'row',
+                alignItems: 'center',
+                gap: 12,
+                paddingVertical: 14,
+                paddingHorizontal: 16,
+                borderRadius: 16,
+                backgroundColor: isDarkMode ? 'rgba(0, 229, 255, 0.12)' : '#E0F2FE',
+                borderWidth: 1,
+                borderColor: 'rgba(0, 229, 255, 0.3)',
+              }}
+              onPress={() => handlePickChatImage(true)}
+              activeOpacity={0.8}
+            >
+              <Ionicons name="camera" size={22} color="#00E5FF" />
+              <Text style={{ fontSize: 14, fontFamily: 'Poppins_700Bold', color: textColor }}>
+                Take Photo with Camera
+              </Text>
+            </TouchableOpacity>
+
+            <TouchableOpacity
+              style={{
+                flexDirection: 'row',
+                alignItems: 'center',
+                gap: 12,
+                paddingVertical: 14,
+                paddingHorizontal: 16,
+                borderRadius: 16,
+                backgroundColor: isDarkMode ? 'rgba(253, 58, 115, 0.12)' : '#FFE4E6',
+                borderWidth: 1,
+                borderColor: 'rgba(253, 58, 115, 0.3)',
+              }}
+              onPress={() => handlePickChatImage(false)}
+              activeOpacity={0.8}
+            >
+              <Ionicons name="images" size={22} color="#FD3A73" />
+              <Text style={{ fontSize: 14, fontFamily: 'Poppins_700Bold', color: textColor }}>
+                Choose from Photos Gallery
+              </Text>
+            </TouchableOpacity>
+
+            <TouchableOpacity
+              style={{
+                paddingVertical: 12,
+                borderRadius: 14,
+                alignItems: 'center',
+                marginTop: 4,
+              }}
+              onPress={() => setIsPhotoPickerOpen(false)}
+            >
+              <Text style={{ color: subText, fontFamily: 'Poppins_600SemiBold', fontSize: 14 }}>
+                Cancel
+              </Text>
+            </TouchableOpacity>
+          </View>
+        </TouchableOpacity>
+      </Modal>
+
+      {/* 12. FULL SCREEN IMAGE VIEWER MODAL */}
+      <Modal
+        visible={!!fullScreenImageUri}
+        transparent
+        animationType="fade"
+        onRequestClose={() => setFullScreenImageUri(null)}
+      >
+        <View style={{ flex: 1, backgroundColor: '#000000', justifyContent: 'center', alignItems: 'center' }}>
+          <TouchableOpacity
+            style={{
+              position: 'absolute',
+              top: Math.max(insets.top, 20),
+              right: 20,
+              zIndex: 10,
+              backgroundColor: 'rgba(255, 255, 255, 0.2)',
+              width: 40,
+              height: 40,
+              borderRadius: 20,
+              alignItems: 'center',
+              justifyContent: 'center',
+            }}
+            onPress={() => setFullScreenImageUri(null)}
+            activeOpacity={0.8}
+          >
+            <Ionicons name="close" size={24} color="#FFFFFF" />
+          </TouchableOpacity>
+
+          {fullScreenImageUri && (
+            <Image
+              source={{ uri: fullScreenImageUri }}
+              style={{ width: '100%', height: '80%' }}
+              resizeMode="contain"
+            />
+          )}
+        </View>
+      </Modal>
     </View>
   );
 }
@@ -4142,6 +4423,49 @@ const styles = StyleSheet.create({
     fontFamily: 'Poppins_700Bold',
     fontSize: 13,
     color: '#10B981',
+  },
+  imageBubble: {
+    borderRadius: 18,
+    borderWidth: 1.5,
+    overflow: 'hidden',
+    maxWidth: 260,
+  },
+  myImageBubble: {
+    alignSelf: 'flex-end',
+    backgroundColor: '#FD3A73',
+  },
+  theirImageBubble: {
+    alignSelf: 'flex-start',
+    backgroundColor: '#1E293B',
+  },
+  chatMediaImage: {
+    width: 240,
+    height: 240,
+    borderRadius: 16,
+  },
+  imagePlaceholder: {
+    width: 240,
+    height: 180,
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 6,
+  },
+  imageMetaOverlay: {
+    position: 'absolute',
+    bottom: 6,
+    right: 8,
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: 'rgba(0, 0, 0, 0.65)',
+    paddingHorizontal: 8,
+    paddingVertical: 3,
+    borderRadius: 10,
+    gap: 4,
+  },
+  imageTimestamp: {
+    fontSize: 10,
+    fontFamily: 'Poppins_600SemiBold',
+    color: '#FFFFFF',
   },
 });
 

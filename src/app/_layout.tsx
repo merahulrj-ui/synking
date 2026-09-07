@@ -473,6 +473,27 @@ function GlobalCallOverlay() {
     };
   }, []);
 
+  React.useEffect(() => {
+    const sub = DeviceEventEmitter.addListener('CALL_TIMEOUT_NO_ANSWER', ({ session }) => {
+      if (!session || !currentUser) return;
+      const targetId = session.callerId === currentUser.id ? session.receiverId : session.callerId;
+      if (targetId) {
+        const isVideo = session.type === 'video' || session.isVideoEnabled;
+        const isCaller = session.callerId === currentUser.id;
+        const msgText = isVideo ? '📹 Missed Video Call' : '📞 Missed Call';
+        sendMessage(targetId, msgText, 'call', {
+          callType: isVideo ? 'video' : 'audio',
+          callDuration: '00:00',
+          callStatus: 'missed',
+        });
+        if (isCaller && Platform.OS !== 'web') {
+          Alert.alert('No Answer', `${session.callerName || 'User'} is currently unavailable.`);
+        }
+      }
+    });
+    return () => sub.remove();
+  }, [currentUser]);
+
   if (!activeCall) return null;
 
   const handleEndCall = () => {
@@ -494,7 +515,11 @@ function GlobalCallOverlay() {
           session.type === 'video'
             ? `📹 Video Call · ${durText}`
             : `📞 Voice Call · ${durText}`;
-        sendMessage(targetId, callLogText, 'text');
+        sendMessage(targetId, callLogText, 'call', {
+          callType: session.type === 'video' ? 'video' : 'audio',
+          callDuration: durText,
+          callStatus: isConnected ? 'completed' : session.status === 'rejected' ? 'declined' : 'missed',
+        });
       }
     }
     // Always notify native TelecomModule to end call & finish lockscreen task if needed

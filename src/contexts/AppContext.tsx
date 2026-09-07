@@ -49,6 +49,7 @@ interface AppContextType {
   wishlistVenueIds: Set<string>;
   toggleVenueWishlist: (venueId: string) => void;
   activeBookings: DateBooking[];
+  cancelBooking: (bookingId: string) => Promise<void>;
   messages: Record<string, ChatMessage[]>;
   unreadChatIds: Set<string>;
   markChatAsRead: (partnerId: string) => void;
@@ -69,7 +70,7 @@ interface AppContextType {
   declineRequest: (requestId: string) => void;
   deleteSentRequest: (requestId: string) => void;
   bookDate: (params: { targetUser: UserProfile; venue: Venue; dateTime: string; splitType: 'split_50_50' | 'i_treat' | 'they_treat' }) => DateBooking;
-  sendMessage: (receiverId: string, text: string, type?: 'text' | 'voice' | 'call_request' | 'date_invite', extraData?: ChatMessage['extraData']) => void;
+  sendMessage: (receiverId: string, text: string, type?: 'text' | 'voice' | 'call_request' | 'date_invite' | 'image' | 'call' | 'system', extraData?: ChatMessage['extraData']) => void;
   deleteMessage: (partnerId: string, messageId: string, deleteForEveryone?: boolean) => void;
   clearChat: (partnerId: string, deleteForEveryone?: boolean) => void;
   deleteMultipleMessages: (partnerId: string, messageIds: string[], deleteForEveryone?: boolean) => void;
@@ -926,6 +927,12 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
           const dateTime = booking.dateTime || 'Upcoming Date';
           NotificationService.showDateBookingNotification(fromName, venueName, dateTime, booking.id);
         }
+      } else if (type === 'DATE_CANCELLED' && payload?.bookingId) {
+        setActiveBookings(prev => {
+          const updated = prev.map(b => b.id === payload.bookingId ? { ...b, status: 'cancelled' as const } : b);
+          AsyncStorage.setItem('@synking_active_bookings', JSON.stringify(updated)).catch(() => {});
+          return updated;
+        });
       } else if (type === 'INCOMING_CALL' && payload) {
         if (payload.receiverId === currentUser?.id && payload.callerUser) {
           const currentSession = WebRTCService.getCurrentSession();
@@ -1398,8 +1405,22 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     return newBooking;
   };
 
+  const cancelBooking = useCallback(async (bookingId: string) => {
+    setActiveBookings(prev => {
+      const updated = prev.map(b => b.id === bookingId ? { ...b, status: 'cancelled' as const } : b);
+      AsyncStorage.setItem('@synking_active_bookings', JSON.stringify(updated)).catch(() => {});
+      return updated;
+    });
+    RealtimeBridge.broadcast('DATE_CANCELLED', { bookingId });
+  }, []);
+
   // Send Message: Instant 0ms Broadcast + Fast Firestore Stream
-  const sendMessage = async (receiverId: string, text: string, type: 'text' | 'voice' | 'call_request' | 'date_invite' = 'text', extraData?: ChatMessage['extraData']) => {
+  const sendMessage = async (
+    receiverId: string, 
+    text: string, 
+    type: 'text' | 'voice' | 'call_request' | 'date_invite' | 'image' | 'call' | 'system' = 'text', 
+    extraData?: ChatMessage['extraData']
+  ) => {
     if (blockedUsers.has(receiverId) || blockedUsers.has(String(receiverId).replace(/\D/g, '').slice(-10))) {
       if (Platform.OS === 'web') {
         window.alert('🚫 Contact Blocked\nYou have blocked this contact. Unblock them to send messages.');
@@ -1671,6 +1692,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
         wishlistVenueIds,
         toggleVenueWishlist,
         activeBookings,
+        cancelBooking,
         messages,
         unreadChatIds,
         markChatAsRead,
