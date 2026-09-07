@@ -25,6 +25,7 @@ export const CreateProfileModal: React.FC<Props> = ({ visible, onClose }) => {
   const [city, setCity] = useState('Roorkee');
   const [occupation, setOccupation] = useState('');
   const [bio, setBio] = useState('');
+  const [phone, setPhone] = useState('');
   const [selectedPhoto, setSelectedPhoto] = useState(AVATAR_OPTIONS[0]);
 
   const cardBg = isDarkMode ? '#000000' : '#FFFFFF';
@@ -41,6 +42,9 @@ export const CreateProfileModal: React.FC<Props> = ({ visible, onClose }) => {
 
     const generateHashId = () => Array.from({length: 16}, () => Math.floor(Math.random() * 16).toString(16)).join('');
     const newId = `usr_${generateHashId()}`;
+    const cleanPhoneDigits = phone.replace(/\D/g, '').slice(-10);
+    const formattedPhone = cleanPhoneDigits.length === 10 ? `+91 ${cleanPhoneDigits}` : '';
+
     const newProfile = {
       id: newId,
       name: name.trim(),
@@ -48,7 +52,7 @@ export const CreateProfileModal: React.FC<Props> = ({ visible, onClose }) => {
       gender,
       occupation: occupation.trim() || 'Member',
       location: city.trim() || 'Roorkee',
-      phoneNumber: currentUser?.phoneNumber || '',
+      phoneNumber: formattedPhone,
       distance: '0 km',
       bio: bio.trim() || `Exploring cafes & dates in ${city || 'Roorkee'} ✨`,
       photo: selectedPhoto,
@@ -124,6 +128,21 @@ export const CreateProfileModal: React.FC<Props> = ({ visible, onClose }) => {
               placeholder="Enter your name"
               placeholderTextColor={subText}
             />
+
+            {/* Mobile Number Input */}
+            <Text style={[styles.fieldLabel, { color: subText }]}>Mobile Number (10 Digits)</Text>
+            <View style={[styles.phoneInputRow, { backgroundColor: inputBg, borderColor: borderCol }]}>
+              <Text style={[styles.countryCode, { color: textColor }]}>🇮🇳 +91</Text>
+              <TextInput
+                style={[styles.phoneInput, { color: textColor }]}
+                value={phone}
+                onChangeText={setPhone}
+                placeholder="98765 00000"
+                placeholderTextColor={subText}
+                keyboardType="phone-pad"
+                maxLength={10}
+              />
+            </View>
 
             {/* City & Age Row */}
             <View style={{ flexDirection: 'row', gap: 10 }}>
@@ -297,6 +316,25 @@ const styles = StyleSheet.create({
     paddingHorizontal: 14,
     paddingVertical: 10,
     fontSize: 14,
+  },
+  phoneInputRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    borderWidth: 1,
+    borderRadius: 14,
+    paddingHorizontal: 14,
+    height: 46,
+  },
+  countryCode: {
+    fontFamily: 'Poppins_700Bold',
+    fontSize: 14,
+    marginRight: 8,
+  },
+  phoneInput: {
+    flex: 1,
+    fontFamily: 'Poppins_500Medium',
+    fontSize: 14,
+    padding: 0,
   },
   genderRow: {
     flexDirection: 'row',
