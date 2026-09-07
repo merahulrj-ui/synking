@@ -8,7 +8,8 @@ import { UserProfile } from '../types';
 import { Colors } from '../constants/theme';
 
 const { width: SCREEN_WIDTH, height: SCREEN_HEIGHT } = Dimensions.get('window');
-const CARD_WIDTH = SCREEN_WIDTH <= 480 ? (SCREEN_WIDTH - 8) : 440;
+export const CARD_WIDTH = SCREEN_WIDTH <= 480 ? (SCREEN_WIDTH - 8) : 440;
+export const CARD_HEIGHT = Math.min(SCREEN_HEIGHT * 0.9, 850);
 // Reduced threshold so it's much easier to physically swipe without it bouncing back
 const SWIPE_THRESHOLD = CARD_WIDTH * 0.15;
 
