@@ -13,7 +13,7 @@ import { CallSession } from '../../types';
 
 export default function TabsLayout() {
   const insets = useSafeAreaInsets();
-  const safeBottom = Math.max(insets.bottom, Platform.OS === 'android' ? 10 : 8);
+  const safeBottom = Math.max(insets.bottom, Platform.OS === 'android' ? 12 : 10);
   const { isDarkMode, incomingRequests, currentUser, acceptedMatchAlert, clearAcceptedMatchAlert, isSuspended, suspendedUntil, unreadChatIds } = useApp();
   const [activeCall, setActiveCall] = React.useState<CallSession | null>(null);
   const [timeLeft, setTimeLeft] = React.useState<string>('');
@@ -90,8 +90,8 @@ export default function TabsLayout() {
             {
               backgroundColor: tabBarBg,
               borderTopColor: isDarkMode ? 'rgba(253, 58, 115, 0.18)' : borderCol,
-              height: Platform.OS === 'ios' ? 60 + safeBottom : 64 + (insets.bottom > 0 ? insets.bottom : 6),
-              paddingBottom: Platform.OS === 'ios' ? safeBottom : Math.max(insets.bottom, 6),
+              height: 56 + safeBottom,
+              paddingBottom: safeBottom,
               ...(isDarkMode ? {
                 shadowColor: '#FD3A73',
                 shadowOffset: { width: 0, height: -4 },
@@ -109,6 +109,7 @@ export default function TabsLayout() {
           ],
           tabBarActiveTintColor: activeColor,
           tabBarInactiveTintColor: inactiveColor,
+          tabBarAllowFontScaling: false,
           tabBarShowLabel: true,
           tabBarLabelStyle: styles.tabLabel,
           tabBarItemStyle: styles.tabItem,
@@ -220,15 +221,18 @@ const styles = StyleSheet.create({
     borderTopWidth: 1,
   },
   tabItem: {
+    paddingHorizontal: 0,
     paddingVertical: 0,
     justifyContent: 'center',
     alignItems: 'center',
   },
   tabLabel: {
-    fontSize: 10.5,
+    fontSize: 9.8,
     fontFamily: 'Poppins_600SemiBold',
+    includeFontPadding: false,
+    letterSpacing: -0.3,
     marginTop: 2,
-    marginBottom: Platform.OS === 'android' ? 2 : 0,
+    textAlign: 'center',
   },
   inSynkTabIconWrapper: {
     width: 28,
