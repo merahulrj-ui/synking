@@ -164,6 +164,7 @@ export default function ChatScreen() {
   const [isSuspended, setIsSuspended] = useState(false);
   const [suspendedUntil, setSuspendedUntil] = useState<number | null>(null);
   const [deletedMsgIds, setDeletedMsgIds] = useState<Set<string>>(new Set());
+  const [chatClearedAt, setChatClearedAt] = useState<number>(0);
   const [fetchedProfile, setFetchedProfile] = useState<UserProfile | null>(null);
   const [isKeyboardOpen, setIsKeyboardOpen] = useState(false);
 
@@ -185,13 +186,26 @@ export default function ChatScreen() {
   // Instant 0ms Preloading: Cache messages & Resolve Real User Profile
   useEffect(() => {
     if (!id) return;
-    // 1. Instant 0ms cached messages load from disk
-    AsyncStorage.getItem(`synking_cached_msgs_${id}`).then(cached => {
-      if (cached) {
+    // 1. Instant 0ms cached messages load from disk — skip if chat was cleared
+    AsyncStorage.multiGet([
+      `synking_cached_msgs_${id}`,
+      `synking_cleared_at_${id}`,
+    ]).then(([cachedEntry, clearedEntry]) => {
+      const clearedAtTs = clearedEntry[1] ? parseInt(clearedEntry[1], 10) : 0;
+      if (cachedEntry[1]) {
         try {
-          const parsed = JSON.parse(cached);
+          const parsed = JSON.parse(cachedEntry[1]);
           if (Array.isArray(parsed) && parsed.length > 0) {
-            setCloudMessages(prev => (prev.length === 0 ? parsed : prev));
+            const valid = clearedAtTs > 0
+              ? parsed.filter((m: any) => {
+                  if (!m?.timestamp) return true;
+                  const msgTs = new Date(m.timestamp).getTime();
+                  return isNaN(msgTs) || msgTs > clearedAtTs;
+                })
+              : parsed;
+            if (valid.length > 0) {
+              setCloudMessages(prev => (prev.length === 0 ? valid : prev));
+            }
           }
         } catch (e) {}
       }
@@ -212,7 +226,7 @@ export default function ChatScreen() {
     }).catch(() => {});
   }, [id]);
 
-  // Load locally deleted message IDs from AsyncStorage on mount
+  // Load locally deleted message IDs and chat cleared timestamp from AsyncStorage on mount
   useEffect(() => {
     if (!id) return;
     AsyncStorage.getItem(`synking_deleted_${id}`).then(stored => {
@@ -223,6 +237,14 @@ export default function ChatScreen() {
             setDeletedMsgIds(new Set(parsed));
           }
         } catch (e) {}
+      }
+    });
+    AsyncStorage.getItem(`synking_cleared_at_${id}`).then(stored => {
+      if (stored) {
+        const ts = parseInt(stored, 10);
+        if (!isNaN(ts) && ts > 0) {
+          setChatClearedAt(ts);
+        }
       }
     });
   }, [id]);
@@ -253,10 +275,17 @@ export default function ChatScreen() {
   };
 
   const clearChatLocally = () => {
+    const now = Date.now();
     setCloudMessages([]);
+    setDeletedMsgIds(new Set());
+    setChatClearedAt(now);
     if (id) {
       AsyncStorage.removeItem(`synking_cached_msgs_${id}`).catch(() => {});
       AsyncStorage.removeItem(`synking_deleted_${id}`).catch(() => {});
+      // Save cleared timestamp so background sync won't reload old messages
+      AsyncStorage.setItem(`synking_cleared_at_${id}`, String(now)).catch(() => {});
+      // Also clear messages[id] in AppContext (localMessages)
+      clearChat(id, false);
     }
   };
 
@@ -1298,14 +1327,23 @@ const VOICE_COMPRESSED_CONFIG: any = {
     if (!id || !currentUser) return;
     const fetchCloud = async () => {
       const msgs = await fetchChatMessagesFromFirestore(currentUser.id, id);
-      const filtered = msgs.filter(m => m && !deletedMsgIds.has(m.id));
+      const filtered = msgs.filter(m => {
+        if (!m) return false;
+        if (deletedMsgIds.has(m.id)) return false;
+        // Filter out messages older than the last clear event
+        if (chatClearedAt > 0 && m.timestamp) {
+          const msgTs = new Date(m.timestamp).getTime();
+          if (!isNaN(msgTs) && msgTs <= chatClearedAt) return false;
+        }
+        return true;
+      });
       setCloudMessages(filtered);
       if (filtered.length > 0 && id) {
         AsyncStorage.setItem(`synking_cached_msgs_${id}`, JSON.stringify(filtered)).catch(() => {});
       }
     };
     fetchCloud();
-  }, [id, currentUser?.id, deletedMsgIds]);
+  }, [id, currentUser?.id, deletedMsgIds, chatClearedAt]);
 
   // 3. Fast 2.5-Second Live Background Sync (Guarantees zero-drop delivery across all network conditions)
   useEffect(() => {
@@ -1314,7 +1352,16 @@ const VOICE_COMPRESSED_CONFIG: any = {
       try {
         const msgs = await fetchChatMessagesFromFirestore(currentUser.id, id);
         if (Array.isArray(msgs) && msgs.length > 0) {
-          const filtered = msgs.filter(m => m && !deletedMsgIds.has(m.id));
+          const filtered = msgs.filter(m => {
+            if (!m) return false;
+            if (deletedMsgIds.has(m.id)) return false;
+            // Don't reload messages that were cleared
+            if (chatClearedAt > 0 && m.timestamp) {
+              const msgTs = new Date(m.timestamp).getTime();
+              if (!isNaN(msgTs) && msgTs <= chatClearedAt) return false;
+            }
+            return true;
+          });
           setCloudMessages(prev => {
             const prevMap = new Map(prev.map(p => [p.id, p]));
             let hasChanged = filtered.length !== prev.length;
@@ -1346,7 +1393,7 @@ const VOICE_COMPRESSED_CONFIG: any = {
       } catch (e) {}
     }, 2500);
     return () => clearInterval(interval);
-  }, [id, currentUser?.id, deletedMsgIds]);
+  }, [id, currentUser?.id, deletedMsgIds, chatClearedAt]);
 
   // Combine and strictly bifurcate cloud + local messages for this specific conversation (0 duplicates guaranteed)
   const userMessages = React.useMemo(() => {
@@ -1360,6 +1407,11 @@ const VOICE_COMPRESSED_CONFIG: any = {
       if (deletedMsgIds.has(m.id)) continue;
       if (m.deletedForEveryone) continue;
       if (m.deletedFor && Array.isArray(m.deletedFor) && m.deletedFor.includes(myId)) continue;
+      // Filter out messages older than the last clear event (protects localMessages too)
+      if (chatClearedAt > 0 && m.timestamp && m.timestamp !== 'Just now') {
+        const msgTs = new Date(m.timestamp).getTime();
+        if (!isNaN(msgTs) && msgTs <= chatClearedAt) continue;
+      }
       const isForThisThread =
         (m.senderId === id && m.receiverId === myId) ||
         (m.senderId === myId && m.receiverId === id);
@@ -1382,7 +1434,7 @@ const VOICE_COMPRESSED_CONFIG: any = {
     });
 
     return result;
-  }, [cloudMessages, localMessages, id, currentUser?.id]);
+  }, [cloudMessages, localMessages, id, currentUser?.id, deletedMsgIds, chatClearedAt]);
 
   const activeBooking = activeBookings.find(b => b.user2Id === id || b.user1Id === id);
 
