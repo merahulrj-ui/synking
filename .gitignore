@@ -25,3 +25,7 @@ Thumbs.db
 # Expo
 *.orig.*
 web-build/
+
+# Temp & Artifacts
+artifacts/
+scratch/
