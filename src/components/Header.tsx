@@ -15,18 +15,24 @@ export const Header: React.FC<HeaderProps> = ({ onOpenFilter, hasActiveFilters }
 
   const headerBg = isDarkMode ? '#000000' : '#FFFFFF';
   const logoTextColor = isDarkMode ? '#FFFFFF' : '#111827';
-  const borderCol = isDarkMode ? 'rgba(255, 255, 255, 0.06)' : 'rgba(0, 0, 0, 0.06)';
+  const borderCol = isDarkMode ? 'rgba(253, 58, 115, 0.15)' : 'rgba(15, 23, 42, 0.06)';
 
   return (
     <View style={[
       styles.header,
       { backgroundColor: headerBg, borderBottomColor: isDarkMode ? 'rgba(253, 58, 115, 0.15)' : borderCol },
-      isDarkMode && {
+      isDarkMode ? {
         shadowColor: '#FD3A73',
         shadowOffset: { width: 0, height: 4 },
         shadowOpacity: 0.12,
         shadowRadius: 12,
         elevation: 8,
+      } : {
+        shadowColor: '#64748B',
+        shadowOffset: { width: 0, height: 2 },
+        shadowOpacity: 0.04,
+        shadowRadius: 8,
+        elevation: 2,
       }
     ]}>
       {/* Brand: Official Glowing Logo + SYNKING */}
@@ -54,7 +60,10 @@ export const Header: React.FC<HeaderProps> = ({ onOpenFilter, hasActiveFilters }
             style={[
               styles.iconBtn,
               hasActiveFilters && styles.filterBtnActive,
-              { borderColor: hasActiveFilters ? '#FD3A73' : (isDarkMode ? 'rgba(255, 255, 255, 0.12)' : 'rgba(0, 0, 0, 0.1)') }
+              { 
+                borderColor: hasActiveFilters ? '#FD3A73' : (isDarkMode ? 'rgba(255, 255, 255, 0.12)' : 'rgba(15, 23, 42, 0.08)'),
+                backgroundColor: hasActiveFilters ? 'rgba(253, 58, 115, 0.12)' : (isDarkMode ? 'rgba(255, 255, 255, 0.05)' : 'rgba(15, 23, 42, 0.04)'),
+              }
             ]}
             activeOpacity={0.7}
             onPress={onOpenFilter}

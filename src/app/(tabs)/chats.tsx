@@ -124,11 +124,11 @@ export default function ChatsScreen() {
     }
   };
 
-  const bg = isDarkMode ? '#000000' : '#F9FAFB';
-  const textColor = isDarkMode ? '#FFFFFF' : '#111827';
-  const subText = isDarkMode ? '#9CA3AF' : '#6B7280';
+  const bg = isDarkMode ? '#000000' : '#F8F9FA';
+  const textColor = isDarkMode ? '#FFFFFF' : '#0F172A';
+  const subText = isDarkMode ? '#94A3B8' : '#64748B';
   const cardBg = isDarkMode ? '#000000' : '#FFFFFF';
-  const borderColor = isDarkMode ? 'rgba(255, 255, 255, 0.08)' : 'rgba(0, 0, 0, 0.06)';
+  const borderColor = isDarkMode ? 'rgba(255, 255, 255, 0.08)' : 'rgba(15, 23, 42, 0.06)';
 
   // 1. Instant 0ms cached messages load + cloud sync for all matches
   React.useEffect(() => {

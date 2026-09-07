@@ -210,13 +210,13 @@ export default function ProfileScreen() {
   // Completion calculation
   const completionData = useMemo(() => calculateProfileCompletion(currentUser), [currentUser]);
 
-  // Luxury Dark & Modern Theme Colors (Pure OLED Black)
-  const bg = isDarkMode ? '#000000' : '#F8FAFC';
+  // Luxury Dark & Modern Theme Colors (Pure OLED Black & Luxury Porcelain White)
+  const bg = isDarkMode ? '#000000' : '#F8F9FA';
   const textColor = isDarkMode ? '#FFFFFF' : '#0F172A';
   const subText = isDarkMode ? '#8E9AA8' : '#64748B';
   const cardBg = isDarkMode ? '#000000' : '#FFFFFF';
-  const innerBg = isDarkMode ? '#000000' : '#F1F5F9';
-  const borderColor = isDarkMode ? 'rgba(255, 255, 255, 0.12)' : 'rgba(0, 0, 0, 0.06)';
+  const innerBg = isDarkMode ? '#000000' : 'rgba(15, 23, 42, 0.035)';
+  const borderColor = isDarkMode ? 'rgba(255, 255, 255, 0.12)' : 'rgba(15, 23, 42, 0.06)';
 
   // Pick Photo
   const handlePickPhoto = async (index: number) => {
@@ -1582,15 +1582,15 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     gap: 12,
-    padding: 12,
-    borderRadius: 16,
+    padding: 14,
+    borderRadius: 18,
     borderWidth: 1,
     marginBottom: 14,
-    shadowColor: '#FD3A73',
-    shadowOffset: { width: 0, height: 3 },
-    shadowOpacity: 0.15,
-    shadowRadius: 8,
-    elevation: 4,
+    shadowColor: '#475569',
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.05,
+    shadowRadius: 14,
+    elevation: 2,
   },
   boostIconBox: {
     width: 32,
@@ -1619,16 +1619,16 @@ const styles = StyleSheet.create({
 
   // Luxury Card Container
   luxuryCard: {
-    borderRadius: 18,
+    borderRadius: 20,
     borderWidth: 1,
-    padding: 16,
-    marginBottom: 12,
+    padding: 18,
+    marginBottom: 14,
     gap: 12,
-    shadowColor: '#FD3A73',
-    shadowOffset: { width: 0, height: 4 },
-    shadowOpacity: 0.1,
-    shadowRadius: 12,
-    elevation: 4,
+    shadowColor: '#475569',
+    shadowOffset: { width: 0, height: 6 },
+    shadowOpacity: 0.05,
+    shadowRadius: 18,
+    elevation: 2,
   },
   cardHeaderRow: {
     flexDirection: 'row',
@@ -1792,10 +1792,15 @@ const styles = StyleSheet.create({
 
   // iOS Grouped Settings Section
   groupedSettings: {
-    borderRadius: 18,
+    borderRadius: 20,
     borderWidth: 1,
     overflow: 'hidden',
     marginBottom: 20,
+    shadowColor: '#475569',
+    shadowOffset: { width: 0, height: 6 },
+    shadowOpacity: 0.05,
+    shadowRadius: 18,
+    elevation: 2,
   },
   settingItem: {
     flexDirection: 'row',

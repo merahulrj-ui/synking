@@ -64,7 +64,7 @@ export default function TabsLayout() {
   }, []);
 
   const tabBarBg = isDarkMode ? '#000000' : '#FFFFFF';
-  const borderCol = isDarkMode ? 'rgba(255, 255, 255, 0.08)' : 'rgba(0, 0, 0, 0.08)';
+  const borderCol = isDarkMode ? 'rgba(255, 255, 255, 0.08)' : 'rgba(15, 23, 42, 0.06)';
   const activeColor = '#FD3A73';
   const inactiveColor = isDarkMode ? '#94A3B8' : '#64748B';
 
@@ -98,7 +98,13 @@ export default function TabsLayout() {
                 shadowOpacity: 0.15,
                 shadowRadius: 12,
                 elevation: 14,
-              } : {}),
+              } : {
+                shadowColor: '#64748B',
+                shadowOffset: { width: 0, height: -4 },
+                shadowOpacity: 0.05,
+                shadowRadius: 16,
+                elevation: 8,
+              }),
             }
           ],
           tabBarActiveTintColor: activeColor,
