@@ -15,7 +15,8 @@ interface NotificationState {
   senderName: string;
   senderPhoto: string;
   previewText: string;
-  type?: 'message' | 'swipe' | 'match';
+  type?: 'message' | 'swipe' | 'match' | 'date_pass';
+  bookingId?: string;
   badgeTitle?: string;
   badgeColor?: string;
 }
@@ -103,16 +104,22 @@ export const InAppNotificationBanner: React.FC = () => {
           }
         }
 
+        const isDateInvite = msg.type === 'date_invite' || (msg.extraData && msg.extraData.bookingId);
+        const dateVenue = msg.extraData?.venueName || 'Restaurant';
+
         // 3. Show or update floating banner
         setNotification({
           id: msg.id,
           senderId: msg.senderId,
           senderName,
           senderPhoto,
-          previewText: readableText,
-          type: 'message',
-          badgeTitle: '💬 New Message',
-          badgeColor: '#00E5FF',
+          previewText: isDateInvite
+            ? `Reserved table at ${dateVenue}! Tap to view Date Pass 🎟️`
+            : readableText,
+          type: isDateInvite ? 'date_pass' : 'message',
+          bookingId: msg.extraData?.bookingId,
+          badgeTitle: isDateInvite ? '🎟️ Date Pass & Table Booked!' : '💬 New Message',
+          badgeColor: isDateInvite ? '#F59E0B' : '#00E5FF',
         });
 
         // Slide Down Animation
@@ -193,6 +200,39 @@ export const InAppNotificationBanner: React.FC = () => {
         hideTimerRef.current = setTimeout(() => {
           dismissBanner();
         }, 5000);
+      } else if (type === 'DATE_BOOKED' && payload) {
+        const booking = payload.booking;
+        if (!booking || !currentUser) return;
+        if (!isMe(booking.user2Id)) return;
+
+        const senderName = booking.userName || 'Your Date';
+        const senderPhoto = booking.userPhoto || 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=200';
+        const venueName = booking.venue?.name || 'Restaurant';
+
+        RingtoneService.playMessageChime();
+
+        setNotification({
+          id: booking.id || `date_${Date.now()}`,
+          senderId: booking.user1Id || '',
+          senderName,
+          senderPhoto,
+          previewText: `Reserved table at ${venueName}! Tap to view Safe Date Pass 🎟️`,
+          type: 'date_pass',
+          bookingId: booking.id,
+          badgeTitle: '🎟️ Date Pass & Table Reserved!',
+          badgeColor: '#F59E0B',
+        });
+
+        Animated.spring(slideAnim, {
+          toValue: 12,
+          useNativeDriver: true,
+          bounciness: 8,
+        }).start();
+
+        if (hideTimerRef.current) clearTimeout(hideTimerRef.current);
+        hideTimerRef.current = setTimeout(() => {
+          dismissBanner();
+        }, 5000);
       }
     });
 
@@ -211,8 +251,13 @@ export const InAppNotificationBanner: React.FC = () => {
 
   const handlePress = () => {
     if (!notification) return;
-    const { senderId, type } = notification;
+    const { senderId, type, bookingId } = notification;
     dismissBanner();
+
+    if (type === 'date_pass' && bookingId) {
+      router.push(`/date-pass/${bookingId}` as any);
+      return;
+    }
 
     if (type === 'swipe') {
       router.push('/(tabs)/matches');

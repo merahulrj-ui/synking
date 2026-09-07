@@ -292,6 +292,20 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     });
   }, []);
 
+  // Load active bookings from AsyncStorage on mount
+  useEffect(() => {
+    AsyncStorage.getItem('@synking_active_bookings').then(stored => {
+      if (stored) {
+        try {
+          const parsed = JSON.parse(stored);
+          if (Array.isArray(parsed)) {
+            setActiveBookings(parsed);
+          }
+        } catch (e) {}
+      }
+    });
+  }, []);
+
   // Sync blocked users from backend when currentUser changes
   useEffect(() => {
     if (currentUser?.id) {
@@ -891,6 +905,27 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
             }
           }
         }
+      } else if (type === 'DATE_BOOKED' && payload) {
+        const booking = payload.booking as DateBooking;
+        const myId = currentUser?.id;
+        const myPhone = (currentUser?.phoneNumber || '').replace(/\D/g, '').slice(-10);
+        const toPhone = String(booking?.user2Id || '').replace(/\D/g, '').slice(-10);
+        const isForMe = booking?.user2Id === myId || (myPhone && toPhone && myPhone === toPhone);
+
+        if (booking && isForMe) {
+          setActiveBookings(prev => {
+            if (prev.some(b => b.id === booking.id)) return prev;
+            const updated = [booking, ...prev];
+            AsyncStorage.setItem('@synking_active_bookings', JSON.stringify(updated)).catch(() => {});
+            return updated;
+          });
+
+          // 🔔 Trigger local phone tray notification for Date Booking
+          const fromName = booking.userName || 'Your Date';
+          const venueName = booking.venue?.name || 'Restaurant';
+          const dateTime = booking.dateTime || 'Upcoming Date';
+          NotificationService.showDateBookingNotification(fromName, venueName, dateTime, booking.id);
+        }
       } else if (type === 'INCOMING_CALL' && payload) {
         if (payload.receiverId === currentUser?.id && payload.callerUser) {
           const currentSession = WebRTCService.getCurrentSession();
@@ -1311,7 +1346,11 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       qrCode: `SYNK-${Math.random().toString(36).substring(2, 8).toUpperCase()}`
     };
 
-    setActiveBookings(prev => [newBooking, ...prev]);
+    setActiveBookings(prev => {
+      const updated = [newBooking, ...prev];
+      AsyncStorage.setItem('@synking_active_bookings', JSON.stringify(updated)).catch(() => {});
+      return updated;
+    });
 
     const inviteMsg: ChatMessage = {
       id: `msg_invite_${Date.now()}`,
@@ -1332,7 +1371,29 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       [targetUser.id]: [...(prev[targetUser.id] || []), inviteMsg]
     }));
 
-    RealtimeBridge.broadcast('NEW_MESSAGE', inviteMsg);
+    // 1. Broadcast chat message targeted to recipient
+    RealtimeBridge.broadcast('NEW_MESSAGE', inviteMsg, targetUser.id);
+
+    // 2. Broadcast booking event to recipient so their Date Passes tab updates & notification triggers
+    const recipientBooking: DateBooking = {
+      ...newBooking,
+      userName: currentUser?.name || 'Your Date',
+      userPhoto: currentUser?.photo || currentUser?.photos?.[0] || '',
+    };
+    RealtimeBridge.broadcast('DATE_BOOKED', { booking: recipientBooking, inviteMsg }, targetUser.id);
+
+    // 3. Save to Firestore so it persists permanently
+    saveChatMessageToFirestore({
+      id: inviteMsg.id,
+      senderId: inviteMsg.senderId,
+      receiverId: inviteMsg.receiverId,
+      cipherText: inviteMsg.text,
+      plainText: inviteMsg.text,
+      isEncrypted: false,
+      type: inviteMsg.type,
+      extraData: inviteMsg.extraData,
+      timestamp: new Date().toISOString(),
+    }).catch(() => {});
 
     return newBooking;
   };

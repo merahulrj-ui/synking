@@ -2726,6 +2726,126 @@ async function sendMatchPushNotification(targetUserId, matchPayload) {
   }
 }
 
+async function sendDateBookingPushNotification(targetUserId, bookingPayload) {
+  try {
+    let pushToken = db.pushTokens?.[targetUserId] || db.profiles?.[targetUserId]?.pushToken;
+    let nativeFcmToken = db.fcmTokens?.[targetUserId] || db.profiles?.[targetUserId]?.fcmPushToken;
+
+    if (!pushToken && !nativeFcmToken) {
+      try {
+        const tokenQuery = await queryTurso('SELECT * FROM push_tokens WHERE user_id = ?', [{ type: 'text', value: String(targetUserId) }]);
+        const rows = tokenQuery?.results?.[0]?.response?.result?.rows;
+        const cols = tokenQuery?.results?.[0]?.response?.result?.cols?.map(c => (typeof c === 'object' && c.name) ? c.name : String(c));
+        if (Array.isArray(rows) && rows.length > 0 && Array.isArray(cols)) {
+          const item = {};
+          cols.forEach((col, idx) => {
+            const rawVal = rows[0][idx]?.value !== undefined ? rows[0][idx].value : rows[0][idx];
+            item[col] = extractPlain(rawVal);
+          });
+          if (item.fcm_token) {
+            nativeFcmToken = item.fcm_token;
+            if (!db.fcmTokens) db.fcmTokens = {};
+            db.fcmTokens[targetUserId] = nativeFcmToken;
+          }
+          if (item.push_token) {
+            pushToken = item.push_token;
+            if (!db.pushTokens) db.pushTokens = {};
+            db.pushTokens[targetUserId] = pushToken;
+          }
+        }
+      } catch (tursoErr) {}
+    }
+
+    if (!pushToken && !nativeFcmToken) {
+      const cleanTarget = String(targetUserId).replace(/\D/g, '').slice(-10);
+      for (const [uid, prof] of Object.entries(db.profiles || {})) {
+        const profPhone = (prof?.phoneNumber || '').replace(/\D/g, '').slice(-10);
+        if ((cleanTarget && profPhone === cleanTarget) || prof?.id === targetUserId) {
+          nativeFcmToken = db.fcmTokens?.[uid] || prof?.fcmPushToken;
+          pushToken = db.pushTokens?.[uid] || prof?.pushToken;
+          if (nativeFcmToken || pushToken) break;
+        }
+      }
+    }
+
+    if (!pushToken && !nativeFcmToken) {
+      console.log(`[DATE_PUSH_SKIP] No push token registered for target ${targetUserId}`);
+      return;
+    }
+
+    const booking = bookingPayload?.booking || bookingPayload;
+    const senderName = booking?.userName || 'Your Date';
+    const venueName = booking?.venue?.name || 'Restaurant';
+    const dateTime = booking?.dateTime || 'Upcoming Date';
+    const bookingId = booking?.id || '';
+
+    const title = `🎟️ Date Planned by ${senderName}!`;
+    const bodyText = `Table reserved at ${venueName} for ${dateTime}! Check your Safe Date Pass 🥂`;
+
+    const dataPayload = {
+      type: 'DATE_BOOKING',
+      title: String(title),
+      body: String(bodyText),
+      bookingId: String(bookingId),
+      senderId: String(booking?.user1Id || ''),
+      venueName: String(venueName),
+      timestamp: String(Date.now()),
+    };
+
+    if (fcmMessaging && nativeFcmToken) {
+      try {
+        const response = await fcmMessaging.send({
+          token: nativeFcmToken,
+          notification: {
+            title: String(title),
+            body: String(bodyText),
+          },
+          data: dataPayload,
+          android: {
+            priority: 'high',
+            notification: {
+              channelId: 'synking_messages',
+              priority: 'high',
+              defaultSound: true,
+              defaultVibrateTimings: true,
+            }
+          }
+        });
+        console.log(`✅ [FCM_DATE_PUSH_SUCCESS] ID: ${response} to ${targetUserId}`);
+        return;
+      } catch (fcmErr) {
+        console.error(`❌ [FCM_DATE_PUSH_ERROR]`, fcmErr.message);
+      }
+    }
+
+    // Fallback to Expo Push
+    if (pushToken) {
+      const pushBody = JSON.stringify({
+        to: pushToken,
+        title: title,
+        body: bodyText,
+        data: dataPayload,
+        priority: 'high',
+        channelId: 'synking_messages',
+        sound: 'default'
+      });
+
+      const req = https.request('https://exp.host/--/api/v2/push/send', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Content-Length': Buffer.byteLength(pushBody),
+        },
+      }, (res) => {});
+      req.on('error', () => {});
+      req.write(pushBody);
+      req.end();
+    }
+  } catch (err) {
+    console.error('[DATE_PUSH_EXCEPTION]', err.message);
+  }
+}
+
 // WebSocket Protocol Handshake
 server.on('upgrade', (req, socket, head) => {
   const key = req.headers['sec-websocket-key'];
@@ -2877,7 +2997,8 @@ server.on('upgrade', (req, socket, head) => {
           parsed.targetUserId ||
           parsed.payload?.receiverId ||
           parsed.payload?.targetUserId ||
-          parsed.payload?.toUserId;
+          parsed.payload?.toUserId ||
+          parsed.payload?.booking?.user2Id;
 
         if (targetUserId) {
           // ⛔ SERVER-SIDE MATCH GATE & VALIDATION for NEW_MESSAGE via WebSocket
@@ -3000,6 +3121,8 @@ server.on('upgrade', (req, socket, head) => {
             sendSwipePushNotification(targetUserId, parsed.payload);
           } else if (parsed.type === 'REQUEST_ACCEPTED' && parsed.payload) {
             sendMatchPushNotification(targetUserId, parsed.payload);
+          } else if (parsed.type === 'DATE_BOOKED' && parsed.payload) {
+            sendDateBookingPushNotification(targetUserId, parsed.payload);
           }
           continue;
         }

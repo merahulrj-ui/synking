@@ -113,6 +113,15 @@ class NotificationServiceClass {
           return;
         }
 
+        // Direct tap on Date Booking Notification opens Date Pass
+        if (callData?.type === 'DATE_BOOKING' && callData?.bookingId) {
+          try {
+            const { router } = require('expo-router');
+            router.push(`/date-pass/${callData.bookingId}`);
+          } catch (e) {}
+          return;
+        }
+
         if (actionId === 'ACCEPT_CALL' || actionId === Notifications.DEFAULT_ACTION_IDENTIFIER) {
           this.dismissCallNotification(callData?.callId);
           try {
@@ -249,6 +258,28 @@ class NotificationServiceClass {
           data: { partnerId, type: 'NEW_MATCH' },
           sound: 'default',
           priority: Notifications.AndroidNotificationPriority.HIGH,
+          channelId: 'synking_messages',
+        },
+        trigger: null,
+      });
+    } catch (e) {}
+  }
+
+  public async showDateBookingNotification(senderName: string, venueName: string, dateTime: string, bookingId: string) {
+    if (Platform.OS === 'web' || !Notifications) return;
+    try {
+      await this.initialize();
+      const title = `🎟️ Date Planned by ${senderName}!`;
+      const body = `Table reserved at ${venueName} for ${dateTime}. Tap to view your Safe Date Pass! 🥂`;
+
+      await Notifications.scheduleNotificationAsync({
+        identifier: `date_${Date.now()}`,
+        content: {
+          title,
+          body,
+          data: { bookingId, type: 'DATE_BOOKING' },
+          sound: 'default',
+          priority: Notifications.AndroidNotificationPriority.MAX,
           channelId: 'synking_messages',
         },
         trigger: null,
