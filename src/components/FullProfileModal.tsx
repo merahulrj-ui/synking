@@ -5,6 +5,7 @@ import { Ionicons, MaterialCommunityIcons } from '@expo/vector-icons';
 import { UserProfile } from '../types';
 import { useApp } from '../contexts/AppContext';
 import { LOOKING_FOR_OPTIONS } from '../app/(tabs)/profile';
+import { ReportReasonModal } from './ReportReasonModal';
 
 const { width: SCREEN_WIDTH, height: SCREEN_HEIGHT } = Dimensions.get('window');
 
@@ -16,8 +17,9 @@ interface Props {
 }
 
 export const FullProfileModal: React.FC<Props> = ({ profile, visible, onClose, onSwipe }) => {
-  const { isDarkMode, isUserBlocked, blockUser, unblockUser } = useApp();
+  const { isDarkMode, isUserBlocked, blockUser, unblockUser, currentUser, submitBlockReport } = useApp();
   const [photoIndex, setPhotoIndex] = useState(0);
+  const [reportModalVisible, setReportModalVisible] = useState(false);
 
   if (!profile) return null;
 
@@ -52,10 +54,8 @@ export const FullProfileModal: React.FC<Props> = ({ profile, visible, onClose, o
           {
             text: 'Block',
             style: 'destructive',
-            onPress: async () => {
-              await blockUser(profile.id);
-              onSwipe('pass');
-              onClose();
+            onPress: () => {
+              setReportModalVisible(true);
             },
           },
         ]
@@ -64,23 +64,22 @@ export const FullProfileModal: React.FC<Props> = ({ profile, visible, onClose, o
   };
 
   const handleReport = () => {
-    Alert.alert(
-      `Report ${profile.name}`,
-      `Are you sure you want to report this profile? Our moderation team reviews reports within 24 hours.`,
-      [
-        { text: 'Cancel', style: 'cancel' },
-        {
-          text: 'Report & Block',
-          style: 'destructive',
-          onPress: async () => {
-            await blockUser(profile.id);
-            Alert.alert('Report Submitted', 'Thank you for keeping our community safe. This user has also been blocked.');
-            onSwipe('pass');
-            onClose();
-          },
-        },
-      ]
-    );
+    setReportModalVisible(true);
+  };
+
+  const handleReportSubmit = async (reason: string, details?: string) => {
+    await submitBlockReport({
+      blockedUserId: profile.id,
+      blockedUserName: profile.name,
+      blockedUserPhoto: profile.photo,
+      blockedUserPhone: profile.phoneNumber,
+      reportedByUserId: currentUser?.id || 'anonymous',
+      reportedByUserName: currentUser?.name || 'Synkin Member',
+      reason: details ? `${reason} — ${details}` : reason,
+    });
+    Alert.alert('Report Submitted 🛡️', `${profile.name} has been blocked and a report has been sent to Synkin Admin.`);
+    onSwipe('pass');
+    onClose();
   };
 
   const handlePhotoTap = (direction: 'left' | 'right') => {
@@ -299,6 +298,14 @@ export const FullProfileModal: React.FC<Props> = ({ profile, visible, onClose, o
           </TouchableOpacity>
         </View>
 
+        {/* Report Reason Selection Modal */}
+        <ReportReasonModal
+          visible={reportModalVisible}
+          targetUserName={profile.name}
+          onClose={() => setReportModalVisible(false)}
+          onSubmit={handleReportSubmit}
+          isDarkMode={isDarkMode}
+        />
       </View>
     </Modal>
   );

@@ -22,6 +22,8 @@ import { useApp } from '../../contexts/AppContext';
 import { Header } from '../../components/Header';
 import { GradientButton } from '../../components/GradientButton';
 import { AuthModal } from '../../components/AuthModal';
+import { AdminModerationModal } from '../../components/AdminModerationModal';
+import { UnlockAppealModal } from '../../components/UnlockAppealModal';
 import { UserProfile } from '../../types';
 import { useRouter } from 'expo-router';
 
@@ -147,8 +149,27 @@ export function calculateProfileCompletion(user: UserProfile | null): {
 }
 
 export default function ProfileScreen() {
-  const { currentUser, isLoggedIn, isDarkMode, toggleTheme, updateCurrentUser, loginUser, logoutUser, deleteAccount } = useApp();
+  const {
+    currentUser,
+    isLoggedIn,
+    isDarkMode,
+    toggleTheme,
+    updateCurrentUser,
+    loginUser,
+    logoutUser,
+    deleteAccount,
+    blockReports,
+    submitUnlockRequest,
+    adminUnblockUser,
+    adminDismissAppeal,
+    deleteBlockReport,
+  } = useApp();
   const router = useRouter();
+
+  // Admin & Unblock Appeal Modals
+  const [adminModalVisible, setAdminModalVisible] = useState(false);
+  const [appealModalVisible, setAppealModalVisible] = useState(false);
+  const pendingAppealsCount = useMemo(() => blockReports.filter(r => r.status === 'appeal_pending').length, [blockReports]);
 
   // Auth Modal State (Unified Login)
   const [authModalVisible, setAuthModalVisible] = useState(false);
@@ -935,6 +956,59 @@ export default function ProfileScreen() {
 
               <View style={[styles.settingDivider, { backgroundColor: borderColor }]} />
 
+              {/* 🛡️ Admin Moderation & Block Reports */}
+              <TouchableOpacity
+                style={styles.settingItem}
+                onPress={() => setAdminModalVisible(true)}
+                activeOpacity={0.7}
+              >
+                <View style={styles.settingItemLeft}>
+                  <View style={[styles.settingIconBox, { backgroundColor: 'rgba(253, 58, 115, 0.15)' }]}>
+                    <Ionicons name="shield-half-outline" size={16} color="#FD3A73" />
+                  </View>
+                  <View>
+                    <Text style={[styles.settingItemTitle, { color: textColor }]}>Admin Moderation & Block Reports</Text>
+                    <Text style={{ fontSize: 10.5, color: subText, fontFamily: 'Poppins_400Regular' }}>
+                      Review blocked users & open blocks
+                    </Text>
+                  </View>
+                </View>
+                <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
+                  {pendingAppealsCount > 0 && (
+                    <View style={{ backgroundColor: '#F59E0B', paddingHorizontal: 7, paddingVertical: 2, borderRadius: 10 }}>
+                      <Text style={{ color: '#000', fontSize: 10, fontFamily: 'Poppins_800ExtraBold' }}>
+                        {pendingAppealsCount} NEW
+                      </Text>
+                    </View>
+                  )}
+                  <Feather name="chevron-right" size={16} color={subText} />
+                </View>
+              </TouchableOpacity>
+
+              <View style={[styles.settingDivider, { backgroundColor: borderColor }]} />
+
+              {/* ⚖️ Account Appeal / Request Unlock */}
+              <TouchableOpacity
+                style={styles.settingItem}
+                onPress={() => setAppealModalVisible(true)}
+                activeOpacity={0.7}
+              >
+                <View style={styles.settingItemLeft}>
+                  <View style={[styles.settingIconBox, { backgroundColor: 'rgba(0, 229, 255, 0.15)' }]}>
+                    <Ionicons name="key-outline" size={16} color="#00E5FF" />
+                  </View>
+                  <View>
+                    <Text style={[styles.settingItemTitle, { color: textColor }]}>Account Appeal / Request Unlock</Text>
+                    <Text style={{ fontSize: 10.5, color: subText, fontFamily: 'Poppins_400Regular' }}>
+                      Blocked or restricted? Request admin unblock
+                    </Text>
+                  </View>
+                </View>
+                <Feather name="chevron-right" size={16} color={subText} />
+              </TouchableOpacity>
+
+              <View style={[styles.settingDivider, { backgroundColor: borderColor }]} />
+
               {/* Log Out */}
               <TouchableOpacity
                 style={styles.settingItem}
@@ -1393,6 +1467,28 @@ export default function ProfileScreen() {
           </View>
         </View>
       </Modal>
+
+      {/* 🛡️ Admin Moderation Console Modal */}
+      <AdminModerationModal
+        visible={adminModalVisible}
+        onClose={() => setAdminModalVisible(false)}
+        blockReports={blockReports}
+        onUnblockUser={adminUnblockUser}
+        onDismissAppeal={adminDismissAppeal}
+        onDeleteReport={deleteBlockReport}
+        isDarkMode={isDarkMode}
+      />
+
+      {/* ⚖️ User Unlock Request Appeal Modal */}
+      <UnlockAppealModal
+        visible={appealModalVisible}
+        onClose={() => setAppealModalVisible(false)}
+        userId={currentUser?.id || 'my_account_id'}
+        userName={currentUser?.name}
+        userPhone={currentUser?.phoneNumber}
+        onSubmitAppeal={submitUnlockRequest}
+        isDarkMode={isDarkMode}
+      />
     </SafeAreaView>
   );
 }

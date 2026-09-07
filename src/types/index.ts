@@ -135,3 +135,18 @@ export interface SafetyContact {
   phone: string;
 }
 
+export interface BlockReport {
+  id: string;
+  blockedUserId: string;
+  blockedUserName: string;
+  blockedUserPhoto?: string;
+  blockedUserPhone?: string;
+  reportedByUserId: string;
+  reportedByUserName: string;
+  reason: string;
+  timestamp: number;
+  status: 'blocked' | 'appeal_pending' | 'unblocked_by_admin' | 'appeal_rejected';
+  appealNote?: string;
+  appealTimestamp?: number;
+}
+

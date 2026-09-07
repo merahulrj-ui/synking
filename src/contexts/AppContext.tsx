@@ -1,7 +1,7 @@
 import React, { createContext, useContext, useState, useEffect, useRef, useCallback } from 'react';
 import { Alert, Platform, NativeModules } from 'react-native';
 import AsyncStorage from '@react-native-async-storage/async-storage';
-import { UserProfile, SynkRequest, Venue, DateBooking, ChatMessage, SafetyContact } from '../types';
+import { UserProfile, SynkRequest, Venue, DateBooking, ChatMessage, SafetyContact, BlockReport } from '../types';
 import { MOCK_VENUES } from '../constants/mockData';
 import {
   saveChatMessageToFirestore,
@@ -92,6 +92,12 @@ interface AppContextType {
   suspendedUntil: number | null;
   strikeCount: number;
   triggerSafetyViolation: (customMsg?: string) => boolean;
+  blockReports: BlockReport[];
+  submitBlockReport: (report: Omit<BlockReport, 'id' | 'timestamp' | 'status'> & { reason: string; appealNote?: string }) => Promise<void>;
+  submitUnlockRequest: (userId: string, appealNote: string) => Promise<boolean>;
+  adminUnblockUser: (reportId: string, userId: string) => Promise<boolean>;
+  adminDismissAppeal: (reportId: string) => Promise<boolean>;
+  deleteBlockReport: (reportId: string) => Promise<boolean>;
 }
 
 const AppContext = createContext<AppContextType | undefined>(undefined);
@@ -360,6 +366,166 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
   const isUserBlocked = useCallback((userId: string): boolean => {
     return blockedUsers.has(userId);
   }, [blockedUsers]);
+
+  // 🛡️ Block Reports & Admin Unlock Appeals Management
+  const [blockReports, setBlockReports] = useState<BlockReport[]>([]);
+
+  useEffect(() => {
+    AsyncStorage.getItem('@synkin_block_reports').then(stored => {
+      if (stored) {
+        try {
+          const parsed = JSON.parse(stored);
+          if (Array.isArray(parsed) && parsed.length > 0) {
+            setBlockReports(parsed);
+            return;
+          }
+        } catch (e) {}
+      }
+      // Initial seed demo report so admin immediately sees how reports and unlock appeals appear
+      const initialSeed: BlockReport[] = [
+        {
+          id: 'report_sample_1',
+          blockedUserId: 'user_rahul_99',
+          blockedUserName: 'Rahul Sharma',
+          blockedUserPhone: '+91 98765 43210',
+          blockedUserPhoto: 'https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?w=500',
+          reportedByUserId: 'user_ananya_22',
+          reportedByUserName: 'Ananya Verma',
+          reason: 'Inappropriate / Abusive messages in chat',
+          timestamp: Date.now() - 3600000 * 24,
+          status: 'appeal_pending',
+          appealNote: 'I apologize for the misunderstanding during the conversation. I will strictly follow all safety guidelines. Please open my block.',
+          appealTimestamp: Date.now() - 3600000 * 3,
+        },
+        {
+          id: 'report_sample_2',
+          blockedUserId: 'user_simran_44',
+          blockedUserName: 'Simran Kaur',
+          blockedUserPhone: '+91 98123 45678',
+          blockedUserPhoto: 'https://images.unsplash.com/photo-1494790108377-be9c29b29330?w=500',
+          reportedByUserId: 'user_vikram_11',
+          reportedByUserName: 'Vikram Singh',
+          reason: 'Suspected fake profile / Catfish identity',
+          timestamp: Date.now() - 3600000 * 48,
+          status: 'blocked',
+          appealNote: undefined,
+        },
+      ];
+      setBlockReports(initialSeed);
+      AsyncStorage.setItem('@synkin_block_reports', JSON.stringify(initialSeed)).catch(() => {});
+    });
+  }, []);
+
+  const submitBlockReport = useCallback(async (reportData: Omit<BlockReport, 'id' | 'timestamp' | 'status'> & { reason: string; appealNote?: string }) => {
+    const newReport: BlockReport = {
+      id: `report_${Date.now()}_${Math.random().toString(36).substring(7)}`,
+      blockedUserId: reportData.blockedUserId,
+      blockedUserName: reportData.blockedUserName,
+      blockedUserPhoto: reportData.blockedUserPhoto,
+      blockedUserPhone: reportData.blockedUserPhone,
+      reportedByUserId: reportData.reportedByUserId,
+      reportedByUserName: reportData.reportedByUserName,
+      reason: reportData.reason,
+      timestamp: Date.now(),
+      status: reportData.appealNote ? 'appeal_pending' : 'blocked',
+      appealNote: reportData.appealNote,
+      appealTimestamp: reportData.appealNote ? Date.now() : undefined,
+    };
+
+    setBlockReports(prev => {
+      const updated = [newReport, ...prev.filter(r => r.blockedUserId !== newReport.blockedUserId)];
+      AsyncStorage.setItem('@synkin_block_reports', JSON.stringify(updated)).catch(() => {});
+      return updated;
+    });
+
+    await blockUser(reportData.blockedUserId);
+  }, [blockUser]);
+
+  const submitUnlockRequest = useCallback(async (userId: string, appealNote: string): Promise<boolean> => {
+    if (!userId || !appealNote.trim()) return false;
+    let found = false;
+    setBlockReports(prev => {
+      const updated = prev.map(r => {
+        if (r.blockedUserId === userId || (currentUser && r.blockedUserId === currentUser.id)) {
+          found = true;
+          return {
+            ...r,
+            status: 'appeal_pending' as const,
+            appealNote: appealNote.trim(),
+            appealTimestamp: Date.now(),
+          };
+        }
+        return r;
+      });
+
+      if (!found) {
+        const freshReport: BlockReport = {
+          id: `appeal_${Date.now()}_${Math.random().toString(36).substring(7)}`,
+          blockedUserId: userId,
+          blockedUserName: currentUser?.name || 'Blocked Member',
+          blockedUserPhoto: currentUser?.photo,
+          blockedUserPhone: currentUser?.phoneNumber,
+          reportedByUserId: 'system_moderation',
+          reportedByUserName: 'System / User Report',
+          reason: 'Account Restriction / Community Guideline Review',
+          timestamp: Date.now(),
+          status: 'appeal_pending',
+          appealNote: appealNote.trim(),
+          appealTimestamp: Date.now(),
+        };
+        updated.unshift(freshReport);
+      }
+
+      AsyncStorage.setItem('@synkin_block_reports', JSON.stringify(updated)).catch(() => {});
+      return updated;
+    });
+    return true;
+  }, [currentUser]);
+
+  const adminUnblockUser = useCallback(async (reportId: string, userId: string): Promise<boolean> => {
+    await unblockUser(userId);
+    setBlockReports(prev => {
+      const updated = prev.map(r => {
+        if (r.id === reportId || r.blockedUserId === userId) {
+          return {
+            ...r,
+            status: 'unblocked_by_admin' as const,
+          };
+        }
+        return r;
+      });
+      AsyncStorage.setItem('@synkin_block_reports', JSON.stringify(updated)).catch(() => {});
+      return updated;
+    });
+    return true;
+  }, [unblockUser]);
+
+  const adminDismissAppeal = useCallback(async (reportId: string): Promise<boolean> => {
+    setBlockReports(prev => {
+      const updated = prev.map(r => {
+        if (r.id === reportId) {
+          return {
+            ...r,
+            status: 'appeal_rejected' as const,
+          };
+        }
+        return r;
+      });
+      AsyncStorage.setItem('@synkin_block_reports', JSON.stringify(updated)).catch(() => {});
+      return updated;
+    });
+    return true;
+  }, []);
+
+  const deleteBlockReport = useCallback(async (reportId: string): Promise<boolean> => {
+    setBlockReports(prev => {
+      const updated = prev.filter(r => r.id !== reportId);
+      AsyncStorage.setItem('@synkin_block_reports', JSON.stringify(updated)).catch(() => {});
+      return updated;
+    });
+    return true;
+  }, []);
+
 
   // Load chat read timestamps from AsyncStorage on mount
   useEffect(() => {
@@ -1746,6 +1912,12 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
         suspendedUntil,
         strikeCount,
         triggerSafetyViolation,
+        blockReports,
+        submitBlockReport,
+        submitUnlockRequest,
+        adminUnblockUser,
+        adminDismissAppeal,
+        deleteBlockReport,
       }}
     >
       {children}
