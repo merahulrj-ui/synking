@@ -210,13 +210,13 @@ export default function ProfileScreen() {
   // Completion calculation
   const completionData = useMemo(() => calculateProfileCompletion(currentUser), [currentUser]);
 
-  // Luxury Dark & Modern Theme Colors
-  const bg = isDarkMode ? '#07090E' : '#F8FAFC';
+  // Luxury Dark & Modern Theme Colors (Pure OLED Black)
+  const bg = isDarkMode ? '#000000' : '#F8FAFC';
   const textColor = isDarkMode ? '#FFFFFF' : '#0F172A';
   const subText = isDarkMode ? '#8E9AA8' : '#64748B';
-  const cardBg = isDarkMode ? '#11141E' : '#FFFFFF';
-  const innerBg = isDarkMode ? '#181C28' : '#F1F5F9';
-  const borderColor = isDarkMode ? 'rgba(255, 255, 255, 0.08)' : 'rgba(0, 0, 0, 0.06)';
+  const cardBg = isDarkMode ? '#000000' : '#FFFFFF';
+  const innerBg = isDarkMode ? '#000000' : '#F1F5F9';
+  const borderColor = isDarkMode ? 'rgba(255, 255, 255, 0.12)' : 'rgba(0, 0, 0, 0.06)';
 
   // Pick Photo
   const handlePickPhoto = async (index: number) => {
@@ -943,7 +943,7 @@ export default function ProfileScreen() {
 
             {/* 🏷️ Synkin App Version & Live Release Status */}
             <View style={{ alignItems: 'center', justifyContent: 'center', marginTop: 24, marginBottom: 8, gap: 4 }}>
-              <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6, backgroundColor: isDarkMode ? '#131927' : '#F1F5F9', paddingHorizontal: 14, paddingVertical: 6, borderRadius: 14, borderWidth: 1, borderColor: borderColor }}>
+              <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6, backgroundColor: isDarkMode ? '#000000' : '#F1F5F9', paddingHorizontal: 14, paddingVertical: 6, borderRadius: 14, borderWidth: 1, borderColor: borderColor }}>
                 <View style={{ width: 8, height: 8, borderRadius: 4, backgroundColor: '#22C55E' }} />
                 <Text style={{ color: textColor, fontSize: 12, fontFamily: 'Poppins_800ExtraBold', letterSpacing: 0.5 }}>
                   Synkin v1.0.69
@@ -988,7 +988,7 @@ export default function ProfileScreen() {
       {/* ========================================================================= */}
       <Modal visible={editModalVisible} animationType="slide" transparent>
         <View style={styles.modalOverlay}>
-          <View style={[styles.editModalContainer, { backgroundColor: isDarkMode ? '#0E1118' : '#FFFFFF', borderColor }]}>
+          <View style={[styles.editModalContainer, { backgroundColor: isDarkMode ? '#000000' : '#FFFFFF', borderColor }]}>
             {/* Modal Top Header */}
             <View style={styles.editModalHeader}>
               <Text style={[styles.modalTitle, { color: textColor }]}>Edit Dating Profile 🎨</Text>
@@ -1459,7 +1459,7 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
     borderWidth: 2,
-    borderColor: '#07090E',
+    borderColor: '#000000',
     shadowColor: '#FD3A73',
     shadowOffset: { width: 0, height: 2 },
     shadowOpacity: 0.6,

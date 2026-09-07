@@ -13,12 +13,12 @@ export default function DatePassScreen() {
 
   const booking = activeBookings.find(b => b.id === bookingId) || activeBookings[0];
 
-  const bg = isDarkMode ? '#05060A' : '#F8F9FB';
-  const headerBg = isDarkMode ? '#05060A' : '#FFFFFF';
+  const bg = isDarkMode ? '#000000' : '#F8F9FB';
+  const headerBg = isDarkMode ? '#000000' : '#FFFFFF';
   const textColor = isDarkMode ? '#FFFFFF' : '#0F172A';
   const subText = isDarkMode ? '#94A3B8' : '#64748B';
-  const cardBg = isDarkMode ? '#13141F' : '#FFFFFF';
-  const borderCol = isDarkMode ? 'rgba(255, 255, 255, 0.08)' : 'rgba(0, 0, 0, 0.06)';
+  const cardBg = isDarkMode ? '#000000' : '#FFFFFF';
+  const borderCol = isDarkMode ? 'rgba(255, 255, 255, 0.12)' : 'rgba(0, 0, 0, 0.06)';
 
   if (!booking) {
     return (

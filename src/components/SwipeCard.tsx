@@ -267,7 +267,7 @@ const styles = StyleSheet.create({
     height: '98.5%',
     borderRadius: 20,
     overflow: 'hidden',
-    backgroundColor: '#0F1017',
+    backgroundColor: '#000000',
     position: 'relative',
     alignSelf: 'center',
     shadowColor: '#FD3A73',

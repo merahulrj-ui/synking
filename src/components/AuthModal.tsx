@@ -44,12 +44,12 @@ export const AuthModal: React.FC<Props> = ({ visible, onClose, targetUserName })
   const [isLoading, setIsLoading] = useState(false);
   const [resendTimer, setResendTimer] = useState(30);
 
-  // Theme Colors
-  const cardBg = isDarkMode ? '#11141E' : '#FFFFFF';
+  // Theme Colors (Pure OLED Black)
+  const cardBg = isDarkMode ? '#000000' : '#FFFFFF';
   const textColor = isDarkMode ? '#FFFFFF' : '#0F172A';
   const subText = isDarkMode ? '#94A3B8' : '#64748B';
-  const borderCol = isDarkMode ? 'rgba(255, 255, 255, 0.1)' : 'rgba(0, 0, 0, 0.08)';
-  const inputBg = isDarkMode ? '#181C28' : '#F1F5F9';
+  const borderCol = isDarkMode ? 'rgba(255, 255, 255, 0.12)' : 'rgba(0, 0, 0, 0.08)';
+  const inputBg = isDarkMode ? '#000000' : '#F1F5F9';
 
   // Resend Countdown Timer
   useEffect(() => {

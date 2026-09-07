@@ -1,4 +1,4 @@
-﻿import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect } from 'react';
 import {
   View,
   Text,
@@ -109,11 +109,11 @@ export const DiscoveryFilterModal: React.FC<Props> = ({
     onReset();
   };
 
-  const bg = isDarkMode ? '#05060A' : '#F9FAFB';
-  const cardBg = isDarkMode ? '#12131F' : '#FFFFFF';
+  const bg = isDarkMode ? '#000000' : '#F9FAFB';
+  const cardBg = isDarkMode ? '#000000' : '#FFFFFF';
   const textColor = isDarkMode ? '#FFFFFF' : '#0F172A';
   const subText = isDarkMode ? '#94A3B8' : '#64748B';
-  const borderCol = isDarkMode ? 'rgba(255, 255, 255, 0.08)' : 'rgba(0, 0, 0, 0.08)';
+  const borderCol = isDarkMode ? 'rgba(255, 255, 255, 0.12)' : 'rgba(0, 0, 0, 0.08)';
 
   return (
     <Modal visible={visible} animationType="slide" transparent onRequestClose={onClose}>

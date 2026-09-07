@@ -15,11 +15,11 @@ export default function MatchesScreen() {
   const [showSentHistory, setShowSentHistory] = useState(false);
   const [acceptedCelebration, setAcceptedCelebration] = useState<any>(null);
 
-  const bg = isDarkMode ? '#05060A' : '#F8F9FB';
+  const bg = isDarkMode ? '#000000' : '#F8F9FB';
   const textColor = isDarkMode ? '#FFFFFF' : '#0F172A';
   const subText = isDarkMode ? '#94A3B8' : '#64748B';
-  const cardBg = isDarkMode ? '#13141F' : '#FFFFFF';
-  const borderCol = isDarkMode ? 'rgba(255, 255, 255, 0.08)' : 'rgba(0, 0, 0, 0.06)';
+  const cardBg = isDarkMode ? '#000000' : '#FFFFFF';
+  const borderCol = isDarkMode ? 'rgba(255, 255, 255, 0.12)' : 'rgba(0, 0, 0, 0.06)';
 
   const handleAccept = (requestId: string) => {
     Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
@@ -40,7 +40,7 @@ export default function MatchesScreen() {
 
       <View style={styles.container}>
         {/* Top 2 Clean Subtabs: 'Requests' vs 'Date Passes' (No redundant Chat tab) */}
-        <View style={[styles.tabToggleRow, { backgroundColor: isDarkMode ? '#13141F' : '#FFFFFF', borderColor: borderCol }]}>
+        <View style={[styles.tabToggleRow, { backgroundColor: isDarkMode ? '#000000' : '#FFFFFF', borderColor: borderCol }]}>
           <TouchableOpacity
             style={[styles.toggleBtn, activeTab === 'requests' && styles.toggleBtnActive]}
             onPress={() => setActiveTab('requests')}

@@ -63,7 +63,7 @@ export default function TabsLayout() {
     return () => unsubscribe();
   }, []);
 
-  const tabBarBg = isDarkMode ? '#05060A' : '#FFFFFF';
+  const tabBarBg = isDarkMode ? '#000000' : '#FFFFFF';
   const borderCol = isDarkMode ? 'rgba(255, 255, 255, 0.08)' : 'rgba(0, 0, 0, 0.08)';
   const activeColor = '#FD3A73';
   const inactiveColor = isDarkMode ? '#94A3B8' : '#64748B';
@@ -261,7 +261,7 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     paddingHorizontal: 3,
     borderWidth: 1.5,
-    borderColor: '#05060A',
+    borderColor: '#000000',
     zIndex: 10,
   },
   tabBadgeText: {

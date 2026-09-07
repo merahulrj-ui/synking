@@ -27,11 +27,11 @@ export const CreateProfileModal: React.FC<Props> = ({ visible, onClose }) => {
   const [bio, setBio] = useState('');
   const [selectedPhoto, setSelectedPhoto] = useState(AVATAR_OPTIONS[0]);
 
-  const cardBg = isDarkMode ? '#13141F' : '#FFFFFF';
+  const cardBg = isDarkMode ? '#000000' : '#FFFFFF';
   const textColor = isDarkMode ? '#FFFFFF' : '#0F172A';
   const subText = isDarkMode ? '#94A3B8' : '#64748B';
-  const borderCol = isDarkMode ? 'rgba(255, 255, 255, 0.08)' : 'rgba(0, 0, 0, 0.08)';
-  const inputBg = isDarkMode ? '#1A1B28' : '#F1F5F9';
+  const borderCol = isDarkMode ? 'rgba(255, 255, 255, 0.12)' : 'rgba(0, 0, 0, 0.08)';
+  const inputBg = isDarkMode ? '#000000' : '#F1F5F9';
 
   const handleCreate = () => {
     if (!name.trim()) {

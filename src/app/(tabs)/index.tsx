@@ -440,7 +440,7 @@ export default function DiscoverScreen() {
                 style={[
                   styles.actionBtn,
                   styles.smallBtn,
-                  { backgroundColor: isDarkMode ? '#1E202B' : '#FFFFFF', borderColor: isDarkMode ? 'rgba(255,255,255,0.05)' : 'rgba(0,0,0,0.05)' }
+                  { backgroundColor: isDarkMode ? '#000000' : '#FFFFFF', borderColor: isDarkMode ? 'rgba(255,255,255,0.12)' : 'rgba(0,0,0,0.05)' }
                 ]}
                 activeOpacity={0.6}
                 onPress={handleRewind}
@@ -454,8 +454,8 @@ export default function DiscoverScreen() {
                   styles.actionBtn,
                   styles.largeBtn,
                   { 
-                    backgroundColor: isDarkMode ? '#1E202B' : '#FFFFFF', 
-                    borderColor: isDarkMode ? 'rgba(239,68,68,0.2)' : 'rgba(0,0,0,0.05)',
+                    backgroundColor: isDarkMode ? '#000000' : '#FFFFFF', 
+                    borderColor: isDarkMode ? 'rgba(239,68,68,0.3)' : 'rgba(0,0,0,0.05)',
                     shadowColor: '#EF4444',
                     shadowOffset: { width: 0, height: 8 },
                     shadowOpacity: isDarkMode ? 0.45 : 0.2,
@@ -475,8 +475,8 @@ export default function DiscoverScreen() {
                   styles.actionBtn,
                   styles.midBtn,
                   { 
-                    backgroundColor: isDarkMode ? '#1E202B' : '#FFFFFF', 
-                    borderColor: isDarkMode ? 'rgba(0,229,255,0.2)' : 'rgba(0,0,0,0.05)',
+                    backgroundColor: isDarkMode ? '#000000' : '#FFFFFF', 
+                    borderColor: isDarkMode ? 'rgba(0,229,255,0.3)' : 'rgba(0,0,0,0.05)',
                     shadowColor: '#00E5FF',
                     shadowOffset: { width: 0, height: 6 },
                     shadowOpacity: isDarkMode ? 0.5 : 0.2,
@@ -499,8 +499,8 @@ export default function DiscoverScreen() {
                   styles.actionBtn,
                   styles.largeBtn,
                   { 
-                    backgroundColor: isDarkMode ? '#1E202B' : '#FFFFFF', 
-                    borderColor: isDarkMode ? 'rgba(253,58,115,0.3)' : 'rgba(0,0,0,0.05)',
+                    backgroundColor: isDarkMode ? '#000000' : '#FFFFFF', 
+                    borderColor: isDarkMode ? 'rgba(253,58,115,0.35)' : 'rgba(0,0,0,0.05)',
                     shadowColor: '#FD3A73',
                     shadowOffset: { width: 0, height: 8 },
                     shadowOpacity: isDarkMode ? 0.6 : 0.3,
@@ -520,8 +520,8 @@ export default function DiscoverScreen() {
                   styles.actionBtn,
                   styles.smallBtn,
                   { 
-                    backgroundColor: isDarkMode ? '#1E202B' : '#FFFFFF', 
-                    borderColor: (boostActiveUntil && Date.now() < boostActiveUntil) ? '#A855F7' : (isDarkMode ? 'rgba(255,255,255,0.05)' : 'rgba(0,0,0,0.05)'),
+                    backgroundColor: isDarkMode ? '#000000' : '#FFFFFF', 
+                    borderColor: (boostActiveUntil && Date.now() < boostActiveUntil) ? '#A855F7' : (isDarkMode ? 'rgba(255,255,255,0.12)' : 'rgba(0,0,0,0.05)'),
                     shadowColor: '#A855F7',
                     shadowOffset: { width: 0, height: 4 },
                     shadowOpacity: (boostActiveUntil && Date.now() < boostActiveUntil) ? 0.8 : 0.2,
@@ -657,9 +657,9 @@ const styles = StyleSheet.create({
     zIndex: 30,
   },
   actionBtn: {
-    backgroundColor: '#22232B',
+    backgroundColor: '#000000',
     borderWidth: 1,
-    borderColor: 'rgba(255, 255, 255, 0.08)',
+    borderColor: 'rgba(255, 255, 255, 0.12)',
     alignItems: 'center',
     justifyContent: 'center',
   },
@@ -744,10 +744,10 @@ const styles = StyleSheet.create({
     paddingVertical: 1,
     borderRadius: 8,
     borderWidth: 1.5,
-    borderColor: '#05060A',
+    borderColor: '#000000',
   },
   quotaPillText: {
-    color: '#05060A',
+    color: '#000000',
     fontFamily: 'Poppins_900Black',
     fontSize: 9,
   },

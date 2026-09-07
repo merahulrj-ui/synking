@@ -13,7 +13,7 @@ export const Header: React.FC<HeaderProps> = ({ onOpenFilter, hasActiveFilters }
   const router = useRouter();
   const { currentLocation, refreshLocation, isDarkMode } = useApp();
 
-  const headerBg = isDarkMode ? '#05060A' : '#FFFFFF';
+  const headerBg = isDarkMode ? '#000000' : '#FFFFFF';
   const logoTextColor = isDarkMode ? '#FFFFFF' : '#111827';
   const borderCol = isDarkMode ? 'rgba(255, 255, 255, 0.06)' : 'rgba(0, 0, 0, 0.06)';
 

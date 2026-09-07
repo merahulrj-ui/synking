@@ -28,12 +28,12 @@ export default function PlanDateScreen() {
   const [selectedSlot, setSelectedSlot] = useState(TIME_SLOTS[0]);
   const [splitType, setSplitType] = useState<'split_50_50' | 'i_treat'>('split_50_50');
 
-  const bg = isDarkMode ? '#05060A' : '#F8F9FB';
-  const headerBg = isDarkMode ? '#05060A' : '#FFFFFF';
+  const bg = isDarkMode ? '#000000' : '#F8F9FB';
+  const headerBg = isDarkMode ? '#000000' : '#FFFFFF';
   const textColor = isDarkMode ? '#FFFFFF' : '#0F172A';
   const subText = isDarkMode ? '#94A3B8' : '#64748B';
-  const cardBg = isDarkMode ? '#13141F' : '#FFFFFF';
-  const borderCol = isDarkMode ? 'rgba(255, 255, 255, 0.08)' : 'rgba(0, 0, 0, 0.06)';
+  const cardBg = isDarkMode ? '#000000' : '#FFFFFF';
+  const borderCol = isDarkMode ? 'rgba(255, 255, 255, 0.12)' : 'rgba(0, 0, 0, 0.06)';
 
   const handleConfirm = () => {
     if (!targetUser || !selectedVenue) return;

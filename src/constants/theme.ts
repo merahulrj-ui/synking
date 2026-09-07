@@ -1,7 +1,7 @@
-﻿export const Colors = {
-  background: '#08090F',
-  surface: '#12141F',
-  surfaceLight: 'rgba(26, 29, 44, 0.75)',
+export const Colors = {
+  background: '#000000',
+  surface: '#000000',
+  surfaceLight: '#000000',
   glassBorder: 'rgba(255, 255, 255, 0.12)',
   text: '#FFFFFF',
   textSecondary: '#94A3B8',

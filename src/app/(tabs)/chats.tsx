@@ -124,11 +124,11 @@ export default function ChatsScreen() {
     }
   };
 
-  const bg = isDarkMode ? '#05060A' : '#F9FAFB';
+  const bg = isDarkMode ? '#000000' : '#F9FAFB';
   const textColor = isDarkMode ? '#FFFFFF' : '#111827';
   const subText = isDarkMode ? '#9CA3AF' : '#6B7280';
-  const cardBg = isDarkMode ? '#11121A' : '#FFFFFF';
-  const borderColor = isDarkMode ? 'rgba(255, 255, 255, 0.06)' : 'rgba(0, 0, 0, 0.06)';
+  const cardBg = isDarkMode ? '#000000' : '#FFFFFF';
+  const borderColor = isDarkMode ? 'rgba(255, 255, 255, 0.08)' : 'rgba(0, 0, 0, 0.06)';
 
   // 1. Instant 0ms cached messages load + cloud sync for all matches
   React.useEffect(() => {
@@ -550,7 +550,7 @@ export default function ChatsScreen() {
           <View
             style={{
               width: 300,
-              backgroundColor: isDarkMode ? '#141522' : '#FFFFFF',
+              backgroundColor: isDarkMode ? '#000000' : '#FFFFFF',
               borderRadius: 22,
               paddingVertical: 18,
               paddingHorizontal: 18,
@@ -677,7 +677,7 @@ const styles = StyleSheet.create({
     borderRadius: 6,
     backgroundColor: '#22C55E',
     borderWidth: 2,
-    borderColor: '#05060A',
+    borderColor: '#000000',
     position: 'absolute',
     bottom: 0,
     right: 0,

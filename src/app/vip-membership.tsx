@@ -181,9 +181,9 @@ export default function VipMembershipScreen() {
     );
   };
 
-  const bgTheme = isDarkMode ? '#07080D' : '#F9FAFB';
+  const bgTheme = isDarkMode ? '#000000' : '#F9FAFB';
   const textColor = isDarkMode ? '#FFFFFF' : '#111827';
-  const cardBg = isDarkMode ? '#13141E' : '#FFFFFF';
+  const cardBg = isDarkMode ? '#000000' : '#FFFFFF';
 
   const handleClose = () => {
     if (router.canGoBack()) {

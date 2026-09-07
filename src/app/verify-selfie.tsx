@@ -36,12 +36,12 @@ export default function VerifySelfieScreen() {
   const router = useRouter();
   const { currentUser, loginUser, isDarkMode } = useApp();
 
-  const bg = isDarkMode ? '#05060A' : '#F8F9FB';
-  const headerBg = isDarkMode ? '#05060A' : '#FFFFFF';
+  const bg = isDarkMode ? '#000000' : '#F8F9FB';
+  const headerBg = isDarkMode ? '#000000' : '#FFFFFF';
   const textColor = isDarkMode ? '#FFFFFF' : '#0F172A';
   const subText = isDarkMode ? '#94A3B8' : '#64748B';
-  const cardBg = isDarkMode ? '#13141F' : '#FFFFFF';
-  const borderCol = isDarkMode ? 'rgba(255, 255, 255, 0.08)' : 'rgba(0, 0, 0, 0.06)';
+  const cardBg = isDarkMode ? '#000000' : '#FFFFFF';
+  const borderCol = isDarkMode ? 'rgba(255, 255, 255, 0.12)' : 'rgba(0, 0, 0, 0.06)';
 
   // Steps: 1 = Snap ID, 2 = AI Result / Confirm, 3 = Live Selfie, 4 = Biometric Match, 5 = Done
   const [step, setStep] = useState<1 | 2 | 3 | 4 | 5>(1);
