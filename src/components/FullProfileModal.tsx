@@ -4,6 +4,7 @@ import { Image } from 'expo-image';
 import { Ionicons, MaterialCommunityIcons } from '@expo/vector-icons';
 import { UserProfile } from '../types';
 import { useApp } from '../contexts/AppContext';
+import { LOOKING_FOR_OPTIONS } from '../app/(tabs)/profile';
 
 const { width: SCREEN_WIDTH, height: SCREEN_HEIGHT } = Dimensions.get('window');
 
@@ -159,6 +160,36 @@ export const FullProfileModal: React.FC<Props> = ({ profile, visible, onClose, o
               <View style={styles.section}>
                 <Text style={[styles.sectionTitle, { color: textTheme }]}>About Me</Text>
                 <Text style={[styles.bioText, { color: subTextTheme }]}>{profile.bio}</Text>
+              </View>
+            ) : null}
+
+            {/* Looking For / Dating Intention */}
+            {profile.lookingFor ? (
+              <View style={styles.section}>
+                <Text style={[styles.sectionTitle, { color: textTheme }]}>Looking For</Text>
+                <View style={{
+                  flexDirection: 'row',
+                  alignItems: 'center',
+                  gap: 8,
+                  backgroundColor: isDarkMode ? '#000000' : '#F1F5F9',
+                  paddingHorizontal: 14,
+                  paddingVertical: 10,
+                  borderRadius: 14,
+                  borderWidth: 1,
+                  borderColor: isDarkMode ? 'rgba(255, 255, 255, 0.12)' : 'rgba(0, 0, 0, 0.06)',
+                  alignSelf: 'flex-start',
+                }}>
+                  <Text style={{ fontSize: 18 }}>
+                    {LOOKING_FOR_OPTIONS.find(o => o.label === profile.lookingFor || o.title === profile.lookingFor)?.emoji || '💘'}
+                  </Text>
+                  <Text style={{
+                    color: textTheme,
+                    fontFamily: 'Poppins_600SemiBold',
+                    fontSize: 13,
+                  }}>
+                    {LOOKING_FOR_OPTIONS.find(o => o.label === profile.lookingFor || o.title === profile.lookingFor)?.title || profile.lookingFor}
+                  </Text>
+                </View>
               </View>
             ) : null}
 

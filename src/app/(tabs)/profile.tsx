@@ -52,11 +52,18 @@ export const ALL_INTERESTS = [
 ];
 
 export const LOOKING_FOR_OPTIONS = [
-  { key: 'long_term', label: '💘 Long-term partner', emoji: '💘', title: 'Long-term relationship' },
-  { key: 'short_term', label: '🥂 Long-term, open to short', emoji: '🥂', title: 'Long-term, open to short' },
-  { key: 'casual', label: '🎉 Casual dating & fun', emoji: '🎉', title: 'Casual dating' },
-  { key: 'friends', label: '☕ New friends & hangout', emoji: '☕', title: 'New friends' },
-  { key: 'figuring_out', label: '💭 Still figuring it out', emoji: '💭', title: 'Still figuring it out' },
+  { key: 'marriage', label: '💍 Marriage / Serious partner', emoji: '💍', title: 'Marriage / Matrimony', description: 'Looking for a life partner with marriage in mind' },
+  { key: 'long_term', label: '💘 Long-term partner', emoji: '💘', title: 'Long-term relationship', description: 'Deep emotional connection and mutual commitment' },
+  { key: 'short_term', label: '🥂 Long-term, open to short', emoji: '🥂', title: 'Long-term, open to short', description: 'Seeking a partner, but open to see how things go' },
+  { key: 'short_open_long', label: '🍷 Short-term, open to long', emoji: '🍷', title: 'Short-term, open to long', description: 'Enjoying dates now, open to something more if it clicks' },
+  { key: 'casual', label: '🎉 Casual dating & fun', emoji: '🎉', title: 'Casual dating & fun', description: 'Lighthearted, spontaneous dates without pressure' },
+  { key: 'soulmate', label: '✨ Deep soulmate connection', emoji: '✨', title: 'Deep connection / Soulmate', description: 'Craving meaningful conversations and emotional chemistry' },
+  { key: 'coffee_dates', label: '☕ Coffee & casual chats', emoji: '☕', title: 'Coffee & casual chats', description: 'Meeting over great coffee, food, and cozy dates' },
+  { key: 'travel_buddy', label: '✈️ Travel & adventure buddy', emoji: '✈️', title: 'Travel & adventure partner', description: 'Exploring cafes, getaways, and new places together' },
+  { key: 'activity_buddy', label: '🎭 Activity & event companion', emoji: '🎭', title: 'Activity & event companion', description: 'Concerts, sports, gym, art, and exploring the city' },
+  { key: 'friends', label: '🤝 New friends & hangout', emoji: '🤝', title: 'New friends & hangouts', description: 'Looking to expand my circle with genuine people' },
+  { key: 'networking', label: '💼 Networking & creative vibes', emoji: '💼', title: 'Professional & creative minds', description: 'Connecting with ambitious creatives and founders' },
+  { key: 'figuring_out', label: '💭 Still figuring it out', emoji: '💭', title: 'Still figuring it out', description: 'No fixed agenda — going with the flow' },
 ];
 
 export const WORKOUT_OPTIONS = ['Everyday 🏋️', 'Often (3-4x/wk) 🏃', 'Sometimes 🚶', 'Never 🛋️'];
@@ -737,13 +744,33 @@ export default function ProfileScreen() {
                   <Feather name="target" size={15} color="#FD3A73" />
                   <Text style={[styles.cardHeaderTitle, { color: textColor }]}>Looking For</Text>
                 </View>
+                <TouchableOpacity
+                  onPress={() => {
+                    if (currentUser) populateEditState(currentUser);
+                    setActiveEditTab('lifestyle');
+                    setEditModalVisible(true);
+                  }}
+                >
+                  <Text style={styles.cardActionLink}>Edit</Text>
+                </TouchableOpacity>
               </View>
-              <View style={[styles.intentionCapsule, { backgroundColor: innerBg, borderColor }]}>
-                <Text style={{ fontSize: 16 }}>💘</Text>
-                <Text style={[styles.intentionText, { color: textColor }]}>
-                  {currentUser?.lookingFor || 'Long-term relationship'}
+              <TouchableOpacity
+                activeOpacity={0.8}
+                onPress={() => {
+                  if (currentUser) populateEditState(currentUser);
+                  setActiveEditTab('lifestyle');
+                  setEditModalVisible(true);
+                }}
+                style={[styles.intentionCapsule, { backgroundColor: innerBg, borderColor }]}
+              >
+                <Text style={{ fontSize: 18 }}>
+                  {LOOKING_FOR_OPTIONS.find(o => o.label === currentUser?.lookingFor || o.title === currentUser?.lookingFor)?.emoji || '💘'}
                 </Text>
-              </View>
+                <Text style={[styles.intentionText, { color: textColor, flex: 1 }]}>
+                  {LOOKING_FOR_OPTIONS.find(o => o.label === currentUser?.lookingFor || o.title === currentUser?.lookingFor)?.title || currentUser?.lookingFor || 'Long-term relationship'}
+                </Text>
+                <Feather name="chevron-right" size={15} color={subText} />
+              </TouchableOpacity>
             </View>
 
             {/* 6. LIFESTYLE & DETAILS (CLEAN GLASS PILLS) */}
@@ -1178,14 +1205,23 @@ export default function ProfileScreen() {
                         style={[
                           styles.optionCard,
                           { backgroundColor: innerBg, borderColor },
-                          editLookingFor === opt.label && styles.optionCardSelected,
+                          (editLookingFor === opt.label || editLookingFor === opt.title) && styles.optionCardSelected,
                         ]}
                         onPress={() => setEditLookingFor(opt.label)}
                         activeOpacity={0.8}
                       >
-                        <Text style={{ fontSize: 18 }}>{opt.emoji}</Text>
-                        <Text style={[styles.optionCardText, { color: textColor }]}>{opt.title}</Text>
-                        {editLookingFor === opt.label && <Ionicons name="checkmark-circle" size={18} color="#FD3A73" style={{ marginLeft: 'auto' }} />}
+                        <Text style={{ fontSize: 22 }}>{opt.emoji}</Text>
+                        <View style={{ flex: 1, marginLeft: 8 }}>
+                          <Text style={[styles.optionCardText, { color: textColor }]}>{opt.title}</Text>
+                          {opt.description ? (
+                            <Text style={{ fontSize: 11, color: subText, fontFamily: 'Poppins_400Regular', marginTop: 1 }}>
+                              {opt.description}
+                            </Text>
+                          ) : null}
+                        </View>
+                        {(editLookingFor === opt.label || editLookingFor === opt.title) && (
+                          <Ionicons name="checkmark-circle" size={18} color="#FD3A73" style={{ marginLeft: 6 }} />
+                        )}
                       </TouchableOpacity>
                     ))}
                   </View>
