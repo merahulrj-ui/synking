@@ -14,6 +14,7 @@ import { InAppNotificationBanner } from '../components/InAppNotificationBanner';
 import { WebRTCService } from '../services/webrtcService';
 import { NativeRTCView } from '../services/webrtcCore';
 import { CallSession } from '../types';
+import { activateKeepAwakeAsync, deactivateKeepAwake } from 'expo-keep-awake';
 
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { RealtimeBridge } from '../services/realtimeBridge';
@@ -284,7 +285,8 @@ function FloatingVideoPiP({
             streamURL={typeof remoteStream.toURL === 'function' ? remoteStream.toURL() : remoteStream}
             style={pipStyles.nativeVideo}
             objectFit="cover"
-            zOrder={9999}
+            zOrder={1}
+            zOrderMediaOverlay={true}
           />
         ) : (
           <Image
@@ -415,6 +417,23 @@ function GlobalCallOverlay() {
       navigateToChat(target);
     }
   }, [isMinimized, activeCall, navigateToChat]);
+
+  // 💡 Keep Screen Awake as long as any call is active
+  React.useEffect(() => {
+    const isCallActive = activeCall && (
+      activeCall.status === 'calling' || 
+      activeCall.status === 'ringing' || 
+      activeCall.status === 'connected'
+    );
+    if (isCallActive) {
+      activateKeepAwakeAsync('synkin_global_call').catch(() => {});
+    } else {
+      deactivateKeepAwake('synkin_global_call').catch(() => {});
+    }
+    return () => {
+      deactivateKeepAwake('synkin_global_call').catch(() => {});
+    };
+  }, [activeCall?.status]);
 
   const hasStartedOngoingCallRef = React.useRef<boolean>(false);
 

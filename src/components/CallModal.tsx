@@ -1,7 +1,8 @@
 import React, { useRef, useEffect, useState } from 'react';
-import { View, Text, StyleSheet, Modal, TouchableOpacity, Image, Platform, ScrollView, Share, Animated, PanResponder, Vibration, NativeModules, BackHandler, DeviceEventEmitter, Dimensions, TextInput } from 'react-native';
+import { View, Text, StyleSheet, Modal, TouchableOpacity, Image, Platform, ScrollView, Share, Animated, PanResponder, Vibration, NativeModules, BackHandler, DeviceEventEmitter, Dimensions, TextInput, AppState } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { LinearGradient } from 'expo-linear-gradient';
+import { activateKeepAwakeAsync, deactivateKeepAwake } from 'expo-keep-awake';
 import { CallSession } from '../types';
 import { WebRTCService } from '../services/webrtcService';
 import { RingtoneService } from '../services/ringtoneService';
@@ -60,23 +61,38 @@ const QUICK_DECLINE_OPTIONS: QuickDeclineOption[] = [
 const LiveSelfVideo: React.FC<{ isPip?: boolean }> = ({ isPip = true }) => {
   const videoRef = useRef<any>(null);
   const [stream, setStream] = useState<any>(() => WebRTCService.getLocalStream());
+  const [renderKey, setRenderKey] = useState<number>(0);
 
   useEffect(() => {
     const update = () => {
       const s = WebRTCService.getLocalStream();
       setStream(s);
+      setRenderKey(prev => prev + 1);
       if (Platform.OS === 'web' && s && videoRef.current && videoRef.current.srcObject !== s) {
         videoRef.current.srcObject = s;
       }
     };
     update();
     const unsub = WebRTCService.subscribe(update);
-    const interval = setInterval(update, 300);
+    const interval = setInterval(update, 500);
+
+    // 📱 When returning from background / multitasking, force SurfaceView re-mount
+    const appStateSub = AppState.addEventListener('change', (state) => {
+      if (state === 'active') {
+        update();
+        setTimeout(update, 250);
+        setTimeout(update, 650);
+      }
+    });
+
     return () => {
       unsub();
       clearInterval(interval);
+      appStateSub.remove();
     };
   }, []);
+
+  const streamUrl = typeof stream?.toURL === 'function' ? stream.toURL() : stream;
 
   return (
     <View style={[styles.selfVideoPlaceholder, { width: '100%', height: '100%', backgroundColor: '#000000', borderRadius: isPip ? 16 : 0 }]}>
@@ -99,11 +115,13 @@ const LiveSelfVideo: React.FC<{ isPip?: boolean }> = ({ isPip = true }) => {
       ) : (
         (NativeRTCView && stream) ? (
           <NativeRTCView
-            streamURL={typeof stream.toURL === 'function' ? stream.toURL() : stream}
+            key={`self_pip_${renderKey}_${streamUrl || 'stream'}`}
+            streamURL={streamUrl}
             style={{ width: '100%', height: '100%', borderRadius: isPip ? 16 : 0, backgroundColor: '#000000' }}
             objectFit="cover"
             mirror={true}
             zOrder={isPip ? 1 : 0}
+            zOrderMediaOverlay={isPip}
           />
         ) : (
           <View style={{ width: '100%', height: '100%', borderRadius: isPip ? 16 : 0, overflow: 'hidden', backgroundColor: '#1A1A1A', justifyContent: 'center', alignItems: 'center' }}>
@@ -255,6 +273,36 @@ export const CallModal: React.FC<Props> = ({ session, isLockscreen, onEndCall, o
       clearInterval(interval);
     };
   }, [session?.status, session?.isSpeakerOn]);
+
+  const [remoteRenderKey, setRemoteRenderKey] = useState<number>(0);
+
+  // 💡 Keep Screen Awake for the entire duration of the active call
+  useEffect(() => {
+    const isCallActive = session && (
+      session.status === 'calling' || 
+      session.status === 'ringing' || 
+      session.status === 'connected'
+    );
+    if (isCallActive) {
+      activateKeepAwakeAsync('synkin_call_screen').catch(() => {});
+    } else {
+      deactivateKeepAwake('synkin_call_screen').catch(() => {});
+    }
+    return () => {
+      deactivateKeepAwake('synkin_call_screen').catch(() => {});
+    };
+  }, [session?.status]);
+
+  // 📱 Listen for AppState changes to trigger SurfaceView re-render when returning from background
+  useEffect(() => {
+    const sub = AppState.addEventListener('change', (state) => {
+      if (state === 'active') {
+        setRemoteRenderKey(k => k + 1);
+        setTimeout(() => setRemoteRenderKey(k => k + 1), 300);
+      }
+    });
+    return () => sub.remove();
+  }, []);
 
   useEffect(() => {
     if (session.status === 'connected' || isLockscreen) {
@@ -461,10 +509,12 @@ export const CallModal: React.FC<Props> = ({ session, isLockscreen, onEndCall, o
               <View style={styles.videoSurfaceContainer}>
                 {Platform.OS !== 'web' && NativeRTCView && remoteStream ? (
                   <NativeRTCView
+                    key={`remote_main_${remoteRenderKey}_${typeof remoteStream.toURL === 'function' ? remoteStream.toURL() : (remoteStream?.id || 'remote')}`}
                     streamURL={typeof remoteStream.toURL === 'function' ? remoteStream.toURL() : remoteStream}
                     style={[styles.nativeRemoteVideo, { backgroundColor: '#000000' }]}
                     objectFit="cover"
                     zOrder={0}
+                    zOrderMediaOverlay={false}
                   />
                 ) : (
                   <LiveRemoteMedia type={session.type === 'video' ? 'video' : 'voice'} photoUrl={session.callerPhoto} isSpeakerOn={session.isSpeakerOn} />

@@ -5,7 +5,7 @@ import { RealtimeBridge } from './realtimeBridge';
 import { RingtoneService } from './ringtoneService';
 import { AudioRouteService } from './audioRouteService';
 import { UserProfile, CallSession } from '../types';
-import { PermissionsAndroid, Platform, NativeModules, Alert } from 'react-native';
+import { PermissionsAndroid, Platform, NativeModules, Alert, AppState, AppStateStatus } from 'react-native';
 import { MediaDevices, PeerConnection, SessionDescription, IceCandidate } from './webrtcCore';
 import { NotificationService } from './notificationService';
 import { CallDebugger } from './callDebugger';
@@ -59,6 +59,9 @@ class WebRTCManager {
 
   private targetChatUserId: string | null = null;
   private blockedUserIds: Set<string> = new Set();
+  private appStateSubscription: any = null;
+  private currentAppState: AppStateStatus = AppState.currentState || 'active';
+  private isResumingCamera: boolean = false;
 
   public setBlockedUsers(ids: string[] | Set<string>) {
     this.blockedUserIds = new Set(ids);
@@ -86,6 +89,22 @@ class WebRTCManager {
   }
 
   constructor() {
+    // 📱 AppState Monitoring: Automatically resume camera capturer when app returns to foreground
+    this.appStateSubscription = AppState.addEventListener('change', (nextAppState: AppStateStatus) => {
+      const prevAppState = this.currentAppState;
+      this.currentAppState = nextAppState;
+      this.log(`📱 AppState transition: ${prevAppState} -> ${nextAppState}`);
+
+      if ((prevAppState === 'background' || prevAppState === 'inactive') && nextAppState === 'active') {
+        if (this.currentSession && (this.currentSession.status === 'connected' || this.currentSession.status === 'calling' || this.currentSession.status === 'ringing')) {
+          const isVideo = this.currentSession.type === 'video' || this.currentSession.isVideoEnabled;
+          if (isVideo) {
+            this.resumeLocalVideoCapturer();
+          }
+        }
+      }
+    });
+
     // Listen for Targeted Real-Time Call Signaling from peer
     RealtimeBridge.subscribe(async ({ type, payload, targetUserId }) => {
       // We rely on the WebSocket server and AppContext to route messages correctly.
@@ -1022,6 +1041,78 @@ class WebRTCManager {
       setTimeout(() => {
         this.isSwitchingCamera = false;
       }, 500);
+    }
+  }
+
+  // 🔄 Resume Camera Capturer when App returns to Foreground from Multitasking
+  public async resumeLocalVideoCapturer(): Promise<void> {
+    if (!this.currentSession) return;
+    const isVideo = this.currentSession.type === 'video' || this.currentSession.isVideoEnabled;
+    if (!isVideo) return;
+
+    if (this.isResumingCamera || this.isSwitchingCamera) {
+      this.log('⏳ Camera resumption or switch already in progress, skipping duplicate.');
+      return;
+    }
+    this.isResumingCamera = true;
+
+    try {
+      this.log('📱 App resumed active: Re-capturing camera to restore live video feed...');
+      const isFront = this.currentSession.isFrontCamera !== false;
+      const targetFacing = isFront ? 'user' : 'environment';
+
+      if (MediaDevices && MediaDevices.getUserMedia) {
+        let newVideoStream: any = null;
+        try {
+          newVideoStream = await MediaDevices.getUserMedia({
+            video: { facingMode: targetFacing, width: { ideal: 640 }, height: { ideal: 480 } },
+            audio: false, // ⚠️ Audio is untouched to prevent echo / route disruption
+          });
+        } catch (err1) {
+          try {
+            newVideoStream = await MediaDevices.getUserMedia({
+              video: { facingMode: targetFacing },
+              audio: false,
+            });
+          } catch (err2) {
+            this.log(`❌ Failed to re-capture camera on resume: ${err2}`);
+            return;
+          }
+        }
+
+        const newVideoTrack = newVideoStream?.getVideoTracks()?.[0];
+        if (newVideoTrack) {
+          if (!this.localStream) {
+            this.localStream = newVideoStream;
+          } else {
+            // Stop and cleanly remove old frozen video tracks
+            const oldVideoTracks = this.localStream.getVideoTracks ? this.localStream.getVideoTracks() : [];
+            oldVideoTracks.forEach((t: any) => {
+              try { t.stop(); } catch (e) {}
+              try { this.localStream.removeTrack(t); } catch (e) {}
+            });
+            this.localStream.addTrack(newVideoTrack);
+          }
+
+          // Seamlessly swap track on RTCRtpSender for the active PeerConnection
+          if (this.peerConnection) {
+            const senders = typeof this.peerConnection.getSenders === 'function' ? this.peerConnection.getSenders() : [];
+            const videoSender = senders.find((s: any) => s.track && s.track.kind === 'video');
+            if (videoSender && typeof videoSender.replaceTrack === 'function') {
+              await videoSender.replaceTrack(newVideoTrack);
+              this.log('✅ Outgoing RTCRtpSender video track replaced successfully on resume.');
+            }
+          }
+
+          this.notifyNativeVideoStreams();
+          this.log(`✅ Camera hardware resumed active: track id=${newVideoTrack.id}, readyState=${newVideoTrack.readyState}`);
+          this.notify();
+        }
+      }
+    } catch (e) {
+      this.log(`⚠️ Error in resumeLocalVideoCapturer: ${e}`);
+    } finally {
+      this.isResumingCamera = false;
     }
   }
 
