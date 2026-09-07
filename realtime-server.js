@@ -111,14 +111,13 @@ function isAdminAuthorized(req) {
 // Turso 9GB Cloud SQLite is 100% Single Source of Truth (No Local JSON)
 
 // 9 GB Turso Cloud SQLite Configuration (AWS Mumbai - 0ms Latency)
-// Set TURSO_DATABASE_URL and TURSO_AUTH_TOKEN in .env or server environment variables
+const FALLBACK_TURSO_TOKEN = 'eyJhbGciOiJFZERTQSIsInR5cCI6IkpXVCJ9.eyJhIjoicnciLCJpYXQiOjE3ODc4OTI0MzYsImlkIjoiMDFhMDQ2YWUtNzgwMS03MzdlLTg3MzAtZWI1NTY5Yjk0NmUxIiwia2lkIjoiMmROU0NaSHpYX2FfcVVsLVhFWmFOSm1tYkRJeUo1VmJsZ3BjSXJnNmc5cyIsInJpZCI6IjRhNWIxNDE3LTkzYWYtNGZiYi1hOTNmLTNiYjU3NGFhOTA3NyJ9.3qHyMOLW_iLlaL0j6c5krGBrR6BrU9nwkzAExC0uH8hYuWXGj1ph79X4YNJuo_Xw3CKaqiUCW0ALaTLGHoeHAw';
 const TURSO_URL = (process.env.TURSO_DATABASE_URL && process.env.TURSO_DATABASE_URL.trim())
   ? process.env.TURSO_DATABASE_URL.trim()
-  : 'https://synking-db-pikirahulkumar-eng.aws-ap-south-1.turso.io'; // fallback for local dev only
+  : 'https://synking-db-pikirahulkumar-eng.aws-ap-south-1.turso.io';
 const TURSO_TOKEN = (process.env.TURSO_AUTH_TOKEN && process.env.TURSO_AUTH_TOKEN.trim().length > 20)
   ? process.env.TURSO_AUTH_TOKEN.trim()
-  : null; // No hardcoded token — set TURSO_AUTH_TOKEN env variable on server
-if (!TURSO_TOKEN) console.warn('[TURSO] ⚠️ TURSO_AUTH_TOKEN env variable not set. Database will not work!');
+  : FALLBACK_TURSO_TOKEN;
 
 async function queryTurso(sql, args = []) {
   if (!TURSO_URL || !TURSO_TOKEN) return null;
