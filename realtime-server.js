@@ -66,6 +66,53 @@ const DEFAULT_VIP_CONFIG = {
 
 let vipPlansConfig = JSON.parse(JSON.stringify(DEFAULT_VIP_CONFIG));
 
+// ──────────────────────────────────────────────────────────────────────────────
+// 📦 ICE Candidate Buffer — Holds WebRTC ICE signals for offline/late-joining
+// users for up to 30 seconds. Flushed immediately when user comes online.
+// Prevents "EglRenderer: Dropping frame - No surface" from ICE miss on reconnect.
+// ──────────────────────────────────────────────────────────────────────────────
+const ICE_SIGNAL_TYPES = new Set(['WEBRTC_ICE', 'WEBRTC_OFFER', 'WEBRTC_ANSWER']);
+const ICE_BUFFER_TTL_MS = 30000; // 30 seconds
+// Map<userId, Array<{ frame: Buffer, addedAt: number }>>
+const iceSignalBuffer = new Map();
+
+function bufferIceSignal(targetUserId, frame, signalType) {
+  if (!iceSignalBuffer.has(targetUserId)) {
+    iceSignalBuffer.set(targetUserId, []);
+  }
+  iceSignalBuffer.get(targetUserId).push({ frame, addedAt: Date.now() });
+  console.log(`[ICE_BUFFERED] ${signalType} queued for ${targetUserId} (total buffered: ${iceSignalBuffer.get(targetUserId).length})`);
+}
+
+function flushIceBuffer(targetUserId, socket) {
+  const pending = iceSignalBuffer.get(targetUserId);
+  if (!pending || pending.length === 0) return;
+  const now = Date.now();
+  let flushed = 0;
+  for (const item of pending) {
+    if (now - item.addedAt <= ICE_BUFFER_TTL_MS && socket.writable) {
+      try { socket.write(item.frame); flushed++; } catch (e) {}
+    }
+  }
+  iceSignalBuffer.delete(targetUserId);
+  if (flushed > 0) {
+    console.log(`[ICE_FLUSHED] ✅ Delivered ${flushed} buffered ICE/SDP signals to ${targetUserId} on reconnect`);
+  }
+}
+
+// Periodically purge stale ICE buffers older than TTL (runs every 60s)
+setInterval(() => {
+  const now = Date.now();
+  for (const [userId, items] of iceSignalBuffer.entries()) {
+    const fresh = items.filter(i => now - i.addedAt <= ICE_BUFFER_TTL_MS);
+    if (fresh.length === 0) {
+      iceSignalBuffer.delete(userId);
+    } else {
+      iceSignalBuffer.set(userId, fresh);
+    }
+  }
+}, 60000);
+
 function broadcastWs(data) {
   if (typeof broadcastToWebSockets === 'function') {
     broadcastToWebSockets(data);
@@ -3401,6 +3448,8 @@ server.on('upgrade', (req, socket, head) => {
         if (parsed.type === 'REGISTER_SOCKET' && parsed.userId) {
           socket.userId = parsed.userId;
           console.log(`[WS_REGISTERED] Socket bound to userId: ${parsed.userId}`);
+          // 📦 Flush any ICE/SDP signals buffered while this user was offline/connecting
+          flushIceBuffer(parsed.userId, socket);
           continue;
         }
 
@@ -3546,6 +3595,10 @@ server.on('upgrade', (req, socket, head) => {
                 { type: 'text', value: targetUserId },
                 { type: 'text', value: payloadStr }
               ]).catch(err => console.error('[TURSO_PENDING_ERR]', err.message));
+            } else if (ICE_SIGNAL_TYPES.has(parsed.type)) {
+              // 📦 Buffer ICE/SDP signals — target user is momentarily offline or reconnecting
+              // These will be flushed to the correct socket the instant the user registers
+              bufferIceSignal(targetUserId, frame, parsed.type);
             } else {
               console.log(`[WS_TARGETED_SIGNAL] ${parsed.type} Target ${targetUserId} not bound yet. Broadcasting fallback.`);
               broadcastToWebSockets(parsed, socket);
