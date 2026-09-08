@@ -1,5 +1,6 @@
 import React, { useEffect, useState } from 'react';
 import { View, StyleSheet, Platform, NativeModules, StatusBar } from 'react-native';
+import { activateKeepAwakeAsync, deactivateKeepAwake } from 'expo-keep-awake';
 import { CallModal } from './CallModal';
 import { WebRTCService } from '../services/webrtcService';
 import { CallSession } from '../types';
@@ -75,14 +76,22 @@ export default function CallApp() {
   // 💡 Keep Screen Awake as long as CallActivity call is active
   useEffect(() => {
     if (session?.status === 'connected' || session?.status === 'calling' || session?.status === 'ringing') {
+      activateKeepAwakeAsync('synkin_callapp_screen').catch(() => {});
       if (Platform.OS === 'android' && NativeModules.CallWakeLockModule?.acquireScreenWakeLock) {
         NativeModules.CallWakeLockModule.acquireScreenWakeLock().catch(() => {});
       }
     } else {
+      deactivateKeepAwake('synkin_callapp_screen').catch(() => {});
       if (Platform.OS === 'android' && NativeModules.CallWakeLockModule?.releaseScreenWakeLock) {
         NativeModules.CallWakeLockModule.releaseScreenWakeLock().catch(() => {});
       }
     }
+    return () => {
+      deactivateKeepAwake('synkin_callapp_screen').catch(() => {});
+      if (Platform.OS === 'android' && NativeModules.CallWakeLockModule?.releaseScreenWakeLock) {
+        NativeModules.CallWakeLockModule.releaseScreenWakeLock().catch(() => {});
+      }
+    };
   }, [session?.status]);
 
   const handleEndCall = () => {

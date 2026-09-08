@@ -7,6 +7,7 @@ import android.content.Intent
 import android.content.IntentFilter
 import android.os.Build
 import android.os.Bundle
+import android.os.PowerManager
 import android.util.Log
 import android.view.WindowManager
 import com.facebook.react.ReactActivity
@@ -26,6 +27,8 @@ class CallActivity : ReactActivity() {
     companion object {
         var currentCallActivity: CallActivity? = null
     }
+
+    private var nativeScreenWakeLock: PowerManager.WakeLock? = null
 
     private val callEndedReceiver = object : BroadcastReceiver() {
         override fun onReceive(context: Context?, intent: Intent?) {
@@ -63,6 +66,21 @@ class CallActivity : ReactActivity() {
 
         // 💡 Keep screen and CPU awake during call to prevent OEM battery freezing
         window.addFlags(WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON)
+
+        // 💡 Hardware Screen WakeLock: Guarantee screen stays bright & awake throughout entire call
+        try {
+            val pm = getSystemService(Context.POWER_SERVICE) as? PowerManager
+            @Suppress("DEPRECATION")
+            nativeScreenWakeLock = pm?.newWakeLock(
+                PowerManager.SCREEN_BRIGHT_WAKE_LOCK or PowerManager.ACQUIRE_CAUSES_WAKEUP or PowerManager.ON_AFTER_RELEASE,
+                "synking:call_activity_screen_awake"
+            )
+            nativeScreenWakeLock?.setReferenceCounted(false)
+            nativeScreenWakeLock?.acquire(2 * 60 * 60 * 1000L)
+            Log.d("SYNKING_WAKELOCK", "✅ Acquired native SCREEN_BRIGHT_WAKE_LOCK in CallActivity")
+        } catch (e: Exception) {
+            Log.e("SYNKING_WAKELOCK", "Error acquiring wake lock: ${e.message}")
+        }
 
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O_MR1) {
             setShowWhenLocked(true)
@@ -136,6 +154,12 @@ class CallActivity : ReactActivity() {
         try {
             CallIntentModule.clear()
             PendingCallStore.clear(this)
+        } catch (e: Exception) {}
+        try {
+            if (nativeScreenWakeLock?.isHeld == true) {
+                nativeScreenWakeLock?.release()
+                Log.d("SYNKING_WAKELOCK", "🛑 Released native SCREEN_BRIGHT_WAKE_LOCK in CallActivity onDestroy")
+            }
         } catch (e: Exception) {}
         try {
             unregisterReceiver(callEndedReceiver)
