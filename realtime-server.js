@@ -3596,9 +3596,10 @@ server.on('upgrade', (req, socket, head) => {
                 { type: 'text', value: payloadStr }
               ]).catch(err => console.error('[TURSO_PENDING_ERR]', err.message));
             } else if (ICE_SIGNAL_TYPES.has(parsed.type)) {
-              // 📦 Buffer ICE/SDP signals — target user is momentarily offline or reconnecting
-              // These will be flushed to the correct socket the instant the user registers
+              // 📦 Buffer ICE/SDP signals AND also broadcast fallback so anonymous clients (like CallActivity) receive immediately
               bufferIceSignal(targetUserId, frame, parsed.type);
+              console.log(`[WS_TARGETED_SIGNAL] ${parsed.type} Target ${targetUserId} buffered & broadcasting fallback.`);
+              broadcastToWebSockets(parsed, socket);
             } else {
               console.log(`[WS_TARGETED_SIGNAL] ${parsed.type} Target ${targetUserId} not bound yet. Broadcasting fallback.`);
               broadcastToWebSockets(parsed, socket);
