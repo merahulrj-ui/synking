@@ -450,6 +450,7 @@ class TelecomModule(reactContext: ReactApplicationContext) : ReactContextBaseJav
             try {
                 val params = PictureInPictureParams.Builder()
                     .setAspectRatio(Rational(9, 16))
+                    .setActions(emptyList())
                     .build()
                 val entered = activity.enterPictureInPictureMode(params)
                 Log.d("SYNKING_PIP", "enterPipMode called from JS: entered=$entered")

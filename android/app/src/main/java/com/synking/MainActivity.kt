@@ -134,6 +134,7 @@ class MainActivity : ReactActivity() {
       try {
         val params = PictureInPictureParams.Builder()
           .setAspectRatio(Rational(9, 16))
+          .setActions(emptyList())
           .build()
         enterPictureInPictureMode(params)
         android.util.Log.d("SYNKING_PIP", "✅ Auto-entered native PiP on Home press during video call")
