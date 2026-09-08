@@ -13,7 +13,7 @@ import { CallSession } from '../../types';
 
 export default function TabsLayout() {
   const insets = useSafeAreaInsets();
-  const safeBottom = Math.max(insets.bottom, Platform.OS === 'android' ? 30 : 16);
+  const safeBottom = Math.max(insets.bottom, Platform.OS === 'android' ? 14 : 10);
   const { isDarkMode, incomingRequests, currentUser, acceptedMatchAlert, clearAcceptedMatchAlert, isSuspended, suspendedUntil, unreadChatIds } = useApp();
   const [activeCall, setActiveCall] = React.useState<CallSession | null>(null);
   const [timeLeft, setTimeLeft] = React.useState<string>('');
@@ -90,9 +90,8 @@ export default function TabsLayout() {
             {
               backgroundColor: tabBarBg,
               borderTopColor: isDarkMode ? 'rgba(253, 58, 115, 0.18)' : borderCol,
-              height: Platform.OS === 'ios' ? 60 + safeBottom : 62 + safeBottom,
+              height: 56 + safeBottom,
               paddingBottom: safeBottom,
-              paddingTop: Platform.OS === 'ios' ? 6 : 8,
               ...(isDarkMode ? {
                 shadowColor: '#FD3A73',
                 shadowOffset: { width: 0, height: -4 },
@@ -110,7 +109,6 @@ export default function TabsLayout() {
           ],
           tabBarActiveTintColor: activeColor,
           tabBarInactiveTintColor: inactiveColor,
-          tabBarAllowFontScaling: false,
           tabBarShowLabel: true,
           tabBarLabelStyle: styles.tabLabel,
           tabBarItemStyle: styles.tabItem,
@@ -218,22 +216,18 @@ export default function TabsLayout() {
 
 const styles = StyleSheet.create({
   tabBar: {
+    paddingTop: 6,
     borderTopWidth: 1,
   },
   tabItem: {
-    paddingHorizontal: 0,
-    paddingVertical: 0,
+    paddingVertical: 2,
     justifyContent: 'center',
     alignItems: 'center',
   },
   tabLabel: {
-    fontSize: 10,
-    fontFamily: 'Poppins_600SemiBold',
-    includeFontPadding: false,
-    letterSpacing: -0.2,
+    fontSize: 11,
+    fontWeight: '700',
     marginTop: 2,
-    marginBottom: Platform.OS === 'android' ? 2 : 0,
-    textAlign: 'center',
   },
   inSynkTabIconWrapper: {
     width: 28,
@@ -279,7 +273,7 @@ const styles = StyleSheet.create({
   tabBadgeText: {
     color: '#FFF',
     fontSize: 8.5,
-    fontFamily: 'Poppins_900Black',
+    fontWeight: '900',
   },
   globalSuspensionBanner: {
     backgroundColor: '#DC2626',
@@ -293,14 +287,14 @@ const styles = StyleSheet.create({
   },
   suspensionBannerTitle: {
     color: '#FFFFFF',
-    fontFamily: 'Poppins_900Black',
+    fontWeight: '900',
     fontSize: 12.5,
     letterSpacing: 0.5,
   },
   suspensionBannerSub: {
     color: '#FEE2E2',
     fontSize: 11,
-    fontFamily: 'Poppins_600SemiBold',
+    fontWeight: '600',
     marginTop: 2,
     textAlign: 'center',
   },
