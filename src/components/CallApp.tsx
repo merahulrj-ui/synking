@@ -4,6 +4,8 @@ import { CallModal } from './CallModal';
 import { WebRTCService } from '../services/webrtcService';
 import { CallSession } from '../types';
 import '../services/telecomBridge';
+import AsyncStorage from '@react-native-async-storage/async-storage';
+import { RealtimeBridge } from '../services/realtimeBridge';
 
 /**
  * CallApp: Standalone Isolated Root Component for CallActivity.
@@ -15,6 +17,16 @@ export default function CallApp() {
   const hadSessionRef = React.useRef(false);
 
   useEffect(() => {
+    // 👤 Register socket with logged-in userId in CallActivity
+    AsyncStorage.getItem('synking_my_user').then(stored => {
+      if (stored) {
+        const parsed = JSON.parse(stored);
+        if (parsed && parsed.id) {
+          RealtimeBridge.registerUser(parsed.id);
+        }
+      }
+    }).catch(() => {});
+
     // 🚀 Cold-boot recovery: If React opens before bridge emits, query native module directly
     if (!WebRTCService.getCurrentSession() && Platform.OS === 'android' && NativeModules.CallIntentModule?.getPendingCall) {
       NativeModules.CallIntentModule.getPendingCall().then((pending: any) => {
