@@ -1,6 +1,6 @@
 import '../services/telecomBridge';
 import React, { useEffect } from 'react';
-import { View, StyleSheet, Platform, Alert, NativeModules, TouchableOpacity, Text, Animated, PanResponder, Dimensions, Image, DeviceEventEmitter, StatusBar as RNStatusBar } from 'react-native';
+import { View, StyleSheet, Platform, Alert, NativeModules, TouchableOpacity, Text, Animated, PanResponder, Dimensions, Image, DeviceEventEmitter, StatusBar as RNStatusBar, AppState } from 'react-native';
 import { Stack, useRouter } from 'expo-router';
 import { StatusBar } from 'expo-status-bar';
 import { Ionicons } from '@expo/vector-icons';
@@ -418,7 +418,7 @@ function GlobalCallOverlay() {
     }
   }, [isMinimized, activeCall, navigateToChat]);
 
-  // 💡 Keep Screen Awake as long as any call is active
+  // 💡 Keep Screen Awake as long as any call is active (foreground + background)
   React.useEffect(() => {
     const isCallActive = activeCall && (
       activeCall.status === 'calling' || 
@@ -427,6 +427,17 @@ function GlobalCallOverlay() {
     );
     if (isCallActive) {
       activateKeepAwakeAsync('synkin_global_call').catch(() => {});
+
+      // Also handle background: reactivate when app comes back to foreground during call
+      const subscription = AppState.addEventListener('change', (nextState) => {
+        if (nextState === 'active') {
+          activateKeepAwakeAsync('synkin_global_call').catch(() => {});
+        }
+      });
+      return () => {
+        subscription.remove();
+        deactivateKeepAwake('synkin_global_call').catch(() => {});
+      };
     } else {
       deactivateKeepAwake('synkin_global_call').catch(() => {});
     }
