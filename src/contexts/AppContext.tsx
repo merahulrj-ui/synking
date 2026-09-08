@@ -1462,7 +1462,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
 
   const deleteAccount = async () => {
     if (currentUser?.id) {
-      await deleteUserProfileFromBackend(currentUser.id);
+      await deleteUserProfileFromBackend(currentUser.id, currentUser.phoneNumber);
     }
     logoutUser();
     setProfiles([]);

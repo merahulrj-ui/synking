@@ -87,12 +87,27 @@ export async function fetchProfilesFromFirestore(currentUserId: string): Promise
 }
 
 /**
- * Permanently delete a user profile from backend
+ * Permanently delete a user profile from backend (Google Play Compliant)
  */
-export async function deleteUserProfileFromBackend(userId: string): Promise<boolean> {
+export async function deleteUserProfileFromBackend(userId: string, phoneNumber?: string): Promise<boolean> {
   try {
+    const res = await fetch(`${getLocalBackendUrl()}/api/user/delete-account`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'x-user-id': userId,
+      },
+      body: JSON.stringify({ userId, phoneNumber }),
+    });
+    if (res.ok) {
+      return true;
+    }
+    // Fallback to DELETE endpoint with x-user-id authentication header
     await fetch(`${getLocalBackendUrl()}/api/profiles/${encodeURIComponent(userId)}`, {
       method: 'DELETE',
+      headers: {
+        'x-user-id': userId,
+      },
     });
     return true;
   } catch (e) {

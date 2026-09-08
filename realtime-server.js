@@ -1068,7 +1068,7 @@ const server = http.createServer((req, res) => {
   // CORS Headers
   res.setHeader('Access-Control-Allow-Origin', '*');
   res.setHeader('Access-Control-Allow-Methods', 'GET, POST, PATCH, DELETE, OPTIONS');
-  res.setHeader('Access-Control-Allow-Headers', 'Content-Type');
+  res.setHeader('Access-Control-Allow-Headers', 'Content-Type, Authorization, x-user-id');
 
   if (req.method === 'OPTIONS') {
     res.writeHead(204);
@@ -1655,8 +1655,19 @@ const server = http.createServer((req, res) => {
   // 2. POST /api/profiles (Save / Update User Profile)
   if (req.method === 'POST' && pathname === '/api/profiles') {
     let body = '';
-    req.on('data', chunk => { body += chunk; });
+    let bodyTooLarge = false;
+    req.on('data', chunk => {
+      if (bodyTooLarge) return;
+      body += chunk;
+      if (body.length > 10 * 1024 * 1024) {
+        bodyTooLarge = true;
+        res.writeHead(413, { 'Content-Type': 'application/json' });
+        res.end(JSON.stringify({ success: false, error: 'Payload Too Large (Max 10MB)' }));
+        req.destroy();
+      }
+    });
     req.on('end', () => {
+      if (bodyTooLarge) return;
       try {
         const profile = JSON.parse(body);
         if (profile && profile.id) {
@@ -1803,18 +1814,103 @@ const server = http.createServer((req, res) => {
       return;
     }
 
-    // 2.1 DELETE /api/profiles/:id (Delete from Local DB + Turso Cloud SQLite)
+  // 2.0.5 POST /api/user/delete-account (Google Play Compliant In-App Account Deletion)
+  if (req.method === 'POST' && (pathname === '/api/user/delete-account' || pathname === '/api/profiles/delete-account')) {
+    let body = '';
+    let bodyTooLarge = false;
+    req.on('data', chunk => {
+      if (bodyTooLarge) return;
+      body += chunk;
+      if (body.length > 1024 * 1024) {
+        bodyTooLarge = true;
+        res.writeHead(413, { 'Content-Type': 'application/json' });
+        res.end(JSON.stringify({ success: false, error: 'Payload Too Large' }));
+        req.destroy();
+      }
+    });
+    req.on('end', async () => {
+      if (bodyTooLarge) return;
+      try {
+        const data = body ? JSON.parse(body) : {};
+        const id = data.userId || req.headers['x-user-id'];
+        const phoneNumber = data.phoneNumber;
+
+        if (!id && !phoneNumber) {
+          res.writeHead(400, { 'Content-Type': 'application/json' });
+          res.end(JSON.stringify({ success: false, error: 'User ID or Phone Number required' }));
+          return;
+        }
+
+        let targetId = id;
+        if (!targetId && phoneNumber) {
+          const cleanPhone = phoneNumber.replace(/\D/g, '').slice(-10);
+          const foundUser = Object.values(db.profiles || {}).find(p => {
+            const pDigits = (p.phoneNumber || '').replace(/\D/g, '').slice(-10);
+            return pDigits === cleanPhone;
+          });
+          if (foundUser) targetId = foundUser.id;
+        }
+
+        // Delete from local memory database
+        if (targetId) {
+          delete db.profiles[targetId];
+          if (db.pushTokens) delete db.pushTokens[targetId];
+          if (db.fcmTokens) delete db.fcmTokens[targetId];
+          Object.keys(db.requests || {}).forEach(k => {
+            const r = db.requests[k];
+            if (r && (r.toUserId === targetId || r.fromUser?.id === targetId)) {
+              delete db.requests[k];
+            }
+          });
+          db.chats = (db.chats || []).filter(c => c.senderId !== targetId && c.receiverId !== targetId);
+          saveDb();
+          broadcastWs({ type: 'USER_DELETED', payload: { userId: targetId } });
+        }
+
+        // Wipe from Turso Cloud SQLite
+        const tursoDeletes = [];
+        if (targetId) {
+          tursoDeletes.push(queryTurso('DELETE FROM users WHERE id = ?', [{ type: 'text', value: targetId }]));
+          tursoDeletes.push(queryTurso('DELETE FROM synk_requests WHERE from_user_id = ? OR to_user_id = ?', [{ type: 'text', value: targetId }, { type: 'text', value: targetId }]));
+          tursoDeletes.push(queryTurso('DELETE FROM messages WHERE sender_id = ? OR receiver_id = ?', [{ type: 'text', value: targetId }, { type: 'text', value: targetId }]));
+          tursoDeletes.push(queryTurso('DELETE FROM pending_messages WHERE sender_id = ? OR receiver_id = ?', [{ type: 'text', value: targetId }, { type: 'text', value: targetId }]));
+          tursoDeletes.push(queryTurso('DELETE FROM push_tokens WHERE user_id = ?', [{ type: 'text', value: targetId }]));
+        }
+        if (phoneNumber) {
+          const cleanDigits = phoneNumber.replace(/\D/g, '').slice(-10);
+          tursoDeletes.push(queryTurso('DELETE FROM users WHERE phone_number LIKE ?', [{ type: 'text', value: `%${cleanDigits}` }]));
+        }
+
+        await Promise.all(tursoDeletes);
+        console.log(`[USER_SELF_DELETED_PERMANENTLY] Successfully wiped ${targetId || phoneNumber} from memory & Turso`);
+
+        res.writeHead(200, { 'Content-Type': 'application/json' });
+        res.end(JSON.stringify({ success: true, deletedId: targetId }));
+        return;
+      } catch (err) {
+        console.error('[DELETE_ACCOUNT_ERR]', err);
+        res.writeHead(500, { 'Content-Type': 'application/json' });
+        res.end(JSON.stringify({ success: false, error: err.message }));
+      }
+    });
+    return;
+  }
+
+  // 2.1 DELETE /api/profiles/:id (Delete from Local DB + Turso Cloud SQLite)
   if (req.method === 'DELETE' && pathname.startsWith('/api/profiles/')) {
-    if (!isAdminAuthorized(req)) {
+    const id = pathname.replace('/api/profiles/', '').trim();
+    const isSelf = req.headers['x-user-id'] === id;
+    if (!isAdminAuthorized(req) && !isSelf) {
       res.writeHead(401, { 'Content-Type': 'application/json' });
-      res.end(JSON.stringify({ success: false, error: 'Unauthorized: Admin session required' }));
+      res.end(JSON.stringify({ success: false, error: 'Unauthorized: Admin session or user auth required' }));
       return;
     }
-    const id = pathname.replace('/api/profiles/', '').trim();
     if (id) {
       if (db.profiles[id]) {
         delete db.profiles[id];
       }
+      if (db.pushTokens) delete db.pushTokens[id];
+      if (db.fcmTokens) delete db.fcmTokens[id];
       // Also delete all synk_requests and chats for this user in memory!
       Object.keys(db.requests || {}).forEach(k => {
         const r = db.requests[k];
@@ -1833,6 +1929,8 @@ const server = http.createServer((req, res) => {
         queryTurso('DELETE FROM users WHERE id = ?', [{ type: 'text', value: id }]),
         queryTurso('DELETE FROM synk_requests WHERE from_user_id = ? OR to_user_id = ?', [{ type: 'text', value: id }, { type: 'text', value: id }]),
         queryTurso('DELETE FROM messages WHERE sender_id = ? OR receiver_id = ?', [{ type: 'text', value: id }, { type: 'text', value: id }]),
+        queryTurso('DELETE FROM pending_messages WHERE sender_id = ? OR receiver_id = ?', [{ type: 'text', value: id }, { type: 'text', value: id }]),
+        queryTurso('DELETE FROM push_tokens WHERE user_id = ?', [{ type: 'text', value: id }]),
       ]).then(() => {
         console.log(`[PROFILE_DELETED_PERMANENTLY] ${id} from memory & Turso Cloud SQLite`);
         res.writeHead(200, { 'Content-Type': 'application/json' });
