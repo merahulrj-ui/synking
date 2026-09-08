@@ -98,6 +98,13 @@ class MyFirebaseMessagingService : FirebaseMessagingService() {
         if (data["type"] == "CALL_ENDED") {
             debug("FCM_CALL_ENDED", "OK", "Processing call termination")
             
+            // 🛑 FIRST & UNCONDITIONAL: Kill any playing ringtone, vibration, and audio IMMEDIATELY!
+            IncomingCallActivity.stopRingtoneGlobally()
+            AudioRouteModule.stopAllRingtones()
+            CallConnectionManager.endCall()
+            sendBroadcast(Intent("com.synking.CLOSE_CALL_SCREEN"))
+            sendBroadcast(Intent("com.synking.CALL_ENDED_FROM_JS"))
+
             val callId = data["callId"] ?: ""
             val wasAnswered = CallState.wasCallAnswered(this, callId)
             val savedPending = PendingCallStore.get(this)
@@ -112,11 +119,6 @@ class MyFirebaseMessagingService : FirebaseMessagingService() {
                 debug("FCM_CALL_ENDED", "OK", "No pending incoming ringing call for callId=$callId on this device. Suppressing FCM termination and Missed Call notification.")
                 return
             }
-
-            // 2. Stop native ringtone & vibration instantly for incoming call recipient!
-            IncomingCallActivity.stopRingtoneGlobally()
-            AudioRouteModule.stopAllRingtones()
-            CallConnectionManager.endCall()
 
             // 3. Directly dismiss open incoming call activity with zero latency
             TelecomModule.incomingActivityInstance?.let { activity ->

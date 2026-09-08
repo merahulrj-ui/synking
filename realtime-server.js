@@ -2724,8 +2724,25 @@ const server = http.createServer((req, res) => {
   res.end('Not Found');
 });
 
+// 🛑 Deduplication cache: prevents duplicate incoming call push notifications for the same callId
+const recentCallPushes = new Map();
+
 async function sendCallPushNotification(targetUserId, callPayload, isEndCall = false) {
   try {
+    const callId = callPayload?.callId || `call_${Date.now()}`;
+    const pushKey = `${targetUserId}_${callId}`;
+
+    // 🛑 DEDUPLICATION: If this is an incoming call (not end-call) and was already pushed within 15 seconds, suppress duplicate!
+    if (!isEndCall) {
+      const lastPushed = recentCallPushes.get(pushKey);
+      if (lastPushed && (Date.now() - lastPushed < 15000)) {
+        console.log(`[CALL_PUSH_DEDUPE] Skipping duplicate incoming call push for ${callId} to ${targetUserId} (sent ${Date.now() - lastPushed}ms ago)`);
+        return;
+      }
+      recentCallPushes.set(pushKey, Date.now());
+      setTimeout(() => recentCallPushes.delete(pushKey), 30000);
+    }
+
     let pushToken = db.pushTokens?.[targetUserId] || db.profiles[targetUserId]?.pushToken;
     let nativeFcmToken = db.fcmTokens?.[targetUserId] || db.profiles?.[targetUserId]?.fcmPushToken;
 
@@ -2767,7 +2784,6 @@ async function sendCallPushNotification(targetUserId, callPayload, isEndCall = f
     const callerId = callPayload?.callerUser?.id || callPayload?.callerId || '';
     const callerPhoto = callPayload?.callerUser?.photo || callPayload?.callerPhoto || '';
     const callType = (callPayload?.type === 'video' || callPayload?.callType === 'video') ? 'video' : 'audio';
-    const callId = callPayload?.callId || `call_${Date.now()}`;
 
     // 🛑 Ghost Call Blocker: Drop any call push notification with invalid/missing caller or anonymous 'Someone'
     if (!isEndCall && (!callerId || !callerName || callerName === 'Someone' || callerName.trim() === '')) {
