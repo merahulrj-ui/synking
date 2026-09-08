@@ -3,6 +3,8 @@ package com.synking
 import android.app.Activity
 import android.app.NotificationManager
 import android.app.KeyguardManager
+import android.app.PictureInPictureParams
+import android.util.Rational
 import android.content.Context
 import android.content.Intent
 import android.media.AudioManager
@@ -443,9 +445,24 @@ class TelecomModule(reactContext: ReactApplicationContext) : ReactContextBaseJav
     // 🎬 JS calls this to manually enter native system PiP mode (e.g., from minimize button)
     @ReactMethod
     fun enterPipMode(promise: Promise) {
-        val entered = MainActivity.enterNativePip()
-        Log.d("SYNKING_PIP", "enterPipMode called from JS: entered=$entered")
-        promise.resolve(entered)
+        val activity = currentActivity ?: MainActivity.instance
+        if (activity == null || Build.VERSION.SDK_INT < Build.VERSION_CODES.O) {
+            promise.resolve(false)
+            return
+        }
+        activity.runOnUiThread {
+            try {
+                val params = PictureInPictureParams.Builder()
+                    .setAspectRatio(Rational(9, 16))
+                    .build()
+                val entered = activity.enterPictureInPictureMode(params)
+                Log.d("SYNKING_PIP", "enterPipMode called from JS: entered=$entered")
+                promise.resolve(entered)
+            } catch (e: Exception) {
+                Log.e("SYNKING_PIP", "enterPipMode error: ${e.message}")
+                promise.resolve(false)
+            }
+        }
     }
 
     companion object {
@@ -584,6 +601,18 @@ class TelecomModule(reactContext: ReactApplicationContext) : ReactContextBaseJav
             Log.d("SYNKING_DEBUG", "📤 [BRIDGE] emitOpenChatEvent -> onOpenChatRequested: partnerId=$partnerId")
             ctx.getJSModule(DeviceEventManagerModule.RCTDeviceEventEmitter::class.java)
                 .emit("onOpenChatRequested", params)
+        }
+
+        fun emitPipChangeEvent(isInPip: Boolean) {
+            val ctx = reactContext ?: return
+            if (!ctx.hasActiveCatalystInstance()) return
+            try {
+                ctx.getJSModule(DeviceEventManagerModule.RCTDeviceEventEmitter::class.java)
+                    ?.emit("NATIVE_PIP_CHANGED", if (isInPip) "entered" else "exited")
+                Log.d("SYNKING_PIP", "📤 [BRIDGE] emitPipChangeEvent: isInPip=$isInPip")
+            } catch (e: Exception) {
+                Log.e("SYNKING_PIP", "emitPipChangeEvent error: ${e.message}")
+            }
         }
 
         fun flushPendingEvents() {

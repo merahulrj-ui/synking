@@ -3,6 +3,7 @@ package com.synking
 import android.os.Build
 import android.os.Bundle
 import android.content.Intent
+import android.content.res.Configuration
 import android.app.PictureInPictureParams
 import android.util.Rational
 
@@ -21,7 +22,7 @@ class MainActivity : ReactActivity() {
     @Volatile var isLockscreenCall = false
     @Volatile var isAppInForeground = false
     @Volatile var isVideoCallActive = false   // JS sets this when a video call is connected
-    private var instance: MainActivity? = null
+    var instance: MainActivity? = null
 
     // Called from JS bridge (TelecomModule) to trigger native PiP
     fun enterNativePip(): Boolean {
@@ -32,7 +33,6 @@ class MainActivity : ReactActivity() {
           .setAspectRatio(Rational(9, 16))
           .build()
         activity.enterPictureInPictureMode(params)
-        true
       } catch (e: Exception) {
         android.util.Log.e("SYNKING_PIP", "enterNativePip failed: ${e.message}")
         false
@@ -144,15 +144,11 @@ class MainActivity : ReactActivity() {
   }
 
   // 📡 Notify JS side when PiP mode changes (entered/exited)
-  override fun onPictureInPictureModeChanged(isInPictureInPictureMode: Boolean, newConfig: android.content.res.Configuration) {
+  @Suppress("DEPRECATION")
+  override fun onPictureInPictureModeChanged(isInPictureInPictureMode: Boolean, newConfig: Configuration) {
     super.onPictureInPictureModeChanged(isInPictureInPictureMode, newConfig)
     android.util.Log.d("SYNKING_PIP", "PiP mode changed: isInPiP=$isInPictureInPictureMode")
-    try {
-      val reactContext = (application as? com.facebook.react.ReactApplication)
-        ?.reactNativeHost?.reactInstanceManager?.currentReactContext
-      reactContext?.getJSModule(com.facebook.react.modules.core.DeviceEventManagerModule.RCTDeviceEventEmitter::class.java)
-        ?.emit("NATIVE_PIP_CHANGED", if (isInPictureInPictureMode) "entered" else "exited")
-    } catch (e: Exception) {}
+    TelecomModule.emitPipChangeEvent(isInPictureInPictureMode)
   }
 
   override fun onDestroy() {
@@ -160,6 +156,9 @@ class MainActivity : ReactActivity() {
     try {
       unregisterReceiver(callEndedReceiver)
     } catch (e: Exception) {}
+    if (instance == this) {
+      instance = null
+    }
     isLockscreenCall = false
     isAppInForeground = false
   }
