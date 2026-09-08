@@ -138,7 +138,8 @@ export default function ChatScreen() {
   const [appealModalVisible, setAppealModalVisible] = useState(false);
   const [appealViolationType, setAppealViolationType] = useState('Contact Sharing Violation (Phone / Instagram ID)');
   const isPartnerBlocked = id ? isUserBlocked(id) : false;
-
+  const [isOnline, setIsOnline] = useState(false);
+  const [lastOnlineCheck, setLastOnlineCheck] = useState(0);
   useEffect(() => {
     if (id) {
       markChatAsRead(id);
@@ -148,6 +149,25 @@ export default function ChatScreen() {
       activeChatTracker.setActiveChat(null);
     };
   }, [id]);
+
+  useEffect(() => {
+    if (!currentUser?.id || !id) return;
+    const ping = () => {
+      RealtimeBridge.broadcast('PRESENCE_PING', { fromUserId: currentUser.id }, id);
+    };
+    ping();
+    const interval = setInterval(ping, 10000);
+    return () => clearInterval(interval);
+  }, [currentUser?.id, id]);
+
+  useEffect(() => {
+    const checkOffline = setInterval(() => {
+      if (Date.now() - lastOnlineCheck > 15000) {
+        setIsOnline(false);
+      }
+    }, 5000);
+    return () => clearInterval(checkOffline);
+  }, [lastOnlineCheck]);
   const [inputText, setInputText] = useState('');
   const [selectedMsgForAction, setSelectedMsgForAction] = useState<ChatMessage | null>(null);
   const [activeCall, setActiveCall] = useState<CallSession | null>(null);
@@ -1158,7 +1178,10 @@ const VOICE_COMPRESSED_CONFIG: any = {
     const unsubscribe = RealtimeBridge.subscribe(({ type, payload }) => {
       const myId = currentUser?.id || 'my_user_id';
       
-      if (type === 'TYPING' && payload?.senderId === id) {
+      if (type === 'PRESENCE_PONG' && payload?.fromUserId === id) {
+        setIsOnline(true);
+        setLastOnlineCheck(Date.now());
+      } else if (type === 'TYPING' && payload?.senderId === id) {
         setIsPartnerTyping(true);
         setTimeout(() => setIsPartnerTyping(false), 2000);
       } else if (type === 'NEW_MESSAGE' && payload) {
@@ -2065,6 +2088,13 @@ const VOICE_COMPRESSED_CONFIG: any = {
               <View style={{ flexDirection: 'row', alignItems: 'center', gap: 4 }}>
                 <Ionicons name="lock-closed" size={10} color="#22C55E" />
                 <Text style={[styles.userStatus, { color: '#22C55E' }]}>P2P WebRTC</Text>
+              </View>
+              {/* Online status indicator */}
+              <View style={{ flexDirection: 'row', alignItems: 'center', gap: 4, marginTop: 2 }}>
+                <View style={[styles.onlineDot, { position: 'relative', top: 0, right: 0, width: 8, height: 8, backgroundColor: isOnline ? '#22C55E' : '#9CA3AF', borderWidth: 0 }]} />
+                <Text style={[styles.userStatus, { color: isOnline ? '#22C55E' : '#9CA3AF', fontSize: 11 }]}>
+                  {isOnline ? 'Online' : 'Offline'}
+                </Text>
               </View>
             </View>
           </TouchableOpacity>

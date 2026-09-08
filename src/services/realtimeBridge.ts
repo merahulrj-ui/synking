@@ -160,7 +160,9 @@ class RealtimeBridgeManager {
       | 'USER_UNBLOCKED'
       | 'DATE_BOOKED'
       | 'DATE_CANCELLED'
-      | 'CALL_NO_ANSWER',
+      | 'CALL_NO_ANSWER'
+      | 'PRESENCE_PING'
+      | 'PRESENCE_PONG',
     payload: any,
     targetUserId?: string
   ) {

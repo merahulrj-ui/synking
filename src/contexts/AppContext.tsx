@@ -909,6 +909,10 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
   // 1. Zero-Latency Realtime Bridge Subscription (0ms instant cross-device/tab synchronization)
   useEffect(() => {
     const unsubscribe = RealtimeBridge.subscribe(({ type, payload }) => {
+      if (type === 'PRESENCE_PING' && payload?.fromUserId && currentUser?.id) {
+        RealtimeBridge.broadcast('PRESENCE_PONG', { fromUserId: currentUser.id }, payload.fromUserId);
+        return;
+      }
       if (type === 'NEW_MESSAGE' && payload) {
         const msg = payload as ChatMessage;
 
