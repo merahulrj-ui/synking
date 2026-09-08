@@ -2085,10 +2085,6 @@ const VOICE_COMPRESSED_CONFIG: any = {
                   <Ionicons name="shield-checkmark" size={14} color="#00E5FF" />
                 )}
               </View>
-              <View style={{ flexDirection: 'row', alignItems: 'center', gap: 4 }}>
-                <Ionicons name="lock-closed" size={10} color="#22C55E" />
-                <Text style={[styles.userStatus, { color: '#22C55E' }]}>P2P WebRTC</Text>
-              </View>
               {/* Online status indicator */}
               <View style={{ flexDirection: 'row', alignItems: 'center', gap: 4, marginTop: 2 }}>
                 <View style={[styles.onlineDot, { position: 'relative', top: 0, right: 0, width: 8, height: 8, backgroundColor: isOnline ? '#22C55E' : '#9CA3AF', borderWidth: 0 }]} />
