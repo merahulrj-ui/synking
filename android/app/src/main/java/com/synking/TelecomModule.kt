@@ -312,12 +312,8 @@ class TelecomModule(reactContext: ReactApplicationContext) : ReactContextBaseJav
 
     @ReactMethod
     fun setAutoPipEnabled(enabled: Boolean, promise: Promise) {
-        promise.resolve(false)
-    }
-
-    @ReactMethod
-    fun enterPipMode(promise: Promise) {
-        promise.resolve(false)
+        MainActivity.isVideoCallActive = enabled
+        promise.resolve(true)
     }
 
     @ReactMethod
@@ -445,7 +441,7 @@ class TelecomModule(reactContext: ReactApplicationContext) : ReactContextBaseJav
     // 🎬 JS calls this to manually enter native system PiP mode (e.g., from minimize button)
     @ReactMethod
     fun enterPipMode(promise: Promise) {
-        val activity = currentActivity ?: MainActivity.instance
+        val activity: Activity? = CallActivity.currentCallActivity ?: reactApplicationContext.currentActivity ?: MainActivity.instance
         if (activity == null || Build.VERSION.SDK_INT < Build.VERSION_CODES.O) {
             promise.resolve(false)
             return
