@@ -1105,6 +1105,19 @@ const server = http.createServer((req, res) => {
     }
   }
 
+  // 0.09 GET /privacy-policy (Public Privacy Policy Page for Google Play Store)
+  if (req.method === 'GET' && pathname === '/privacy-policy') {
+    const privacyPath = path.join(__dirname, 'privacy-policy', 'index.html');
+    if (fs.existsSync(privacyPath)) {
+      res.writeHead(200, { 'Content-Type': 'text/html; charset=utf-8', 'Access-Control-Allow-Origin': '*' });
+      fs.createReadStream(privacyPath).pipe(res);
+      return;
+    }
+    res.writeHead(404, { 'Content-Type': 'text/plain' });
+    res.end('Privacy policy page not found');
+    return;
+  }
+
   // 0.1 GET /admin (Password Protected Private Admin Console)
   if (req.method === 'GET' && pathname === '/admin') {
     // If key is supplied in URL query string, authenticate, set HttpOnly cookie, and redirect to clean /admin!
