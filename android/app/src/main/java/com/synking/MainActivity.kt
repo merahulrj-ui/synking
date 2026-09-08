@@ -3,6 +3,8 @@ package com.synking
 import android.os.Build
 import android.os.Bundle
 import android.content.Intent
+import android.app.PictureInPictureParams
+import android.util.Rational
 
 import com.facebook.react.ReactActivity
 import com.facebook.react.ReactActivityDelegate
@@ -18,6 +20,24 @@ class MainActivity : ReactActivity() {
   companion object {
     @Volatile var isLockscreenCall = false
     @Volatile var isAppInForeground = false
+    @Volatile var isVideoCallActive = false   // JS sets this when a video call is connected
+    private var instance: MainActivity? = null
+
+    // Called from JS bridge (TelecomModule) to trigger native PiP
+    fun enterNativePip(): Boolean {
+      val activity = instance ?: return false
+      if (Build.VERSION.SDK_INT < Build.VERSION_CODES.O) return false
+      return try {
+        val params = PictureInPictureParams.Builder()
+          .setAspectRatio(Rational(9, 16))
+          .build()
+        activity.enterPictureInPictureMode(params)
+        true
+      } catch (e: Exception) {
+        android.util.Log.e("SYNKING_PIP", "enterNativePip failed: ${e.message}")
+        false
+      }
+    }
   }
 
   private var pendingIncomingCallIntent: Intent? = null
@@ -47,6 +67,7 @@ class MainActivity : ReactActivity() {
     // This is required for expo-splash-screen.
     setTheme(R.style.AppTheme);
     super.onCreate(null)
+    instance = this
     // 🔒 Privacy DRM: Block screenshots and screen recording across the app
     window.setFlags(
       android.view.WindowManager.LayoutParams.FLAG_SECURE,
@@ -104,6 +125,34 @@ class MainActivity : ReactActivity() {
   override fun onPause() {
     super.onPause()
     isAppInForeground = false
+  }
+
+  // 🎬 Auto-enter native Android PiP when user presses Home during an active video call
+  override fun onUserLeaveHint() {
+    super.onUserLeaveHint()
+    if (isVideoCallActive && Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
+      try {
+        val params = PictureInPictureParams.Builder()
+          .setAspectRatio(Rational(9, 16))
+          .build()
+        enterPictureInPictureMode(params)
+        android.util.Log.d("SYNKING_PIP", "✅ Auto-entered native PiP on Home press during video call")
+      } catch (e: Exception) {
+        android.util.Log.e("SYNKING_PIP", "Auto PiP failed: ${e.message}")
+      }
+    }
+  }
+
+  // 📡 Notify JS side when PiP mode changes (entered/exited)
+  override fun onPictureInPictureModeChanged(isInPictureInPictureMode: Boolean, newConfig: android.content.res.Configuration) {
+    super.onPictureInPictureModeChanged(isInPictureInPictureMode, newConfig)
+    android.util.Log.d("SYNKING_PIP", "PiP mode changed: isInPiP=$isInPictureInPictureMode")
+    try {
+      val reactContext = (application as? com.facebook.react.ReactApplication)
+        ?.reactNativeHost?.reactInstanceManager?.currentReactContext
+      reactContext?.getJSModule(com.facebook.react.modules.core.DeviceEventManagerModule.RCTDeviceEventEmitter::class.java)
+        ?.emit("NATIVE_PIP_CHANGED", if (isInPictureInPictureMode) "entered" else "exited")
+    } catch (e: Exception) {}
   }
 
   override fun onDestroy() {

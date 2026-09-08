@@ -460,6 +460,19 @@ function GlobalCallOverlay() {
 
   const hasStartedOngoingCallRef = React.useRef<boolean>(false);
 
+  // 📡 Listen for native PiP mode change events (entered / exited)
+  React.useEffect(() => {
+    if (Platform.OS !== 'android') return;
+    const sub = DeviceEventEmitter.addListener('NATIVE_PIP_CHANGED', (state: string) => {
+      if (state === 'exited') {
+        // User swiped PiP away or returned to app — restore full call UI
+        WebRTCService.setMinimized(false);
+        setIsMinimized(false);
+      }
+    });
+    return () => sub.remove();
+  }, []);
+
   React.useEffect(() => {
     // Pure UI Observer: listens to WebRTC session state changes
     const unsubscribe = WebRTCService.subscribe(session => {
@@ -467,16 +480,27 @@ function GlobalCallOverlay() {
       if (!session) {
         setIsMinimized(false);
         hasStartedOngoingCallRef.current = false;
+        // Tell native: no active call, disable auto-PiP on Home press
+        if (Platform.OS === 'android' && NativeModules.TelecomModule?.setVideoCallActive) {
+          NativeModules.TelecomModule.setVideoCallActive(false).catch(() => {});
+        }
       } else if (session.status === 'rejected' || session.status === 'ended') {
         setIsMinimized(false);
         hasStartedOngoingCallRef.current = false;
+        if (Platform.OS === 'android' && NativeModules.TelecomModule?.setVideoCallActive) {
+          NativeModules.TelecomModule.setVideoCallActive(false).catch(() => {});
+        }
       } else {
         setIsMinimized(WebRTCService.getIsMinimized());
         if (session.status === 'connected') {
+          // Tell native: video call active, auto-enter PiP on Home press
+          const isVideo = session.type === 'video' || session.isVideoEnabled;
+          if (Platform.OS === 'android' && NativeModules.TelecomModule?.setVideoCallActive) {
+            NativeModules.TelecomModule.setVideoCallActive(!!isVideo).catch(() => {});
+          }
           if (!hasStartedOngoingCallRef.current) {
             hasStartedOngoingCallRef.current = true;
             if (Platform.OS === 'android' && NativeModules.TelecomModule?.startOngoingCall) {
-              const isVideo = session.type === 'video' || session.isVideoEnabled;
               const photo = session.callerPhoto || '';
               if (NativeModules.TelecomModule.startOngoingCallWithDetails) {
                 NativeModules.TelecomModule.startOngoingCallWithDetails(session.callerName || 'Synkin Call', photo, !!isVideo).catch(() => {});
@@ -555,6 +579,16 @@ function GlobalCallOverlay() {
 
   const handleMinimizeToChat = () => {
     if (!activeCall) return;
+    const isVideo = activeCall.type === 'video' || activeCall.isVideoEnabled;
+
+    // 🎬 For video calls: trigger native Android PiP so bubble floats over all apps
+    if (isVideo && Platform.OS === 'android' && NativeModules.TelecomModule?.enterPipMode) {
+      NativeModules.TelecomModule.enterPipMode().catch(() => {});
+      WebRTCService.setMinimized(true);
+      return;
+    }
+
+    // For audio calls: fall back to in-app floating pill / navigate to chat
     WebRTCService.setMinimized(true);
     const partnerId = activeCall.callerId === currentUser?.id ? activeCall.receiverId : activeCall.callerId;
     if (partnerId && currentUser) {

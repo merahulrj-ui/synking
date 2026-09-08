@@ -432,6 +432,22 @@ class TelecomModule(reactContext: ReactApplicationContext) : ReactContextBaseJav
         }
     }
 
+    // 🎬 JS calls this when video call connects/disconnects to tell native whether to enter PiP on Home press
+    @ReactMethod
+    fun setVideoCallActive(active: Boolean, promise: Promise) {
+        MainActivity.isVideoCallActive = active
+        Log.d("SYNKING_PIP", "setVideoCallActive: $active")
+        promise.resolve(true)
+    }
+
+    // 🎬 JS calls this to manually enter native system PiP mode (e.g., from minimize button)
+    @ReactMethod
+    fun enterPipMode(promise: Promise) {
+        val entered = MainActivity.enterNativePip()
+        Log.d("SYNKING_PIP", "enterPipMode called from JS: entered=$entered")
+        promise.resolve(entered)
+    }
+
     companion object {
         var incomingActivityInstance: IncomingCallActivity? = null
         var globalReactContext: ReactApplicationContext? = null
