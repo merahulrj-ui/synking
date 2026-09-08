@@ -66,6 +66,7 @@ class CallActivity : ReactActivity() {
 
         // 💡 Keep screen and CPU awake during call to prevent OEM battery freezing
         window.addFlags(WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON)
+        window.decorView.keepScreenOn = true
 
         // 💡 Hardware Screen WakeLock: Guarantee screen stays bright & awake throughout entire call
         try {
@@ -103,6 +104,17 @@ class CallActivity : ReactActivity() {
                 registerReceiver(callEndedReceiver, filter)
             }
         } catch (e: Exception) {}
+    }
+
+    override fun onResume() {
+        super.onResume()
+        window.addFlags(WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON)
+        window.decorView.keepScreenOn = true
+        if (nativeScreenWakeLock?.isHeld != true) {
+            try {
+                nativeScreenWakeLock?.acquire(2 * 60 * 60 * 1000L)
+            } catch (e: Exception) {}
+        }
     }
 
     override fun onNewIntent(intent: Intent) {

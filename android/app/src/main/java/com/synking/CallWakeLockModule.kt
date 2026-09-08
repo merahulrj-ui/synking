@@ -1,4 +1,4 @@
-﻿package com.synking
+package com.synking
 
 import android.content.Context
 import android.os.PowerManager
@@ -36,6 +36,10 @@ class CallWakeLockModule(private val reactContext: ReactApplicationContext) : Re
                     screenWakeLock?.acquire(2 * 60 * 60 * 1000L) // Safe 2-hour maximum ceiling
                     android.util.Log.d("SYNKING_WAKELOCK", "✅ Acquired SCREEN_BRIGHT_WAKE_LOCK: Display stays awake in background!")
                 }
+                reactContext.currentActivity?.let { act ->
+                    act.window.addFlags(android.view.WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON)
+                    act.window.decorView.keepScreenOn = true
+                }
                 promise.resolve(true)
             } catch (e: Exception) {
                 android.util.Log.e("SYNKING_WAKELOCK", "❌ Error acquiring wake lock: ${e.message}")
@@ -51,6 +55,10 @@ class CallWakeLockModule(private val reactContext: ReactApplicationContext) : Re
                 if (screenWakeLock?.isHeld == true) {
                     screenWakeLock?.release()
                     android.util.Log.d("SYNKING_WAKELOCK", "🛑 Released SCREEN_BRIGHT_WAKE_LOCK.")
+                }
+                reactContext.currentActivity?.let { act ->
+                    act.window.clearFlags(android.view.WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON)
+                    act.window.decorView.keepScreenOn = false
                 }
                 promise.resolve(true)
             } catch (e: Exception) {
