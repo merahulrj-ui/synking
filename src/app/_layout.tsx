@@ -10,6 +10,7 @@ import { Colors } from '../constants/theme';
 import { useFonts, Poppins_400Regular, Poppins_500Medium, Poppins_600SemiBold, Poppins_700Bold, Poppins_800ExtraBold, Poppins_900Black } from '@expo-google-fonts/poppins';
 
 import { CallModal } from '../components/CallModal';
+import { NativeFloatingPipContainer } from '../components/NativeFloatingPipContainer';
 import { InAppNotificationBanner } from '../components/InAppNotificationBanner';
 import { WebRTCService } from '../services/webrtcService';
 import { NativeRTCView } from '../services/webrtcCore';
@@ -459,13 +460,17 @@ function GlobalCallOverlay() {
   }, [activeCall?.status]);
 
   const hasStartedOngoingCallRef = React.useRef<boolean>(false);
+  const [isNativePipActive, setIsNativePipActive] = React.useState<boolean>(false);
 
   // 📡 Listen for native PiP mode change events (entered / exited)
   React.useEffect(() => {
     if (Platform.OS !== 'android') return;
     const sub = DeviceEventEmitter.addListener('NATIVE_PIP_CHANGED', (state: string) => {
-      if (state === 'exited') {
+      if (state === 'entered') {
+        setIsNativePipActive(true);
+      } else if (state === 'exited') {
         // User swiped PiP away or returned to app — restore full call UI
+        setIsNativePipActive(false);
         WebRTCService.setMinimized(false);
         setIsMinimized(false);
       }
@@ -478,6 +483,7 @@ function GlobalCallOverlay() {
     const unsubscribe = WebRTCService.subscribe(session => {
       setActiveCall(session);
       if (!session) {
+        setIsNativePipActive(false);
         setIsMinimized(false);
         hasStartedOngoingCallRef.current = false;
         // Tell native: no active call, disable auto-PiP on Home press
@@ -485,6 +491,7 @@ function GlobalCallOverlay() {
           NativeModules.TelecomModule.setVideoCallActive(false).catch(() => {});
         }
       } else if (session.status === 'rejected' || session.status === 'ended') {
+        setIsNativePipActive(false);
         setIsMinimized(false);
         hasStartedOngoingCallRef.current = false;
         if (Platform.OS === 'android' && NativeModules.TelecomModule?.setVideoCallActive) {
@@ -579,16 +586,6 @@ function GlobalCallOverlay() {
 
   const handleMinimizeToChat = () => {
     if (!activeCall) return;
-    const isVideo = activeCall.type === 'video' || activeCall.isVideoEnabled;
-
-    // 🎬 For video calls: trigger native Android PiP so bubble floats over all apps
-    if (isVideo && Platform.OS === 'android' && NativeModules.TelecomModule?.enterPipMode) {
-      NativeModules.TelecomModule.enterPipMode().catch(() => {});
-      WebRTCService.setMinimized(true);
-      return;
-    }
-
-    // For audio calls: fall back to in-app floating pill / navigate to chat
     WebRTCService.setMinimized(true);
     const partnerId = activeCall.callerId === currentUser?.id ? activeCall.receiverId : activeCall.callerId;
     if (partnerId && currentUser) {
@@ -597,6 +594,18 @@ function GlobalCallOverlay() {
       setIsMinimized(true);
     }
   };
+
+  // 🎬 USER PRESSED HOME BUTTON (Native Android PiP Mode):
+  // Activates ONLY when Home button is pressed during an active video call.
+  // Completely separate container from CallModal with ZERO dialer elements!
+  if (isNativePipActive && activeCall) {
+    return (
+      <NativeFloatingPipContainer
+        session={activeCall}
+        onEndCall={handleEndCall}
+      />
+    );
+  }
 
   if (isMinimized) {
     const isVideo = activeCall.type === 'video' || activeCall.isVideoEnabled;
