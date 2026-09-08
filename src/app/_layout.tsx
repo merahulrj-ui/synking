@@ -649,7 +649,6 @@ function RootLayoutContent() {
             />
             <Stack.Screen
               name="chat/[id]"
-              getId={({ params }: any) => params?.id}
               options={{
                 headerShown: false,
                 animation: 'slide_from_right',
