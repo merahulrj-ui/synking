@@ -43,6 +43,16 @@ class RealtimeBridgeManager {
     }
   }
 
+  public unregisterUser(userId?: string) {
+    const idToUnregister = userId || this.registeredUserId;
+    if (this.socket && this.socket.readyState === WebSocket.OPEN && idToUnregister) {
+      try {
+        this.socket.send(JSON.stringify({ type: 'UNREGISTER_SOCKET', userId: idToUnregister }));
+      } catch (e) {}
+    }
+    this.registeredUserId = null;
+  }
+
   private connectWebSocket() {
     try {
       // Connect both Web & Native Mobile to Central AWS EC2 WebSocket Engine (Mumbai ap-south-1)

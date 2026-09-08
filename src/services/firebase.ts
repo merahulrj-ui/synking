@@ -118,6 +118,38 @@ export async function checkUserExistsOnBackend(userId: string): Promise<boolean>
 }
 
 /**
+ * Check if a phone number is already registered in Turso DB or Server memory
+ */
+export async function checkPhoneExistsOnBackend(phone: string): Promise<{ exists: boolean; user?: any }> {
+  if (!phone) return { exists: false };
+  try {
+    const cleanDigits = phone.replace(/\D/g, '').slice(-10);
+    const formattedPhone = `+91 ${cleanDigits}`;
+    const res = await fetch(`${getLocalBackendUrl()}/api/check-phone?phone=${encodeURIComponent(formattedPhone)}`);
+    if (res.ok) {
+      const data = await res.json();
+      return { exists: !!data?.exists, user: data?.user };
+    }
+  } catch (e) {}
+  return { exists: false };
+}
+
+/**
+ * Unregister device push token from backend on logout to prevent ghost notifications
+ */
+export async function unregisterPushTokenOnBackend(userId: string): Promise<boolean> {
+  if (!userId) return false;
+  try {
+    const res = await fetch(`${getLocalBackendUrl()}/api/profiles/push-token?userId=${encodeURIComponent(userId)}`, {
+      method: 'DELETE',
+    });
+    return res.ok;
+  } catch (e) {
+    return false;
+  }
+}
+
+/**
  * Master Reset: Wipe all users, requests, and chats completely
  */
 export async function wipeAllUsersFromBackend(): Promise<boolean> {

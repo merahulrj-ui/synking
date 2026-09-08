@@ -418,7 +418,7 @@ function GlobalCallOverlay() {
     }
   }, [isMinimized, activeCall, navigateToChat]);
 
-  // 💡 Keep Screen Awake as long as any call is active (foreground + background)
+  // 💡 Keep Screen Awake as long as any call is active (foreground + background native WakeLock)
   React.useEffect(() => {
     const isCallActive = activeCall && (
       activeCall.status === 'calling' || 
@@ -427,6 +427,9 @@ function GlobalCallOverlay() {
     );
     if (isCallActive) {
       activateKeepAwakeAsync('synkin_global_call').catch(() => {});
+      if (Platform.OS === 'android' && NativeModules.CallWakeLockModule?.acquireScreenWakeLock) {
+        NativeModules.CallWakeLockModule.acquireScreenWakeLock().catch(() => {});
+      }
 
       // Also handle background: reactivate when app comes back to foreground during call
       const subscription = AppState.addEventListener('change', (nextState) => {
@@ -437,12 +440,21 @@ function GlobalCallOverlay() {
       return () => {
         subscription.remove();
         deactivateKeepAwake('synkin_global_call').catch(() => {});
+        if (Platform.OS === 'android' && NativeModules.CallWakeLockModule?.releaseScreenWakeLock) {
+          NativeModules.CallWakeLockModule.releaseScreenWakeLock().catch(() => {});
+        }
       };
     } else {
       deactivateKeepAwake('synkin_global_call').catch(() => {});
+      if (Platform.OS === 'android' && NativeModules.CallWakeLockModule?.releaseScreenWakeLock) {
+        NativeModules.CallWakeLockModule.releaseScreenWakeLock().catch(() => {});
+      }
     }
     return () => {
       deactivateKeepAwake('synkin_global_call').catch(() => {});
+      if (Platform.OS === 'android' && NativeModules.CallWakeLockModule?.releaseScreenWakeLock) {
+        NativeModules.CallWakeLockModule.releaseScreenWakeLock().catch(() => {});
+      }
     };
   }, [activeCall?.status]);
 

@@ -136,7 +136,20 @@ export const AuthModal: React.FC<Props> = ({ visible, onClose, targetUserName })
     const formattedPhone = `+91 ${cleanDigits}`;
 
     try {
-      // 1. If Existing User: Login with full saved profile from Turso
+      // 1. Strict Server Check: If user exists with this phone number, ALWAYS restore that account
+      const checkRes = await fetch(`${getLocalBackendUrl()}/api/check-phone?phone=${encodeURIComponent(formattedPhone)}`);
+      if (checkRes.ok) {
+        const checkData = await checkRes.json();
+        if (checkData.exists && checkData.user) {
+          await loginUser(checkData.user);
+          setIsLoading(false);
+          onClose();
+          if (Platform.OS !== 'web') Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
+          Alert.alert('Welcome Back! 🎉', `Signed in as ${checkData.user.name}. All matches & chats restored.`);
+          return;
+        }
+      }
+
       if (isExistingUser && existingUserProfile) {
         await loginUser(existingUserProfile);
         setIsLoading(false);

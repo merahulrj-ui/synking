@@ -3,7 +3,6 @@ node_modules/
 .expo/
 dist/
 build/
-android/
 ios/
 
 # Environment variables - NEVER commit these
@@ -29,3 +28,4 @@ web-build/
 # Temp & Artifacts
 artifacts/
 scratch/
+enable-adguard-dns.bat

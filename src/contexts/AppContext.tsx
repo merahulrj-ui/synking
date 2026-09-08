@@ -19,6 +19,7 @@ import {
   markMessagesAsReadOnBackend,
   updateMessageReactionOnBackend,
   checkUserExistsOnBackend,
+  unregisterPushTokenOnBackend,
   blockUserOnBackend,
   unblockUserOnBackend,
   fetchBlockedUsersFromBackend,
@@ -1167,6 +1168,11 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
         if (payload.userId === currentUser?.id) {
           console.log('🚪 [USER_DELETED_BY_ADMIN] Logging out deleted user:', currentUser?.id);
           logoutUser();
+          if (Platform.OS === 'web') {
+            window.alert('Session Expired: Your profile was removed from the server. Please sign in again.');
+          } else {
+            Alert.alert('Session Expired', 'Your profile is no longer active. Please sign in again.');
+          }
         } else {
           setProfiles(prev => prev.filter(p => p && p.id !== payload.userId));
           setMatches(prev => prev.filter(m => m && m.id !== payload.userId));
@@ -1231,6 +1237,11 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
         setIncomingRequests([]);
         setSentRequests([]);
         setMessages({});
+        if (Platform.OS === 'web') {
+          window.alert('Session Expired: Your profile is no longer active. Please sign in.');
+        } else {
+          Alert.alert('Session Expired', 'Your profile is no longer active. Please sign in again.');
+        }
         return;
       }
     }
@@ -1405,16 +1416,48 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
   };
 
   const logoutUser = () => {
+    const oldUserId = currentUser?.id;
     setCurrentUser(null);
     setIsLoggedIn(false);
     setMatches([]);
     setIncomingRequests([]);
     setSentRequests([]);
     setMessages({});
+
+    // 1. Unbind Push Token & Socket from Backend so this device NEVER receives ghost calls or notifications
+    if (oldUserId) {
+      RealtimeBridge.unregisterUser(oldUserId);
+      unregisterPushTokenOnBackend(oldUserId).catch(() => {});
+    }
+
+    // 2. Wipe Local Storage & Cache completely (All messages, calls, session data)
     if (typeof window !== 'undefined' && window.localStorage) {
       window.localStorage.removeItem('synking_my_user');
     }
-    AsyncStorage.removeItem('synking_my_user').catch(() => {});
+    AsyncStorage.getAllKeys().then(keys => {
+      const keysToRemove = keys.filter(key => 
+        key === 'synking_my_user' ||
+        key.startsWith('synking_cached_msgs') ||
+        key.startsWith('synking_msgs_') ||
+        key.startsWith('synking_chat_') ||
+        key.startsWith('synking_call_') ||
+        key.startsWith('synking_deleted_') ||
+        key === 'synking_chat_read_timestamps' ||
+        key === '@synking_active_bookings' ||
+        key === 'synking_seen_match_alerts' ||
+        key === 'synking_supersynks_data' ||
+        key === 'synking_rewinds_data' ||
+        key === 'synking_daily_swipes_data' ||
+        key === 'synking_boost_active_until' ||
+        key === 'synking_phone_strikes' ||
+        key === 'synking_suspended_until'
+      );
+      if (keysToRemove.length > 0) {
+        AsyncStorage.multiRemove(keysToRemove).catch(() => {});
+      }
+    }).catch(() => {
+      AsyncStorage.removeItem('synking_my_user').catch(() => {});
+    });
   };
 
   const deleteAccount = async () => {

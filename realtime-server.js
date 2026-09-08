@@ -1554,24 +1554,23 @@ const server = http.createServer((req, res) => {
       return;
     }
 
-    // 1. Check in-memory profiles first
-    if (db.profiles && db.profiles[userId]) {
-      res.writeHead(200, { 'Content-Type': 'application/json' });
-      res.end(JSON.stringify({ exists: true, user: db.profiles[userId] }));
-      return;
-    }
-
-    // 2. Check Turso Cloud SQLite
+    // Check Turso Cloud SQLite first as authoritative source
     queryTurso('SELECT id, name FROM users WHERE id = ?', [{ type: 'text', value: userId }]).then(resTurso => {
       const rows = resTurso?.results?.[0]?.response?.result?.rows;
       if (Array.isArray(rows) && rows.length > 0) {
         res.writeHead(200, { 'Content-Type': 'application/json' });
-        res.end(JSON.stringify({ exists: true }));
+        res.end(JSON.stringify({ exists: true, user: db.profiles?.[userId] || { id: userId } }));
       } else {
+        // User was deleted from Turso database! Wipe from in-memory cache as well
+        if (db.profiles && db.profiles[userId]) {
+          delete db.profiles[userId];
+          saveDb();
+        }
         res.writeHead(200, { 'Content-Type': 'application/json' });
         res.end(JSON.stringify({ exists: false }));
       }
     }).catch(() => {
+      // Fallback to memory on Turso network error
       res.writeHead(200, { 'Content-Type': 'application/json' });
       res.end(JSON.stringify({ exists: !!(db.profiles && db.profiles[userId]) }));
     });
@@ -1661,6 +1660,24 @@ const server = http.createServer((req, res) => {
       try {
         const profile = JSON.parse(body);
         if (profile && profile.id) {
+          // Strict 1 Phone = 1 Account Check (No Duplicate Accounts)
+          if (profile.phoneNumber) {
+            const cleanDigits = profile.phoneNumber.replace(/\D/g, '').slice(-10);
+            if (cleanDigits && cleanDigits.length === 10) {
+              const existingWithPhone = Object.values(db.profiles || {}).find(p => {
+                if (p.id === profile.id) return false;
+                const pDigits = (p.phoneNumber || '').replace(/\D/g, '').slice(-10);
+                return pDigits === cleanDigits;
+              });
+              if (existingWithPhone) {
+                console.log(`⚠️ [PHONE_EXISTS] Prevented duplicate profile for phone ${cleanDigits}. Existing user: ${existingWithPhone.id}`);
+                res.writeHead(200, { 'Content-Type': 'application/json' });
+                res.end(JSON.stringify({ success: true, isDuplicatePhone: true, profile: existingWithPhone }));
+                return;
+              }
+            }
+          }
+
           db.profiles[profile.id] = {
             ...profile,
             updatedAt: new Date().toISOString()
@@ -1722,13 +1739,36 @@ const server = http.createServer((req, res) => {
           });
 
           res.writeHead(200, { 'Content-Type': 'application/json' });
-          res.end(JSON.stringify({ success: true })); return;
+          res.end(JSON.stringify({ success: true }));
           return;
         }
       } catch (e) {}
       res.writeHead(400, { 'Content-Type': 'application/json' });
       res.end(JSON.stringify({ success: false, error: 'Invalid push token payload' }));
     });
+    return;
+  }
+
+  // 2.0.1 DELETE /api/profiles/push-token (Unregister Push Token on User Logout)
+  if (req.method === 'DELETE' && pathname === '/api/profiles/push-token') {
+    const userId = url.searchParams.get('userId');
+    if (userId) {
+      if (db.pushTokens) delete db.pushTokens[userId];
+      if (db.fcmTokens) delete db.fcmTokens[userId];
+      if (db.profiles && db.profiles[userId]) {
+        delete db.profiles[userId].pushToken;
+        delete db.profiles[userId].fcmPushToken;
+      }
+      saveDb();
+      queryTurso('DELETE FROM push_tokens WHERE user_id = ?', [{ type: 'text', value: String(userId) }])
+        .catch(err => console.warn('[TURSO_DELETE_TOKEN_ERR]', err.message));
+      console.log(`[PUSH_TOKEN_UNBOUND] Removed Push Token for logged-out User: ${userId}`);
+      res.writeHead(200, { 'Content-Type': 'application/json' });
+      res.end(JSON.stringify({ success: true }));
+      return;
+    }
+    res.writeHead(400, { 'Content-Type': 'application/json' });
+    res.end(JSON.stringify({ success: false, error: 'User ID required' }));
     return;
   }
 
@@ -2578,11 +2618,23 @@ async function sendCallPushNotification(targetUserId, callPayload, isEndCall = f
       return;
     }
 
-    const callerName = callPayload?.callerUser?.name || callPayload?.callerName || 'Someone';
+    const callerName = callPayload?.callerUser?.name || callPayload?.callerName || '';
     const callerId = callPayload?.callerUser?.id || callPayload?.callerId || '';
     const callerPhoto = callPayload?.callerUser?.photo || callPayload?.callerPhoto || '';
     const callType = (callPayload?.type === 'video' || callPayload?.callType === 'video') ? 'video' : 'audio';
     const callId = callPayload?.callId || `call_${Date.now()}`;
+
+    // 🛑 Ghost Call Blocker: Drop any call push notification with invalid/missing caller or anonymous 'Someone'
+    if (!isEndCall && (!callerId || !callerName || callerName === 'Someone' || callerName.trim() === '')) {
+      console.log(`🛑 [GHOST_CALL_DROPPED] Dropping incoming call push to ${targetUserId}: invalid/unverified caller (${callerName || 'Unknown'}, ${callerId})`);
+      return;
+    }
+
+    // Drop call push if target user is calling itself
+    if (callerId && targetUserId && callerId === targetUserId) {
+      console.log(`🛑 [SELF_CALL_DROPPED] Dropping incoming call push to ${targetUserId}: caller matches target`);
+      return;
+    }
 
     // Reconstruct the data payload exactly as Android expects it
     const dataPayload = {
@@ -3251,6 +3303,12 @@ server.on('upgrade', (req, socket, head) => {
         if (parsed.type === 'REGISTER_SOCKET' && parsed.userId) {
           socket.userId = parsed.userId;
           console.log(`[WS_REGISTERED] Socket bound to userId: ${parsed.userId}`);
+          continue;
+        }
+
+        if (parsed.type === 'UNREGISTER_SOCKET') {
+          console.log(`[WS_UNREGISTERED] Socket unbound from userId: ${socket.userId}`);
+          socket.userId = null;
           continue;
         }
 
