@@ -72,6 +72,19 @@ export default function CallApp() {
     };
   }, []);
 
+  // 💡 Keep Screen Awake as long as CallActivity call is active
+  useEffect(() => {
+    if (session?.status === 'connected' || session?.status === 'calling' || session?.status === 'ringing') {
+      if (Platform.OS === 'android' && NativeModules.CallWakeLockModule?.acquireScreenWakeLock) {
+        NativeModules.CallWakeLockModule.acquireScreenWakeLock().catch(() => {});
+      }
+    } else {
+      if (Platform.OS === 'android' && NativeModules.CallWakeLockModule?.releaseScreenWakeLock) {
+        NativeModules.CallWakeLockModule.releaseScreenWakeLock().catch(() => {});
+      }
+    }
+  }, [session?.status]);
+
   const handleEndCall = () => {
     WebRTCService.endCall();
     if (Platform.OS === 'android' && NativeModules.TelecomModule?.endCall) {
