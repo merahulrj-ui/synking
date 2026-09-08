@@ -649,7 +649,7 @@ function RootLayoutContent() {
             />
             <Stack.Screen
               name="chat/[id]"
-              dangerouslySingular={({ params }) => (params as any)?.id}
+              getId={({ params }: any) => params?.id}
               options={{
                 headerShown: false,
                 animation: 'slide_from_right',
