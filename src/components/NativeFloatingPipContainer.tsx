@@ -1,5 +1,6 @@
 import React, { useEffect, useState, useRef } from 'react';
-import { View, Text, StyleSheet, TouchableOpacity, Image, Platform } from 'react-native';
+import { View, Text, StyleSheet, TouchableOpacity, Image, Platform, NativeModules } from 'react-native';
+import { activateKeepAwakeAsync, deactivateKeepAwake } from 'expo-keep-awake';
 import { Ionicons } from '@expo/vector-icons';
 import { WebRTCService } from '../services/webrtcService';
 import { CallSession } from '../types';
@@ -35,6 +36,20 @@ export const NativeFloatingPipContainer: React.FC<Props> = ({ session, onEndCall
       setSec(s => s + 1);
     }, 1000);
     return () => clearInterval(timer);
+  }, []);
+
+  // 💡 Keep Screen Awake during PiP mode
+  useEffect(() => {
+    activateKeepAwakeAsync('synkin_pip_screen').catch(() => {});
+    if (Platform.OS === 'android' && NativeModules.CallWakeLockModule?.acquireScreenWakeLock) {
+      NativeModules.CallWakeLockModule.acquireScreenWakeLock().catch(() => {});
+    }
+    return () => {
+      deactivateKeepAwake('synkin_pip_screen').catch(() => {});
+      if (Platform.OS === 'android' && NativeModules.CallWakeLockModule?.releaseScreenWakeLock) {
+        NativeModules.CallWakeLockModule.releaseScreenWakeLock().catch(() => {});
+      }
+    };
   }, []);
 
   // Subscribe to live WebRTC stream updates
