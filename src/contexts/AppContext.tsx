@@ -439,22 +439,34 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     });
 
     await blockUser(reportData.blockedUserId);
+
+    // Sync report to Central Web Admin Console (Turso Cloud SQLite)
+    try {
+      fetch(`${CLOUD_BACKEND_URL}/api/reports/submit`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(newReport),
+      }).catch(err => console.warn('[REPORT_SYNC_WARN]', err));
+    } catch (e) {}
   }, [blockUser]);
 
   const submitUnlockRequest = useCallback(async (userId: string, appealNote: string, violationReason?: string): Promise<boolean> => {
     if (!userId || !appealNote.trim()) return false;
+    let targetReport: BlockReport | null = null;
     let found = false;
     setBlockReports(prev => {
       const updated = prev.map(r => {
         if (r.blockedUserId === userId || (currentUser && r.blockedUserId === currentUser.id)) {
           found = true;
-          return {
+          const updatedReport: BlockReport = {
             ...r,
             reason: violationReason ? `Contact Sharing: ${violationReason}` : r.reason,
             status: 'appeal_pending' as const,
             appealNote: appealNote.trim(),
             appealTimestamp: Date.now(),
           };
+          targetReport = updatedReport;
+          return updatedReport;
         }
         return r;
       });
@@ -474,12 +486,25 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
           appealNote: appealNote.trim(),
           appealTimestamp: Date.now(),
         };
+        targetReport = freshReport;
         updated.unshift(freshReport);
       }
 
       AsyncStorage.setItem('@synkin_block_reports', JSON.stringify(updated)).catch(() => {});
       return updated;
     });
+
+    // Sync appeal to Central Web Admin Console
+    if (targetReport) {
+      try {
+        fetch(`${CLOUD_BACKEND_URL}/api/reports/submit`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(targetReport),
+        }).catch(err => console.warn('[APPEAL_SYNC_WARN]', err));
+      } catch (e) {}
+    }
+
     return true;
   }, [currentUser]);
 
@@ -1153,6 +1178,33 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
             return next;
           });
         }
+      } else if (type === 'ACCOUNT_UNBLOCKED' && payload) {
+        const targetUserId = payload.userId;
+        const myId = currentUser?.id;
+        const myPhone = (currentUser?.phoneNumber || '').replace(/\D/g, '').slice(-10);
+        const targetPhone = String(targetUserId || '').replace(/\D/g, '').slice(-10);
+        const isMe = targetUserId === myId || (myPhone && targetPhone && myPhone === targetPhone);
+
+        if (isMe) {
+          console.log('⚖️ [ACCOUNT_UNBLOCKED_BY_ADMIN] Admin unlocked this account live!');
+          setIsSuspended(false);
+          setSuspendedUntil(null);
+          setStrikeCount(0);
+          AsyncStorage.removeItem('synking_suspended_until').catch(() => {});
+          AsyncStorage.removeItem('synking_phone_strikes').catch(() => {});
+        }
+
+        // Also update local blockReports state
+        setBlockReports(prev => {
+          const updated = prev.map(r => {
+            if (r.id === payload.reportId || r.blockedUserId === targetUserId) {
+              return { ...r, status: 'unblocked_by_admin' as const };
+            }
+            return r;
+          });
+          AsyncStorage.setItem('@synkin_block_reports', JSON.stringify(updated)).catch(() => {});
+          return updated;
+        });
       } else if (type === 'DATABASE_WIPED') {
         console.log('🧹 [DATABASE_WIPED_BY_ADMIN] Resetting state and logging out all users');
         logoutUser();
@@ -1164,7 +1216,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       }
     });
     return () => unsubscribe();
-  }, [currentUser?.id]);
+  }, [currentUser]);
 
   // 2. Sync Real User Profiles & Incoming/Sent Requests from Cloud Firestore
   const syncCloudState = async () => {

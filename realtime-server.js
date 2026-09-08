@@ -525,6 +525,18 @@ async function renderAdminHtml() {
   const requestList = Object.values(db.requests || {});
   const chatList = db.chats || [];
 
+  let reportList = [];
+  try {
+    const reportRes = await queryTurso('SELECT * FROM block_reports ORDER BY created_at DESC');
+    const rows = reportRes?.results?.[0]?.response?.result?.rows || [];
+    const cols = (reportRes?.results?.[0]?.response?.result?.cols || []).map(c => c.name);
+    reportList = rows.map(r => {
+      const item = {};
+      cols.forEach((c, i) => item[c] = r[i]?.value !== undefined ? r[i].value : r[i]);
+      return item;
+    });
+  } catch(e) {}
+
   return `<!DOCTYPE html>
 <html lang="en">
 <head>
@@ -690,6 +702,10 @@ async function renderAdminHtml() {
       <div class="stat-lbl">Active WebSockets</div>
       <div class="stat-val">${clients.size}</div>
     </div>
+    <div class="stat-card">
+      <div class="stat-lbl" style="color: #F87171;">🛡️ Safety Reports & Appeals</div>
+      <div class="stat-val" style="color: #F87171;">${reportList.length}</div>
+    </div>
   </div>
 
   <div class="section-title">
@@ -761,6 +777,69 @@ async function renderAdminHtml() {
             <td>${timeStr}</td>
             <td>
               <button class="del-req-btn" data-id="${r.id}" style="background: #EF4444; color: white; border: none; padding: 4px 8px; border-radius: 6px; font-weight: 700; cursor: pointer; font-size: 11px;">🗑️ Delete</button>
+            </td>
+          </tr>
+          `;
+        }).join('')}
+      </tbody>
+    </table>
+  </div>
+
+  <div class="section-title" style="margin-top: 36px;">
+    <span>🛡️ Blocked Members & Safety Moderation (${reportList.length})</span>
+  </div>
+  <div class="table-box" style="margin-bottom: 40px;">
+    <table>
+      <thead>
+        <tr>
+          <th>Blocked User</th>
+          <th>Phone Number</th>
+          <th>Reported By</th>
+          <th>Reason</th>
+          <th>Appeal / Request Note</th>
+          <th>Status</th>
+          <th>Actions</th>
+        </tr>
+      </thead>
+      <tbody>
+        ${reportList.length === 0 ? '<tr><td colspan="7" style="color: #94A3B8; text-align: center; padding: 24px;">No blocked users or safety violations reported. System clear! ✅</td></tr>' : ''}
+        ${reportList.map(r => {
+          const isUnblocked = r.status === 'unblocked' || r.status === 'unblocked_by_admin';
+          const isPending = r.status === 'appeal_pending';
+          const statusBadge = isUnblocked
+            ? '<span style="background: rgba(34, 197, 94, 0.15); color: #22C55E; border: 1px solid #22C55E; padding: 4px 8px; border-radius: 6px; font-weight: 700; font-size: 11px;">UNBLOCKED</span>'
+            : isPending
+            ? '<span style="background: rgba(234, 179, 8, 0.15); color: #EAB308; border: 1px solid #EAB308; padding: 4px 8px; border-radius: 6px; font-weight: 700; font-size: 11px;">APPEAL PENDING ⚠️</span>'
+            : '<span style="background: rgba(239, 68, 68, 0.15); color: #EF4444; border: 1px solid #EF4444; padding: 4px 8px; border-radius: 6px; font-weight: 700; font-size: 11px;">BLOCKED</span>';
+
+          return `
+          <tr>
+            <td>
+              <div style="display: flex; align-items: center; gap: 8px;">
+                ${r.blocked_user_photo ? `<img src="${r.blocked_user_photo}" style="width: 32px; height: 32px; border-radius: 16px; object-fit: cover;" />` : ''}
+                <div>
+                  <strong>${r.blocked_user_name || 'User'}</strong>
+                  <div style="font-family: monospace; color: #94A3B8; font-size: 11px;">${r.blocked_user_id || ''}</div>
+                </div>
+              </div>
+            </td>
+            <td style="font-weight: 700; color: #00E5FF;">${r.blocked_user_phone || '<span style="color: #64748B; font-weight: 400;">N/A</span>'}</td>
+            <td>
+              <div><strong>${r.reported_by_user_name || 'Safety Shield 🛡️'}</strong></div>
+              <div style="font-family: monospace; color: #64748B; font-size: 11px;">${r.reported_by_user_id || ''}</div>
+            </td>
+            <td style="color: #F87171; max-width: 220px; word-break: break-word;">${r.reason || 'Safety Violation'}</td>
+            <td style="color: #FDE047; max-width: 260px; word-break: break-word; font-style: italic;">
+              ${r.appeal_note ? `"${r.appeal_note}"` : '<span style="color: #64748B; font-style: normal;">No appeal submitted</span>'}
+            </td>
+            <td>${statusBadge}</td>
+            <td>
+              <div style="display: flex; gap: 6px; align-items: center;">
+                ${!isUnblocked ? `
+                  <button onclick="unblockMember('${r.id}', '${r.blocked_user_id}')" style="background: #22C55E; color: white; border: none; padding: 6px 12px; border-radius: 6px; font-weight: 700; cursor: pointer; font-size: 11px;">⚖️ Unblock</button>
+                ` : ''}
+                <button onclick="deleteReport('${r.id}')" style="background: #EF4444; color: white; border: none; padding: 6px 10px; border-radius: 6px; font-weight: 700; cursor: pointer; font-size: 11px;">🗑️</button>
+              </div>
             </td>
           </tr>
           `;
@@ -937,6 +1016,47 @@ async function renderAdminHtml() {
         location.reload();
       } catch (e) {
         alert('Error: ' + e);
+      }
+    };
+
+    // 5. Unblock Member & Lift Suspension
+    window.unblockMember = async function(reportId, userId) {
+      if (!confirm('Unblock this member and restore full account access?')) return;
+      try {
+        const res = await fetch('/api/admin/unblock-member', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ reportId, userId })
+        });
+        const data = await res.json();
+        if (data.success) {
+          alert('Member unblocked successfully!');
+          location.reload();
+        } else {
+          alert('Failed to unblock: ' + (data.error || 'Unknown error'));
+        }
+      } catch (err) {
+        alert('Error: ' + err.message);
+      }
+    };
+
+    // 6. Delete Safety Report
+    window.deleteReport = async function(reportId) {
+      if (!confirm('Delete this safety report record?')) return;
+      try {
+        const res = await fetch('/api/admin/delete-report', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ reportId })
+        });
+        const data = await res.json();
+        if (data.success) {
+          location.reload();
+        } else {
+          alert('Failed: ' + (data.error || 'Unknown error'));
+        }
+      } catch (err) {
+        alert('Error: ' + err.message);
       }
     };
   </script>
@@ -1190,6 +1310,158 @@ const server = http.createServer((req, res) => {
         res.writeHead(400, { 'Content-Type': 'application/json' });
         res.end(JSON.stringify({ success: false, error: 'Invalid payload' }));
       } catch (err) {
+        res.writeHead(500, { 'Content-Type': 'application/json' });
+        res.end(JSON.stringify({ success: false, error: err.message }));
+      }
+    });
+    return;
+  }
+
+  // 0.5 POST /api/admin/unblock-member (Admin Unblock & Restore Access)
+  if (req.method === 'POST' && pathname === '/api/admin/unblock-member') {
+    if (!isAdminAuthorized(req)) {
+      res.writeHead(401, { 'Content-Type': 'application/json' });
+      res.end(JSON.stringify({ success: false, error: 'Unauthorized key' }));
+      return;
+    }
+
+    let body = '';
+    req.on('data', chunk => { body += chunk; });
+    req.on('end', async () => {
+      try {
+        const { reportId, userId } = JSON.parse(body || '{}');
+        if (!userId && !reportId) {
+          res.writeHead(400, { 'Content-Type': 'application/json' });
+          res.end(JSON.stringify({ success: false, error: 'Missing userId or reportId' }));
+          return;
+        }
+
+        // 1. Update Turso block_reports
+        if (reportId) {
+          await queryTurso(
+            "UPDATE block_reports SET status = 'unblocked_by_admin' WHERE id = ?",
+            [{ type: 'text', value: String(reportId) }]
+          );
+        }
+        if (userId) {
+          await queryTurso(
+            "UPDATE block_reports SET status = 'unblocked_by_admin' WHERE blocked_user_id = ?",
+            [{ type: 'text', value: String(userId) }]
+          );
+          // Remove from blocked_users table
+          await queryTurso(
+            "DELETE FROM blocked_users WHERE blocked_id = ?",
+            [{ type: 'text', value: String(userId) }]
+          );
+          if (db.blockedUsers) {
+            db.blockedUsers = db.blockedUsers.filter(b => b.blockedId !== userId);
+          }
+        }
+
+        // 2. Broadcast 0ms WebSocket unblock signal to client apps!
+        broadcastWs({
+          type: 'ACCOUNT_UNBLOCKED',
+          payload: { userId, reportId }
+        });
+
+        console.log(`⚖️ [ADMIN_UNBLOCK] Member ${userId} unblocked and restored by admin!`);
+        res.writeHead(200, { 'Content-Type': 'application/json', 'Access-Control-Allow-Origin': '*' });
+        res.end(JSON.stringify({ success: true, userId, reportId }));
+      } catch (err) {
+        res.writeHead(500, { 'Content-Type': 'application/json' });
+        res.end(JSON.stringify({ success: false, error: err.message }));
+      }
+    });
+    return;
+  }
+
+  // 0.6 POST /api/admin/delete-report (Admin Delete Safety Report)
+  if (req.method === 'POST' && pathname === '/api/admin/delete-report') {
+    if (!isAdminAuthorized(req)) {
+      res.writeHead(401, { 'Content-Type': 'application/json' });
+      res.end(JSON.stringify({ success: false, error: 'Unauthorized key' }));
+      return;
+    }
+
+    let body = '';
+    req.on('data', chunk => { body += chunk; });
+    req.on('end', async () => {
+      try {
+        const { reportId } = JSON.parse(body || '{}');
+        if (reportId) {
+          await queryTurso(
+            "DELETE FROM block_reports WHERE id = ?",
+            [{ type: 'text', value: String(reportId) }]
+          );
+        }
+        res.writeHead(200, { 'Content-Type': 'application/json', 'Access-Control-Allow-Origin': '*' });
+        res.end(JSON.stringify({ success: true, reportId }));
+      } catch (err) {
+        res.writeHead(500, { 'Content-Type': 'application/json' });
+        res.end(JSON.stringify({ success: false, error: err.message }));
+      }
+    });
+    return;
+  }
+
+  // 0.7 POST /api/reports/submit (App/User Submits Safety Block or Appeal Report to Admin Console)
+  if (req.method === 'POST' && pathname === '/api/reports/submit') {
+    let body = '';
+    req.on('data', chunk => { body += chunk; });
+    req.on('end', async () => {
+      try {
+        const r = JSON.parse(body || '{}');
+        const reportId = r.id || `report_${Date.now()}_${Math.random().toString(36).substring(7)}`;
+        const blockedUserId = r.blockedUserId || r.blocked_user_id || '';
+        const blockedUserName = r.blockedUserName || r.blocked_user_name || 'Member';
+        const blockedUserPhone = r.blockedUserPhone || r.blocked_user_phone || '';
+        const blockedUserPhoto = r.blockedUserPhoto || r.blocked_user_photo || '';
+        const reportedByUserId = r.reportedByUserId || r.reported_by_user_id || '';
+        const reportedByUserName = r.reportedByUserName || r.reported_by_user_name || '';
+        const reason = r.reason || 'Safety violation';
+        const appealNote = r.appealNote || r.appeal_note || '';
+        const status = r.status || (appealNote ? 'appeal_pending' : 'blocked');
+
+        await queryTurso(`
+          INSERT INTO block_reports (
+            id, blocked_user_id, blocked_user_name, blocked_user_phone, blocked_user_photo,
+            reported_by_user_id, reported_by_user_name, reason, appeal_note, status, created_at
+          ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, CURRENT_TIMESTAMP)
+          ON CONFLICT(id) DO UPDATE SET
+            reason = excluded.reason,
+            appeal_note = excluded.appeal_note,
+            status = excluded.status,
+            blocked_user_phone = COALESCE(excluded.blocked_user_phone, block_reports.blocked_user_phone)
+        `, [
+          { type: 'text', value: String(reportId) },
+          { type: 'text', value: String(blockedUserId) },
+          { type: 'text', value: String(blockedUserName) },
+          { type: 'text', value: String(blockedUserPhone) },
+          { type: 'text', value: String(blockedUserPhoto) },
+          { type: 'text', value: String(reportedByUserId) },
+          { type: 'text', value: String(reportedByUserName) },
+          { type: 'text', value: String(reason) },
+          { type: 'text', value: String(appealNote) },
+          { type: 'text', value: String(status) }
+        ]);
+
+        // Also add relation to blocked_users if peer block
+        if (reportedByUserId && blockedUserId && reportedByUserId !== 'system_shield') {
+          await queryTurso(
+            'INSERT OR IGNORE INTO blocked_users (blocker_id, blocked_id) VALUES (?, ?)',
+            [{ type: 'text', value: String(reportedByUserId) }, { type: 'text', value: String(blockedUserId) }]
+          ).catch(() => {});
+          if (!db.blockedUsers) db.blockedUsers = [];
+          if (!db.blockedUsers.some(b => b.blockerId === reportedByUserId && b.blockedId === blockedUserId)) {
+            db.blockedUsers.push({ blockerId: reportedByUserId, blockedId: blockedUserId });
+          }
+        }
+
+        console.log(`🛡️ [SAFETY_REPORT_SAVED] Report ${reportId} for user ${blockedUserId} saved in Turso SQLite Cloud!`);
+        res.writeHead(200, { 'Content-Type': 'application/json', 'Access-Control-Allow-Origin': '*' });
+        res.end(JSON.stringify({ success: true, id: reportId }));
+      } catch (err) {
+        console.error('[REPORT_SUBMIT_ERR]', err.message);
         res.writeHead(500, { 'Content-Type': 'application/json' });
         res.end(JSON.stringify({ success: false, error: err.message }));
       }
