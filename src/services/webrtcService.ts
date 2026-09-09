@@ -543,7 +543,7 @@ class WebRTCManager {
       if (MediaDevices && MediaDevices.getUserMedia) {
         this.localStream = await MediaDevices.getUserMedia({
           audio: false, // ⚠️ CRITICAL: Audio is FALSE so ringtone & loudspeaker are 100% unaffected!
-          video: { facingMode: 'user', width: { ideal: 640 }, height: { ideal: 480 } },
+          video: { facingMode: 'user', width: { ideal: 640 }, height: { ideal: 480 }, frameRate: { ideal: 24, max: 30 } },
         });
         this.log(`📸 Front camera preview active for incoming video call (tracks: ${this.localStream.getVideoTracks().length})`);
         this.notify();
@@ -577,7 +577,7 @@ class WebRTCManager {
               noiseSuppression: true,
               autoGainControl: true,
             },
-            video: includeVideo ? { facingMode: 'user', width: { ideal: 640 }, height: { ideal: 480 } } : false,
+            video: includeVideo ? { facingMode: 'user', width: { ideal: 640 }, height: { ideal: 480 }, frameRate: { ideal: 24, max: 30 } } : false,
           });
         } else if (this.localStream.getAudioTracks().length === 0) {
           // Attach audio track to existing camera preview stream
@@ -917,7 +917,7 @@ class WebRTCManager {
         this.log('📹 Upgrading Audio Call to Video: Capturing camera stream...');
         if (MediaDevices && MediaDevices.getUserMedia) {
           const videoStream = await MediaDevices.getUserMedia({
-            video: { facingMode: 'user', width: { ideal: 640 }, height: { ideal: 480 } },
+            video: { facingMode: 'user', width: { ideal: 640 }, height: { ideal: 480 }, frameRate: { ideal: 24, max: 30 } },
             audio: false,
           });
 
@@ -1017,12 +1017,12 @@ class WebRTCManager {
             let newVideoStream: any = null;
             try {
               newVideoStream = await MediaDevices.getUserMedia({
-                video: { facingMode: targetFacingMode, width: { ideal: 640 }, height: { ideal: 480 } },
+                video: { facingMode: targetFacingMode, width: { ideal: 640 }, height: { ideal: 480 }, frameRate: { ideal: 24, max: 30 } },
                 audio: false,
               });
             } catch (facingErr) {
               newVideoStream = await MediaDevices.getUserMedia({
-                video: { facingMode: targetFacingMode },
+                video: { facingMode: targetFacingMode, frameRate: { ideal: 24, max: 30 } },
                 audio: false,
               });
             }
@@ -1085,13 +1085,13 @@ class WebRTCManager {
         let newVideoStream: any = null;
         try {
           newVideoStream = await MediaDevices.getUserMedia({
-            video: { facingMode: targetFacing, width: { ideal: 640 }, height: { ideal: 480 } },
+            video: { facingMode: targetFacing, width: { ideal: 640 }, height: { ideal: 480 }, frameRate: { ideal: 24, max: 30 } },
             audio: false, // ⚠️ Audio is untouched to prevent echo / route disruption
           });
         } catch (err1) {
           try {
             newVideoStream = await MediaDevices.getUserMedia({
-              video: { facingMode: targetFacing },
+              video: { facingMode: targetFacing, frameRate: { ideal: 24, max: 30 } },
               audio: false,
             });
           } catch (err2) {
