@@ -11,6 +11,21 @@ import { AudioRouteService } from '../services/audioRouteService';
 import { RealtimeBridge } from '../services/realtimeBridge';
 import { saveChatMessageToFirestore } from '../services/firebase';
 import { encryptE2EEMessage } from '../utils/encryption';
+import * as Haptics from 'expo-haptics';
+
+// 📳 Tactical Micro-Haptic Click Engine (Apple / Pixel feel)
+const triggerHaptic = (style: 'light' | 'medium' | 'heavy' = 'light') => {
+  if (Platform.OS === 'web') return;
+  try {
+    if (style === 'light') {
+      Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light).catch(() => {});
+    } else if (style === 'medium') {
+      Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium).catch(() => {});
+    } else if (style === 'heavy') {
+      Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Heavy).catch(() => {});
+    }
+  } catch (e) {}
+};
 
 interface QuickDeclineOption {
   id: string;
@@ -472,6 +487,7 @@ export const CallModal: React.FC<Props> = ({ session, isLockscreen, onEndCall, o
   }, [session.status, session.isIncoming, session.type, session.isVideoEnabled]);
 
   const handleAccept = () => {
+    triggerHaptic('medium');
     RingtoneService.stop();
     Vibration.cancel();
     WebRTCService.log(`📞 ACCEPT TAPPED: User accepted incoming ${session.type} call. Connecting WebRTC P2P stream...`);
@@ -483,6 +499,7 @@ export const CallModal: React.FC<Props> = ({ session, isLockscreen, onEndCall, o
   };
 
   const handleDecline = () => {
+    triggerHaptic('medium');
     RingtoneService.stop();
     Vibration.cancel();
     WebRTCService.log('❌ DECLINE TAPPED: User declined incoming call. Sending CALL_REJECTED.');
@@ -491,6 +508,7 @@ export const CallModal: React.FC<Props> = ({ session, isLockscreen, onEndCall, o
   };
 
   const handleEndCallAction = () => {
+    triggerHaptic('heavy');
     RingtoneService.stop();
     Vibration.cancel();
     WebRTCService.log(`🛑 END CALL TAPPED: User ended ${session.type} call. Cleaning up tracks.`);
@@ -635,6 +653,7 @@ export const CallModal: React.FC<Props> = ({ session, isLockscreen, onEndCall, o
                       }}
                       onPress={(e) => { 
                         e.stopPropagation(); 
+                        triggerHaptic('light');
                         resetControlsTimer();
                         WebRTCService.switchCamera(); 
                       }}
@@ -666,6 +685,7 @@ export const CallModal: React.FC<Props> = ({ session, isLockscreen, onEndCall, o
             <TouchableOpacity
               style={styles.chatMinimizeBtn}
               onPress={() => {
+                triggerHaptic('light');
                 resetControlsTimer();
                 handleOpenChat();
               }}
@@ -681,6 +701,7 @@ export const CallModal: React.FC<Props> = ({ session, isLockscreen, onEndCall, o
             <TouchableOpacity 
               style={styles.floatingFlipBtn}
               onPress={() => {
+                triggerHaptic('light');
                 resetControlsTimer();
                 WebRTCService.switchCamera();
               }}
@@ -906,7 +927,10 @@ export const CallModal: React.FC<Props> = ({ session, isLockscreen, onEndCall, o
                 <View style={styles.actionItemCol}>
                   <TouchableOpacity
                     style={[styles.actionCircleBtn, styles.messageCallBtn]}
-                    onPress={handleIncomingMessage}
+                    onPress={() => {
+                      triggerHaptic('light');
+                      handleIncomingMessage();
+                    }}
                     activeOpacity={0.8}
                   >
                     <Ionicons name="chatbubble-ellipses" size={24} color="#FFFFFF" />
@@ -921,6 +945,7 @@ export const CallModal: React.FC<Props> = ({ session, isLockscreen, onEndCall, o
                 <TouchableOpacity
                   style={[styles.controlBtn, session.isMuted && styles.controlBtnMuted]}
                   onPress={() => {
+                    triggerHaptic('light');
                     resetControlsTimer();
                     if (onToggleMute) onToggleMute(); else WebRTCService.toggleMute();
                   }}
@@ -938,6 +963,7 @@ export const CallModal: React.FC<Props> = ({ session, isLockscreen, onEndCall, o
                 <TouchableOpacity
                   style={[styles.controlBtn, session.isSpeakerOn && styles.controlBtnActive]}
                   onPress={() => {
+                    triggerHaptic('light');
                     resetControlsTimer();
                     if (onToggleSpeaker) onToggleSpeaker(); else WebRTCService.toggleSpeaker();
                   }}
@@ -955,6 +981,7 @@ export const CallModal: React.FC<Props> = ({ session, isLockscreen, onEndCall, o
                 <TouchableOpacity
                   style={[styles.controlBtn, session.isVideoEnabled && styles.controlBtnActive]}
                   onPress={() => {
+                    triggerHaptic('light');
                     resetControlsTimer();
                     if (onToggleVideo) onToggleVideo(); else WebRTCService.toggleVideo();
                   }}
@@ -971,7 +998,10 @@ export const CallModal: React.FC<Props> = ({ session, isLockscreen, onEndCall, o
                 {/* End Call Button (Apple Signature Crimson with Ambient Glow) */}
                 <TouchableOpacity
                   style={styles.endCallBtn}
-                  onPress={onEndCall}
+                  onPress={() => {
+                    triggerHaptic('heavy');
+                    onEndCall();
+                  }}
                   activeOpacity={0.8}
                   hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
                 >
