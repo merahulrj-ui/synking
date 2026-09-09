@@ -375,9 +375,68 @@ export const CallModal: React.FC<Props> = ({ session, isLockscreen, onEndCall, o
   const isIncoming = session.isIncoming === true;
   const isIncomingRinging = isIncoming && session.status === 'ringing';
   const isConnected = session.status === 'connected';
+  const isVideoCall = session.type === 'video' || session.isVideoEnabled;
   const durationText = WebRTCService.formatDuration(session.durationSeconds);
   const [localStream, setLocalStream] = useState<any>(() => WebRTCService.getLocalStream());
   const [remoteStream, setRemoteStream] = useState<any>(() => WebRTCService.getRemoteStream());
+
+  // 🎛️ WhatsApp-style auto-hide and tap-to-toggle call controls for connected video calls
+  const [areControlsVisible, setAreControlsVisible] = useState<boolean>(true);
+  const controlsTimerRef = useRef<any>(null);
+
+  const resetControlsTimer = () => {
+    if (controlsTimerRef.current) {
+      clearTimeout(controlsTimerRef.current);
+      controlsTimerRef.current = null;
+    }
+    if (isConnected && isVideoCall) {
+      controlsTimerRef.current = setTimeout(() => {
+        setAreControlsVisible(false);
+      }, 4000);
+    }
+  };
+
+  const toggleControls = () => {
+    if (controlsTimerRef.current) {
+      clearTimeout(controlsTimerRef.current);
+      controlsTimerRef.current = null;
+    }
+    setAreControlsVisible((prev) => {
+      const next = !prev;
+      if (next && isConnected && isVideoCall) {
+        controlsTimerRef.current = setTimeout(() => {
+          setAreControlsVisible(false);
+        }, 4000);
+      }
+      return next;
+    });
+  };
+
+  // ⏱️ Auto-hide call controls after 4 seconds of connected video call (WhatsApp style)
+  useEffect(() => {
+    if (isConnected && isVideoCall) {
+      setAreControlsVisible(true);
+      if (controlsTimerRef.current) clearTimeout(controlsTimerRef.current);
+      controlsTimerRef.current = setTimeout(() => {
+        setAreControlsVisible(false);
+      }, 4000);
+    } else {
+      setAreControlsVisible(true);
+      if (controlsTimerRef.current) {
+        clearTimeout(controlsTimerRef.current);
+        controlsTimerRef.current = null;
+      }
+    }
+
+    return () => {
+      if (controlsTimerRef.current) {
+        clearTimeout(controlsTimerRef.current);
+        controlsTimerRef.current = null;
+      }
+    };
+  }, [isConnected, isVideoCall]);
+
+  const showControls = !isVideoCall || !isConnected || areControlsVisible;
 
   useEffect(() => {
     const updateStreams = () => {
@@ -515,8 +574,6 @@ export const CallModal: React.FC<Props> = ({ session, isLockscreen, onEndCall, o
     onEndCall();
   };
 
-  const isVideoCall = session.type === 'video' || session.isVideoEnabled;
-
   const callContent = (
     <View style={styles.modalOverlay}>
       <LinearGradient
@@ -541,6 +598,15 @@ export const CallModal: React.FC<Props> = ({ session, isLockscreen, onEndCall, o
                   <LiveRemoteMedia type={session.type === 'video' ? 'video' : 'voice'} photoUrl={session.callerPhoto} isSpeakerOn={session.isSpeakerOn} />
                 )}
               </View>
+
+              {/* 📱 Fullscreen Video Tap Backdrop (WhatsApp style tap to toggle controls) */}
+              {!isInNativePip && (
+                <TouchableOpacity
+                  style={[StyleSheet.absoluteFill, { zIndex: 1 }]}
+                  activeOpacity={1}
+                  onPress={toggleControls}
+                />
+              )}
 
               {/* Draggable Self PiP Overlay (Hidden in Native PiP) */}
               {!isInNativePip && (
@@ -569,6 +635,7 @@ export const CallModal: React.FC<Props> = ({ session, isLockscreen, onEndCall, o
                       }}
                       onPress={(e) => { 
                         e.stopPropagation(); 
+                        resetControlsTimer();
                         WebRTCService.switchCamera(); 
                       }}
                       activeOpacity={0.7}
@@ -595,10 +662,13 @@ export const CallModal: React.FC<Props> = ({ session, isLockscreen, onEndCall, o
           )}
 
           {/* Top Left: Chat Button (Hidden in Native PiP) */}
-          {!isInNativePip && !isIncomingRinging && ((session.type === 'video' || session.isVideoEnabled) || isConnected) && (
+          {!isInNativePip && showControls && !isIncomingRinging && ((session.type === 'video' || session.isVideoEnabled) || isConnected) && (
             <TouchableOpacity
               style={styles.chatMinimizeBtn}
-              onPress={handleOpenChat}
+              onPress={() => {
+                resetControlsTimer();
+                handleOpenChat();
+              }}
               activeOpacity={0.7}
               hitSlop={{ top: 20, bottom: 20, left: 20, right: 20 }}
             >
@@ -607,10 +677,13 @@ export const CallModal: React.FC<Props> = ({ session, isLockscreen, onEndCall, o
           )}
 
           {/* Top Right: Flip Camera Button (Hidden in Native PiP) */}
-          {!isInNativePip && (session.type === 'video' || session.isVideoEnabled) && !isIncomingRinging && (
+          {!isInNativePip && showControls && (session.type === 'video' || session.isVideoEnabled) && !isIncomingRinging && (
             <TouchableOpacity 
               style={styles.floatingFlipBtn}
-              onPress={() => WebRTCService.switchCamera()}
+              onPress={() => {
+                resetControlsTimer();
+                WebRTCService.switchCamera();
+              }}
               activeOpacity={0.7}
               hitSlop={{ top: 20, bottom: 20, left: 20, right: 20 }}
             >
@@ -634,7 +707,7 @@ export const CallModal: React.FC<Props> = ({ session, isLockscreen, onEndCall, o
                 {isVideoCall ? 'Synkin Video Call' : 'Synkin Voice Call'}
               </Text>
             </View>
-          ) : (
+          ) : showControls ? (
             <View style={[styles.topHeader, (session.type === 'video' || session.isVideoEnabled) && styles.topHeaderFloating]}>
               <View style={styles.e2eeBadge}>
                 <Ionicons name="lock-closed" size={13} color="#38BDF8" />
@@ -658,7 +731,7 @@ export const CallModal: React.FC<Props> = ({ session, isLockscreen, onEndCall, o
                 {session.status === 'rejected' && '❌ Call Declined'}
               </Text>
             </View>
-          ))}
+          ) : null)}
 
           {/* 2. CENTER SECTION (Hidden in Native PiP) */}
           {!isInNativePip && (isIncomingRinging ? (
@@ -841,13 +914,16 @@ export const CallModal: React.FC<Props> = ({ session, isLockscreen, onEndCall, o
                   <Text style={styles.actionBtnLabel}>Message</Text>
                 </View>
               </View>
-            ) : (
+            ) : showControls ? (
               // ACTIVE / OUTGOING CALL CONTROLS (LUXURY OBSIDIAN & PEARL WHITE)
               <View style={styles.controlBar}>
                 {/* Mute Button */}
                 <TouchableOpacity
                   style={[styles.controlBtn, session.isMuted && styles.controlBtnMuted]}
-                  onPress={() => (onToggleMute ? onToggleMute() : WebRTCService.toggleMute())}
+                  onPress={() => {
+                    resetControlsTimer();
+                    if (onToggleMute) onToggleMute(); else WebRTCService.toggleMute();
+                  }}
                   activeOpacity={0.75}
                   hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
                 >
@@ -861,7 +937,10 @@ export const CallModal: React.FC<Props> = ({ session, isLockscreen, onEndCall, o
                 {/* Speaker Button (Pearl White Active / Frosted Glass Inactive) */}
                 <TouchableOpacity
                   style={[styles.controlBtn, session.isSpeakerOn && styles.controlBtnActive]}
-                  onPress={() => (onToggleSpeaker ? onToggleSpeaker() : WebRTCService.toggleSpeaker())}
+                  onPress={() => {
+                    resetControlsTimer();
+                    if (onToggleSpeaker) onToggleSpeaker(); else WebRTCService.toggleSpeaker();
+                  }}
                   activeOpacity={0.75}
                   hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
                 >
@@ -875,7 +954,10 @@ export const CallModal: React.FC<Props> = ({ session, isLockscreen, onEndCall, o
                 {/* Video Toggle (Pearl White Active / Frosted Glass Inactive) */}
                 <TouchableOpacity
                   style={[styles.controlBtn, session.isVideoEnabled && styles.controlBtnActive]}
-                  onPress={() => (onToggleVideo ? onToggleVideo() : WebRTCService.toggleVideo())}
+                  onPress={() => {
+                    resetControlsTimer();
+                    if (onToggleVideo) onToggleVideo(); else WebRTCService.toggleVideo();
+                  }}
                   activeOpacity={0.75}
                   hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
                 >
@@ -896,7 +978,7 @@ export const CallModal: React.FC<Props> = ({ session, isLockscreen, onEndCall, o
                   <Ionicons name="call" size={26} color="#FFFFFF" style={{ transform: [{ rotate: '135deg' }] }} />
                 </TouchableOpacity>
               </View>
-            )
+            ) : null
           )}
 
           {/* Quick Reply Message Sheet (Hidden in Native PiP) */}
