@@ -63,10 +63,13 @@ export default function TabsLayout() {
     return () => unsubscribe();
   }, []);
 
-  const tabBarBg = isDarkMode ? '#000000' : '#FFF5F7';
-  const borderCol = isDarkMode ? 'rgba(255, 255, 255, 0.08)' : 'rgba(253, 58, 115, 0.12)';
+  // 🎨 NAVBAR PRESETS:
+  // Option 1 (Tinder Pure Dark): isDarkMode ? '#000000' : '#0B0E14'
+  // Option 2 (Apple Ceramic Off-White): isDarkMode ? '#000000' : '#F8F9FA'
+  const tabBarBg = isDarkMode ? '#000000' : '#F8F9FA';
+  const borderCol = isDarkMode ? 'rgba(255, 255, 255, 0.08)' : 'rgba(15, 23, 42, 0.06)';
   const activeColor = '#FD3A73';
-  const inactiveColor = isDarkMode ? '#94A3B8' : '#7E8B9B';
+  const inactiveColor = isDarkMode ? '#94A3B8' : '#64748B';
 
   return (
     <>
@@ -99,11 +102,11 @@ export default function TabsLayout() {
                 shadowRadius: 12,
                 elevation: 14,
               } : {
-                shadowColor: '#FD3A73',
+                shadowColor: '#0F172A',
                 shadowOffset: { width: 0, height: -3 },
-                shadowOpacity: 0.08,
+                shadowOpacity: 0.04,
                 shadowRadius: 12,
-                elevation: 4,
+                elevation: 3,
               }),
             }
           ],
