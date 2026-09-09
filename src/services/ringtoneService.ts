@@ -249,6 +249,65 @@ class RingtoneServiceClass {
       osc.stop(now + 0.35);
     } catch (e) {}
   }
+
+  // 5. CALL DISCONNECT CHIME: WhatsApp-style 340ms millisecond tone + light haptics
+  public playCallEndTone() {
+    try {
+      // 1. Light haptic double-tap feedback
+      if (Platform.OS !== 'web') {
+        try {
+          const Haptics = require('expo-haptics');
+          Haptics?.impactAsync?.(Haptics.ImpactFeedbackStyle.Light)?.catch?.(() => {});
+        } catch (e) {}
+      }
+
+      // 2. Play 340ms local native audio tone via expo-audio
+      if (Platform.OS !== 'web' && ExpoAudioModule && typeof ExpoAudioModule.createAudioPlayer === 'function') {
+        try {
+          const endTonePlayer = ExpoAudioModule.createAudioPlayer(require('../../assets/sounds/call_end.wav'));
+          endTonePlayer.volume = 0.85;
+          endTonePlayer.play();
+          setTimeout(() => {
+            try {
+              endTonePlayer.pause();
+              if (typeof endTonePlayer.release === 'function') {
+                endTonePlayer.release();
+              }
+            } catch (e) {}
+          }, 600);
+          return;
+        } catch (e) {
+          console.warn('[CALL_END_TONE_NATIVE_WARN]', e);
+        }
+      }
+
+      // 3. Web Audio Oscillator fallback (340ms 3-tone chime)
+      const ctx = this.getAudioContext();
+      if (!ctx) return;
+      const now = ctx.currentTime;
+
+      const playBeep = (freq: number, startDelay: number, duration: number) => {
+        const start = now + startDelay;
+        const gain = ctx.createGain();
+        gain.gain.setValueAtTime(0, start);
+        gain.gain.linearRampToValueAtTime(0.2, start + 0.01);
+        gain.gain.exponentialRampToValueAtTime(0.001, start + duration);
+        gain.connect(ctx.destination);
+
+        const osc = ctx.createOscillator();
+        osc.type = 'sine';
+        osc.frequency.setValueAtTime(freq, start);
+        osc.connect(gain);
+
+        osc.start(start);
+        osc.stop(start + duration);
+      };
+
+      playBeep(520, 0, 0.08);
+      playBeep(440, 0.105, 0.08);
+      playBeep(350, 0.21, 0.13);
+    } catch (e) {}
+  }
 }
 
 export const RingtoneService = new RingtoneServiceClass();

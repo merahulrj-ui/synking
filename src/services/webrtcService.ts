@@ -515,6 +515,7 @@ class WebRTCManager {
     const peerId = this.getPeerUserId();
     this.log(`🛑 Ending ongoing call (${durationFormatted}).`);
     this.cleanup();
+    RingtoneService.playCallEndTone();
     RealtimeBridge.broadcast('CALL_ENDED', { callId, callerName }, peerId);
     return { session: sessionCopy, durationFormatted };
   }
@@ -1298,6 +1299,7 @@ class WebRTCManager {
 
     // 1. Instantly stop outgoing ringtone, ringback, and any vibrations
     RingtoneService.stop();
+    RingtoneService.playCallEndTone();
     try {
       const { Vibration } = require('react-native');
       Vibration.cancel();
@@ -1332,6 +1334,7 @@ class WebRTCManager {
 
     // 1. Instantly stop all audio & ringtones
     RingtoneService.stop();
+    RingtoneService.playCallEndTone();
     try {
       const { Vibration } = require('react-native');
       Vibration.cancel();
