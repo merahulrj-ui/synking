@@ -141,25 +141,16 @@ export default function TabsLayout() {
           name="matches"
           options={{
             title: 'InSynk',
-            tabBarIcon: ({ focused }) => (
+            tabBarIcon: ({ focused, color }) => (
               <View style={styles.inSynkTabIconWrapper}>
-                <View style={[
-                  styles.inSynkCircle,
-                  focused ? styles.inSynkCircleActive : styles.inSynkCircleInactive,
-                  focused && {
-                    shadowColor: '#FD3A73',
-                    shadowOffset: { width: 0, height: 0 },
-                    shadowOpacity: 0.7,
-                    shadowRadius: 10,
-                    elevation: 10,
-                  }
-                ]}>
-                  <Image
-                    source={require('../../../assets/images/logo_emblem.png')}
-                    style={styles.inSynkTabIcon}
-                    resizeMode="contain"
-                  />
-                </View>
+                <Image
+                  source={require('../../../assets/images/logo_emblem.png')}
+                  style={[
+                    styles.inSynkTabIcon,
+                    { tintColor: color }
+                  ]}
+                  resizeMode="contain"
+                />
                 {incomingRequests.length > 0 && (
                   <View style={styles.tabBadge}>
                     <Text style={styles.tabBadgeText}>{incomingRequests.length}</Text>
@@ -231,30 +222,15 @@ const styles = StyleSheet.create({
     letterSpacing: 0.1,
   },
   inSynkTabIconWrapper: {
-    width: 34,
-    height: 34,
+    width: 28,
+    height: 28,
     alignItems: 'center',
     justifyContent: 'center',
     position: 'relative',
   },
-  inSynkCircle: {
-    width: 34,
-    height: 34,
-    borderRadius: 10,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  inSynkCircleInactive: {
-    opacity: 1,
-  },
-  inSynkCircleActive: {
-    opacity: 1,
-    transform: [{ scale: 1.08 }],
-  },
   inSynkTabIcon: {
-    width: 34,
-    height: 34,
-    borderRadius: 10,
+    width: 28,
+    height: 28,
   },
   tabBadge: {
     position: 'absolute',
