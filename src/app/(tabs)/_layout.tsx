@@ -90,7 +90,7 @@ export default function TabsLayout() {
             {
               backgroundColor: tabBarBg,
               borderTopColor: isDarkMode ? 'rgba(253, 58, 115, 0.18)' : borderCol,
-              height: 56 + safeBottom,
+              height: 64 + safeBottom,
               paddingBottom: safeBottom,
               ...(isDarkMode ? {
                 shadowColor: '#FD3A73',
@@ -216,30 +216,31 @@ export default function TabsLayout() {
 
 const styles = StyleSheet.create({
   tabBar: {
-    paddingTop: 6,
+    paddingTop: 8,
     borderTopWidth: 1,
   },
   tabItem: {
-    paddingVertical: 2,
+    paddingVertical: 3,
     justifyContent: 'center',
     alignItems: 'center',
   },
   tabLabel: {
     fontSize: 11,
-    fontWeight: '700',
-    marginTop: 2,
+    fontWeight: '600',
+    marginTop: 3,
+    letterSpacing: 0.1,
   },
   inSynkTabIconWrapper: {
-    width: 28,
-    height: 28,
+    width: 30,
+    height: 30,
     alignItems: 'center',
     justifyContent: 'center',
     position: 'relative',
   },
   inSynkCircle: {
-    width: 28,
-    height: 28,
-    borderRadius: 8,
+    width: 30,
+    height: 30,
+    borderRadius: 9,
     alignItems: 'center',
     justifyContent: 'center',
   },
@@ -251,9 +252,9 @@ const styles = StyleSheet.create({
     transform: [{ scale: 1.08 }],
   },
   inSynkTabIcon: {
-    width: 28,
-    height: 28,
-    borderRadius: 8,
+    width: 30,
+    height: 30,
+    borderRadius: 9,
   },
   tabBadge: {
     position: 'absolute',
