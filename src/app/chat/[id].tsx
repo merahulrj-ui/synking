@@ -562,6 +562,9 @@ const VOICE_COMPRESSED_CONFIG: any = {
   }, [isRecording, recordingSeconds]);
 
   const startRecording = async () => {
+    if (Platform.OS !== 'web') {
+      Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium).catch(() => {});
+    }
     // 👑 VIP ONLY: Gated only when VIP Plans are enabled by admin
     if (vipPlansEnabled && !currentUser?.isVip) {
       const title = '✨ 👑 VIP Exclusive Feature 👑 ✨';
@@ -651,6 +654,9 @@ const VOICE_COMPRESSED_CONFIG: any = {
   };
 
   const cancelRecording = async () => {
+    if (Platform.OS !== 'web') {
+      Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light).catch(() => {});
+    }
     addAudioLog('🛑 Recording cancelled by user.');
     if (animFrameRef.current) clearInterval(animFrameRef.current);
     if (Platform.OS !== 'web') {
@@ -676,6 +682,9 @@ const VOICE_COMPRESSED_CONFIG: any = {
   };
 
   const sendVoiceNote = async () => {
+    if (Platform.OS !== 'web') {
+      Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium).catch(() => {});
+    }
     addAudioLog('🚀 Finishing voice note...');
     if (animFrameRef.current) clearInterval(animFrameRef.current);
     setLiveMicLevel(0);
@@ -1743,6 +1752,9 @@ const VOICE_COMPRESSED_CONFIG: any = {
 
   // Start Native WebRTC Voice or Video Call (Outgoing)
   const handleStartCall = (type: 'audio' | 'video') => {
+    if (Platform.OS !== 'web') {
+      Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium).catch(() => {});
+    }
     if (!currentUser || !targetUser) return;
 
     if (isPartnerBlocked) {
