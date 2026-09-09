@@ -141,14 +141,15 @@ export default function TabsLayout() {
           name="matches"
           options={{
             title: 'InSynk',
-            tabBarIcon: ({ focused, color }) => (
+            tabBarIcon: ({ focused }) => (
               <View style={styles.inSynkTabIconWrapper}>
                 <Image
-                  source={require('../../../assets/images/logo_emblem.png')}
-                  style={[
-                    styles.inSynkTabIcon,
-                    { tintColor: color }
-                  ]}
+                  source={
+                    focused
+                      ? require('../../../assets/images/tabIcons/insynk_active.png')
+                      : require('../../../assets/images/tabIcons/insynk_inactive.png')
+                  }
+                  style={styles.inSynkTabIcon}
                   resizeMode="contain"
                 />
                 {incomingRequests.length > 0 && (
