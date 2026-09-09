@@ -73,7 +73,9 @@
     "owner": "merahulrj",
     "updates": {
       "url": "https://u.expo.dev/7991a7fd-8364-4a1c-a332-90ca559d0128",
-      "enabled": true
+      "enabled": true,
+      "checkAutomatically": "ON_LOAD",
+      "fallbackToCacheTimeout": 3000
     }
   }
 }
