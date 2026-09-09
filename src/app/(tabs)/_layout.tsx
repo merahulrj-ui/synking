@@ -90,7 +90,7 @@ export default function TabsLayout() {
             {
               backgroundColor: tabBarBg,
               borderTopColor: isDarkMode ? 'rgba(253, 58, 115, 0.18)' : borderCol,
-              height: 64 + safeBottom,
+              height: 68 + safeBottom,
               paddingBottom: safeBottom,
               ...(isDarkMode ? {
                 shadowColor: '#FD3A73',
@@ -120,7 +120,7 @@ export default function TabsLayout() {
           options={{
             title: 'Swipe',
             tabBarIcon: ({ focused, color }) => (
-              <Ionicons name={focused ? 'flame' : 'flame-outline'} size={24} color={color} />
+              <Ionicons name={focused ? 'flame' : 'flame-outline'} size={28} color={color} />
             ),
           }}
         />
@@ -131,7 +131,7 @@ export default function TabsLayout() {
           options={{
             title: 'Explore',
             tabBarIcon: ({ focused, color }) => (
-              <Ionicons name={focused ? 'compass' : 'compass-outline'} size={24} color={color} />
+              <Ionicons name={focused ? 'compass' : 'compass-outline'} size={28} color={color} />
             ),
           }}
         />
@@ -182,7 +182,7 @@ export default function TabsLayout() {
             title: 'Chat',
             tabBarIcon: ({ focused, color }) => (
               <View style={{ position: 'relative' }}>
-                <Ionicons name={focused ? 'chatbubbles' : 'chatbubbles-outline'} size={24} color={color} />
+                <Ionicons name={focused ? 'chatbubbles' : 'chatbubbles-outline'} size={28} color={color} />
                 {(unreadChatCount > 0 || unreadChatIds.size > 0) && (
                   <View style={styles.tabBadge}>
                     <Text style={styles.tabBadgeText}>{Math.max(unreadChatCount, unreadChatIds.size)}</Text>
@@ -199,7 +199,7 @@ export default function TabsLayout() {
           options={{
             title: 'Profile',
             tabBarIcon: ({ focused, color }) => (
-              <Ionicons name={focused ? 'person' : 'person-outline'} size={24} color={color} />
+              <Ionicons name={focused ? 'person' : 'person-outline'} size={28} color={color} />
             ),
           }}
         />
@@ -227,20 +227,20 @@ const styles = StyleSheet.create({
   tabLabel: {
     fontSize: 11,
     fontWeight: '600',
-    marginTop: 3,
+    marginTop: 4,
     letterSpacing: 0.1,
   },
   inSynkTabIconWrapper: {
-    width: 30,
-    height: 30,
+    width: 34,
+    height: 34,
     alignItems: 'center',
     justifyContent: 'center',
     position: 'relative',
   },
   inSynkCircle: {
-    width: 30,
-    height: 30,
-    borderRadius: 9,
+    width: 34,
+    height: 34,
+    borderRadius: 10,
     alignItems: 'center',
     justifyContent: 'center',
   },
@@ -252,14 +252,14 @@ const styles = StyleSheet.create({
     transform: [{ scale: 1.08 }],
   },
   inSynkTabIcon: {
-    width: 30,
-    height: 30,
-    borderRadius: 9,
+    width: 34,
+    height: 34,
+    borderRadius: 10,
   },
   tabBadge: {
     position: 'absolute',
-    top: -3,
-    right: -5,
+    top: -4,
+    right: -7,
     backgroundColor: '#EF4444',
     minWidth: 16,
     height: 16,
