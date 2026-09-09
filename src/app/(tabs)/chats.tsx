@@ -425,7 +425,7 @@ export default function ChatsScreen() {
                     </View>
                   )}
 
-                  {/* Avatar with Online Indicator */}
+                  {/* Avatar */}
                   <View style={styles.avatarWrapper}>
                     <Image
                       source={{ uri: item.photo }}
@@ -439,7 +439,6 @@ export default function ChatsScreen() {
                         },
                       ]}
                     />
-                    <View style={styles.onlineDot} />
                   </View>
 
                   {/* Chat Info */}

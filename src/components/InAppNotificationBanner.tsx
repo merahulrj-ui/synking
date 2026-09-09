@@ -309,10 +309,9 @@ export const InAppNotificationBanner: React.FC = () => {
         activeOpacity={0.9}
         onPress={handlePress}
       >
-        {/* Sender Avatar with Online Badge */}
+        {/* Sender Avatar */}
         <View style={styles.avatarWrapper}>
           <Image source={{ uri: notification.senderPhoto }} style={styles.avatar} />
-          <View style={styles.onlineDot} />
         </View>
 
         {/* Message Content */}

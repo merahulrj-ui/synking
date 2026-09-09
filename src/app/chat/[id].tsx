@@ -2073,7 +2073,6 @@ const VOICE_COMPRESSED_CONFIG: any = {
                 source={{ uri: targetUser.photo || targetUser.photos?.[0] || 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=800' }}
                 style={styles.avatar}
               />
-              <View style={[styles.onlineDot, { backgroundColor: isOnline ? '#22C55E' : '#9CA3AF' }]} />
             </View>
 
             <View style={{ flex: 1 }}>
