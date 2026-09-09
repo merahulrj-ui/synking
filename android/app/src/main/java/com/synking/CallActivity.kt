@@ -1,10 +1,13 @@
 package com.synking
 
 import android.app.NotificationManager
+import android.app.PictureInPictureParams
+import android.util.Rational
 import android.content.BroadcastReceiver
 import android.content.Context
 import android.content.Intent
 import android.content.IntentFilter
+import android.content.res.Configuration
 import android.os.Build
 import android.os.Bundle
 import android.os.PowerManager
@@ -121,8 +124,8 @@ class CallActivity : ReactActivity() {
         super.onUserLeaveHint()
         if (CallIntentModule.pendingCallType == "video" && Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
             try {
-                val params = android.app.PictureInPictureParams.Builder()
-                    .setAspectRatio(android.util.Rational(9, 16))
+                val params = PictureInPictureParams.Builder()
+                    .setAspectRatio(Rational(9, 16))
                     .setActions(emptyList())
                     .build()
                 enterPictureInPictureMode(params)
@@ -134,7 +137,7 @@ class CallActivity : ReactActivity() {
     }
 
     @Suppress("DEPRECATION")
-    override fun onPictureInPictureModeChanged(isInPictureInPictureMode: Boolean, newConfig: android.content.res.Configuration?) {
+    override fun onPictureInPictureModeChanged(isInPictureInPictureMode: Boolean, newConfig: Configuration) {
         super.onPictureInPictureModeChanged(isInPictureInPictureMode, newConfig)
         Log.d("SYNKING_PIP", "CallActivity PiP mode changed: isInPiP=$isInPictureInPictureMode")
         TelecomModule.emitPipChangeEvent(isInPictureInPictureMode)
