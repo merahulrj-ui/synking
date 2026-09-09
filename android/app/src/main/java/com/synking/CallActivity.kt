@@ -117,6 +117,29 @@ class CallActivity : ReactActivity() {
         }
     }
 
+    override fun onUserLeaveHint() {
+        super.onUserLeaveHint()
+        if (CallIntentModule.pendingCallType == "video" && Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
+            try {
+                val params = android.app.PictureInPictureParams.Builder()
+                    .setAspectRatio(android.util.Rational(9, 16))
+                    .setActions(emptyList())
+                    .build()
+                enterPictureInPictureMode(params)
+                Log.d("SYNKING_PIP", "✅ CallActivity: Auto-entered native PiP on Home press during video call")
+            } catch (e: Exception) {
+                Log.e("SYNKING_PIP", "CallActivity Auto PiP failed: ${e.message}")
+            }
+        }
+    }
+
+    @Suppress("DEPRECATION")
+    override fun onPictureInPictureModeChanged(isInPictureInPictureMode: Boolean, newConfig: android.content.res.Configuration?) {
+        super.onPictureInPictureModeChanged(isInPictureInPictureMode, newConfig)
+        Log.d("SYNKING_PIP", "CallActivity PiP mode changed: isInPiP=$isInPictureInPictureMode")
+        TelecomModule.emitPipChangeEvent(isInPictureInPictureMode)
+    }
+
     override fun onNewIntent(intent: Intent) {
         super.onNewIntent(intent)
         setIntent(intent)
