@@ -79,16 +79,23 @@ const LiveSelfVideo: React.FC<{ isPip?: boolean }> = ({ isPip = true }) => {
     };
     update();
     const unsub = WebRTCService.subscribe(update);
+    const interval = setInterval(update, 2000);
 
-    // 📱 When returning from background / multitasking, update stream cleanly without churning SurfaceView
+    // 📱 When returning from background / multitasking, re-mount SurfaceView cleanly
     const appStateSub = AppState.addEventListener('change', (state) => {
       if (state === 'active') {
         update();
+        setMountKey(k => k + 1);
+        setTimeout(() => {
+          update();
+          setMountKey(k => k + 1);
+        }, 300);
       }
     });
 
     return () => {
       unsub();
+      clearInterval(interval);
       appStateSub.remove();
     };
   }, []);
@@ -294,11 +301,12 @@ export const CallModal: React.FC<Props> = ({ session, isLockscreen, onEndCall, o
     };
   }, [session?.status]);
 
-  // 📱 Listen for AppState changes to safely refresh SurfaceView when returning from background
+  // 📱 Listen for AppState changes to trigger SurfaceView re-render when returning from background
   useEffect(() => {
     const sub = AppState.addEventListener('change', (state) => {
       if (state === 'active') {
         setRemoteRenderKey(k => k + 1);
+        setTimeout(() => setRemoteRenderKey(k => k + 1), 300);
       }
     });
     return () => sub.remove();

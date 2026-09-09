@@ -535,7 +535,7 @@ class WebRTCManager {
       if (MediaDevices && MediaDevices.getUserMedia) {
         this.localStream = await MediaDevices.getUserMedia({
           audio: false, // ⚠️ CRITICAL: Audio is FALSE so ringtone & loudspeaker are 100% unaffected!
-          video: { facingMode: 'user', width: { ideal: 640 }, height: { ideal: 480 }, frameRate: { ideal: 30, max: 30 } },
+          video: { facingMode: 'user', width: { ideal: 640 }, height: { ideal: 480 } },
         });
         this.log(`📸 Front camera preview active for incoming video call (tracks: ${this.localStream.getVideoTracks().length})`);
         this.notify();
@@ -569,7 +569,7 @@ class WebRTCManager {
               noiseSuppression: true,
               autoGainControl: true,
             },
-            video: includeVideo ? { facingMode: 'user', width: { ideal: 640 }, height: { ideal: 480 }, frameRate: { ideal: 30, max: 30 } } : false,
+            video: includeVideo ? { facingMode: 'user', width: { ideal: 640 }, height: { ideal: 480 } } : false,
           });
         } else if (this.localStream.getAudioTracks().length === 0) {
           // Attach audio track to existing camera preview stream
@@ -1009,7 +1009,7 @@ class WebRTCManager {
             let newVideoStream: any = null;
             try {
               newVideoStream = await MediaDevices.getUserMedia({
-                video: { facingMode: targetFacingMode, width: { ideal: 640 }, height: { ideal: 480 }, frameRate: { ideal: 30, max: 30 } },
+                video: { facingMode: targetFacingMode, width: { ideal: 640 }, height: { ideal: 480 } },
                 audio: false,
               });
             } catch (facingErr) {
@@ -1071,7 +1071,7 @@ class WebRTCManager {
         let newVideoStream: any = null;
         try {
           newVideoStream = await MediaDevices.getUserMedia({
-            video: { facingMode: targetFacing, width: { ideal: 640 }, height: { ideal: 480 }, frameRate: { ideal: 30, max: 30 } },
+            video: { facingMode: targetFacing, width: { ideal: 640 }, height: { ideal: 480 } },
             audio: false, // ⚠️ Audio is untouched to prevent echo / route disruption
           });
         } catch (err1) {
