@@ -14,6 +14,7 @@ import {
   Modal,
   Keyboard,
   BackHandler,
+  Vibration,
 } from 'react-native';
 import { activeChatTracker } from '../../services/activeChatTracker';
 import {
@@ -28,6 +29,15 @@ import { useLocalSearchParams, useRouter } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
 import * as Haptics from 'expo-haptics';
 import { LinearGradient } from 'expo-linear-gradient';
+
+// 📳 Tactical Haptic Engine for Chat & Header Buttons
+const triggerChatHaptic = (ms: number = 40) => {
+  if (Platform.OS === 'web') return;
+  try {
+    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Heavy).catch(() => {});
+    Vibration.vibrate(ms);
+  } catch (e) {}
+};
 import { useApp } from '../../contexts/AppContext';
 import { WebRTCService } from '../../services/webrtcService';
 import { CallModal } from '../../components/CallModal';
@@ -562,9 +572,7 @@ const VOICE_COMPRESSED_CONFIG: any = {
   }, [isRecording, recordingSeconds]);
 
   const startRecording = async () => {
-    if (Platform.OS !== 'web') {
-      Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium).catch(() => {});
-    }
+    triggerChatHaptic(45);
     // 👑 VIP ONLY: Gated only when VIP Plans are enabled by admin
     if (vipPlansEnabled && !currentUser?.isVip) {
       const title = '✨ 👑 VIP Exclusive Feature 👑 ✨';
@@ -654,9 +662,7 @@ const VOICE_COMPRESSED_CONFIG: any = {
   };
 
   const cancelRecording = async () => {
-    if (Platform.OS !== 'web') {
-      Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light).catch(() => {});
-    }
+    triggerChatHaptic(30);
     addAudioLog('🛑 Recording cancelled by user.');
     if (animFrameRef.current) clearInterval(animFrameRef.current);
     if (Platform.OS !== 'web') {
@@ -682,9 +688,7 @@ const VOICE_COMPRESSED_CONFIG: any = {
   };
 
   const sendVoiceNote = async () => {
-    if (Platform.OS !== 'web') {
-      Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium).catch(() => {});
-    }
+    triggerChatHaptic(50);
     addAudioLog('🚀 Finishing voice note...');
     if (animFrameRef.current) clearInterval(animFrameRef.current);
     setLiveMicLevel(0);
@@ -1752,9 +1756,7 @@ const VOICE_COMPRESSED_CONFIG: any = {
 
   // Start Native WebRTC Voice or Video Call (Outgoing)
   const handleStartCall = (type: 'audio' | 'video') => {
-    if (Platform.OS !== 'web') {
-      Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium).catch(() => {});
-    }
+    triggerChatHaptic(50);
     if (!currentUser || !targetUser) return;
 
     if (isPartnerBlocked) {
@@ -2111,7 +2113,10 @@ const VOICE_COMPRESSED_CONFIG: any = {
             {/* Video Call Icon */}
             <TouchableOpacity
               style={styles.callIconBtn}
-              onPress={() => handleStartCall('video')}
+              onPress={() => {
+                triggerChatHaptic(50);
+                handleStartCall('video');
+              }}
               activeOpacity={0.75}
             >
               <Ionicons name="videocam" size={20} color="#FD3A73" />
@@ -2125,7 +2130,10 @@ const VOICE_COMPRESSED_CONFIG: any = {
             {/* Voice Call Icon */}
             <TouchableOpacity
               style={styles.callIconBtn}
-              onPress={() => handleStartCall('audio')}
+              onPress={() => {
+                triggerChatHaptic(50);
+                handleStartCall('audio');
+              }}
               activeOpacity={0.75}
             >
               <Ionicons name="call" size={18} color="#FD3A73" />

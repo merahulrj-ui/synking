@@ -13,16 +13,19 @@ import { saveChatMessageToFirestore } from '../services/firebase';
 import { encryptE2EEMessage } from '../utils/encryption';
 import * as Haptics from 'expo-haptics';
 
-// 📳 Tactical Micro-Haptic Click Engine (Apple / Pixel feel)
+// 📳 Tactical Micro-Haptic Click Engine (Apple / Pixel feel + Android Linear Motor Boost)
 const triggerHaptic = (style: 'light' | 'medium' | 'heavy' = 'light') => {
   if (Platform.OS === 'web') return;
   try {
     if (style === 'light') {
-      Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light).catch(() => {});
-    } else if (style === 'medium') {
       Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium).catch(() => {});
+      Vibration.vibrate(30);
+    } else if (style === 'medium') {
+      Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Heavy).catch(() => {});
+      Vibration.vibrate(45);
     } else if (style === 'heavy') {
       Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Heavy).catch(() => {});
+      Vibration.vibrate(70);
     }
   } catch (e) {}
 };
