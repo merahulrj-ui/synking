@@ -102,6 +102,13 @@ class WebRTCManager {
             this.resumeLocalVideoCapturer();
           }
         }
+      } else if (nextAppState === 'background' || nextAppState === 'inactive') {
+        // 🛑 BATTERY FIX: If app goes to background without an active call, kill any leaked camera hardware!
+        if (!this.currentSession || (this.currentSession.status !== 'connected' && this.currentSession.status !== 'calling' && this.currentSession.status !== 'ringing')) {
+          if (this.localStream) {
+            this.cleanup();
+          }
+        }
       }
     });
 
@@ -1022,7 +1029,13 @@ class WebRTCManager {
 
             const newVideoTrack = newVideoStream?.getVideoTracks()?.[0];
             if (newVideoTrack) {
-              videoTrack.stop();
+              try { videoTrack.enabled = false; } catch (e) {}
+              try { videoTrack.stop(); } catch (e) {}
+              try {
+                if (typeof videoTrack.release === 'function') {
+                  videoTrack.release();
+                }
+              } catch (e) {}
               this.localStream.removeTrack(videoTrack);
               this.localStream.addTrack(newVideoTrack);
 
@@ -1092,10 +1105,16 @@ class WebRTCManager {
           if (!this.localStream) {
             this.localStream = newVideoStream;
           } else {
-            // Stop and cleanly remove old frozen video tracks
+            // Stop and cleanly release old frozen video tracks to prevent battery drain
             const oldVideoTracks = this.localStream.getVideoTracks ? this.localStream.getVideoTracks() : [];
             oldVideoTracks.forEach((t: any) => {
+              try { t.enabled = false; } catch (e) {}
               try { t.stop(); } catch (e) {}
+              try {
+                if (typeof t.release === 'function') {
+                  t.release();
+                }
+              } catch (e) {}
               try { this.localStream.removeTrack(t); } catch (e) {}
             });
             this.localStream.addTrack(newVideoTrack);
@@ -1275,9 +1294,21 @@ class WebRTCManager {
       this.iceCandidateQueue = [];
       this.remoteVideoFrame = null;
 
+      // 🛑 BATTERY FIX: Complete hardware camera and microphone release
       if (this.localStream) {
         try {
-          this.localStream.getTracks().forEach((track: any) => track.stop());
+          this.localStream.getTracks().forEach((track: any) => {
+            try { track.enabled = false; } catch (e) {}
+            try { track.stop(); } catch (e) {}
+            try {
+              if (typeof track.release === 'function') {
+                track.release();
+              }
+            } catch (e) {}
+          });
+          if (typeof this.localStream.release === 'function') {
+            this.localStream.release(true);
+          }
         } catch (e) {}
         this.localStream = null;
       }
@@ -1377,14 +1408,39 @@ class WebRTCManager {
         NativeModules.TelecomModule.endCall().catch(() => {});
       }
 
+      // 🛑 BATTERY FIX 1: RELEASE ALL KEEP-AWAKE LOCKS & SCREEN WAKELOCKS IMMEDIATELY
+      try {
+        const { deactivateKeepAwake } = require('expo-keep-awake');
+        deactivateKeepAwake('synkin_call_screen').catch(() => {});
+        deactivateKeepAwake('synkin_global_call').catch(() => {});
+        deactivateKeepAwake('synkin_callapp_screen').catch(() => {});
+        deactivateKeepAwake().catch(() => {});
+      } catch (e) {}
+
+      if (Platform.OS === 'android' && NativeModules.CallWakeLockModule?.releaseScreenWakeLock) {
+        NativeModules.CallWakeLockModule.releaseScreenWakeLock().catch(() => {});
+      }
+
       this.iceStatus = 'disconnected';
       this.pendingOffer = null;
       this.iceCandidateQueue = [];
       this.remoteVideoFrame = null;
 
+      // 🛑 BATTERY FIX 2: FORCE-RELEASE HARDWARE CAMERA & MICROPHONE SENSORS
       if (this.localStream) {
         try {
-          this.localStream.getTracks().forEach((track: any) => track.stop());
+          this.localStream.getTracks().forEach((track: any) => {
+            try { track.enabled = false; } catch (e) {}
+            try { track.stop(); } catch (e) {}
+            try {
+              if (typeof track.release === 'function') {
+                track.release();
+              }
+            } catch (e) {}
+          });
+          if (typeof this.localStream.release === 'function') {
+            this.localStream.release(true);
+          }
         } catch (e) {}
         this.localStream = null;
       }
@@ -1398,7 +1454,19 @@ class WebRTCManager {
         } catch (e) {}
       }
 
-      this.remoteStream = null;
+      if (this.remoteStream) {
+        try {
+          this.remoteStream.getTracks().forEach((track: any) => {
+            try { track.enabled = false; } catch (e) {}
+            try { track.stop(); } catch (e) {}
+          });
+          if (typeof this.remoteStream.release === 'function') {
+            this.remoteStream.release(true);
+          }
+        } catch (e) {}
+        this.remoteStream = null;
+      }
+
       this.currentSession = null;
       this.notify();
     } finally {
