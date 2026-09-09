@@ -266,6 +266,16 @@ export const CallModal: React.FC<Props> = ({ session, isLockscreen, onEndCall, o
   const [showQuickMessages, setShowQuickMessages] = useState<boolean>(false);
   const [customNote, setCustomNote] = useState<string>('');
   const [isBluetooth, setIsBluetooth] = useState<boolean>(false);
+  const [isInNativePip, setIsInNativePip] = useState<boolean>(false);
+
+  // 📱 Listen for Android system PiP mode changes — hide buttons, show only clean video in PiP
+  useEffect(() => {
+    if (Platform.OS !== 'android') return;
+    const pipSub = DeviceEventEmitter.addListener('NATIVE_PIP_CHANGED', (status: string) => {
+      setIsInNativePip(status === 'entered');
+    });
+    return () => pipSub.remove();
+  }, []);
 
   useEffect(() => {
     let mounted = true;
@@ -529,40 +539,42 @@ export const CallModal: React.FC<Props> = ({ session, isLockscreen, onEndCall, o
                 )}
               </View>
 
-              {/* Draggable Self PiP Overlay */}
-              <Animated.View 
-                style={[styles.pipSelfView, { transform: pipPan.getTranslateTransform(), zIndex: 20 }]}
-                {...pipPanResponder.panHandlers}
-              >
-                <View style={{ flex: 1, width: '100%', height: '100%', overflow: 'hidden', backgroundColor: '#000000' }}>
-                  <LiveSelfVideo isPip={true} />
-                  
-                  {/* 📸 Flip Camera Button Overlay */}
-                  <TouchableOpacity 
-                    style={{
-                      position: 'absolute',
-                      bottom: 10,
-                      right: 10,
-                      backgroundColor: 'rgba(0, 0, 0, 0.6)',
-                      width: 34,
-                      height: 34,
-                      borderRadius: 17,
-                      alignItems: 'center',
-                      justifyContent: 'center',
-                      borderWidth: 1,
-                      borderColor: 'rgba(255, 255, 255, 0.3)',
-                      zIndex: 100,
-                    }}
-                    onPress={(e) => { 
-                      e.stopPropagation(); 
-                      WebRTCService.switchCamera(); 
-                    }}
-                    activeOpacity={0.7}
-                  >
-                    <Ionicons name="camera-reverse" size={18} color="#00E5FF" />
-                  </TouchableOpacity>
-                </View>
-              </Animated.View>
+              {/* Draggable Self PiP Overlay (Hidden in Native PiP) */}
+              {!isInNativePip && (
+                <Animated.View 
+                  style={[styles.pipSelfView, { transform: pipPan.getTranslateTransform(), zIndex: 20 }]}
+                  {...pipPanResponder.panHandlers}
+                >
+                  <View style={{ flex: 1, width: '100%', height: '100%', overflow: 'hidden', backgroundColor: '#000000' }}>
+                    <LiveSelfVideo isPip={true} />
+                    
+                    {/* 📸 Flip Camera Button Overlay */}
+                    <TouchableOpacity 
+                      style={{
+                        position: 'absolute',
+                        bottom: 10,
+                        right: 10,
+                        backgroundColor: 'rgba(0, 0, 0, 0.6)',
+                        width: 34,
+                        height: 34,
+                        borderRadius: 17,
+                        alignItems: 'center',
+                        justifyContent: 'center',
+                        borderWidth: 1,
+                        borderColor: 'rgba(255, 255, 255, 0.3)',
+                        zIndex: 100,
+                      }}
+                      onPress={(e) => { 
+                        e.stopPropagation(); 
+                        WebRTCService.switchCamera(); 
+                      }}
+                      activeOpacity={0.7}
+                    >
+                      <Ionicons name="camera-reverse" size={18} color="#00E5FF" />
+                    </TouchableOpacity>
+                  </View>
+                </Animated.View>
+              )}
             </>
           )}
 
@@ -579,8 +591,8 @@ export const CallModal: React.FC<Props> = ({ session, isLockscreen, onEndCall, o
             </View>
           )}
 
-          {/* Top Left: Chat Button (Only when active/connected or outgoing, incoming has bottom Message button) */}
-          {!isIncomingRinging && ((session.type === 'video' || session.isVideoEnabled) || isConnected) && (
+          {/* Top Left: Chat Button (Hidden in Native PiP) */}
+          {!isInNativePip && !isIncomingRinging && ((session.type === 'video' || session.isVideoEnabled) || isConnected) && (
             <TouchableOpacity
               style={styles.chatMinimizeBtn}
               onPress={handleOpenChat}
@@ -591,8 +603,8 @@ export const CallModal: React.FC<Props> = ({ session, isLockscreen, onEndCall, o
             </TouchableOpacity>
           )}
 
-          {/* Top Right: Flip Camera Button (Always accessible on Video Call) */}
-          {(session.type === 'video' || session.isVideoEnabled) && !isIncomingRinging && (
+          {/* Top Right: Flip Camera Button (Hidden in Native PiP) */}
+          {!isInNativePip && (session.type === 'video' || session.isVideoEnabled) && !isIncomingRinging && (
             <TouchableOpacity 
               style={styles.floatingFlipBtn}
               onPress={() => WebRTCService.switchCamera()}
@@ -603,8 +615,8 @@ export const CallModal: React.FC<Props> = ({ session, isLockscreen, onEndCall, o
             </TouchableOpacity>
           )}
 
-          {/* 1. TOP STATUS HEADER (ALWAYS AT TOP, hidden in PiP) */}
-          {isIncomingRinging ? (
+          {/* 1. TOP STATUS HEADER (Hidden in Native PiP) */}
+          {!isInNativePip && (isIncomingRinging ? (
             <View style={styles.topHeaderIncoming}>
               <View style={styles.e2eeBadge}>
                 <Ionicons name="lock-closed" size={12} color="#38BDF8" />
@@ -643,10 +655,10 @@ export const CallModal: React.FC<Props> = ({ session, isLockscreen, onEndCall, o
                 {session.status === 'rejected' && '❌ Call Declined'}
               </Text>
             </View>
-          )}
+          ))}
 
-          {/* 2. CENTER SECTION */}
-          {isIncomingRinging ? (
+          {/* 2. CENTER SECTION (Hidden in Native PiP) */}
+          {!isInNativePip && (isIncomingRinging ? (
             isVideoCall ? (
               // INCOMING VIDEO CALL CENTER: WhatsApp style with medium avatar & "Turn off your video" pill
               <View style={styles.videoIncomingCenterSection}>
@@ -769,10 +781,10 @@ export const CallModal: React.FC<Props> = ({ session, isLockscreen, onEndCall, o
             </View>
           ) : (
             <View style={{ flex: 1 }} />
-          )}
+          ))}
 
-          {/* 3. BOTTOM CONTROL BAR */}
-          {session.status === 'rejected' || session.status === 'ended' ? (
+          {/* 3. BOTTOM CONTROL BAR (Hidden in Native PiP) */}
+          {!isInNativePip && (session.status === 'rejected' || session.status === 'ended' ? (
               <View style={styles.declinedActionsRow}>
                 <TouchableOpacity
                   style={styles.declinedDismissBtn}
@@ -882,10 +894,10 @@ export const CallModal: React.FC<Props> = ({ session, isLockscreen, onEndCall, o
                 </TouchableOpacity>
               </View>
             )
-          }
+          )}
 
-          {/* Quick Reply Message Sheet (Stays on Screen, cuts call & delivers in background) */}
-          {showQuickMessages && (
+          {/* Quick Reply Message Sheet (Hidden in Native PiP) */}
+          {!isInNativePip && showQuickMessages && (
             <View style={styles.quickMessagesOverlay}>
               <TouchableOpacity
                 style={styles.quickMessagesBackdrop}
