@@ -63,10 +63,10 @@ export default function TabsLayout() {
     return () => unsubscribe();
   }, []);
 
-  const tabBarBg = isDarkMode ? '#000000' : '#FFFFFF';
-  const borderCol = isDarkMode ? 'rgba(255, 255, 255, 0.08)' : 'rgba(15, 23, 42, 0.06)';
+  const tabBarBg = isDarkMode ? '#000000' : '#FFF5F7';
+  const borderCol = isDarkMode ? 'rgba(255, 255, 255, 0.08)' : 'rgba(253, 58, 115, 0.12)';
   const activeColor = '#FD3A73';
-  const inactiveColor = isDarkMode ? '#94A3B8' : '#64748B';
+  const inactiveColor = isDarkMode ? '#94A3B8' : '#7E8B9B';
 
   return (
     <>
@@ -99,11 +99,11 @@ export default function TabsLayout() {
                 shadowRadius: 12,
                 elevation: 14,
               } : {
-                shadowColor: '#64748B',
-                shadowOffset: { width: 0, height: -4 },
-                shadowOpacity: 0.05,
-                shadowRadius: 16,
-                elevation: 8,
+                shadowColor: '#FD3A73',
+                shadowOffset: { width: 0, height: -3 },
+                shadowOpacity: 0.08,
+                shadowRadius: 12,
+                elevation: 4,
               }),
             }
           ],
