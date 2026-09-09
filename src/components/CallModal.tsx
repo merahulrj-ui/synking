@@ -1,5 +1,5 @@
 import React, { useRef, useEffect, useState } from 'react';
-import { View, Text, StyleSheet, Modal, TouchableOpacity, Image, Platform, ScrollView, Share, Animated, PanResponder, Vibration, NativeModules, BackHandler, DeviceEventEmitter, Dimensions, TextInput, AppState } from 'react-native';
+import { View, Text, StyleSheet, Modal, TouchableOpacity, Image, Platform, ScrollView, Share, Animated, PanResponder, Vibration, NativeModules, BackHandler, DeviceEventEmitter, Dimensions, TextInput, AppState, useWindowDimensions } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { LinearGradient } from 'expo-linear-gradient';
 import { activateKeepAwakeAsync, deactivateKeepAwake } from 'expo-keep-awake';
@@ -266,13 +266,16 @@ export const CallModal: React.FC<Props> = ({ session, isLockscreen, onEndCall, o
   const [showQuickMessages, setShowQuickMessages] = useState<boolean>(false);
   const [customNote, setCustomNote] = useState<string>('');
   const [isBluetooth, setIsBluetooth] = useState<boolean>(false);
-  const [isInNativePip, setIsInNativePip] = useState<boolean>(false);
+  const { width: windowWidth, height: windowHeight } = useWindowDimensions();
+  const isDimensionPip = Platform.OS === 'android' && windowWidth < 320 && windowHeight < 520;
+  const [isEventPip, setIsEventPip] = useState<boolean>(false);
+  const isInNativePip = isEventPip || isDimensionPip;
 
   // 📱 Listen for Android system PiP mode changes — hide buttons, show only clean video in PiP
   useEffect(() => {
     if (Platform.OS !== 'android') return;
     const pipSub = DeviceEventEmitter.addListener('NATIVE_PIP_CHANGED', (status: string) => {
-      setIsInNativePip(status === 'entered');
+      setIsEventPip(status === 'entered');
     });
     return () => pipSub.remove();
   }, []);

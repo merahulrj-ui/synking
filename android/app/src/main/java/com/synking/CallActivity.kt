@@ -124,6 +124,7 @@ class CallActivity : ReactActivity() {
         super.onUserLeaveHint()
         if (CallIntentModule.pendingCallType == "video" && Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
             try {
+                TelecomModule.emitPipChangeEvent(true)
                 val params = PictureInPictureParams.Builder()
                     .setAspectRatio(Rational(9, 16))
                     .setActions(emptyList())
