@@ -1031,12 +1031,12 @@ class WebRTCManager {
             if (newVideoTrack) {
               try { videoTrack.enabled = false; } catch (e) {}
               try { videoTrack.stop(); } catch (e) {}
+              try { this.localStream.removeTrack(videoTrack); } catch (e) {}
               try {
                 if (typeof videoTrack.release === 'function') {
                   videoTrack.release();
                 }
               } catch (e) {}
-              this.localStream.removeTrack(videoTrack);
               this.localStream.addTrack(newVideoTrack);
 
               if (this.peerConnection) {
@@ -1110,12 +1110,12 @@ class WebRTCManager {
             oldVideoTracks.forEach((t: any) => {
               try { t.enabled = false; } catch (e) {}
               try { t.stop(); } catch (e) {}
+              try { this.localStream.removeTrack(t); } catch (e) {}
               try {
                 if (typeof t.release === 'function') {
                   t.release();
                 }
               } catch (e) {}
-              try { this.localStream.removeTrack(t); } catch (e) {}
             });
             this.localStream.addTrack(newVideoTrack);
           }
@@ -1297,14 +1297,11 @@ class WebRTCManager {
       // 🛑 BATTERY FIX: Complete hardware camera and microphone release
       if (this.localStream) {
         try {
+          // stream.release(true) internally: removeTrack → track.release() → mediaStreamRelease
+          // Do NOT call track.release() separately as it disposes native track before removeTrack can run
           this.localStream.getTracks().forEach((track: any) => {
             try { track.enabled = false; } catch (e) {}
             try { track.stop(); } catch (e) {}
-            try {
-              if (typeof track.release === 'function') {
-                track.release();
-              }
-            } catch (e) {}
           });
           if (typeof this.localStream.release === 'function') {
             this.localStream.release(true);
@@ -1429,14 +1426,11 @@ class WebRTCManager {
       // 🛑 BATTERY FIX 2: FORCE-RELEASE HARDWARE CAMERA & MICROPHONE SENSORS
       if (this.localStream) {
         try {
+          // stream.release(true) internally: removeTrack → track.release() → mediaStreamRelease
+          // Do NOT call track.release() separately as it disposes native track before removeTrack can run
           this.localStream.getTracks().forEach((track: any) => {
             try { track.enabled = false; } catch (e) {}
             try { track.stop(); } catch (e) {}
-            try {
-              if (typeof track.release === 'function') {
-                track.release();
-              }
-            } catch (e) {}
           });
           if (typeof this.localStream.release === 'function') {
             this.localStream.release(true);
