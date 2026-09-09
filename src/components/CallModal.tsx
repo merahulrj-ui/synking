@@ -626,7 +626,7 @@ export const CallModal: React.FC<Props> = ({ session, isLockscreen, onEndCall, o
                 <Text style={styles.e2eeText}>End-to-End Encrypted HD</Text>
               </View>
 
-              <Text style={styles.callTypeTitle}>
+              <Text style={styles.callTypeTitle} numberOfLines={1}>
                 {session.callerName}
               </Text>
 
@@ -1158,6 +1158,7 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     gap: 8,
     width: '100%',
+    paddingTop: Platform.OS === 'web' ? 12 : 44,
   },
   e2eeBadge: {
     flexDirection: 'row',
@@ -1181,8 +1182,10 @@ const styles = StyleSheet.create({
   callTypeTitle: {
     color: '#FFFFFF',
     fontSize: 22,
-    fontFamily: 'Poppins_900Black',
-    letterSpacing: -0.4,
+    fontFamily: 'Poppins_700Bold',
+    letterSpacing: 0,
+    paddingHorizontal: 12,
+    textAlign: 'center',
   },
   callStatus: {
     color: '#94A3B8',
@@ -1266,15 +1269,15 @@ const styles = StyleSheet.create({
   },
   topHeaderFloating: {
     position: 'absolute',
-    top: Platform.OS === 'web' ? 18 : 48,
+    top: Platform.OS === 'web' ? 18 : 58,
     alignSelf: 'center',
-    minWidth: 210,
-    backgroundColor: 'rgba(10, 14, 23, 0.72)',
-    paddingHorizontal: 20,
-    paddingVertical: 10,
+    minWidth: 230,
+    backgroundColor: 'rgba(10, 14, 23, 0.78)',
+    paddingHorizontal: 22,
+    paddingVertical: 12,
     borderRadius: 28,
     borderWidth: 1,
-    borderColor: 'rgba(255, 255, 255, 0.12)',
+    borderColor: 'rgba(255, 255, 255, 0.16)',
     zIndex: 20,
     alignItems: 'center',
     gap: 4,
@@ -1376,14 +1379,15 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     gap: 6,
     width: '100%',
-    paddingTop: Platform.OS === 'web' ? 12 : 24,
+    paddingTop: Platform.OS === 'web' ? 12 : 44,
     zIndex: 10,
   },
   incomingCallerNameHeader: {
     color: '#FFFFFF',
     fontSize: 26,
     fontFamily: 'Poppins_700Bold',
-    letterSpacing: -0.4,
+    letterSpacing: 0,
+    paddingHorizontal: 12,
     textAlign: 'center',
     textShadowColor: 'rgba(0, 0, 0, 0.7)',
     textShadowOffset: { width: 0, height: 1 },
