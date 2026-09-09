@@ -1158,7 +1158,6 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     gap: 8,
     width: '100%',
-    paddingTop: Platform.OS === 'web' ? 12 : 44,
   },
   e2eeBadge: {
     flexDirection: 'row',
@@ -1269,7 +1268,7 @@ const styles = StyleSheet.create({
   },
   topHeaderFloating: {
     position: 'absolute',
-    top: Platform.OS === 'web' ? 18 : 58,
+    top: Platform.OS === 'web' ? 18 : 48,
     alignSelf: 'center',
     minWidth: 230,
     backgroundColor: 'rgba(10, 14, 23, 0.78)',
@@ -1379,7 +1378,7 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     gap: 6,
     width: '100%',
-    paddingTop: Platform.OS === 'web' ? 12 : 44,
+    paddingTop: Platform.OS === 'web' ? 12 : 24,
     zIndex: 10,
   },
   incomingCallerNameHeader: {
