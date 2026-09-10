@@ -15,6 +15,7 @@ import { WebRTCService } from '../services/webrtcService';
 import { NativeRTCView } from '../services/webrtcCore';
 import { CallSession } from '../types';
 import { activateKeepAwakeAsync, deactivateKeepAwake } from 'expo-keep-awake';
+import { activeChatTracker } from '../services/activeChatTracker';
 
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { RealtimeBridge } from '../services/realtimeBridge';
@@ -169,7 +170,18 @@ function GlobalCallOverlay() {
     lastChatNavTimeRef.current = now;
     WebRTCService.setMinimized(true);
     setIsMinimized(true);
-    router.push(`/chat/${partnerId}`);
+
+    if (activeChatTracker.isChatActive(partnerId)) {
+      console.log('[GlobalCallOverlay] 🛑 Already in chat with partnerId:', partnerId);
+      return;
+    }
+
+    const currentChat = activeChatTracker.getActiveChat();
+    if (currentChat) {
+      router.replace(`/chat/${partnerId}`);
+    } else {
+      router.push(`/chat/${partnerId}`);
+    }
   }, [router]);
 
   React.useEffect(() => {

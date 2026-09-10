@@ -1954,6 +1954,7 @@ const VOICE_COMPRESSED_CONFIG: any = {
       }
     } catch (e) {}
 
+    activeChatTracker.setActiveChat(null);
     if (router.canGoBack()) {
       router.back();
     } else {

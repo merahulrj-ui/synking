@@ -90,7 +90,14 @@ class NotificationServiceClass {
         if (callData?.type === 'NEW_MESSAGE' && callData?.senderId) {
           try {
             const { router } = require('expo-router');
-            router.push(`/chat/${callData.senderId}`);
+            const { activeChatTracker } = require('./activeChatTracker');
+            if (activeChatTracker.isChatActive(callData.senderId)) return;
+            const currentChat = activeChatTracker.getActiveChat();
+            if (currentChat) {
+              router.replace(`/chat/${callData.senderId}`);
+            } else {
+              router.push(`/chat/${callData.senderId}`);
+            }
           } catch (e) {}
           return;
         }
@@ -108,7 +115,14 @@ class NotificationServiceClass {
         if (callData?.type === 'NEW_MATCH' && callData?.partnerId) {
           try {
             const { router } = require('expo-router');
-            router.push(`/chat/${callData.partnerId}`);
+            const { activeChatTracker } = require('./activeChatTracker');
+            if (activeChatTracker.isChatActive(callData.partnerId)) return;
+            const currentChat = activeChatTracker.getActiveChat();
+            if (currentChat) {
+              router.replace(`/chat/${callData.partnerId}`);
+            } else {
+              router.push(`/chat/${callData.partnerId}`);
+            }
           } catch (e) {}
           return;
         }

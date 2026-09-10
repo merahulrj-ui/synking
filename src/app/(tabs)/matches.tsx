@@ -7,6 +7,7 @@ import { useApp } from '../../contexts/AppContext';
 import { Header } from '../../components/Header';
 import { DatePassCard } from '../../components/DatePassCard';
 import { useRouter } from 'expo-router';
+import { activeChatTracker } from '../../services/activeChatTracker';
 
 export default function MatchesScreen() {
   const { incomingRequests, sentRequests, acceptRequest, declineRequest, deleteSentRequest, activeBookings, isDarkMode } = useApp();
@@ -281,7 +282,13 @@ export default function MatchesScreen() {
             onPress={() => {
               const target = acceptedCelebration;
               setAcceptedCelebration(null);
-              router.push(`/chat/${target.id}`);
+              if (activeChatTracker.isChatActive(target.id)) return;
+              const currentChat = activeChatTracker.getActiveChat();
+              if (currentChat) {
+                router.replace(`/chat/${target.id}`);
+              } else {
+                router.push(`/chat/${target.id}`);
+              }
             }}
             activeOpacity={0.85}
           >

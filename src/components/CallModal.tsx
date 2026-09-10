@@ -520,9 +520,6 @@ export const CallModal: React.FC<Props> = ({ session, isLockscreen, onEndCall, o
 
   const handleOpenChat = () => {
     const partnerId = session.callerId || session.receiverId;
-    if (partnerId) {
-      WebRTCService.setTargetChatUserId(partnerId);
-    }
     const isVideo = session.type === 'video' || session.isVideoEnabled;
     if (Platform.OS === 'android' && isVideo && NativeModules.TelecomModule?.enterPipMode) {
       NativeModules.TelecomModule.enterPipMode().catch(() => {});
@@ -530,8 +527,9 @@ export const CallModal: React.FC<Props> = ({ session, isLockscreen, onEndCall, o
     WebRTCService.setMinimized(true);
     if (onMinimize) {
       onMinimize();
-    } else {
-      if (Platform.OS === 'web' && partnerId && typeof window !== 'undefined' && window.location) {
+    } else if (partnerId) {
+      WebRTCService.setTargetChatUserId(partnerId);
+      if (Platform.OS === 'web' && typeof window !== 'undefined' && window.location) {
         window.location.href = `/chat/${partnerId}`;
       }
     }

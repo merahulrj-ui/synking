@@ -265,7 +265,15 @@ export const InAppNotificationBanner: React.FC = () => {
     }
 
     if (type === 'match') {
-      router.push(`/chat/${senderId}` as any);
+      if (activeChatTracker.isChatActive(senderId)) {
+        return;
+      }
+      const currentChat = activeChatTracker.getActiveChat();
+      if (currentChat) {
+        router.replace(`/chat/${senderId}` as any);
+      } else {
+        router.push(`/chat/${senderId}` as any);
+      }
       return;
     }
 

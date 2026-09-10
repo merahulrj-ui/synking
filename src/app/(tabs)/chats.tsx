@@ -8,6 +8,7 @@ import { useRouter } from 'expo-router';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { fetchChatMessagesFromFirestore } from '../../services/firebase';
 import { ChatMessage } from '../../types';
+import { activeChatTracker } from '../../services/activeChatTracker';
 
 function formatLastMessageSnippet(msg?: ChatMessage): string {
   if (!msg || !msg.text) return 'Say hi! Mutual match verified ✨';
@@ -397,7 +398,13 @@ export default function ChatsScreen() {
                     } else {
                       markChatAsRead(item.id);
                       if (item.phoneNumber) markChatAsRead(item.phoneNumber);
-                      router.push(`/chat/${item.id}`);
+                      if (activeChatTracker.isChatActive(item.id)) return;
+                      const currentChat = activeChatTracker.getActiveChat();
+                      if (currentChat) {
+                        router.replace(`/chat/${item.id}`);
+                      } else {
+                        router.push(`/chat/${item.id}`);
+                      }
                     }
                   }}
                   onLongPress={() => {
