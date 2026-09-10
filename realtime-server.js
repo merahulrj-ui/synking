@@ -1175,11 +1175,41 @@ const server = http.createServer((req, res) => {
 
   // 0.03 GET /favicon.png or /favicon.ico
   if ((req.method === 'GET' || req.method === 'HEAD') && (pathname === '/favicon.png' || pathname === '/favicon.ico')) {
-    const iconPath = path.join(__dirname, 'assets', 'images', 'favicon.png');
-    if (fs.existsSync(iconPath)) {
+    const iconPath = path.join(__dirname, 'public', 'images', 'favicon.png');
+    const fallbackPath = path.join(__dirname, 'assets', 'images', 'favicon.png');
+    const target = fs.existsSync(iconPath) ? iconPath : fallbackPath;
+    if (fs.existsSync(target)) {
       res.writeHead(200, { 'Content-Type': 'image/png', 'Cache-Control': 'public, max-age=86400' });
       if (req.method === 'HEAD') { res.end(); return; }
-      fs.createReadStream(iconPath).pipe(res);
+      fs.createReadStream(target).pipe(res);
+      return;
+    }
+  }
+
+  // 0.035 GET /images/* or root image paths (Official Synkin Logo & Brand Assets)
+  if ((req.method === 'GET' || req.method === 'HEAD') && (pathname.startsWith('/images/') || pathname === '/logo_emblem.png' || pathname === '/logo.png' || pathname === '/icon.png')) {
+    const filename = path.basename(pathname);
+    let imgPath = path.join(__dirname, 'public', 'images', filename);
+    if (!fs.existsSync(imgPath)) {
+      imgPath = path.join(__dirname, 'assets', 'images', filename);
+    }
+    if (fs.existsSync(imgPath) && fs.statSync(imgPath).isFile()) {
+      const ext = path.extname(imgPath).toLowerCase();
+      const mimeTypes = {
+        '.png': 'image/png',
+        '.jpg': 'image/jpeg',
+        '.jpeg': 'image/jpeg',
+        '.svg': 'image/svg+xml',
+        '.webp': 'image/webp',
+        '.ico': 'image/x-icon',
+      };
+      res.writeHead(200, {
+        'Content-Type': mimeTypes[ext] || 'application/octet-stream',
+        'Cache-Control': 'public, max-age=86400',
+        'Access-Control-Allow-Origin': '*',
+      });
+      if (req.method === 'HEAD') { res.end(); return; }
+      fs.createReadStream(imgPath).pipe(res);
       return;
     }
   }
