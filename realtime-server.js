@@ -1127,10 +1127,11 @@ const server = http.createServer((req, res) => {
   const pathname = url.pathname;
 
   // 0. GET / (Official Synkin Landing Page / Browser Showcase)
-  if (req.method === 'GET' && (pathname === '/' || pathname === '/index.html')) {
+  if ((req.method === 'GET' || req.method === 'HEAD') && (pathname === '/' || pathname === '/index.html')) {
     const acceptHeader = req.headers['accept'] || '';
     if (acceptHeader.includes('application/json') && !acceptHeader.includes('text/html')) {
       res.writeHead(200, { 'Content-Type': 'application/json' });
+      if (req.method === 'HEAD') { res.end(); return; }
       res.end(JSON.stringify({
         service: 'SYNKING Realtime Engine & Cloud Gateway',
         status: 'online',
@@ -1143,11 +1144,13 @@ const server = http.createServer((req, res) => {
     const indexPath = path.join(__dirname, 'public', 'index.html');
     if (fs.existsSync(indexPath)) {
       res.writeHead(200, { 'Content-Type': 'text/html; charset=utf-8', 'Access-Control-Allow-Origin': '*' });
+      if (req.method === 'HEAD') { res.end(); return; }
       fs.createReadStream(indexPath).pipe(res);
       return;
     }
 
     res.writeHead(200, { 'Content-Type': 'application/json' });
+    if (req.method === 'HEAD') { res.end(); return; }
     res.end(JSON.stringify({
       service: 'SYNKING Realtime Engine & Cloud Gateway',
       status: 'online',
@@ -1158,8 +1161,9 @@ const server = http.createServer((req, res) => {
   }
 
   // 0.02 GET /health or /api/health (Dedicated JSON Health Check)
-  if (req.method === 'GET' && (pathname === '/health' || pathname === '/api/health')) {
+  if ((req.method === 'GET' || req.method === 'HEAD') && (pathname === '/health' || pathname === '/api/health')) {
     res.writeHead(200, { 'Content-Type': 'application/json' });
+    if (req.method === 'HEAD') { res.end(); return; }
     res.end(JSON.stringify({
       service: 'SYNKING Realtime Engine & Cloud Gateway',
       status: 'online',
@@ -1170,20 +1174,22 @@ const server = http.createServer((req, res) => {
   }
 
   // 0.03 GET /favicon.png or /favicon.ico
-  if (req.method === 'GET' && (pathname === '/favicon.png' || pathname === '/favicon.ico')) {
+  if ((req.method === 'GET' || req.method === 'HEAD') && (pathname === '/favicon.png' || pathname === '/favicon.ico')) {
     const iconPath = path.join(__dirname, 'assets', 'images', 'favicon.png');
     if (fs.existsSync(iconPath)) {
       res.writeHead(200, { 'Content-Type': 'image/png', 'Cache-Control': 'public, max-age=86400' });
+      if (req.method === 'HEAD') { res.end(); return; }
       fs.createReadStream(iconPath).pipe(res);
       return;
     }
   }
 
   // 0.04 GET /terms (Public Terms of Service for Google Play Store)
-  if (req.method === 'GET' && (pathname === '/terms' || pathname === '/terms-of-service')) {
+  if ((req.method === 'GET' || req.method === 'HEAD') && (pathname === '/terms' || pathname === '/terms-of-service')) {
     const termsPath = path.join(__dirname, 'public', 'terms.html');
     if (fs.existsSync(termsPath)) {
       res.writeHead(200, { 'Content-Type': 'text/html; charset=utf-8', 'Access-Control-Allow-Origin': '*' });
+      if (req.method === 'HEAD') { res.end(); return; }
       fs.createReadStream(termsPath).pipe(res);
       return;
     }
@@ -1207,10 +1213,11 @@ const server = http.createServer((req, res) => {
   }
 
   // 0.09 GET /privacy-policy (Public Privacy Policy Page for Google Play Store)
-  if (req.method === 'GET' && pathname === '/privacy-policy') {
+  if ((req.method === 'GET' || req.method === 'HEAD') && (pathname === '/privacy-policy' || pathname === '/privacy')) {
     const privacyPath = path.join(__dirname, 'privacy-policy', 'index.html');
     if (fs.existsSync(privacyPath)) {
       res.writeHead(200, { 'Content-Type': 'text/html; charset=utf-8', 'Access-Control-Allow-Origin': '*' });
+      if (req.method === 'HEAD') { res.end(); return; }
       fs.createReadStream(privacyPath).pipe(res);
       return;
     }
