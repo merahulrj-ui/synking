@@ -520,10 +520,6 @@ export const CallModal: React.FC<Props> = ({ session, isLockscreen, onEndCall, o
 
   const handleOpenChat = () => {
     const partnerId = session.callerId || session.receiverId;
-    const isVideo = session.type === 'video' || session.isVideoEnabled;
-    if (Platform.OS === 'android' && isVideo && NativeModules.TelecomModule?.enterPipMode) {
-      NativeModules.TelecomModule.enterPipMode().catch(() => {});
-    }
     WebRTCService.setMinimized(true);
     if (onMinimize) {
       onMinimize();
