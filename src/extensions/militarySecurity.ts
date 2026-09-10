@@ -1,4 +1,4 @@
-﻿/**
+/**
  * ==============================================================================
  * SYNKING MILITARY-GRADE DEFENSE & CRYPTOGRAPHIC ENGINE
  * ==============================================================================
@@ -239,11 +239,14 @@ export async function decryptMilitaryGrade(
 
   if (keyWrapper.type === 'node') {
     try {
+      const NodeBuffer = (globalThis as any).Buffer || (typeof require !== 'undefined' ? require('buffer').Buffer : null);
       const decipher = cryptoInstance.createDecipheriv('aes-256-gcm', keyWrapper.key, iv);
-      decipher.setAuthTag(Buffer.from(tag));
-      let dec = decipher.update(Buffer.from(cipherBytes), undefined, 'utf8');
-      dec += decipher.final('utf8');
-      return dec;
+      if (NodeBuffer) {
+        decipher.setAuthTag(NodeBuffer.from(tag));
+        let dec = decipher.update(NodeBuffer.from(cipherBytes), undefined, 'utf8');
+        dec += decipher.final('utf8');
+        return dec;
+      }
     } catch (e) {
       throw new Error('🚨 TAMPER_DETECTED: AES-GCM 128-bit authentication failed! Data was modified in transit.');
     }
