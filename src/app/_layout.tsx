@@ -568,11 +568,18 @@ function GlobalCallOverlay() {
 
   const handleMinimizeToChat = () => {
     if (!activeCall) return;
-    WebRTCService.setMinimized(true);
+    const isVideo = activeCall.type === 'video' || activeCall.isVideoEnabled;
     const partnerId = activeCall.callerId === currentUser?.id ? activeCall.receiverId : activeCall.callerId;
     if (partnerId && currentUser) {
       navigateToChat(partnerId);
+    }
+    if (Platform.OS === 'android' && isVideo && NativeModules.TelecomModule?.enterPipMode) {
+      NativeModules.TelecomModule.enterPipMode().catch(() => {});
+      // In Native PiP on Android, do NOT show the duplicate JS FloatingVideoPiP
+      setIsMinimized(false);
+      WebRTCService.setMinimized(false);
     } else {
+      WebRTCService.setMinimized(true);
       setIsMinimized(true);
     }
   };
