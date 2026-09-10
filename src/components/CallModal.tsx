@@ -273,9 +273,11 @@ interface Props {
   onToggleVideo?: () => boolean | Promise<boolean>;
   onToggleSpeaker?: () => boolean | Promise<boolean>;
   onMinimize?: () => void;
+  isMinimized?: boolean;
+  onExpand?: () => void;
 }
 
-export const CallModal: React.FC<Props> = ({ session, isLockscreen, onEndCall, onAcceptCall, onToggleMute, onToggleVideo, onToggleSpeaker, onMinimize }) => {
+export const CallModal: React.FC<Props> = ({ session, isLockscreen, onEndCall, onAcceptCall, onToggleMute, onToggleVideo, onToggleSpeaker, onMinimize, isMinimized, onExpand }) => {
   if (!session) return null;
 
   const [isExpanded, setIsExpanded] = useState<boolean>(() => {
@@ -288,6 +290,36 @@ export const CallModal: React.FC<Props> = ({ session, isLockscreen, onEndCall, o
   const isDimensionPip = Platform.OS === 'android' && windowWidth > 0 && windowHeight > 0 && windowWidth < 300 && windowHeight < 450;
   const [isEventPip, setIsEventPip] = useState<boolean>(false);
   const isInNativePip = isEventPip || isDimensionPip;
+
+  const screenWidth = Dimensions.get('window').width;
+  const minPan = useRef(new Animated.ValueXY({ x: screenWidth - 132, y: 70 })).current;
+  const isMinDraggingRef = useRef(false);
+
+  const minPanResponder = useRef(
+    PanResponder.create({
+      onStartShouldSetPanResponder: () => true,
+      onMoveShouldSetPanResponder: (_, gesture) => Math.abs(gesture.dx) > 4 || Math.abs(gesture.dy) > 4,
+      onPanResponderGrant: () => {
+        isMinDraggingRef.current = false;
+        minPan.setOffset({
+          x: (minPan.x as any)._value || 0,
+          y: (minPan.y as any)._value || 0,
+        });
+        minPan.setValue({ x: 0, y: 0 });
+      },
+      onPanResponderMove: (_, gesture) => {
+        if (Math.abs(gesture.dx) > 4 || Math.abs(gesture.dy) > 4) {
+          isMinDraggingRef.current = true;
+        }
+        Animated.event([null, { dx: minPan.x, dy: minPan.y }], { useNativeDriver: false })(_, gesture);
+      },
+      onPanResponderRelease: () => {
+        minPan.flattenOffset();
+      },
+    })
+  ).current;
+
+  const isMinMode = !!isMinimized && !isInNativePip && (session.type === 'video' || session.isVideoEnabled);
 
   useEffect(() => {
     let mounted = true;
@@ -604,10 +636,50 @@ export const CallModal: React.FC<Props> = ({ session, isLockscreen, onEndCall, o
   };
 
   const callContent = (
-    <View style={styles.modalOverlay}>
-      <LinearGradient
-        colors={['#080406', '#000000', '#000000']}
-        style={styles.callingCard}
+    <View pointerEvents={isMinMode ? 'box-none' : 'auto'} style={[styles.modalOverlay, isMinMode && { backgroundColor: 'transparent' }]}>
+      {isMinMode ? (
+        <View pointerEvents="box-none" style={[styles.callingCard, { backgroundColor: 'transparent' }]}>
+          {/* Minimized Draggable Squircle (In-App PiP) */}
+          <Animated.View
+            style={[
+              styles.nativePipContainer,
+              { transform: minPan.getTranslateTransform() },
+            ]}
+            {...minPanResponder.panHandlers}
+          >
+            <TouchableOpacity
+              style={styles.nativePipTouchable}
+              onPress={() => {
+                if (!isMinDraggingRef.current) {
+                  onExpand?.();
+                }
+              }}
+              activeOpacity={0.92}
+            >
+              {Platform.OS !== 'web' && NativeRTCView && remoteStream ? (
+                <NativeRTCView
+                  key={`remote_main_${remoteRenderKey}_${typeof remoteStream.toURL === 'function' ? remoteStream.toURL() : (remoteStream?.id || 'remote')}`}
+                  streamURL={typeof remoteStream.toURL === 'function' ? remoteStream.toURL() : remoteStream}
+                  style={styles.nativePipVideo}
+                  objectFit="cover"
+                  zOrder={0}
+                  zOrderMediaOverlay={false}
+                />
+              ) : Platform.OS === 'web' ? (
+                <LiveRemoteMedia type={session.type === 'video' ? 'video' : 'voice'} photoUrl={session.callerPhoto} isSpeakerOn={session.isSpeakerOn} />
+              ) : (
+                <Image
+                  source={{ uri: session.callerPhoto || 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=800' }}
+                  style={styles.nativePipVideo}
+                />
+              )}
+            </TouchableOpacity>
+          </Animated.View>
+        </View>
+      ) : (
+        <LinearGradient
+          colors={['#080406', '#000000', '#000000']}
+          style={styles.callingCard}
         >
           {/* 1. CONNECTED VIDEO CALL: Fullscreen Remote Video + Draggable Self PiP */}
           {isConnected && (session.type === 'video' || session.isVideoEnabled) && (
@@ -1128,7 +1200,8 @@ export const CallModal: React.FC<Props> = ({ session, isLockscreen, onEndCall, o
             </View>
           )}
         </LinearGradient>
-      </View>
+      )}
+    </View>
   );
 
   if (!isExpanded && isIncomingRinging) {
@@ -1226,7 +1299,15 @@ export const CallModal: React.FC<Props> = ({ session, isLockscreen, onEndCall, o
 
   if (Platform.OS === 'android') {
     return (
-      <View style={[StyleSheet.absoluteFill, { zIndex: 999999, elevation: 999999 }]}>
+      <View pointerEvents={isMinMode ? 'box-none' : 'auto'} style={[StyleSheet.absoluteFill, { zIndex: 999999, elevation: 999999 }]}>
+        {callContent}
+      </View>
+    );
+  }
+
+  if (isMinMode) {
+    return (
+      <View pointerEvents="box-none" style={[StyleSheet.absoluteFill, { zIndex: 999999, elevation: 999999 }]}>
         {callContent}
       </View>
     );
@@ -1436,6 +1517,38 @@ const styles = StyleSheet.create({
   nativeRemoteVideo: {
     width: '100%',
     height: '100%',
+  },
+  nativePipContainer: {
+    position: 'absolute',
+    top: 0,
+    left: 0,
+    width: 116,
+    height: 174,
+    borderRadius: 18,
+    zIndex: 9999999,
+    elevation: 12,
+    backgroundColor: '#000000',
+    shadowColor: '#000000',
+    shadowOffset: { width: 0, height: 8 },
+    shadowOpacity: 0.45,
+    shadowRadius: 12,
+    overflow: 'hidden',
+    borderWidth: 1,
+    borderColor: 'rgba(255, 255, 255, 0.15)',
+  },
+  nativePipTouchable: {
+    flex: 1,
+    width: '100%',
+    height: '100%',
+    borderRadius: 18,
+    overflow: 'hidden',
+    backgroundColor: '#000000',
+  },
+  nativePipVideo: {
+    width: '100%',
+    height: '100%',
+    borderRadius: 18,
+    backgroundColor: '#000000',
   },
   pipSelfView: {
     position: 'absolute',
