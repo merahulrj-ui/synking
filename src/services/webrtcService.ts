@@ -285,6 +285,11 @@ class WebRTCManager {
     this.log(`🚀 Starting outgoing ${params.type} call to ${params.targetUser.name}...`);
     this.notify();
 
+    // 💡 Hardware Screen WakeLock: Guarantee screen stays bright & awake throughout entire call
+    if (Platform.OS === 'android' && NativeModules.CallWakeLockModule?.acquireScreenWakeLock) {
+      NativeModules.CallWakeLockModule.acquireScreenWakeLock().catch(() => {});
+    }
+
     // Route audio: Loudspeaker for video call, In-ear Handset Earpiece for voice call
     const isVideo = params.type === 'video';
     if (isVideo) {
@@ -387,6 +392,11 @@ class WebRTCManager {
     this.log(`📲 Incoming ${type} call from ${callerUser.name} (autoAccept: ${autoAccept})...`);
     this.notify();
 
+    // 💡 Hardware Screen WakeLock: Guarantee screen stays bright & awake throughout entire call
+    if (Platform.OS === 'android' && NativeModules.CallWakeLockModule?.acquireScreenWakeLock) {
+      NativeModules.CallWakeLockModule.acquireScreenWakeLock().catch(() => {});
+    }
+
     if (!autoAccept && type === 'video') {
       this.initCameraPreviewOnly().catch(() => {});
     }
@@ -468,6 +478,12 @@ class WebRTCManager {
 
       this.currentSession.status = 'connected';
       this.notify();
+
+      // 💡 Hardware Screen WakeLock: Guarantee screen stays bright & awake throughout entire call
+      if (Platform.OS === 'android' && NativeModules.CallWakeLockModule?.acquireScreenWakeLock) {
+        NativeModules.CallWakeLockModule.acquireScreenWakeLock().catch(() => {});
+      }
+
       this.cleanupRingingPulse();
       this.startConnectionWatchdog();
       this.startTimer();
@@ -1158,8 +1174,10 @@ class WebRTCManager {
     if (Platform.OS === 'android' && NativeModules.TelecomModule?.setSpeakerOn) {
       NativeModules.TelecomModule.setSpeakerOn(on).catch(() => {});
     }
-    if (this.currentSession.status === 'connected' && this.currentSession.type === 'audio') {
+    if (this.currentSession.status === 'connected' && this.currentSession.type === 'audio' && !this.currentSession.isVideoEnabled) {
       AudioRouteService.setProximitySensorEnabled(!on).catch(() => {});
+    } else {
+      AudioRouteService.setProximitySensorEnabled(false).catch(() => {});
     }
     this.log(on ? '🔊 SPEAKER SET: Loudspeaker active' : '🔈 HEADSET/EARPIECE SET: Active');
     this.notify();

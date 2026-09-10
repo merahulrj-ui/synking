@@ -74,25 +74,35 @@ export default function CallApp() {
   }, []);
 
   // 💡 Keep Screen Awake as long as CallActivity call is active
+  const isCallActive = Boolean(
+    session && (
+      session.status === 'connected' || 
+      session.status === 'calling' || 
+      session.status === 'ringing'
+    )
+  );
+
   useEffect(() => {
-    if (session?.status === 'connected' || session?.status === 'calling' || session?.status === 'ringing') {
+    if (!isCallActive) {
+      deactivateKeepAwake('synkin_callapp_screen').catch(() => {});
+      return;
+    }
+
+    const assertLocks = () => {
       activateKeepAwakeAsync('synkin_callapp_screen').catch(() => {});
       if (Platform.OS === 'android' && NativeModules.CallWakeLockModule?.acquireScreenWakeLock) {
         NativeModules.CallWakeLockModule.acquireScreenWakeLock().catch(() => {});
       }
-    } else {
-      deactivateKeepAwake('synkin_callapp_screen').catch(() => {});
-      if (Platform.OS === 'android' && NativeModules.CallWakeLockModule?.releaseScreenWakeLock) {
-        NativeModules.CallWakeLockModule.releaseScreenWakeLock().catch(() => {});
-      }
-    }
-    return () => {
-      deactivateKeepAwake('synkin_callapp_screen').catch(() => {});
-      if (Platform.OS === 'android' && NativeModules.CallWakeLockModule?.releaseScreenWakeLock) {
-        NativeModules.CallWakeLockModule.releaseScreenWakeLock().catch(() => {});
-      }
     };
-  }, [session?.status]);
+
+    assertLocks();
+    const heartbeat = setInterval(assertLocks, 4000);
+
+    return () => {
+      clearInterval(heartbeat);
+      deactivateKeepAwake('synkin_callapp_screen').catch(() => {});
+    };
+  }, [isCallActive]);
 
   const handleEndCall = () => {
     WebRTCService.endCall();

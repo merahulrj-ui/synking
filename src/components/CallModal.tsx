@@ -339,32 +339,47 @@ export const CallModal: React.FC<Props> = ({ session, isLockscreen, onEndCall, o
   const [remoteRenderKey, setRemoteRenderKey] = useState<number>(0);
 
   // 💡 Keep Screen Awake for the entire duration of the active call
-  useEffect(() => {
-    const isCallActive = session && (
+  const isCallActive = Boolean(
+    session && (
       session.status === 'calling' || 
       session.status === 'ringing' || 
       session.status === 'connected'
-    );
-    if (isCallActive) {
-      activateKeepAwakeAsync('synkin_call_screen').catch(() => {});
-    } else {
+    )
+  );
+
+  useEffect(() => {
+    if (!isCallActive) {
       deactivateKeepAwake('synkin_call_screen').catch(() => {});
+      return;
     }
+
+    const assertModalWakeLocks = () => {
+      activateKeepAwakeAsync('synkin_call_screen').catch(() => {});
+      if (Platform.OS === 'android' && NativeModules.CallWakeLockModule?.acquireScreenWakeLock) {
+        NativeModules.CallWakeLockModule.acquireScreenWakeLock().catch(() => {});
+      }
+    };
+
+    assertModalWakeLocks();
+    const heartbeat = setInterval(assertModalWakeLocks, 4000);
+
     return () => {
+      clearInterval(heartbeat);
       deactivateKeepAwake('synkin_call_screen').catch(() => {});
     };
-  }, [session?.status]);
-
+  }, [isCallActive]);
 
   useEffect(() => {
-    if (session.status === 'connected' || isLockscreen) {
+    if (session?.status === 'connected' || isLockscreen) {
       setIsExpanded(true);
     }
-  }, [session.status, isLockscreen]);
+  }, [session?.status, isLockscreen]);
 
   useEffect(() => {
-    // If it's an audio call and connected, turn on proximity sensor to turn screen black near ear
-    if (session.status === 'connected' && session.type === 'audio' && !session.isSpeakerOn) {
+    const isVideo = session?.type === 'video' || session?.isVideoEnabled;
+    // Strictly Audio calls without loudspeaker near ear should enable proximity sensor.
+    // VIDEO calls must NEVER enable proximity sensor, otherwise hand gestures or viewing angle turn screen black!
+    if (session?.status === 'connected' && session?.type === 'audio' && !session?.isSpeakerOn && !isVideo) {
       AudioRouteService.setProximitySensorEnabled(true);
     } else {
       AudioRouteService.setProximitySensorEnabled(false);
@@ -372,7 +387,7 @@ export const CallModal: React.FC<Props> = ({ session, isLockscreen, onEndCall, o
     return () => {
       AudioRouteService.setProximitySensorEnabled(false);
     };
-  }, [session.status, session.type, session.isSpeakerOn]);
+  }, [session?.status, session?.type, session?.isSpeakerOn, session?.isVideoEnabled]);
 
   // 📱 Android Back Button Minimization Hook (Minimizes to In-App PiP)
   useEffect(() => {

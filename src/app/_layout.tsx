@@ -205,44 +205,52 @@ function GlobalCallOverlay() {
   }, [isMinimized, activeCall, navigateToChat]);
 
   // 💡 Keep Screen Awake as long as any call is active (foreground + background native WakeLock)
-  React.useEffect(() => {
-    const isCallActive = activeCall && (
+  const isCallActive = Boolean(
+    activeCall && (
       activeCall.status === 'calling' || 
       activeCall.status === 'ringing' || 
       activeCall.status === 'connected'
-    );
-    if (isCallActive) {
-      activateKeepAwakeAsync('synkin_global_call').catch(() => {});
-      if (Platform.OS === 'android' && NativeModules.CallWakeLockModule?.acquireScreenWakeLock) {
-        NativeModules.CallWakeLockModule.acquireScreenWakeLock().catch(() => {});
-      }
+    )
+  );
 
-      // Also handle background: reactivate when app comes back to foreground during call
-      const subscription = AppState.addEventListener('change', (nextState) => {
-        if (nextState === 'active') {
-          activateKeepAwakeAsync('synkin_global_call').catch(() => {});
-        }
-      });
-      return () => {
-        subscription.remove();
-        deactivateKeepAwake('synkin_global_call').catch(() => {});
-        if (Platform.OS === 'android' && NativeModules.CallWakeLockModule?.releaseScreenWakeLock) {
-          NativeModules.CallWakeLockModule.releaseScreenWakeLock().catch(() => {});
-        }
-      };
-    } else {
+  React.useEffect(() => {
+    if (!isCallActive) {
       deactivateKeepAwake('synkin_global_call').catch(() => {});
       if (Platform.OS === 'android' && NativeModules.CallWakeLockModule?.releaseScreenWakeLock) {
         NativeModules.CallWakeLockModule.releaseScreenWakeLock().catch(() => {});
       }
+      return;
     }
+
+    const assertWakeLocks = () => {
+      activateKeepAwakeAsync('synkin_global_call').catch(() => {});
+      if (Platform.OS === 'android' && NativeModules.CallWakeLockModule?.acquireScreenWakeLock) {
+        NativeModules.CallWakeLockModule.acquireScreenWakeLock().catch(() => {});
+      }
+    };
+
+    // Immediate acquisition
+    assertWakeLocks();
+
+    // 💓 Active Heartbeat (Every 4s) to bypass OEM aggressive 15s display sleep timeouts
+    const heartbeatInterval = setInterval(assertWakeLocks, 4000);
+
+    // Re-assert when app returns to foreground
+    const subscription = AppState.addEventListener('change', (nextState) => {
+      if (nextState === 'active') {
+        assertWakeLocks();
+      }
+    });
+
     return () => {
+      clearInterval(heartbeatInterval);
+      subscription.remove();
       deactivateKeepAwake('synkin_global_call').catch(() => {});
       if (Platform.OS === 'android' && NativeModules.CallWakeLockModule?.releaseScreenWakeLock) {
         NativeModules.CallWakeLockModule.releaseScreenWakeLock().catch(() => {});
       }
     };
-  }, [activeCall?.status]);
+  }, [isCallActive]);
 
 
   const hasStartedOngoingCallRef = React.useRef<boolean>(false);
