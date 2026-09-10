@@ -1126,8 +1126,27 @@ const server = http.createServer((req, res) => {
   const url = new URL(req.url, `http://${req.headers.host || 'localhost'}`);
   const pathname = url.pathname;
 
-  // 0. GET / (Public Health Check - Zero User Data Exposed)
-  if (req.method === 'GET' && pathname === '/') {
+  // 0. GET / (Official Synkin Landing Page / Browser Showcase)
+  if (req.method === 'GET' && (pathname === '/' || pathname === '/index.html')) {
+    const acceptHeader = req.headers['accept'] || '';
+    if (acceptHeader.includes('application/json') && !acceptHeader.includes('text/html')) {
+      res.writeHead(200, { 'Content-Type': 'application/json' });
+      res.end(JSON.stringify({
+        service: 'SYNKING Realtime Engine & Cloud Gateway',
+        status: 'online',
+        database: 'Turso 9GB Cloud SQLite (AWS Mumbai)',
+        uptimeSeconds: Math.floor(process.uptime()),
+      }));
+      return;
+    }
+
+    const indexPath = path.join(__dirname, 'public', 'index.html');
+    if (fs.existsSync(indexPath)) {
+      res.writeHead(200, { 'Content-Type': 'text/html; charset=utf-8', 'Access-Control-Allow-Origin': '*' });
+      fs.createReadStream(indexPath).pipe(res);
+      return;
+    }
+
     res.writeHead(200, { 'Content-Type': 'application/json' });
     res.end(JSON.stringify({
       service: 'SYNKING Realtime Engine & Cloud Gateway',
@@ -1135,6 +1154,41 @@ const server = http.createServer((req, res) => {
       database: 'Turso 9GB Cloud SQLite (AWS Mumbai)',
       uptimeSeconds: Math.floor(process.uptime()),
     }));
+    return;
+  }
+
+  // 0.02 GET /health or /api/health (Dedicated JSON Health Check)
+  if (req.method === 'GET' && (pathname === '/health' || pathname === '/api/health')) {
+    res.writeHead(200, { 'Content-Type': 'application/json' });
+    res.end(JSON.stringify({
+      service: 'SYNKING Realtime Engine & Cloud Gateway',
+      status: 'online',
+      database: 'Turso 9GB Cloud SQLite (AWS Mumbai)',
+      uptimeSeconds: Math.floor(process.uptime()),
+    }));
+    return;
+  }
+
+  // 0.03 GET /favicon.png or /favicon.ico
+  if (req.method === 'GET' && (pathname === '/favicon.png' || pathname === '/favicon.ico')) {
+    const iconPath = path.join(__dirname, 'assets', 'images', 'favicon.png');
+    if (fs.existsSync(iconPath)) {
+      res.writeHead(200, { 'Content-Type': 'image/png', 'Cache-Control': 'public, max-age=86400' });
+      fs.createReadStream(iconPath).pipe(res);
+      return;
+    }
+  }
+
+  // 0.04 GET /terms (Public Terms of Service for Google Play Store)
+  if (req.method === 'GET' && (pathname === '/terms' || pathname === '/terms-of-service')) {
+    const termsPath = path.join(__dirname, 'public', 'terms.html');
+    if (fs.existsSync(termsPath)) {
+      res.writeHead(200, { 'Content-Type': 'text/html; charset=utf-8', 'Access-Control-Allow-Origin': '*' });
+      fs.createReadStream(termsPath).pipe(res);
+      return;
+    }
+    res.writeHead(404, { 'Content-Type': 'text/plain' });
+    res.end('Terms of service page not found');
     return;
   }
 
