@@ -96,233 +96,8 @@ const floatingPillStyles = StyleSheet.create({
   },
 });
 
-const pipStyles = StyleSheet.create({
-  container: {
-    position: 'absolute',
-    top: 0,
-    left: 0,
-    width: 118,
-    height: 168,
-    borderRadius: 16,
-    zIndex: 9999999,
-    elevation: 9999999,
-    backgroundColor: '#000000',
-    borderWidth: 2,
-    borderColor: '#22C55E',
-    shadowColor: '#000000',
-    shadowOffset: { width: 0, height: 6 },
-    shadowOpacity: 0.55,
-    shadowRadius: 14,
-    overflow: 'hidden',
-  },
-  innerTouch: {
-    flex: 1,
-    width: '100%',
-    height: '100%',
-    position: 'relative',
-    borderRadius: 14,
-    overflow: 'hidden',
-  },
-  nativeVideo: {
-    width: '100%',
-    height: '100%',
-    borderRadius: 14,
-    backgroundColor: '#000000',
-  },
-  fallbackImage: {
-    width: '100%',
-    height: '100%',
-    borderRadius: 14,
-  },
-  topOverlay: {
-    position: 'absolute',
-    top: 6,
-    left: 6,
-    zIndex: 10,
-  },
-  expandBadge: {
-    backgroundColor: 'rgba(0, 0, 0, 0.65)',
-    padding: 4,
-    borderRadius: 8,
-  },
-  hangupBtn: {
-    position: 'absolute',
-    top: 6,
-    right: 6,
-    width: 24,
-    height: 24,
-    borderRadius: 12,
-    backgroundColor: '#EF4444',
-    alignItems: 'center',
-    justifyContent: 'center',
-    zIndex: 20,
-    borderWidth: 1,
-    borderColor: 'rgba(255, 255, 255, 0.3)',
-  },
-  bottomOverlay: {
-    position: 'absolute',
-    bottom: 6,
-    left: 6,
-    right: 6,
-    backgroundColor: 'rgba(0, 0, 0, 0.75)',
-    paddingVertical: 3,
-    paddingHorizontal: 6,
-    borderRadius: 10,
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 4,
-    justifyContent: 'center',
-    zIndex: 10,
-  },
-  dot: {
-    width: 5,
-    height: 5,
-    borderRadius: 2.5,
-    backgroundColor: '#22C55E',
-  },
-  timerText: {
-    color: '#FFFFFF',
-    fontSize: 10.5,
-    fontFamily: 'Poppins_800ExtraBold',
-  },
-});
 
-function FloatingVideoPiP({
-  session,
-  onExpand,
-  onEndCall,
-}: {
-  session: CallSession;
-  onExpand: () => void;
-  onEndCall: () => void;
-}) {
-  const [sec, setSec] = React.useState(session.durationSeconds || 0);
-  const videoRef = React.useRef<any>(null);
-  const screenWidth = Dimensions.get('window').width;
 
-  // Draggable PanResponder
-  const pan = React.useRef(new Animated.ValueXY({ x: screenWidth - 134, y: 70 })).current;
-
-  const panResponder = React.useRef(
-    PanResponder.create({
-      onStartShouldSetPanResponder: () => true,
-      onMoveShouldSetPanResponder: (_, gesture) => Math.abs(gesture.dx) > 3 || Math.abs(gesture.dy) > 3,
-      onPanResponderGrant: () => {
-        pan.setOffset({
-          x: (pan.x as any)._value || 0,
-          y: (pan.y as any)._value || 0,
-        });
-        pan.setValue({ x: 0, y: 0 });
-      },
-      onPanResponderMove: Animated.event([null, { dx: pan.x, dy: pan.y }], { useNativeDriver: false }),
-      onPanResponderRelease: () => {
-        pan.flattenOffset();
-      },
-    })
-  ).current;
-
-  // Live Timer
-  React.useEffect(() => {
-    const timer = setInterval(() => {
-      setSec(s => s + 1);
-    }, 1000);
-    return () => clearInterval(timer);
-  }, []);
-
-  // Web Video Stream Attacher
-  React.useEffect(() => {
-    if (Platform.OS !== 'web') return;
-    const attach = () => {
-      const stream = WebRTCService.getRemoteStream();
-      if (stream && videoRef.current && videoRef.current.srcObject !== stream) {
-        videoRef.current.srcObject = stream;
-        videoRef.current.muted = false;
-        videoRef.current.volume = 1.0;
-      }
-    };
-    attach();
-    const interval = setInterval(attach, 500);
-    return () => clearInterval(interval);
-  }, []);
-
-  const mins = Math.floor(sec / 60).toString().padStart(2, '0');
-  const secs = (sec % 60).toString().padStart(2, '0');
-  const durStr = `${mins}:${secs}`;
-  const remoteStream = WebRTCService.getRemoteStream();
-
-  return (
-    <Animated.View
-      style={[
-        pipStyles.container,
-        {
-          transform: pan.getTranslateTransform(),
-        },
-      ]}
-      {...panResponder.panHandlers}
-    >
-      <TouchableOpacity
-        style={pipStyles.innerTouch}
-        onPress={onExpand}
-        activeOpacity={0.9}
-      >
-        {/* Remote Video Surface */}
-        {Platform.OS === 'web' ? (
-          // @ts-ignore
-          <video
-            ref={videoRef}
-            autoPlay
-            playsInline
-            style={{
-              width: '100%',
-              height: '100%',
-              objectFit: 'cover',
-              borderRadius: 14,
-              backgroundColor: '#000000',
-            }}
-          />
-        ) : NativeRTCView && remoteStream ? (
-          <NativeRTCView
-            streamURL={typeof remoteStream.toURL === 'function' ? remoteStream.toURL() : remoteStream}
-            style={pipStyles.nativeVideo}
-            objectFit="cover"
-            zOrder={1}
-            zOrderMediaOverlay={true}
-          />
-        ) : (
-          <Image
-            source={{ uri: session.callerPhoto || 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=800' }}
-            style={pipStyles.fallbackImage}
-          />
-        )}
-
-        {/* Top Badges: Maximize / Return */}
-        <View style={pipStyles.topOverlay} pointerEvents="none">
-          <View style={pipStyles.expandBadge}>
-            <Ionicons name="expand" size={11} color="#FFFFFF" />
-          </View>
-        </View>
-
-        {/* Hangup Red Button (Top-Right) */}
-        <TouchableOpacity
-          style={pipStyles.hangupBtn}
-          onPress={(e) => {
-            e.stopPropagation();
-            onEndCall();
-          }}
-          hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
-        >
-          <Ionicons name="call" size={11} color="#FFFFFF" style={{ transform: [{ rotate: '135deg' }] }} />
-        </TouchableOpacity>
-
-        {/* Bottom Bar: Live Timer & Partner Name */}
-        <View style={pipStyles.bottomOverlay} pointerEvents="none">
-          <View style={pipStyles.dot} />
-          <Text style={pipStyles.timerText}>{durStr}</Text>
-        </View>
-      </TouchableOpacity>
-    </Animated.View>
-  );
-}
 
 function FloatingInCallPill({
   session,
@@ -574,30 +349,19 @@ function GlobalCallOverlay() {
       navigateToChat(partnerId);
     }
     if (Platform.OS === 'android' && isVideo && NativeModules.TelecomModule?.enterPipMode) {
+      // Always use native Android PiP for video calls — no JS floating PiP needed
       NativeModules.TelecomModule.enterPipMode().catch(() => {});
-      // In Native PiP on Android, do NOT show the duplicate JS FloatingVideoPiP
       setIsMinimized(false);
       WebRTCService.setMinimized(false);
-    } else {
+    } else if (!isVideo) {
+      // Audio-only calls: show the in-call pill
       WebRTCService.setMinimized(true);
       setIsMinimized(true);
     }
   };
 
   if (isMinimized) {
-    const isVideo = activeCall.type === 'video' || activeCall.isVideoEnabled;
-    if (isVideo) {
-      return (
-        <FloatingVideoPiP
-          session={activeCall}
-          onExpand={() => {
-            WebRTCService.setMinimized(false);
-            setIsMinimized(false);
-          }}
-          onEndCall={handleEndCall}
-        />
-      );
-    }
+    // Audio-only minimized call: show floating pill (video uses native Android PiP)
     return (
       <FloatingInCallPill
         session={activeCall}
