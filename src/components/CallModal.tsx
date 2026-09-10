@@ -285,18 +285,9 @@ export const CallModal: React.FC<Props> = ({ session, isLockscreen, onEndCall, o
   const [customNote, setCustomNote] = useState<string>('');
   const [isBluetooth, setIsBluetooth] = useState<boolean>(false);
   const { width: windowWidth, height: windowHeight } = useWindowDimensions();
-  const isDimensionPip = Platform.OS === 'android' && windowWidth < 320 && windowHeight < 520;
+  const isDimensionPip = Platform.OS === 'android' && windowWidth > 0 && windowHeight > 0 && windowWidth < 300 && windowHeight < 450;
   const [isEventPip, setIsEventPip] = useState<boolean>(false);
   const isInNativePip = isEventPip || isDimensionPip;
-
-  // 📱 Listen for Android system PiP mode changes — hide buttons, show only clean video in PiP
-  useEffect(() => {
-    if (Platform.OS !== 'android') return;
-    const pipSub = DeviceEventEmitter.addListener('NATIVE_PIP_CHANGED', (status: string) => {
-      setIsEventPip(status === 'entered');
-    });
-    return () => pipSub.remove();
-  }, []);
 
   useEffect(() => {
     let mounted = true;
@@ -332,16 +323,6 @@ export const CallModal: React.FC<Props> = ({ session, isLockscreen, onEndCall, o
     };
   }, [session?.status]);
 
-  // 📱 Listen for AppState changes to trigger SurfaceView re-render when returning from background
-  useEffect(() => {
-    const sub = AppState.addEventListener('change', (state) => {
-      if (state === 'active') {
-        setRemoteRenderKey(k => k + 1);
-        setTimeout(() => setRemoteRenderKey(k => k + 1), 300);
-      }
-    });
-    return () => sub.remove();
-  }, []);
 
   useEffect(() => {
     if (session.status === 'connected' || isLockscreen) {
@@ -410,7 +391,7 @@ export const CallModal: React.FC<Props> = ({ session, isLockscreen, onEndCall, o
     if (isConnected && isVideoCall) {
       controlsTimerRef.current = setTimeout(() => {
         setAreControlsVisible(false);
-      }, 4000);
+      }, 8000);
     }
   };
 
@@ -424,20 +405,49 @@ export const CallModal: React.FC<Props> = ({ session, isLockscreen, onEndCall, o
       if (next && isConnected && isVideoCall) {
         controlsTimerRef.current = setTimeout(() => {
           setAreControlsVisible(false);
-        }, 4000);
+        }, 8000);
       }
       return next;
     });
   };
 
-  // ⏱️ Auto-hide call controls after 4 seconds of connected video call (WhatsApp style)
+  // 📱 Listen for Android system PiP mode changes — hide buttons in PiP (Zero Clutter), instant wake-up on return!
+  useEffect(() => {
+    if (Platform.OS !== 'android') return;
+    const pipSub = DeviceEventEmitter.addListener('NATIVE_PIP_CHANGED', (status: string) => {
+      const inPip = status === 'entered';
+      setIsEventPip(inPip);
+      if (!inPip) {
+        // Exited PiP back to full screen: instantly show all controls!
+        setAreControlsVisible(true);
+        resetControlsTimer();
+      }
+    });
+    return () => pipSub.remove();
+  }, [isConnected, isVideoCall]);
+
+  // 📱 Listen for AppState changes — when returning to foreground, restore buttons and refresh video
+  useEffect(() => {
+    const sub = AppState.addEventListener('change', (state) => {
+      if (state === 'active') {
+        setIsEventPip(false);
+        setAreControlsVisible(true);
+        resetControlsTimer();
+        setRemoteRenderKey(k => k + 1);
+        setTimeout(() => setRemoteRenderKey(k => k + 1), 300);
+      }
+    });
+    return () => sub.remove();
+  }, [isConnected, isVideoCall]);
+
+  // ⏱️ Auto-hide call controls after 8 seconds of connected video call (gentle timeout)
   useEffect(() => {
     if (isConnected && isVideoCall) {
       setAreControlsVisible(true);
       if (controlsTimerRef.current) clearTimeout(controlsTimerRef.current);
       controlsTimerRef.current = setTimeout(() => {
         setAreControlsVisible(false);
-      }, 4000);
+      }, 8000);
     } else {
       setAreControlsVisible(true);
       if (controlsTimerRef.current) {
