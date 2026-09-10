@@ -97,6 +97,151 @@ const floatingPillStyles = StyleSheet.create({
   },
 });
 
+const nativePipStyles = StyleSheet.create({
+  container: {
+    position: 'absolute',
+    top: 0,
+    left: 0,
+    width: 116,
+    height: 174,
+    borderRadius: 18,
+    zIndex: 9999999,
+    elevation: 12,
+    backgroundColor: '#000000',
+    shadowColor: '#000000',
+    shadowOffset: { width: 0, height: 8 },
+    shadowOpacity: 0.45,
+    shadowRadius: 12,
+    overflow: 'hidden',
+    borderWidth: 1,
+    borderColor: 'rgba(255, 255, 255, 0.15)',
+  },
+  touchable: {
+    flex: 1,
+    width: '100%',
+    height: '100%',
+    borderRadius: 18,
+    overflow: 'hidden',
+    backgroundColor: '#000000',
+  },
+  video: {
+    width: '100%',
+    height: '100%',
+    borderRadius: 18,
+    backgroundColor: '#000000',
+  },
+  fallback: {
+    width: '100%',
+    height: '100%',
+    borderRadius: 18,
+  },
+});
+
+function NativeStyleVideoPiP({
+  session,
+  onExpand,
+}: {
+  session: CallSession;
+  onExpand: () => void;
+}) {
+  const videoRef = React.useRef<any>(null);
+  const screenWidth = Dimensions.get('window').width;
+
+  const pan = React.useRef(new Animated.ValueXY({ x: screenWidth - 132, y: 70 })).current;
+  const isDraggingRef = React.useRef(false);
+
+  const panResponder = React.useRef(
+    PanResponder.create({
+      onStartShouldSetPanResponder: () => true,
+      onMoveShouldSetPanResponder: (_, gesture) => Math.abs(gesture.dx) > 4 || Math.abs(gesture.dy) > 4,
+      onPanResponderGrant: () => {
+        isDraggingRef.current = false;
+        pan.setOffset({
+          x: (pan.x as any)._value || 0,
+          y: (pan.y as any)._value || 0,
+        });
+        pan.setValue({ x: 0, y: 0 });
+      },
+      onPanResponderMove: (_, gesture) => {
+        if (Math.abs(gesture.dx) > 4 || Math.abs(gesture.dy) > 4) {
+          isDraggingRef.current = true;
+        }
+        Animated.event([null, { dx: pan.x, dy: pan.y }], { useNativeDriver: false })(_, gesture);
+      },
+      onPanResponderRelease: () => {
+        pan.flattenOffset();
+      },
+    })
+  ).current;
+
+  React.useEffect(() => {
+    if (Platform.OS !== 'web') return;
+    const attach = () => {
+      const stream = WebRTCService.getRemoteStream();
+      if (stream && videoRef.current && videoRef.current.srcObject !== stream) {
+        videoRef.current.srcObject = stream;
+        videoRef.current.muted = false;
+        videoRef.current.volume = 1.0;
+      }
+    };
+    attach();
+    const interval = setInterval(attach, 500);
+    return () => clearInterval(interval);
+  }, []);
+
+  const remoteStream = WebRTCService.getRemoteStream();
+
+  return (
+    <Animated.View
+      style={[
+        nativePipStyles.container,
+        {
+          transform: pan.getTranslateTransform(),
+        },
+      ]}
+      {...panResponder.panHandlers}
+    >
+      <TouchableOpacity
+        style={nativePipStyles.touchable}
+        onPress={() => {
+          if (!isDraggingRef.current) {
+            onExpand();
+          }
+        }}
+        activeOpacity={0.92}
+      >
+        {Platform.OS === 'web' ? (
+          // @ts-ignore
+          <video
+            ref={videoRef}
+            autoPlay
+            playsInline
+            style={{
+              width: '100%',
+              height: '100%',
+              objectFit: 'cover',
+              borderRadius: 18,
+              backgroundColor: '#000000',
+            }}
+          />
+        ) : NativeRTCView && remoteStream ? (
+          <NativeRTCView
+            streamURL={typeof remoteStream.toURL === 'function' ? remoteStream.toURL() : remoteStream}
+            style={nativePipStyles.video}
+            objectFit="cover"
+            zOrder={1}
+            zOrderMediaOverlay={true}
+          />
+        ) : (
+          <Image
+            source={{ uri: session.callerPhoto || 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=800' }}
+            style={nativePipStyles.fallback}
+          />
+        )}
+      </TouchableOpacity>
+    </Animated.View>
+  );
+}
 
 function FloatingInCallPill({
   session,
@@ -353,19 +498,27 @@ function GlobalCallOverlay() {
 
   const handleMinimizeToChat = () => {
     if (!activeCall) return;
-    const isVideo = activeCall.type === 'video' || activeCall.isVideoEnabled;
     const partnerId = activeCall.callerId === currentUser?.id ? activeCall.receiverId : activeCall.callerId;
     if (partnerId && currentUser) {
       navigateToChat(partnerId);
-    }
-    if (Platform.OS === 'android' && isVideo && NativeModules.TelecomModule?.enterPipMode) {
-      NativeModules.TelecomModule.enterPipMode().catch(() => {});
     }
     WebRTCService.setMinimized(true);
     setIsMinimized(true);
   };
 
   if (isMinimized) {
+    const isVideo = activeCall.type === 'video' || activeCall.isVideoEnabled;
+    if (isVideo) {
+      return (
+        <NativeStyleVideoPiP
+          session={activeCall}
+          onExpand={() => {
+            WebRTCService.setMinimized(false);
+            setIsMinimized(false);
+          }}
+        />
+      );
+    }
     return (
       <FloatingInCallPill
         session={activeCall}
