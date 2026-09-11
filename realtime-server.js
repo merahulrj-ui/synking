@@ -1246,6 +1246,22 @@ const server = http.createServer((req, res) => {
     }
   }
 
+  // 0.048 GET /js/* (Public Client Scripts e.g. Synkin ZK Vault)
+  if ((req.method === 'GET' || req.method === 'HEAD') && pathname.startsWith('/js/')) {
+    const filename = path.basename(pathname);
+    const jsPath = path.join(__dirname, 'public', 'js', filename);
+    if (fs.existsSync(jsPath) && fs.statSync(jsPath).isFile()) {
+      res.writeHead(200, {
+        'Content-Type': 'application/javascript; charset=utf-8',
+        'Cache-Control': 'public, max-age=3600',
+        'Access-Control-Allow-Origin': '*',
+      });
+      if (req.method === 'HEAD') { res.end(); return; }
+      fs.createReadStream(jsPath).pipe(res);
+      return;
+    }
+  }
+
   // 0.05 GET /synk_signature.mp3 (Official Synk Signature Ringtone Stream)
   if (req.method === 'GET' && (pathname === '/synk_signature.mp3' || pathname === '/sounds/synk_signature.mp3')) {
     const soundPath = path.join(__dirname, 'assets', 'sounds', 'synk_signature.mp3');

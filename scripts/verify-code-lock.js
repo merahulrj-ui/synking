@@ -1,7 +1,7 @@
 const { execSync } = require('child_process');
 
 try {
-  const diff = execSync('git diff --name-status v1.0.73-golden-core-locked', { encoding: 'utf-8' });
+  const diff = execSync('git diff --name-status v1.0.74-golden-core-locked', { encoding: 'utf-8' });
   const lines = diff.split('\n').filter(Boolean);
   const violations = lines.filter(line => {
     const parts = line.trim().split(/\s+/);

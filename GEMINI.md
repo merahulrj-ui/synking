@@ -1,7 +1,17 @@
-﻿# STRICT CODE LOCK & IMMUTABILITY SECURITY POLICY
+# STRICT CODE LOCK & IMMUTABILITY SECURITY POLICY
 
 > 🚨 **SECURITY RULE - MANDATORY FOR ALL AI AGENTS & DEVELOPERS**
 > **STATUS: LOCKED & FROZEN (Baseline: Commit `64bcb09` / Version `1.0.71` Golden Release)**
+
+---
+
+## 🏆 ABSOLUTE MASTER RULE (GOLDEN 6 LINES)
+1. **IF A FILE IS NOT REQUIRED FOR THE CURRENT TASK ➔ DO NOT OPEN IT.**
+2. **IF A SEARCH IS NOT REQUIRED ➔ DO NOT SEARCH.**
+3. **IF A TOOL CALL IS NOT REQUIRED ➔ DO NOT CALL IT.**
+4. **IF A CHANGE IS NOT REQUIRED ➔ DO NOT CHANGE IT.**
+5. **IF THE USER DID NOT ASK FOR IT ➔ DO NOT DO IT.**
+6. **MINIMUM FILES + MINIMUM TOKENS + MINIMUM CHANGES.**
 
 ---
 
@@ -28,7 +38,18 @@
 
 ---
 
-## 2. Protected Files Inventory
+## 2. AI Credit & Token Protection Guidelines
+
+- Treat every file read, repository search, tool call, and analysis as COSTLY.
+- ONLY inspect files directly relevant to the current user request.
+- No blind searches across the codebase. Use targeted searches only.
+- Never read entire large files when only a small section is needed.
+- Protect working systems (WebRTC, Telecom, Call Activity, DRM, Radar) — never touch unless asked.
+- Final response must be concise, direct, and in Hindi/Hinglish.
+
+---
+
+## 3. Protected Files Inventory
 
 The following core modules are cryptographically and strictly locked:
 - **Calling Suite**: `src/components/CallModal.tsx`, `src/components/CallApp.tsx`, `src/services/webrtcService.ts`, `src/services/audioRouteService.ts`, `src/services/telecomBridge.ts`, `src/services/realtimeBridge.ts`.
@@ -38,6 +59,6 @@ The following core modules are cryptographically and strictly locked:
 
 ---
 
-## 3. Enforcement
+## 4. Enforcement
 - Any proposed change violating this policy must be rejected immediately by the AI agent with a notification to the user.
 - Any new features must be presented as separate, standalone files.

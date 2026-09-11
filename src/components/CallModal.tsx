@@ -81,10 +81,18 @@ const LiveSelfVideo: React.FC<{ isPip?: boolean }> = ({ isPip = true }) => {
   const streamRef = useRef<any>(WebRTCService.getLocalStream());
   const [stream, setStream] = useState<any>(() => WebRTCService.getLocalStream());
   const [mountKey, setMountKey] = useState<number>(0);
+  const [isFrontCamera, setIsFrontCamera] = useState<boolean>(() => {
+    const s = WebRTCService.getSession();
+    return s ? s.isFrontCamera !== false : true;
+  });
 
   useEffect(() => {
     const update = () => {
       const s = WebRTCService.getLocalStream();
+      const session = WebRTCService.getSession();
+      if (session) {
+        setIsFrontCamera(session.isFrontCamera !== false);
+      }
       const prevUrl = typeof streamRef.current?.toURL === 'function' ? streamRef.current.toURL() : streamRef.current;
       const nextUrl = typeof s?.toURL === 'function' ? s.toURL() : s;
       if (prevUrl !== nextUrl || (!streamRef.current && s)) {
@@ -133,7 +141,7 @@ const LiveSelfVideo: React.FC<{ isPip?: boolean }> = ({ isPip = true }) => {
             width: '100%',
             height: '100%',
             objectFit: 'cover',
-            transform: 'scaleX(-1)',
+            transform: isFrontCamera ? 'scaleX(-1)' : 'none',
             borderRadius: isPip ? 16 : 0,
             backgroundColor: '#000000',
           }}
@@ -141,11 +149,11 @@ const LiveSelfVideo: React.FC<{ isPip?: boolean }> = ({ isPip = true }) => {
       ) : (
         (NativeRTCView && stream) ? (
           <NativeRTCView
-            key={`self_pip_${mountKey}_${streamUrl || 'stream'}`}
+            key={`self_pip_${mountKey}_${isFrontCamera ? 'front' : 'back'}_${streamUrl || 'stream'}`}
             streamURL={streamUrl}
             style={{ width: '100%', height: '100%', borderRadius: isPip ? 16 : 0, backgroundColor: '#000000' }}
             objectFit="cover"
-            mirror={true}
+            mirror={isFrontCamera}
             zOrder={isPip ? 1 : 0}
             zOrderMediaOverlay={isPip}
           />
