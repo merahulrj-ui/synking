@@ -74,8 +74,6 @@
   </script>
   <!-- Synkin Zero-Knowledge Web Vault (Method A: Device-Locked IndexedDB) -->
   <script src="/js/synkin-zk-vault.js?v=20260911_v2"></script>
-  <!-- Synkin Web App Controller (Swipe Deck & Radar Search) -->
-  <script src="/js/synkin-web-app.js?v=20260911_v1"></script>
 
   <style>
     :root {
@@ -822,7 +820,7 @@
           </div>
         </div>
 
-        <button onclick="openSynkinWebApp()" class="w-full gradient-glow-btn py-3.5 rounded-2xl font-bold text-sm text-white flex items-center justify-center gap-2">
+        <button onclick="closeZKLoginModal()" class="w-full gradient-glow-btn py-3.5 rounded-2xl font-bold text-sm text-white flex items-center justify-center gap-2">
           <span>Explore Sparks & Matches 🔥</span>
         </button>
 
@@ -832,153 +830,6 @@
       </div>
 
     </div>
-  </div>
-
-  <!-- ============================================================================== -->
-  <!-- SYNKIN WEB APP PORTAL (Swipe Deck, 360° Radar Search & Verified Venues) -->
-  <!-- ============================================================================== -->
-  <div id="synkin-web-app-view" class="fixed inset-0 z-[60] bg-[#0A0714] overflow-y-auto hidden">
-    <!-- Web App Top Navigation Bar -->
-    <header class="sticky top-0 z-40 bg-[#0A0714]/95 backdrop-blur-xl border-b border-white/10 px-4 sm:px-8 py-3.5 flex items-center justify-between">
-      <!-- Logo & Mode Status -->
-      <div class="flex items-center gap-3">
-        <div class="w-10 h-10 rounded-xl bg-gradient-to-tr from-pink-600 to-purple-600 p-0.5 shadow-md flex items-center justify-center">
-          <div class="w-full h-full bg-[#0A0714] rounded-[10px] flex items-center justify-center p-1">
-            <img src="/images/synkin_heart_emblem_256.png?v=30" onerror="this.src='images/synkin_heart_emblem_256.png'" alt="Synkin Logo" class="w-full h-full object-contain" />
-          </div>
-        </div>
-        <div>
-          <span class="font-display font-bold text-lg text-white">Synkin<span class="text-pink-500">.</span></span>
-          <div class="flex items-center gap-1.5 text-[10px] text-green-400 font-semibold">
-            <span class="w-1.5 h-1.5 rounded-full bg-green-400 animate-pulse"></span>
-            <span>Live Radar Active</span>
-          </div>
-        </div>
-      </div>
-
-      <!-- Center Sub-Tabs Switcher -->
-      <div class="flex items-center gap-1.5 bg-[#160E2E] p-1 rounded-2xl border border-white/10 shadow-lg">
-        <button onclick="SynkinWebApp.switchTab('swipe')" id="webapp-nav-swipe" class="px-4 py-2 rounded-xl text-xs font-bold transition bg-gradient-to-r from-pink-600 to-purple-600 text-white shadow-lg shadow-pink-600/30">
-          🔥 Sparks (Swipe)
-        </button>
-        <button onclick="SynkinWebApp.switchTab('radar')" id="webapp-nav-radar" class="px-4 py-2 rounded-xl text-xs font-bold transition text-gray-400 hover:text-white bg-white/5 hover:bg-white/10">
-          📡 360° Radar Search
-        </button>
-        <button onclick="SynkinWebApp.switchTab('venues')" id="webapp-nav-venues" class="px-4 py-2 rounded-xl text-xs font-bold transition text-gray-400 hover:text-white bg-white/5 hover:bg-white/10">
-          ☕ Date Spots
-        </button>
-      </div>
-
-      <!-- Right User Pill & Exit -->
-      <div class="flex items-center gap-3">
-        <div class="hidden sm:flex items-center gap-2 px-3 py-1.5 rounded-full bg-white/5 border border-white/10 text-xs text-white">
-          <span class="text-pink-400">👤</span>
-          <span id="webapp-top-phone" class="font-mono text-xs">+91 95554 22455</span>
-          <span class="text-[10px] text-green-400" title="Zero-Knowledge Encrypted">🛡️</span>
-        </div>
-        <button onclick="closeSynkinWebApp()" title="Back to Website" class="w-9 h-9 rounded-full bg-white/5 hover:bg-white/10 border border-white/10 flex items-center justify-center text-gray-300 hover:text-white transition">
-          ✕
-        </button>
-      </div>
-    </header>
-
-    <!-- Web App Main Content Container -->
-    <main class="max-w-4xl mx-auto px-4 py-8">
-      
-      <!-- TAB 1: SWIPE DECK -->
-      <div id="webapp-view-swipe" class="space-y-6">
-        <!-- Interactive Card Container -->
-        <div class="max-w-md mx-auto relative">
-          <div id="swipe-card-container">
-            <!-- Dynamic Card Rendered Here via JS -->
-            <div class="h-[520px] w-full flex items-center justify-center text-gray-400 bg-white/5 rounded-3xl animate-pulse">
-              Loading nearby sparks...
-            </div>
-          </div>
-
-          <!-- Bottom Action Buttons -->
-          <div class="flex items-center justify-center gap-4 pt-6">
-            <!-- Rewind -->
-            <button onclick="SynkinWebApp.rewind()" class="w-12 h-12 rounded-full bg-[#1A1033] border border-white/10 hover:border-yellow-500/40 text-yellow-400 flex items-center justify-center shadow-lg transition active:scale-95" title="Rewind">
-              <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"/></svg>
-            </button>
-
-            <!-- Pass / Nope -->
-            <button onclick="SynkinWebApp.swipeLeft()" class="w-16 h-16 rounded-full bg-[#1A1033] border border-red-500/30 hover:border-red-500/80 text-red-400 flex items-center justify-center shadow-xl shadow-red-900/20 transition hover:scale-105 active:scale-95" title="Pass">
-              <svg class="w-7 h-7" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M6 18L18 6M6 6l12 12"/></svg>
-            </button>
-
-            <!-- 3-Min Vibe Check -->
-            <button onclick="SynkinWebApp.triggerVibeCheck()" class="w-14 h-14 rounded-full bg-gradient-to-tr from-cyan-600 to-blue-600 text-white flex items-center justify-center shadow-xl shadow-cyan-600/30 transition hover:scale-105 active:scale-95" title="3-Min Video Vibe Check">
-              <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 10l4.553-2.276A1 1 0 0121 8.618v6.764a1 1 0 01-1.447.894L15 14M5 18h8a2 2 0 002-2V8a2 2 0 00-2-2H5a2 2 0 00-2 2v8a2 2 0 002 2z"/></svg>
-            </button>
-
-            <!-- Like / Synk -->
-            <button onclick="SynkinWebApp.swipeRight()" class="w-16 h-16 rounded-full bg-[#1A1033] border border-pink-500/40 hover:border-pink-500 text-pink-500 flex items-center justify-center shadow-xl shadow-pink-900/30 transition hover:scale-105 active:scale-95" title="Like / Match">
-              <svg class="w-8 h-8" fill="currentColor" viewBox="0 0 24 24"><path d="M12 21.35l-1.45-1.32C5.4 15.36 2 12.28 2 8.5 2 5.42 4.42 3 7.5 3c1.74 0 3.41.81 4.5 2.09C13.09 3.81 14.76 3 16.5 3 19.58 3 22 5.42 22 8.5c0 3.78-3.4 6.86-8.55 11.54L12 21.35z"/></svg>
-            </button>
-          </div>
-        </div>
-      </div>
-
-      <!-- TAB 2: 360° RADAR SEARCH -->
-      <div id="webapp-view-radar" class="space-y-6 hidden">
-        <!-- Search Bar & Filters -->
-        <div class="glass-card rounded-2xl p-4 border border-white/10 space-y-4">
-          <div class="relative">
-            <svg class="w-5 h-5 text-gray-400 absolute left-4 top-1/2 -translate-y-1/2" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"/></svg>
-            <input 
-              type="text" 
-              placeholder="Search by name, Roorkee, Coffee, Travel..." 
-              oninput="SynkinWebApp.handleSearchInput(this.value)"
-              class="w-full bg-[#120B24] border border-white/10 rounded-xl pl-12 pr-4 py-3 text-sm text-white placeholder:text-gray-500 outline-none focus:border-pink-500 transition" 
-            />
-          </div>
-
-          <!-- Filter Pills -->
-          <div class="flex items-center gap-2 overflow-x-auto pb-1">
-            <button onclick="SynkinWebApp.setFilterTag('all')" id="filter-pill-all" class="px-3 py-1.5 rounded-xl text-xs font-bold transition bg-pink-600 text-white">
-              All Matches
-            </button>
-            <button onclick="SynkinWebApp.setFilterTag('coffee')" id="filter-pill-coffee" class="px-3 py-1.5 rounded-xl text-xs font-bold transition text-gray-400 bg-white/5 hover:text-white">
-              Coffee Lovers ☕
-            </button>
-            <button onclick="SynkinWebApp.setFilterTag('music')" id="filter-pill-music" class="px-3 py-1.5 rounded-xl text-xs font-bold transition text-gray-400 bg-white/5 hover:text-white">
-              Music 🎵
-            </button>
-            <button onclick="SynkinWebApp.setFilterTag('travel')" id="filter-pill-travel" class="px-3 py-1.5 rounded-xl text-xs font-bold transition text-gray-400 bg-white/5 hover:text-white">
-              Travelers ✈️
-            </button>
-            <button onclick="SynkinWebApp.setFilterTag('foodie')" id="filter-pill-foodie" class="px-3 py-1.5 rounded-xl text-xs font-bold transition text-gray-400 bg-white/5 hover:text-white">
-              Foodies 🍕
-            </button>
-          </div>
-        </div>
-
-        <!-- Radar Cards Grid -->
-        <div id="radar-grid-container" class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6">
-          <!-- Populated by SynkinWebApp.renderRadarGrid() -->
-        </div>
-      </div>
-
-      <!-- TAB 3: VERIFIED FIRST DATE VENUES -->
-      <div id="webapp-view-venues" class="space-y-6 hidden">
-        <div class="flex items-center justify-between">
-          <div>
-            <h3 class="text-xl font-bold text-white font-display">Curated & Verified 1st Dates 🛡️</h3>
-            <p class="text-xs text-gray-400 mt-1">100% verified safe spots with complimentary member perks.</p>
-          </div>
-          <span class="px-3 py-1 rounded-full bg-green-500/20 text-green-400 text-xs font-bold border border-green-500/30">
-            Scam-Proof Guarantee
-          </span>
-        </div>
-
-        <div id="venues-list-container" class="grid grid-cols-1 md:grid-cols-2 gap-6">
-          <!-- Populated by SynkinWebApp.renderVenuesList() -->
-        </div>
-      </div>
-
-    </main>
   </div>
 
   <!-- Interactive Simulator & ZK Login Script -->
@@ -1088,37 +939,13 @@
       // Update Nav button to show Logged In User Profile Badge
       const navBtn = document.getElementById('nav-zk-login-btn');
       if (navBtn) {
-        navBtn.onclick = openSynkinWebApp;
         navBtn.innerHTML = `
           <div class="flex items-center gap-2">
             <span class="w-2 h-2 rounded-full bg-green-400"></span>
             <span class="text-xs font-bold text-white">+91 ${phone}</span>
-            <span class="text-xs text-pink-400 font-bold">🔥 Open App</span>
+            <span class="text-xs text-green-400">🛡️</span>
           </div>
         `;
-      }
-    }
-
-    function openSynkinWebApp() {
-      closeZKLoginModal();
-      const webAppView = document.getElementById('synkin-web-app-view');
-      if (webAppView) {
-        webAppView.classList.remove('hidden');
-        document.body.style.overflow = 'hidden';
-        const user = localStorage.getItem('synkin_web_user') || '9555422455';
-        const phoneEl = document.getElementById('webapp-top-phone');
-        if (phoneEl) phoneEl.innerText = '+91 ' + user;
-        if (window.SynkinWebApp) {
-          window.SynkinWebApp.init();
-        }
-      }
-    }
-
-    function closeSynkinWebApp() {
-      const webAppView = document.getElementById('synkin-web-app-view');
-      if (webAppView) {
-        webAppView.classList.add('hidden');
-        document.body.style.overflow = 'auto';
       }
     }
 
@@ -1129,10 +956,8 @@
         }
         localStorage.removeItem('synkin_web_user');
         backToPhoneStep();
-        closeSynkinWebApp();
         const navBtn = document.getElementById('nav-zk-login-btn');
         if (navBtn) {
-          navBtn.onclick = openZKLoginModal;
           navBtn.innerHTML = '<span class="w-2 h-2 rounded-full bg-green-400 animate-pulse"></span><span>Web Login 🔒</span>';
         }
       }
