@@ -1230,6 +1230,22 @@ const server = http.createServer((req, res) => {
     return;
   }
 
+  // 0.045 GET /robots.txt & /sitemap.xml (Search Engine Crawlers)
+  if ((req.method === 'GET' || req.method === 'HEAD') && (pathname === '/robots.txt' || pathname === '/sitemap.xml')) {
+    const filePath = path.join(__dirname, 'public', pathname.replace('/', ''));
+    if (fs.existsSync(filePath)) {
+      const isXml = pathname.endsWith('.xml');
+      res.writeHead(200, {
+        'Content-Type': isXml ? 'application/xml; charset=utf-8' : 'text/plain; charset=utf-8',
+        'Cache-Control': 'public, max-age=86400',
+        'Access-Control-Allow-Origin': '*',
+      });
+      if (req.method === 'HEAD') { res.end(); return; }
+      fs.createReadStream(filePath).pipe(res);
+      return;
+    }
+  }
+
   // 0.05 GET /synk_signature.mp3 (Official Synk Signature Ringtone Stream)
   if (req.method === 'GET' && (pathname === '/synk_signature.mp3' || pathname === '/sounds/synk_signature.mp3')) {
     const soundPath = path.join(__dirname, 'assets', 'sounds', 'synk_signature.mp3');

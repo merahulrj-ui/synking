@@ -1,0 +1,3 @@
+User-agent: *
+Allow: /
+Sitemap: http://3.108.217.155:8082/sitemap.xml
