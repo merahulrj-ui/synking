@@ -48,6 +48,7 @@ export default function DiscoverScreen() {
   const [showFilterModal, setShowFilterModal] = useState(false);
   const [discoveryFilter, setDiscoveryFilter] = useState<DiscoveryFilter>(DEFAULT_DISCOVERY_FILTER);
   const [rewindToastUser, setRewindToastUser] = useState<any>(null);
+  const [authModalVisible, setAuthModalVisible] = useState(false);
 
   // Load persistent discovery filters from storage
   useEffect(() => {
@@ -180,7 +181,7 @@ export default function DiscoverScreen() {
 
   const triggerButtonSwipe = (action: 'like' | 'pass' | 'supersynk') => {
     if (!isLoggedIn) {
-      router.push('/(tabs)/profile');
+      setAuthModalVisible(true);
       return;
     }
     if (!currentProfile || isProcessingSwipe.current) return;
@@ -220,6 +221,12 @@ export default function DiscoverScreen() {
   };
 
   const handleSwipe = (action: 'like' | 'pass' | 'supersynk', profileId?: string) => {
+    if (!isLoggedIn) {
+      setAuthModalVisible(true);
+      isProcessingSwipe.current = false;
+      return;
+    }
+
     const targetId = profileId || currentProfile?.id;
     if (!targetId) {
       isProcessingSwipe.current = false;
@@ -290,7 +297,7 @@ export default function DiscoverScreen() {
 
   const handleRewind = () => {
     if (!isLoggedIn) {
-      router.push('/(tabs)/profile');
+      setAuthModalVisible(true);
       return;
     }
     if (Platform.OS !== 'web') Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium).catch(() => {});
@@ -324,7 +331,7 @@ export default function DiscoverScreen() {
 
   const handleSuperSynk = () => {
     if (!isLoggedIn) {
-      router.push('/(tabs)/profile');
+      setAuthModalVisible(true);
       return;
     }
     if (!currentProfile || isProcessingSwipe.current) return;
@@ -360,7 +367,7 @@ export default function DiscoverScreen() {
 
   const handleBoostProfile = () => {
     if (!isLoggedIn) {
-      router.push('/(tabs)/profile');
+      setAuthModalVisible(true);
       return;
     }
 
@@ -446,6 +453,8 @@ export default function DiscoverScreen() {
                   ref={swipeCardRef}
                   profile={currentProfile}
                   isFirst={true}
+                  canSwipe={isLoggedIn}
+                  onAuthRequired={() => setAuthModalVisible(true)}
                   onSwipe={handleSwipe}
                   onShowProfile={() => setExpandedProfile(currentProfile)}
                 />
@@ -630,6 +639,13 @@ export default function DiscoverScreen() {
         filter={discoveryFilter}
         onApply={handleApplyFilter}
         onReset={handleResetFilter}
+      />
+
+      {/* 🔐 Auth Modal for Unauthenticated Guests */}
+      <AuthModal
+        visible={authModalVisible}
+        onClose={() => setAuthModalVisible(false)}
+        targetUserName={currentProfile?.name}
       />
     </SafeAreaView>
   );

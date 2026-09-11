@@ -18,13 +18,15 @@ interface Props {
   isFirst?: boolean;
   onSwipe?: (action: 'like' | 'pass' | 'supersynk', profileId?: string) => void;
   onShowProfile?: () => void;
+  canSwipe?: boolean;
+  onAuthRequired?: () => void;
 }
 
 export interface SwipeCardHandle {
   triggerSwipe: (action: 'like' | 'pass' | 'supersynk') => void;
 }
 
-export const SwipeCard = React.forwardRef(({ profile, isFirst = true, onSwipe, onShowProfile }: Props, ref: React.Ref<SwipeCardHandle>) => {
+export const SwipeCard = React.forwardRef(({ profile, isFirst = true, onSwipe, onShowProfile, canSwipe = true, onAuthRequired }: Props, ref: React.Ref<SwipeCardHandle>) => {
   const [photoIndex, setPhotoIndex] = useState(0);
   const photos = (profile.photos && profile.photos.length > 0) ? profile.photos : [profile.photo];
   const position = useRef(new Animated.ValueXY()).current;
@@ -41,6 +43,10 @@ export const SwipeCard = React.forwardRef(({ profile, isFirst = true, onSwipe, o
   profileIdRef.current = profile.id;
   const onSwipeRef = useRef(onSwipe);
   onSwipeRef.current = onSwipe;
+  const canSwipeRef = useRef(canSwipe);
+  canSwipeRef.current = canSwipe;
+  const onAuthRequiredRef = useRef(onAuthRequired);
+  onAuthRequiredRef.current = onAuthRequired;
 
   // Touch gesture physics
   const panResponder = useRef(
@@ -51,6 +57,25 @@ export const SwipeCard = React.forwardRef(({ profile, isFirst = true, onSwipe, o
         position.setValue({ x: gesture.dx, y: gesture.dy });
       },
       onPanResponderRelease: (_, gesture) => {
+        const isSwipeGesture =
+          gesture.dx > SWIPE_THRESHOLD ||
+          gesture.dx < -SWIPE_THRESHOLD ||
+          gesture.dy < -SWIPE_THRESHOLD * 1.3;
+
+        if (isSwipeGesture && !canSwipeRef.current) {
+          try {
+            Haptics.notificationAsync(Haptics.NotificationFeedbackType.Warning);
+          } catch (e) {}
+          Animated.spring(position, {
+            toValue: { x: 0, y: 0 },
+            friction: 6,
+            tension: 50,
+            useNativeDriver: true,
+          }).start();
+          onAuthRequiredRef.current && onAuthRequiredRef.current();
+          return;
+        }
+
         if (gesture.dx > SWIPE_THRESHOLD) {
           triggerSwipe('like');
         } else if (gesture.dx < -SWIPE_THRESHOLD) {
@@ -80,6 +105,10 @@ export const SwipeCard = React.forwardRef(({ profile, isFirst = true, onSwipe, o
   };
 
   const triggerSwipe = (action: 'like' | 'pass' | 'supersynk') => {
+    if (!canSwipeRef.current) {
+      onAuthRequiredRef.current && onAuthRequiredRef.current();
+      return;
+    }
     if (action === 'like') {
       try { Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium); } catch (e) {}
       forceSwipe('like', SCREEN_WIDTH + 100, 0, 450);
