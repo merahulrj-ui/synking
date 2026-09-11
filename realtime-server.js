@@ -1145,7 +1145,13 @@ const server = http.createServer((req, res) => {
     const websitePath = path.join(__dirname, 'public', 'website.html');
     const targetPath = fs.existsSync(indexPath) ? indexPath : (fs.existsSync(websitePath) ? websitePath : null);
     if (targetPath) {
-      res.writeHead(200, { 'Content-Type': 'text/html; charset=utf-8', 'Access-Control-Allow-Origin': '*' });
+      res.writeHead(200, {
+        'Content-Type': 'text/html; charset=utf-8',
+        'Access-Control-Allow-Origin': '*',
+        'Cache-Control': 'no-cache, no-store, must-revalidate',
+        'Pragma': 'no-cache',
+        'Expires': '0',
+      });
       if (req.method === 'HEAD') { res.end(); return; }
       fs.createReadStream(targetPath).pipe(res);
       return;
@@ -1168,7 +1174,13 @@ const server = http.createServer((req, res) => {
     const appHtmlPath = path.join(__dirname, 'public', 'app.html');
     const target = fs.existsSync(appIndexPath) ? appIndexPath : (fs.existsSync(appHtmlPath) ? appHtmlPath : null);
     if (target) {
-      res.writeHead(200, { 'Content-Type': 'text/html; charset=utf-8', 'Access-Control-Allow-Origin': '*' });
+      res.writeHead(200, {
+        'Content-Type': 'text/html; charset=utf-8',
+        'Access-Control-Allow-Origin': '*',
+        'Cache-Control': 'no-cache, no-store, must-revalidate',
+        'Pragma': 'no-cache',
+        'Expires': '0',
+      });
       if (req.method === 'HEAD') { res.end(); return; }
       fs.createReadStream(target).pipe(res);
       return;
