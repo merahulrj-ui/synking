@@ -76,6 +76,9 @@
       "enabled": true,
       "checkAutomatically": "ON_LOAD",
       "fallbackToCacheTimeout": 3000
+    },
+    "experiments": {
+      "baseUrl": "/app"
     }
   }
 }

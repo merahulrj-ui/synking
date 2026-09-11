@@ -1164,11 +1164,13 @@ const server = http.createServer((req, res) => {
 
   // 0.01 GET /app (Exact React Native Mobile App Web View)
   if ((req.method === 'GET' || req.method === 'HEAD') && (pathname === '/app' || pathname === '/app/')) {
-    const appPath = path.join(__dirname, 'public', 'app.html');
-    if (fs.existsSync(appPath)) {
+    const appIndexPath = path.join(__dirname, 'public', 'app', 'index.html');
+    const appHtmlPath = path.join(__dirname, 'public', 'app.html');
+    const target = fs.existsSync(appIndexPath) ? appIndexPath : (fs.existsSync(appHtmlPath) ? appHtmlPath : null);
+    if (target) {
       res.writeHead(200, { 'Content-Type': 'text/html; charset=utf-8', 'Access-Control-Allow-Origin': '*' });
       if (req.method === 'HEAD') { res.end(); return; }
-      fs.createReadStream(appPath).pipe(res);
+      fs.createReadStream(target).pipe(res);
       return;
     }
   }
@@ -1276,12 +1278,16 @@ const server = http.createServer((req, res) => {
   }
 
   // 0.049 GET /_expo/*, /_next/*, /assets/* (Compiled Chunks, Fonts, Icons & Static Assets)
-  if ((req.method === 'GET' || req.method === 'HEAD') && (pathname.startsWith('/_expo/') || pathname.startsWith('/_next/') || pathname.startsWith('/assets/'))) {
-    const rootDir = pathname.startsWith('/_expo/') ? '_expo' : (pathname.startsWith('/_next/') ? '_next' : 'assets');
-    const relativeSubPath = pathname.replace(new RegExp(`^\\/${rootDir}\\/`), '').replace(/\.\./g, '');
+  const normStaticPath = pathname.startsWith('/app/') ? pathname.slice(4) : pathname;
+  if ((req.method === 'GET' || req.method === 'HEAD') && (normStaticPath.startsWith('/_expo/') || normStaticPath.startsWith('/_next/') || normStaticPath.startsWith('/assets/'))) {
+    const rootDir = normStaticPath.startsWith('/_expo/') ? '_expo' : (normStaticPath.startsWith('/_next/') ? '_next' : 'assets');
+    const relativeSubPath = normStaticPath.replace(new RegExp(`^\\/${rootDir}\\/`), '').replace(/\.\./g, '');
     let assetPath = path.join(__dirname, 'public', rootDir, relativeSubPath);
     if (!fs.existsSync(assetPath)) {
       assetPath = path.join(__dirname, rootDir, relativeSubPath);
+    }
+    if (!fs.existsSync(assetPath)) {
+      assetPath = path.join(__dirname, 'dist', rootDir, relativeSubPath);
     }
     if (fs.existsSync(assetPath) && fs.statSync(assetPath).isFile()) {
       const ext = path.extname(assetPath).toLowerCase();
