@@ -29,3 +29,6 @@ web-build/
 artifacts/
 scratch/
 enable-adguard-dns.bat
+dist-mobile-web/
+web-dist/
+

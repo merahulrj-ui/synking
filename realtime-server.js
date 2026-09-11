@@ -1162,6 +1162,17 @@ const server = http.createServer((req, res) => {
     return;
   }
 
+  // 0.01 GET /app (Exact React Native Mobile App Web View)
+  if ((req.method === 'GET' || req.method === 'HEAD') && (pathname === '/app' || pathname === '/app/')) {
+    const appPath = path.join(__dirname, 'public', 'app.html');
+    if (fs.existsSync(appPath)) {
+      res.writeHead(200, { 'Content-Type': 'text/html; charset=utf-8', 'Access-Control-Allow-Origin': '*' });
+      if (req.method === 'HEAD') { res.end(); return; }
+      fs.createReadStream(appPath).pipe(res);
+      return;
+    }
+  }
+
   // 0.02 GET /health or /api/health (Dedicated JSON Health Check)
   if ((req.method === 'GET' || req.method === 'HEAD') && (pathname === '/health' || pathname === '/api/health')) {
     res.writeHead(200, { 'Content-Type': 'application/json' });
@@ -1264,10 +1275,14 @@ const server = http.createServer((req, res) => {
     }
   }
 
-  // 0.049 GET /_next/* (Next.js Compiled Chunks & Static Assets)
-  if ((req.method === 'GET' || req.method === 'HEAD') && pathname.startsWith('/_next/')) {
-    const relativeSubPath = pathname.replace(/^\/_next\//, '').replace(/\.\./g, '');
-    const assetPath = path.join(__dirname, 'public', '_next', relativeSubPath);
+  // 0.049 GET /_expo/*, /_next/*, /assets/* (Compiled Chunks, Fonts, Icons & Static Assets)
+  if ((req.method === 'GET' || req.method === 'HEAD') && (pathname.startsWith('/_expo/') || pathname.startsWith('/_next/') || pathname.startsWith('/assets/'))) {
+    const rootDir = pathname.startsWith('/_expo/') ? '_expo' : (pathname.startsWith('/_next/') ? '_next' : 'assets');
+    const relativeSubPath = pathname.replace(new RegExp(`^\\/${rootDir}\\/`), '').replace(/\.\./g, '');
+    let assetPath = path.join(__dirname, 'public', rootDir, relativeSubPath);
+    if (!fs.existsSync(assetPath)) {
+      assetPath = path.join(__dirname, rootDir, relativeSubPath);
+    }
     if (fs.existsSync(assetPath) && fs.statSync(assetPath).isFile()) {
       const ext = path.extname(assetPath).toLowerCase();
       const mimeTypes = {
@@ -1276,8 +1291,15 @@ const server = http.createServer((req, res) => {
         '.json': 'application/json; charset=utf-8',
         '.svg': 'image/svg+xml',
         '.png': 'image/png',
+        '.jpg': 'image/jpeg',
+        '.jpeg': 'image/jpeg',
+        '.webp': 'image/webp',
         '.ico': 'image/x-icon',
         '.txt': 'text/plain; charset=utf-8',
+        '.ttf': 'font/ttf',
+        '.woff': 'font/woff',
+        '.woff2': 'font/woff2',
+        '.otf': 'font/otf',
       };
       res.writeHead(200, {
         'Content-Type': mimeTypes[ext] || 'application/octet-stream',
