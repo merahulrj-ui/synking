@@ -1142,10 +1142,12 @@ const server = http.createServer((req, res) => {
     }
 
     const indexPath = path.join(__dirname, 'public', 'index.html');
-    if (fs.existsSync(indexPath)) {
+    const websitePath = path.join(__dirname, 'public', 'website.html');
+    const targetPath = fs.existsSync(indexPath) ? indexPath : (fs.existsSync(websitePath) ? websitePath : null);
+    if (targetPath) {
       res.writeHead(200, { 'Content-Type': 'text/html; charset=utf-8', 'Access-Control-Allow-Origin': '*' });
       if (req.method === 'HEAD') { res.end(); return; }
-      fs.createReadStream(indexPath).pipe(res);
+      fs.createReadStream(targetPath).pipe(res);
       return;
     }
 
