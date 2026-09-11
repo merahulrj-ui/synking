@@ -32,11 +32,11 @@ export default function NextLandingPage() {
       {/* NAVBAR */}
       <header className="fixed top-0 left-0 right-0 z-50 border-b border-white/[0.08] bg-[#07050d]/85 backdrop-blur-xl">
         <div className="mx-auto flex h-20 max-w-7xl items-center justify-between px-6">
-          {/* Logo */}
+          {/* Official Synkin Logo */}
           <Link href="/" className="flex items-center gap-3 group">
             <div className="flex h-11 w-11 items-center justify-center rounded-2xl bg-gradient-to-tr from-[#FD3A73] to-[#8E2DE2] p-0.5 shadow-lg shadow-[#FD3A73]/30 group-hover:scale-105 transition-all">
-              <div className="flex h-full w-full items-center justify-center rounded-[14px] bg-[#0A0714]">
-                <Flame className="h-6 w-6 text-[#FD3A73] animate-pulse" />
+              <div className="flex h-full w-full items-center justify-center rounded-[14px] bg-[#0A0714] p-1.5 overflow-hidden">
+                <img src="/images/logo_emblem.png" alt="Synkin Logo" className="w-full h-full object-contain" />
               </div>
             </div>
             <div className="flex flex-col">
