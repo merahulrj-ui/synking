@@ -1253,11 +1253,39 @@ const server = http.createServer((req, res) => {
     if (fs.existsSync(jsPath) && fs.statSync(jsPath).isFile()) {
       res.writeHead(200, {
         'Content-Type': 'application/javascript; charset=utf-8',
-        'Cache-Control': 'public, max-age=3600',
+        'Cache-Control': 'no-store, no-cache, must-revalidate, proxy-revalidate',
+        'Pragma': 'no-cache',
+        'Expires': '0',
         'Access-Control-Allow-Origin': '*',
       });
       if (req.method === 'HEAD') { res.end(); return; }
       fs.createReadStream(jsPath).pipe(res);
+      return;
+    }
+  }
+
+  // 0.049 GET /_next/* (Next.js Compiled Chunks & Static Assets)
+  if ((req.method === 'GET' || req.method === 'HEAD') && pathname.startsWith('/_next/')) {
+    const relativeSubPath = pathname.replace(/^\/_next\//, '').replace(/\.\./g, '');
+    const assetPath = path.join(__dirname, 'public', '_next', relativeSubPath);
+    if (fs.existsSync(assetPath) && fs.statSync(assetPath).isFile()) {
+      const ext = path.extname(assetPath).toLowerCase();
+      const mimeTypes = {
+        '.js': 'application/javascript; charset=utf-8',
+        '.css': 'text/css; charset=utf-8',
+        '.json': 'application/json; charset=utf-8',
+        '.svg': 'image/svg+xml',
+        '.png': 'image/png',
+        '.ico': 'image/x-icon',
+        '.txt': 'text/plain; charset=utf-8',
+      };
+      res.writeHead(200, {
+        'Content-Type': mimeTypes[ext] || 'application/octet-stream',
+        'Cache-Control': 'public, max-age=31536000, immutable',
+        'Access-Control-Allow-Origin': '*',
+      });
+      if (req.method === 'HEAD') { res.end(); return; }
+      fs.createReadStream(assetPath).pipe(res);
       return;
     }
   }
