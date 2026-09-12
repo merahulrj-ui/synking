@@ -1168,8 +1168,9 @@ const server = http.createServer((req, res) => {
     return;
   }
 
-  // 0.01 GET /app (Exact React Native Mobile App Web View)
-  if ((req.method === 'GET' || req.method === 'HEAD') && (pathname === '/app' || pathname === '/app/')) {
+  // 0.01 GET /app & SPA subroutes (/app/profile, /app/chats, etc.)
+  const isAppSpaRoute = pathname === '/app' || (pathname.startsWith('/app/') && !pathname.includes('.') && !pathname.startsWith('/app/_expo/') && !pathname.startsWith('/app/_next/') && !pathname.startsWith('/app/assets/'));
+  if ((req.method === 'GET' || req.method === 'HEAD') && isAppSpaRoute) {
     const appIndexPath = path.join(__dirname, 'public', 'app', 'index.html');
     const appHtmlPath = path.join(__dirname, 'public', 'app.html');
     const target = fs.existsSync(appIndexPath) ? appIndexPath : (fs.existsSync(appHtmlPath) ? appHtmlPath : null);
@@ -1242,16 +1243,102 @@ const server = http.createServer((req, res) => {
   }
 
   // 0.04 GET /terms (Public Terms of Service for Google Play Store)
-  if ((req.method === 'GET' || req.method === 'HEAD') && (pathname === '/terms' || pathname === '/terms-of-service')) {
-    const termsPath = path.join(__dirname, 'public', 'terms.html');
+  if ((req.method === 'GET' || req.method === 'HEAD') && (pathname === '/terms' || pathname === '/terms-of-service' || pathname === '/terms/' || pathname === '/terms-of-service/')) {
+    let termsPath = path.join(__dirname, 'public', 'terms', 'index.html');
+    if (!fs.existsSync(termsPath)) termsPath = path.join(__dirname, 'public', 'terms.html');
     if (fs.existsSync(termsPath)) {
-      res.writeHead(200, { 'Content-Type': 'text/html; charset=utf-8', 'Access-Control-Allow-Origin': '*' });
+      res.writeHead(200, { 'Content-Type': 'text/html; charset=utf-8', 'Access-Control-Allow-Origin': '*', 'Cache-Control': 'public, max-age=3600' });
       if (req.method === 'HEAD') { res.end(); return; }
       fs.createReadStream(termsPath).pipe(res);
       return;
     }
     res.writeHead(404, { 'Content-Type': 'text/plain' });
     res.end('Terms of service page not found');
+    return;
+  }
+
+  // 0.042 GET /dating/* (Programmatic City SEO Landing Pages)
+  if ((req.method === 'GET' || req.method === 'HEAD') && pathname.startsWith('/dating/')) {
+    const citySlug = pathname.replace(/^\/dating\//, '').replace(/\/$/, '').toLowerCase().replace(/[^a-z0-9-]/g, '');
+    let cityPath = path.join(__dirname, 'public', 'dating', `${citySlug}.html`);
+    if (!fs.existsSync(cityPath)) {
+      cityPath = path.join(__dirname, 'public', 'dating', citySlug, 'index.html');
+    }
+    if (fs.existsSync(cityPath) && fs.statSync(cityPath).isFile()) {
+      res.writeHead(200, {
+        'Content-Type': 'text/html; charset=utf-8',
+        'Access-Control-Allow-Origin': '*',
+        'Cache-Control': 'public, max-age=3600',
+      });
+      if (req.method === 'HEAD') { res.end(); return; }
+      fs.createReadStream(cityPath).pipe(res);
+      return;
+    }
+  }
+
+  // 0.043 GET /safety (Public Safety & Cryptography Architecture Page)
+  if ((req.method === 'GET' || req.method === 'HEAD') && (pathname === '/safety' || pathname === '/safety/')) {
+    let safetyPath = path.join(__dirname, 'public', 'safety', 'index.html');
+    if (!fs.existsSync(safetyPath)) safetyPath = path.join(__dirname, 'public', 'safety.html');
+    if (fs.existsSync(safetyPath)) {
+      res.writeHead(200, {
+        'Content-Type': 'text/html; charset=utf-8',
+        'Access-Control-Allow-Origin': '*',
+        'Cache-Control': 'public, max-age=3600',
+      });
+      if (req.method === 'HEAD') { res.end(); return; }
+      fs.createReadStream(safetyPath).pipe(res);
+      return;
+    }
+  }
+
+  // 0.0435 GET /blog/* (Public Editorial Journal & Guides)
+  if ((req.method === 'GET' || req.method === 'HEAD') && (pathname === '/blog' || pathname.startsWith('/blog/'))) {
+    let blogPath;
+    if (pathname === '/blog' || pathname === '/blog/') {
+      blogPath = path.join(__dirname, 'public', 'blog', 'index.html');
+      if (!fs.existsSync(blogPath)) blogPath = path.join(__dirname, 'public', 'blog.html');
+    } else {
+      const slug = pathname.replace(/^\/blog\//, '').replace(/\/$/, '').toLowerCase().replace(/[^a-z0-9-]/g, '');
+      blogPath = path.join(__dirname, 'public', 'blog', slug, 'index.html');
+      if (!fs.existsSync(blogPath)) {
+        blogPath = path.join(__dirname, 'public', 'blog', `${slug}.html`);
+      }
+    }
+    if (blogPath && fs.existsSync(blogPath) && fs.statSync(blogPath).isFile()) {
+      res.writeHead(200, {
+        'Content-Type': 'text/html; charset=utf-8',
+        'Access-Control-Allow-Origin': '*',
+        'Cache-Control': 'public, max-age=3600',
+      });
+      if (req.method === 'HEAD') { res.end(); return; }
+      fs.createReadStream(blogPath).pipe(res);
+      return;
+    }
+  }
+
+  // 0.044 GET /download/apk or /synkin.apk (Direct Android APK Download)
+  if ((req.method === 'GET' || req.method === 'HEAD') && (pathname === '/download/apk' || pathname === '/download/apk/' || pathname === '/synkin.apk' || pathname === '/Synkin.apk')) {
+    const localApkPath = path.join(__dirname, 'public', 'Synkin.apk');
+    if (fs.existsSync(localApkPath)) {
+      const stat = fs.statSync(localApkPath);
+      res.writeHead(200, {
+        'Content-Type': 'application/vnd.android.package-archive',
+        'Content-Disposition': 'attachment; filename="Synkin.apk"',
+        'Content-Length': stat.size,
+        'Cache-Control': 'public, max-age=86400',
+        'Access-Control-Allow-Origin': '*',
+      });
+      if (req.method === 'HEAD') { res.end(); return; }
+      fs.createReadStream(localApkPath).pipe(res);
+      return;
+    }
+    // High-speed CDN fallback: Redirect to latest EAS cloud build artifact
+    res.writeHead(302, {
+      'Location': 'https://expo.dev/artifacts/eas/BV9SHW_5XREwoRW-PIDsCLnummllQ7UOmIZt58HT-6o.apk',
+      'Cache-Control': 'no-cache',
+    });
+    res.end();
     return;
   }
 
@@ -1319,9 +1406,12 @@ const server = http.createServer((req, res) => {
         '.woff2': 'font/woff2',
         '.otf': 'font/otf',
       };
+      const cacheHeader = (ext === '.js' || ext === '.html' || ext === '.json')
+        ? 'no-cache, no-store, must-revalidate'
+        : 'public, max-age=86400';
       res.writeHead(200, {
         'Content-Type': mimeTypes[ext] || 'application/octet-stream',
-        'Cache-Control': 'public, max-age=31536000, immutable',
+        'Cache-Control': cacheHeader,
         'Access-Control-Allow-Origin': '*',
       });
       if (req.method === 'HEAD') { res.end(); return; }
@@ -1345,10 +1435,11 @@ const server = http.createServer((req, res) => {
   }
 
   // 0.09 GET /privacy-policy (Public Privacy Policy Page for Google Play Store)
-  if ((req.method === 'GET' || req.method === 'HEAD') && (pathname === '/privacy-policy' || pathname === '/privacy')) {
-    const privacyPath = path.join(__dirname, 'privacy-policy', 'index.html');
+  if ((req.method === 'GET' || req.method === 'HEAD') && (pathname === '/privacy-policy' || pathname === '/privacy' || pathname === '/privacy-policy/' || pathname === '/privacy/')) {
+    let privacyPath = path.join(__dirname, 'public', 'privacy-policy', 'index.html');
+    if (!fs.existsSync(privacyPath)) privacyPath = path.join(__dirname, 'privacy-policy', 'index.html');
     if (fs.existsSync(privacyPath)) {
-      res.writeHead(200, { 'Content-Type': 'text/html; charset=utf-8', 'Access-Control-Allow-Origin': '*' });
+      res.writeHead(200, { 'Content-Type': 'text/html; charset=utf-8', 'Access-Control-Allow-Origin': '*', 'Cache-Control': 'public, max-age=3600' });
       if (req.method === 'HEAD') { res.end(); return; }
       fs.createReadStream(privacyPath).pipe(res);
       return;
