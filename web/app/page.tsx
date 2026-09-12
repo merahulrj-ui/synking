@@ -25,7 +25,6 @@ import {
   ChevronDown,
   PhoneOff,
   Flame,
-  Star,
   Check,
   X,
 } from 'lucide-react';
@@ -37,51 +36,67 @@ export default function NextLandingPage() {
   const [openFaq, setOpenFaq] = useState<number | null>(0);
   const [activeCity, setActiveCity] = useState<string>('delhi');
 
-  const radiusStats: Record<number, { singles: number; walkTime: string; label: string }> = {
-    500: { singles: 42, walkTime: '4 min walk', label: 'Same Street & Cafes' },
-    1000: { singles: 118, walkTime: '9 min walk', label: 'Immediate Neighborhood' },
-    2000: { singles: 340, walkTime: '5 min metro/drive', label: 'Metro & Market Hub' },
-    5000: { singles: 890, walkTime: '15 min commute', label: 'City Sector Coverage' },
+  const radiusStats: Record<number, { walkTime: string; label: string; desc: string }> = {
+    500: {
+      walkTime: '4 min walk',
+      label: 'Same Street & Cafes',
+      desc: 'Instant spontaneous connection within walking distance',
+    },
+    1000: {
+      walkTime: '9 min walk',
+      label: 'Immediate Neighborhood',
+      desc: 'Discover singles in your local sector or university campus',
+    },
+    2000: {
+      walkTime: 'Short metro/drive',
+      label: 'Metro & Market Hub',
+      desc: 'Explore popular cafes and social hotspots nearby',
+    },
+    5000: {
+      walkTime: '15 min commute',
+      label: 'City Sector Coverage',
+      desc: 'Wider proximity coverage for your commercial or tech corridor',
+    },
   };
 
   const cityHubs: Record<
     string,
-    { name: string; tag: string; hubs: string[]; cafes: string[]; active: string }
+    { name: string; tag: string; hubs: string[]; cafes: string[]; status: string }
   > = {
     delhi: {
       name: 'Delhi NCR',
       tag: 'Connaught Place · Hauz Khas · Cyber Hub',
       hubs: ['Hauz Khas Social & Deer Park', 'Cyber Hub Gurgaon', 'Connaught Place Inner Circle', 'Noida Sector 18 & Advant'],
       cafes: ['Blue Tokai (SDA & Galleria)', 'Diggin (Chanakyapuri & Anand Lok)', 'Colocal Chocolaterie (Dhan Mill)', 'Third Wave Coffee (Cyber Hub)'],
-      active: '4,850+ Singles Active',
+      status: 'Live on Synkin Radar',
     },
     bangalore: {
       name: 'Bengaluru',
       tag: 'Koramangala · Indiranagar · HSR Layout',
       hubs: ['Koramangala 5th Block', '100ft Road Indiranagar', 'HSR Sector 4 & 7', 'Church Street & Lavelle Road'],
       cafes: ['Third Wave Coffee (12th Main Indiranagar)', 'Blue Tokai (Koramangala)', 'Dyu Art Cafe (Koramangala)', 'Brik Oven (Church Street)'],
-      active: '5,420+ Singles Active',
+      status: 'Live on Synkin Radar',
     },
     mumbai: {
       name: 'Mumbai',
       tag: 'Bandra · BKC · Powai · Juhu',
       hubs: ['Pali Hill & Carter Road Bandra', 'BKC Gourmet District', 'Juhu Tara Road', 'Hiranandani Gardens Powai'],
       cafes: ['Subko Specialty Coffee (Bandra)', 'Blue Tokai (Bandra & BKC)', 'Kala Ghoda Cafe (Fort)', 'The Pantry (Colaba)'],
-      active: '4,100+ Singles Active',
+      status: 'Live on Synkin Radar',
     },
     pune: {
       name: 'Pune',
       tag: 'Koregaon Park · FC Road · Kalyani Nagar',
       hubs: ['North Main Road Koregaon Park', 'FC Road Student Spine', 'Kalyani Nagar Joggers Park', 'Balewadi High Street'],
       cafes: ['German Bakery (Koregaon Park)', 'One O Eight Cafe (KP)', 'Third Wave Coffee (Aundh)', 'Le Plaisir (Deccan)'],
-      active: '2,750+ Singles Active',
+      status: 'Live on Synkin Radar',
     },
     hyderabad: {
       name: 'Hyderabad',
       tag: 'Jubilee Hills · Banjara Hills · Gachibowli',
       hubs: ['Road No. 36 Jubilee Hills', 'Banjara Hills Road 12', 'Gachibowli Tech Corridor', 'Durgam Cheruvu Lakefront'],
       cafes: ['Roastery Coffee House (Banjara Hills)', 'Concu (Jubilee Hills)', 'Autumn Leaf Cafe', 'Third Wave Coffee (Hitec City)'],
-      active: '3,120+ Singles Active',
+      status: 'Live on Synkin Radar',
     },
   };
 
@@ -127,17 +142,8 @@ export default function NextLandingPage() {
       <div className="fixed top-[30%] right-[-10%] h-[600px] w-[600px] rounded-full bg-purple-700/15 blur-[150px] pointer-events-none" />
       <div className="fixed bottom-[-10%] left-[20%] h-[550px] w-[550px] rounded-full bg-cyan-500/10 blur-[160px] pointer-events-none" />
 
-      {/* Top Announcement Bar */}
-      <div className="relative z-50 bg-gradient-to-r from-[#FD3A73] via-pink-600 to-purple-600 py-2 px-4 text-center text-xs font-semibold text-white tracking-wide shadow-md flex items-center justify-center gap-2">
-        <span className="inline-flex h-2 w-2 rounded-full bg-white animate-ping" />
-        <span>Live Across Delhi NCR, Bengaluru, Mumbai & Pune · Over 12,500+ Verified Singles Active Now</span>
-        <Link href="/app" className="underline font-bold hover:text-pink-100 ml-2 hidden sm:inline">
-          Catch A Spark →
-        </Link>
-      </div>
-
       {/* ========================================================================= */}
-      {/* NAVBAR */}
+      {/* NAVBAR (CLEAN & PROFESSIONAL - NO FAKE BANNER) */}
       {/* ========================================================================= */}
       <header className="sticky top-0 z-50 border-b border-white/[0.08] bg-[#07050d]/90 backdrop-blur-xl transition-all">
         <div className="mx-auto flex h-20 max-w-7xl items-center justify-between px-6">
@@ -203,7 +209,7 @@ export default function NextLandingPage() {
               <Sparkles className="h-3.5 w-3.5 animate-spin [animation-duration:8s]" />
               <span>THE SPONTANEOUS REAL-TIME DATING APP</span>
               <span className="text-zinc-500">·</span>
-              <span className="text-emerald-400 font-semibold">100% Free Signup</span>
+              <span className="text-emerald-400 font-semibold">Zero Number Sharing</span>
             </div>
 
             {/* Keyword-Rich H1 */}
@@ -241,23 +247,19 @@ export default function NextLandingPage() {
               </a>
             </div>
 
-            {/* Micro Trust Proof */}
+            {/* Micro Trust Proof - 100% Genuine Features */}
             <div className="mt-8 flex flex-wrap items-center gap-6 text-xs text-zinc-400 font-medium">
-              <div className="flex items-center gap-1.5 text-amber-400">
-                <div className="flex">
-                  {[...Array(5)].map((_, i) => (
-                    <Star key={i} className="h-3.5 w-3.5 fill-amber-400 text-amber-400" />
-                  ))}
-                </div>
-                <span className="font-bold text-white">4.8/5 Rating</span>
+              <div className="flex items-center gap-1.5 text-emerald-400">
+                <CheckCircle2 className="h-4 w-4" />
+                <span className="font-semibold">100% Free Signup</span>
               </div>
-              <div className="flex items-center gap-1.5">
-                <CheckCircle2 className="h-4 w-4 text-emerald-400" />
+              <div className="flex items-center gap-1.5 text-zinc-300">
+                <CheckCircle2 className="h-4 w-4 text-[#FD3A73]" />
                 <span>Zero Phone Number Leaks</span>
               </div>
-              <div className="flex items-center gap-1.5">
-                <CheckCircle2 className="h-4 w-4 text-emerald-400" />
-                <span>Verified Singles Only</span>
+              <div className="flex items-center gap-1.5 text-zinc-300">
+                <CheckCircle2 className="h-4 w-4 text-purple-400" />
+                <span>Selfie Liveness Verified</span>
               </div>
             </div>
           </div>
@@ -300,7 +302,7 @@ export default function NextLandingPage() {
                         <span className="h-2.5 w-2.5 rounded-full bg-emerald-400 ring-4 ring-emerald-400/20" />
                       </h3>
                       <span className="text-[10px] font-bold uppercase tracking-wider text-[#FD3A73] bg-[#FD3A73]/10 px-2 py-0.5 rounded-md border border-[#FD3A73]/20">
-                        Active Now
+                        Nearby
                       </span>
                     </div>
 
@@ -329,33 +331,33 @@ export default function NextLandingPage() {
       </section>
 
       {/* ========================================================================= */}
-      {/* SECTION 2: LIVE TRUST & REALITY METRICS BAR */}
+      {/* SECTION 2: ARCHITECTURAL PILLARS (GENUINE CORE VALUES) */}
       {/* ========================================================================= */}
       <section className="border-y border-white/[0.08] bg-[#0A0714] py-10 px-6">
         <div className="max-w-7xl mx-auto grid grid-cols-2 md:grid-cols-4 gap-8 text-center">
           <div className="flex flex-col items-center">
-            <div className="flex items-center gap-1 text-3xl sm:text-4xl font-black text-white">
-              <span className="text-[#FD3A73]">48</span>
-              <span className="text-xl text-[#FD3A73]">m</span>
+            <div className="flex items-center gap-1 text-2xl sm:text-3xl font-black text-white">
+              <span className="text-[#FD3A73]">500m</span>
+              <span className="text-base text-zinc-400 font-semibold">- 5km</span>
             </div>
-            <p className="text-xs text-zinc-400 font-semibold mt-1 uppercase tracking-wider">Avg. Time To First Date</p>
-            <span className="text-[10px] text-zinc-500 mt-0.5">Skipping weeks of texting</span>
+            <p className="text-xs text-zinc-400 font-semibold mt-1 uppercase tracking-wider">Walking Proximity</p>
+            <span className="text-[10px] text-zinc-500 mt-0.5">Zero distant matches</span>
           </div>
 
           <div className="flex flex-col items-center">
-            <div className="text-3xl sm:text-4xl font-black text-emerald-400">100%</div>
-            <p className="text-xs text-zinc-400 font-semibold mt-1 uppercase tracking-wider">Verified Profiles</p>
-            <span className="text-[10px] text-zinc-500 mt-0.5">Selfie liveness verification</span>
+            <div className="text-2xl sm:text-3xl font-black text-emerald-400">Selfie Check</div>
+            <p className="text-xs text-zinc-400 font-semibold mt-1 uppercase tracking-wider">Liveness Verification</p>
+            <span className="text-[10px] text-zinc-500 mt-0.5">Zero fake catfish accounts</span>
           </div>
 
           <div className="flex flex-col items-center">
-            <div className="text-3xl sm:text-4xl font-black text-purple-400">0%</div>
-            <p className="text-xs text-zinc-400 font-semibold mt-1 uppercase tracking-wider">Catfishing Rate</p>
-            <span className="text-[10px] text-zinc-500 mt-0.5">Instant 3-min video checks</span>
+            <div className="text-2xl sm:text-3xl font-black text-purple-400">3 Minutes</div>
+            <p className="text-xs text-zinc-400 font-semibold mt-1 uppercase tracking-wider">Video Vibe Check</p>
+            <span className="text-[10px] text-zinc-500 mt-0.5">Face-to-face chemistry</span>
           </div>
 
           <div className="flex flex-col items-center">
-            <div className="text-3xl sm:text-4xl font-black text-sky-400">256-Bit</div>
+            <div className="text-2xl sm:text-3xl font-black text-sky-400">256-Bit</div>
             <p className="text-xs text-zinc-400 font-semibold mt-1 uppercase tracking-wider">Zero-Knowledge Privacy</p>
             <span className="text-[10px] text-zinc-500 mt-0.5">No phone numbers revealed</span>
           </div>
@@ -438,7 +440,7 @@ export default function NextLandingPage() {
                 </div>
                 <div className="col-span-4 text-center font-bold text-emerald-400 flex items-center justify-center gap-1">
                   <Check className="h-4 w-4 text-emerald-400 shrink-0" />
-                  <span>Same Evening (Within 48 Mins)</span>
+                  <span>Same Evening (Within Walking Reach)</span>
                 </div>
               </div>
 
@@ -496,7 +498,7 @@ export default function NextLandingPage() {
             </h2>
             <p className="mt-4 text-sm text-zinc-400 leading-relaxed">
               Find verified singles sitting in the cafe down your street, reading in the library, or walking through your
-              campus right now.
+              neighborhood right now.
             </p>
 
             {/* Interactive Radius Selector */}
@@ -516,10 +518,10 @@ export default function NextLandingPage() {
               ))}
             </div>
 
-            {/* Dynamic Status Pill */}
+            {/* Genuine Status Pill */}
             <div className="mt-4 text-xs font-semibold text-zinc-300 flex items-center justify-center gap-2">
               <span className="h-2 w-2 rounded-full bg-emerald-400 animate-pulse" />
-              <span>{radiusStats[selectedRadius].singles} verified singles active within {radiusStats[selectedRadius].walkTime} ({radiusStats[selectedRadius].label})</span>
+              <span>Proximity Range: {radiusStats[selectedRadius].walkTime} ({radiusStats[selectedRadius].label}) — {radiusStats[selectedRadius].desc}</span>
             </div>
           </div>
 
@@ -542,8 +544,8 @@ export default function NextLandingPage() {
               </div>
               <h3 className="text-xl font-bold text-white">Spontaneous Attraction</h3>
               <p className="text-xs text-zinc-400 mt-3 leading-relaxed">
-                Catch eyes across the room or discover someone on your metro commute. When two people trigger their
-                spark radar within 500 meters, chemistry happens naturally.
+                Catch eyes across the room or discover someone on your commute. When two people trigger their spark radar
+                within proximity, chemistry happens naturally.
               </p>
             </div>
 
@@ -884,7 +886,7 @@ export default function NextLandingPage() {
       </section>
 
       {/* ========================================================================= */}
-      {/* SECTION 9: LOCAL SINGLES DATING HUBS (SEO Local Anchors) */}
+      {/* SECTION 9: LOCAL SINGLES DATING HUBS (GENUINE STATUS - NO FAKE NUMBERS) */}
       {/* ========================================================================= */}
       <section id="hubs" className="py-24 px-6 border-b border-white/5 bg-[#07050d]">
         <div className="max-w-7xl mx-auto">
@@ -893,10 +895,10 @@ export default function NextLandingPage() {
               Local Proximity Hubs
             </span>
             <h2 className="mt-2 text-3xl sm:text-5xl font-extrabold text-white tracking-tight">
-              Singles Active In Your City.
+              Singles Hubs In Your City.
             </h2>
             <p className="mt-4 text-sm text-zinc-400 leading-relaxed">
-              Synkin is buzzing across the premier social districts of India. Explore where sparks are flying tonight.
+              Synkin is active across the premier social and cafe districts of India. Explore where sparks happen.
             </p>
 
             {/* City Tabs */}
@@ -925,8 +927,8 @@ export default function NextLandingPage() {
                 <p className="text-xs text-[#FD3A73] font-semibold mt-1">{cityHubs[activeCity].tag}</p>
               </div>
               <div className="flex items-center gap-2 rounded-full bg-emerald-500/10 px-4 py-1.5 text-xs font-bold text-emerald-400 border border-emerald-500/20">
-                <span className="h-2 w-2 rounded-full bg-emerald-400 animate-ping" />
-                <span>{cityHubs[activeCity].active}</span>
+                <span className="h-2 w-2 rounded-full bg-emerald-400 animate-pulse" />
+                <span>{cityHubs[activeCity].status}</span>
               </div>
             </div>
 
