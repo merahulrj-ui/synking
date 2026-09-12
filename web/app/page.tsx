@@ -200,12 +200,12 @@ export default function NextLandingPage() {
       {/* ========================================================================= */}
       {/* 2. HERO SECTION */}
       {/* ========================================================================= */}
-      <section className="relative pt-12 pb-16 px-6 sm:pt-20 sm:pb-24">
+      <section className="relative pt-4 pb-6 px-6 sm:pt-6 sm:pb-8">
         <div className="max-w-6xl mx-auto grid grid-cols-1 lg:grid-cols-12 gap-12 lg:gap-8 items-center">
           {/* Left Column: Focused Copy & Action */}
           <div className="lg:col-span-7 flex flex-col items-start text-left">
             {/* Minimalist Proximity Pill */}
-            <div className="inline-flex items-center gap-2 rounded-full border border-[#FD3A73]/30 bg-[#FD3A73]/10 px-3.5 py-1.5 text-xs font-bold text-[#FD3A73] backdrop-blur-md mb-6">
+            <div className="inline-flex items-center gap-2 rounded-full border border-[#FD3A73]/30 bg-[#FD3A73]/10 px-3.5 py-1.5 text-xs font-bold text-[#FD3A73] backdrop-blur-md mb-3">
               <span className="h-2 w-2 rounded-full bg-emerald-400 animate-pulse" />
               <span>SPONTANEOUS PROXIMITY DATING</span>
               <span className="text-zinc-600">·</span>
@@ -221,13 +221,13 @@ export default function NextLandingPage() {
             </h1>
 
             {/* Clear Subheadline */}
-            <p className="mt-5 text-base sm:text-lg text-zinc-300 max-w-xl leading-relaxed font-normal">
+            <p className="mt-3 text-base sm:text-lg text-zinc-300 max-w-xl leading-relaxed font-normal">
               Skip 3 weeks of dry texting with people you never meet. Synkin turns walking-distance proximity into
               instant chemistry with a 360° radar, private 3-minute video vibe check, and same-day coffee at verified partner cafes.
             </p>
 
             {/* Clean Dual Conversion Buttons */}
-            <div className="mt-8 flex flex-col sm:flex-row items-stretch sm:items-center gap-3.5 w-full sm:w-auto">
+            <div className="mt-5 flex flex-col sm:flex-row items-stretch sm:items-center gap-3.5 w-full sm:w-auto">
               <Link
                 href="/app"
                 className="flex items-center justify-center gap-2 rounded-xl bg-gradient-to-r from-[#FD3A73] to-[#8E2DE2] px-7 py-3.5 text-sm font-bold text-white shadow-xl shadow-[#FD3A73]/30 hover:brightness-110 active:scale-95 transition-all text-center"
@@ -247,7 +247,7 @@ export default function NextLandingPage() {
             </div>
 
             {/* Streamlined Trust Proof */}
-            <div className="mt-7 flex flex-wrap items-center gap-5 text-xs text-zinc-400">
+            <div className="mt-4 flex flex-wrap items-center gap-5 text-xs text-zinc-400">
               <span className="flex items-center gap-1.5 text-emerald-400 font-medium">
                 <CheckCircle2 className="h-4 w-4" /> 100% Free
               </span>
@@ -338,8 +338,8 @@ export default function NextLandingPage() {
       {/* ========================================================================= */}
       {/* 3. FOUR CORE METRICS (TRUST BAR) */}
       {/* ========================================================================= */}
-      <section className="border-y border-white/[0.08] bg-white/[0.01] py-8 px-6 backdrop-blur-md">
-        <div className="max-w-6xl mx-auto grid grid-cols-2 md:grid-cols-4 gap-6 text-center">
+      <section className="border-y border-white/[0.08] bg-white/[0.01] py-4 px-6 backdrop-blur-md">
+        <div className="max-w-6xl mx-auto grid grid-cols-2 md:grid-cols-4 gap-4 text-center">
           <div className="p-3">
             <div className="text-2xl sm:text-3xl font-black text-white">500m – 5km</div>
             <div className="text-xs font-semibold text-[#FD3A73] mt-1">Walking Reach Only</div>
@@ -366,9 +366,9 @@ export default function NextLandingPage() {
       {/* ========================================================================= */}
       {/* 4. THE 4-STEP SYNKIN EXPERIENCE */}
       {/* ========================================================================= */}
-      <section id="experience" className="py-20 sm:py-28 px-6">
+      <section id="experience" className="py-8 sm:py-6 px-6">
         <div className="max-w-6xl mx-auto">
-          <div className="text-center max-w-2xl mx-auto mb-16">
+          <div className="text-center max-w-2xl mx-auto mb-6">
             <span className="text-[11px] font-bold uppercase tracking-[0.25em] text-[#FD3A73]">
               THE 4-STEP REAL-WORLD JOURNEY
             </span>
@@ -381,9 +381,9 @@ export default function NextLandingPage() {
           </div>
 
           {/* 4 Unified Step Cards */}
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
             {/* STEP 1: 360° RADAR */}
-            <div id="radar" className="rounded-2xl border border-white/[0.08] bg-white/[0.03] p-7 backdrop-blur-xl shadow-[inset_0_1px_1px_rgba(255,255,255,0.08)] hover:border-white/15 transition-all flex flex-col justify-between">
+            <div id="radar" className="rounded-2xl border border-white/[0.08] bg-white/[0.03] p-5 sm:p-5 backdrop-blur-xl shadow-[inset_0_1px_1px_rgba(255,255,255,0.08)] hover:border-white/15 transition-all flex flex-col justify-between">
               <div>
                 <div className="flex items-center justify-between mb-4">
                   <span className="text-xs font-bold text-[#FD3A73] tracking-wider uppercase">STEP 01</span>
@@ -435,7 +435,7 @@ export default function NextLandingPage() {
             </div>
 
             {/* STEP 2: 3-MINUTE VIDEO VIBE CHECK */}
-            <div id="vibe-check" className="rounded-2xl border border-white/[0.08] bg-white/[0.03] p-7 backdrop-blur-xl shadow-[inset_0_1px_1px_rgba(255,255,255,0.08)] hover:border-white/15 transition-all flex flex-col justify-between">
+            <div id="vibe-check" className="rounded-2xl border border-white/[0.08] bg-white/[0.03] p-5 sm:p-5 backdrop-blur-xl shadow-[inset_0_1px_1px_rgba(255,255,255,0.08)] hover:border-white/15 transition-all flex flex-col justify-between">
               <div>
                 <div className="flex items-center justify-between mb-4">
                   <span className="text-xs font-bold text-purple-400 tracking-wider uppercase">STEP 02</span>
@@ -490,7 +490,7 @@ export default function NextLandingPage() {
             </div>
 
             {/* STEP 3: ZERO-NUMBER SAFETY SHIELD */}
-            <div id="safety" className="rounded-2xl border border-white/[0.08] bg-white/[0.03] p-7 backdrop-blur-xl shadow-[inset_0_1px_1px_rgba(255,255,255,0.08)] hover:border-white/15 transition-all flex flex-col justify-between">
+            <div id="safety" className="rounded-2xl border border-white/[0.08] bg-white/[0.03] p-5 sm:p-5 backdrop-blur-xl shadow-[inset_0_1px_1px_rgba(255,255,255,0.08)] hover:border-white/15 transition-all flex flex-col justify-between">
               <div>
                 <div className="flex items-center justify-between mb-4">
                   <span className="text-xs font-bold text-emerald-400 tracking-wider uppercase">STEP 03</span>
@@ -527,7 +527,7 @@ export default function NextLandingPage() {
             </div>
 
             {/* STEP 4: DAYLIGHT PARTNER CAFES */}
-            <div id="cafes" className="rounded-2xl border border-white/[0.08] bg-white/[0.03] p-7 backdrop-blur-xl shadow-[inset_0_1px_1px_rgba(255,255,255,0.08)] hover:border-white/15 transition-all flex flex-col justify-between">
+            <div id="cafes" className="rounded-2xl border border-white/[0.08] bg-white/[0.03] p-5 sm:p-5 backdrop-blur-xl shadow-[inset_0_1px_1px_rgba(255,255,255,0.08)] hover:border-white/15 transition-all flex flex-col justify-between">
               <div>
                 <div className="flex items-center justify-between mb-4">
                   <span className="text-xs font-bold text-amber-400 tracking-wider uppercase">STEP 04</span>
@@ -578,9 +578,9 @@ export default function NextLandingPage() {
       {/* ========================================================================= */}
       {/* 5. THE REALITY CHECK (COMPARISON MATRIX) */}
       {/* ========================================================================= */}
-      <section id="comparison" className="py-20 sm:py-28 px-6 border-t border-white/5 bg-black/40">
+      <section id="comparison" className="py-8 sm:py-6 px-6 border-t border-white/5 bg-black/40">
         <div className="max-w-4xl mx-auto">
-          <div className="text-center max-w-xl mx-auto mb-14">
+          <div className="text-center max-w-xl mx-auto mb-6">
             <span className="text-[11px] font-bold uppercase tracking-[0.25em] text-[#FD3A73]">
               WHY SYNKIN WINS
             </span>
@@ -657,9 +657,9 @@ export default function NextLandingPage() {
       {/* ========================================================================= */}
       {/* 6. CITY DATING CORRIDORS */}
       {/* ========================================================================= */}
-      <section id="hubs" className="py-20 sm:py-28 px-6">
+      <section id="hubs" className="py-8 sm:py-6 px-6">
         <div className="max-w-5xl mx-auto">
-          <div className="text-center max-w-xl mx-auto mb-12">
+          <div className="text-center max-w-xl mx-auto mb-5">
             <span className="text-[11px] font-bold uppercase tracking-[0.25em] text-[#FD3A73]">
               METRO CITY CORRIDORS
             </span>
@@ -686,7 +686,7 @@ export default function NextLandingPage() {
           </div>
 
           {/* Active City Card */}
-          <div className="rounded-2xl border border-white/10 bg-white/[0.02] p-7 backdrop-blur-xl">
+          <div className="rounded-2xl border border-white/10 bg-white/[0.02] p-5 sm:p-5 backdrop-blur-xl">
             <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 pb-5 border-b border-white/10">
               <div>
                 <h3 className="text-xl font-bold text-white">{cityHubs[activeCity].name}</h3>
@@ -697,7 +697,7 @@ export default function NextLandingPage() {
               </span>
             </div>
 
-            <div className="grid grid-cols-1 sm:grid-cols-2 gap-6 pt-6">
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 pt-6">
               <div>
                 <div className="text-xs font-bold uppercase tracking-wider text-[#FD3A73] mb-3 flex items-center gap-1.5">
                   <MapPin className="h-3.5 w-3.5" /> High-Density Singles Hubs
@@ -743,9 +743,9 @@ export default function NextLandingPage() {
       {/* ========================================================================= */}
       {/* 7. INTERACTIVE FAQ ACCORDION */}
       {/* ========================================================================= */}
-      <section id="faq" className="py-20 sm:py-28 px-6 border-t border-white/5 bg-black/40">
+      <section id="faq" className="py-8 sm:py-6 px-6 border-t border-white/5 bg-black/40">
         <div className="max-w-3xl mx-auto">
-          <div className="text-center mb-14">
+          <div className="text-center mb-6">
             <span className="text-[11px] font-bold uppercase tracking-[0.25em] text-[#FD3A73]">
               FREQUENTLY ASKED QUESTIONS
             </span>
@@ -789,10 +789,10 @@ export default function NextLandingPage() {
       {/* ========================================================================= */}
       {/* 8. CLOSING CONVERSION BANNER */}
       {/* ========================================================================= */}
-      <section className="py-24 px-6 relative overflow-hidden">
+      <section className="py-8 sm:py-10 px-6 relative overflow-hidden">
         <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-[600px] h-[350px] bg-gradient-to-tr from-[#FD3A73]/20 via-purple-600/15 to-transparent blur-[120px] pointer-events-none -z-10" />
 
-        <div className="max-w-4xl mx-auto rounded-3xl border border-[#FD3A73]/30 bg-gradient-to-b from-[#140D24] to-[#07050d] p-8 sm:p-14 text-center shadow-2xl relative">
+        <div className="max-w-4xl mx-auto rounded-3xl border border-[#FD3A73]/30 bg-gradient-to-b from-[#140D24] to-[#07050d] p-5 sm:p-8 text-center shadow-2xl relative">
           <div className="inline-flex items-center gap-2 rounded-full border border-emerald-500/30 bg-emerald-500/10 px-4 py-1 text-xs font-bold text-emerald-400 mb-5">
             <span className="h-2 w-2 rounded-full bg-emerald-400 animate-ping" />
             <span>Sparks Are Active Nearby Right Now</span>
@@ -809,7 +809,7 @@ export default function NextLandingPage() {
             Zero phone number exposure. Verified genuine humans. 3-minute video vibe check, then coffee at Blue Tokai.
           </p>
 
-          <div className="mt-8 flex flex-col sm:flex-row items-center justify-center gap-4">
+          <div className="mt-5 flex flex-col sm:flex-row items-center justify-center gap-4">
             <Link
               href="/app"
               className="flex items-center justify-center gap-2 w-full sm:w-auto rounded-xl bg-gradient-to-r from-[#FD3A73] to-[#8E2DE2] px-8 py-4 text-sm font-bold text-white shadow-xl shadow-[#FD3A73]/35 hover:brightness-110 active:scale-95 transition-all text-center"
@@ -837,8 +837,8 @@ export default function NextLandingPage() {
       {/* ========================================================================= */}
       {/* 9. REFINED LUXURY FOOTER */}
       {/* ========================================================================= */}
-      <footer className="border-t border-white/[0.08] bg-[#050308] py-12 px-6">
-        <div className="max-w-6xl mx-auto flex flex-col md:flex-row items-center justify-between gap-6 text-xs text-zinc-400">
+      <footer className="border-t border-white/[0.08] bg-[#050308] py-6 px-6">
+        <div className="max-w-6xl mx-auto flex flex-col md:flex-row items-center justify-between gap-4 text-xs text-zinc-400">
           <div className="flex items-center gap-3">
             <div className="h-8 w-8 rounded-lg bg-gradient-to-tr from-[#FD3A73] to-[#8E2DE2] p-0.5 shadow-sm">
               <div className="h-full w-full rounded-[6px] bg-[#0A0714] p-1 flex items-center justify-center">
@@ -855,7 +855,7 @@ export default function NextLandingPage() {
             </div>
           </div>
 
-          <div className="flex flex-wrap items-center justify-center gap-6 font-medium">
+          <div className="flex flex-wrap items-center justify-center gap-4 font-medium">
             <Link href="/" className="hover:text-white transition-colors">Home</Link>
             <a href="#radar" className="hover:text-white transition-colors">Radar</a>
             <a href="#vibe-check" className="hover:text-white transition-colors">3-Min Vibe</a>
