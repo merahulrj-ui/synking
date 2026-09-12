@@ -38,14 +38,14 @@ export const Header: React.FC<HeaderProps> = ({ onOpenFilter, hasActiveFilters }
       {/* Brand: InSynk Active Heart + Synkin. */}
       <View style={styles.brandRow}>
         <Image
-          source={require('../../assets/images/logo_emblem.png')}
+          source={require('../../assets/images/tabIcons/insynk_active.png')}
           style={[
             styles.logoImg,
             isDarkMode && {
               shadowColor: '#FD3A73',
               shadowOffset: { width: 0, height: 0 },
-              shadowOpacity: 0.6,
-              shadowRadius: 10,
+              shadowOpacity: 0.5,
+              shadowRadius: 8,
             }
           ]}
           resizeMode="contain"
@@ -119,7 +119,6 @@ const styles = StyleSheet.create({
   logoImg: {
     width: 28,
     height: 28,
-    borderRadius: 7,
   },
   logoText: {
     color: '#FFFFFF',
