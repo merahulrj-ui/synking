@@ -1,83 +1,20 @@
 'use client';
 
-import React, { useState, useEffect } from 'react';
+import React, { useEffect } from 'react';
 import Link from 'next/link';
-import MobileHeader from '../../components/MobileHeader';
-import MobileTabBar, { TabType } from '../../components/MobileTabBar';
-import SwipeScreen from '../../components/tabs/SwipeScreen';
-import ExploreScreen from '../../components/tabs/ExploreScreen';
-import InSynkScreen from '../../components/tabs/InSynkScreen';
-import ChatScreen from '../../components/tabs/ChatScreen';
-import ProfileScreen from '../../components/tabs/ProfileScreen';
-import DiscoveryFilterModal from '../../components/modals/DiscoveryFilterModal';
-import VipMembershipModal from '../../components/modals/VipMembershipModal';
-import ChatModal from '../../components/modals/ChatModal';
-import AuthModal from '../../components/AuthModal';
-import { Profile, CurrentUser, DateVenue } from '../../lib/types';
-import { getCurrentUser, setCurrentUser, fetchProfiles } from '../../lib/api';
-import { Heart, Sparkles, PhoneOff, ArrowRight, ShieldCheck } from 'lucide-react';
 
-export default function AppRoutePage() {
-  const [activeTab, setActiveTab] = useState<TabType>('swipe');
-  const [currentUser, setLocalUser] = useState<CurrentUser | null>(null);
-  const [profiles, setProfiles] = useState<Profile[]>([]);
-  const [loading, setLoading] = useState(true);
-
-  // Modals
-  const [isFilterOpen, setIsFilterOpen] = useState(false);
-  const [isVipOpen, setIsVipOpen] = useState(false);
-  const [isAuthOpen, setIsAuthOpen] = useState(false);
-  const [activeChat, setActiveChat] = useState<any>(null);
-  const [matchedProfile, setMatchedProfile] = useState<Profile | null>(null);
-  const [activeCallPartner, setActiveCallPartner] = useState<string | null>(null);
-
+export default function WebAppPortal() {
   useEffect(() => {
-    // Check persistent session
-    const user = getCurrentUser();
-    if (user) {
-      setLocalUser(user);
-      // Guest user profile for preview
-      const demoUser: CurrentUser = {
-        id: `guest_${Date.now()}`,
-        name: 'Guest User',
-        phone: '',
-        city: 'Delhi NCR',
-      };
-      setLocalUser(demoUser);
-      setCurrentUser(demoUser);
+    // Dynamically inject the exact Expo React Native Web application bundle
+    const scriptId = 'expo-web-bundle';
+    if (!document.getElementById(scriptId)) {
+      const script = document.createElement('script');
+      script.id = scriptId;
+      script.src = '/app/_expo/static/js/web/index-91dc49b0979d50b0fa990b2eb3b0bcad.js';
+      script.defer = true;
+      document.body.appendChild(script);
     }
-
-    loadProfiles();
   }, []);
-
-  const loadProfiles = async () => {
-    setLoading(true);
-    try {
-      const data = await fetchProfiles();
-      setProfiles(data);
-    } finally {
-      setLoading(false);
-    }
-  };
-
-  const handleLogout = () => {
-    setCurrentUser(null);
-    setLocalUser(null);
-    window.location.href = '/';
-  };
-
-  const handleAcceptRequest = (profile: Profile) => {
-    setMatchedProfile(profile);
-  };
-
-  const handlePlanDateFromExplore = (venue: DateVenue) => {
-    setActiveTab('insynk');
-    alert(`⚡ Date planned at ${venue.name}! VIP Date Pass generated in InSynk tab.`);
-  };
-
-  const handleTriggerVideoCall = (partnerName: string) => {
-    setActiveCallPartner(partnerName);
-  };
 
   return (
     <div className="relative w-screen h-screen flex items-center justify-center bg-[#050308] text-white font-sans overflow-hidden select-none">
@@ -125,7 +62,7 @@ export default function AppRoutePage() {
         <div className="rounded-3xl border border-white/10 bg-zinc-950/70 p-5 backdrop-blur-xl shadow-2xl space-y-4">
           <div className="inline-flex items-center gap-2 rounded-full border border-emerald-500/30 bg-emerald-500/10 px-3 py-1 text-xs font-bold text-emerald-400">
             <span className="h-2 w-2 rounded-full bg-emerald-400 animate-ping" />
-            {profiles.length > 0 ? `${profiles.length}+ Singles Live in Radar` : '140+ Singles Active Nearby'}
+            140+ Singles Active Nearby
           </div>
 
           <div className="flex items-start gap-3 pt-1">
@@ -174,71 +111,25 @@ export default function AppRoutePage() {
       </aside>
 
       {/* ========================================================================= */}
-      {/* CENTER PHONE CONTAINER (Full-featured 5-tab Next.js mobile app) */}
+      {/* CENTER PHONE STAGE (Hosts the exact React Native Expo App) */}
       {/* ========================================================================= */}
       <main className="relative z-10 w-full h-full lg:max-w-[430px] lg:h-[min(94vh,900px)] flex flex-col items-center justify-center lg:p-2.5 lg:rounded-[44px] lg:bg-gradient-to-b lg:from-white/10 lg:via-white/5 lg:to-pink-500/15 lg:shadow-[0_30px_100px_-20px_rgba(253,58,115,0.35)]">
-        <div className="relative flex h-full w-full flex-col bg-[#000000] lg:rounded-[36px] lg:border lg:border-white/10 overflow-hidden shadow-2xl">
-          {/* Top Mobile Header */}
-          <MobileHeader
-            onOpenFilter={() => setIsFilterOpen(true)}
-            onOpenVip={() => setIsVipOpen(true)}
-            hasActiveFilters={false}
-          />
-
-          {/* Content Area for 5 Tabs */}
-          <div className="relative flex flex-1 flex-col overflow-hidden">
-            {loading ? (
-              <div className="flex flex-1 flex-col items-center justify-center p-6 text-center">
-                <div className="h-10 w-10 animate-spin rounded-full border-2 border-[#FD3A73] border-t-transparent" />
-                <span className="mt-3 text-xs font-semibold tracking-wider text-zinc-400 uppercase">
-                  Loading Radar Feed...
-                </span>
-              </div>
-            ) : (
-              <>
-                {activeTab === 'swipe' && (
-                  <SwipeScreen
-                    profiles={profiles}
-                    currentUser={currentUser}
-                    onOpenAuth={() => setIsAuthOpen(true)}
-                    onRefresh={loadProfiles}
-                    onOpenProfileModal={(p) =>
-                      alert(`Bio: ${p.bio || 'Living life fully'}\nInterests: ${(p.interests || []).join(', ')}`)
-                    }
-                  />
-                )}
-
-                {activeTab === 'explore' && (
-                  <ExploreScreen onPlanDate={handlePlanDateFromExplore} />
-                )}
-
-                {activeTab === 'insynk' && (
-                  <InSynkScreen onAcceptRequest={handleAcceptRequest} />
-                )}
-
-                {activeTab === 'chat' && (
-                  <ChatScreen onOpenChatThread={(c) => setActiveChat(c)} />
-                )}
-
-                {activeTab === 'profile' && (
-                  <ProfileScreen
-                    currentUser={currentUser}
-                    onOpenAuth={() => setIsAuthOpen(true)}
-                    onLogout={handleLogout}
-                    onOpenVip={() => setIsVipOpen(true)}
-                  />
-                )}
-              </>
-            )}
+        {/* React Native Web Mounting Point */}
+        <div
+          id="root"
+          className="relative w-full h-full bg-black overflow-hidden lg:rounded-[36px] lg:border lg:border-white/10 flex"
+        >
+          {/* Fallback loader before Expo JS bundle executes */}
+          <div className="absolute inset-0 flex flex-col items-center justify-center bg-black text-white gap-3 pointer-events-none">
+            <img
+              src="/images/logo_emblem.png"
+              alt="Synkin Loading"
+              className="w-16 h-16 object-contain animate-pulse"
+            />
+            <div className="text-xs font-semibold tracking-wider text-pink-400">
+              Connecting to Spark Radar...
+            </div>
           </div>
-
-          {/* 5 Bottom Tabs matching mobile layout */}
-          <MobileTabBar
-            activeTab={activeTab}
-            onSelectTab={setActiveTab}
-            incomingCount={2}
-            unreadChatCount={1}
-          />
         </div>
       </main>
 
@@ -255,15 +146,14 @@ export default function AppRoutePage() {
 
           <div className="mx-auto my-3.5 flex h-44 w-44 items-center justify-center rounded-2xl border-2 border-[#FD3A73]/40 bg-[#0d0817] p-2.5 shadow-lg shadow-[#FD3A73]/25">
             <img
-              src="https://api.qrserver.com/v1/create-qr-code/?size=220x220&data=https://synkin.in/app&color=FD3A73&bgcolor=0D0817"
+              src="https://api.qrserver.com/v1/create-qr-code/?size=220x220&data=http://3.108.217.155:8082/app&color=FD3A73&bgcolor=0D0817"
               alt="Scan QR code for Synkin mobile web"
               className="h-full w-full rounded-xl object-contain"
             />
           </div>
 
           <a
-            href="/download/apk"
-            download="Synkin.apk"
+            href="/#download"
             className="flex items-center justify-center gap-2 w-full rounded-xl bg-gradient-to-r from-[#FD3A73] to-[#b81855] py-3 text-xs font-bold text-white shadow-lg shadow-[#FD3A73]/30 hover:brightness-110 active:scale-95 transition-all"
           >
             <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5">
@@ -313,132 +203,6 @@ export default function AppRoutePage() {
           <span>© 2026 Synkin Inc.</span>
         </div>
       </aside>
-
-      {/* ========================================================================= */}
-      {/* MODALS & OVERLAYS */}
-      {/* ========================================================================= */}
-
-      {/* MATCH CELEBRATION MODAL */}
-      {matchedProfile && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/90 p-4 backdrop-blur-md animate-in zoom-in-95 duration-200">
-          <div className="relative w-full max-w-sm rounded-3xl border border-[#FD3A73]/40 bg-[#121422] p-6 text-center shadow-2xl shadow-[#FD3A73]/20">
-            <div className="mx-auto mb-3 flex h-16 w-16 items-center justify-center rounded-full bg-[#FD3A73]/20 text-[#FD3A73]">
-              <Heart className="h-10 w-10 fill-[#FD3A73] text-[#FD3A73] animate-pulse" />
-            </div>
-            <h2 className="text-3xl font-black text-white">It&apos;s InSynk! 🔥</h2>
-            <p className="mt-1 text-xs text-zinc-300">
-              You and <strong className="text-[#FD3A73]">{matchedProfile.name}</strong> connected with mutual sparks!
-            </p>
-
-            <div className="mt-6 flex items-center justify-center gap-4">
-              <div className="h-16 w-16 overflow-hidden rounded-full border-2 border-[#FD3A73] shadow-md">
-                <img
-                  src="https://images.unsplash.com/photo-1539571696357-5a69c17a67c6?w=200"
-                  alt="You"
-                  className="h-full w-full object-cover"
-                />
-              </div>
-              <Sparkles className="h-6 w-6 text-amber-400 animate-spin" />
-              <div className="h-16 w-16 overflow-hidden rounded-full border-2 border-[#FD3A73] shadow-md">
-                <img
-                  src={matchedProfile.photoUrl}
-                  alt={matchedProfile.name}
-                  className="h-full w-full object-cover"
-                />
-              </div>
-            </div>
-
-            <div className="mt-6 flex flex-col gap-2">
-              <button
-                onClick={() => {
-                  setMatchedProfile(null);
-                  setActiveTab('chat');
-                }}
-                className="w-full rounded-2xl bg-gradient-to-r from-[#FD3A73] to-[#8E2DE2] py-3 text-xs font-bold text-white shadow-lg shadow-[#FD3A73]/30 active:scale-95 transition-all cursor-pointer"
-              >
-                Send Message &amp; Plan Coffee ☕
-              </button>
-              <button
-                onClick={() => setMatchedProfile(null)}
-                className="w-full rounded-2xl bg-white/5 py-2.5 text-xs font-semibold text-zinc-400 hover:text-white cursor-pointer"
-              >
-                Keep Swiping
-              </button>
-            </div>
-          </div>
-        </div>
-      )}
-
-      {/* 3-MIN VIDEO CALL SIMULATOR */}
-      {activeCallPartner && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/95 p-4 backdrop-blur-xl animate-in fade-in duration-200">
-          <div className="relative flex h-[580px] w-full max-w-sm flex-col overflow-hidden rounded-3xl border border-purple-500/40 bg-zinc-950 shadow-2xl">
-            {/* Remote Video Stream */}
-            <img
-              src="https://images.unsplash.com/photo-1517841905240-472988babdf9?w=800"
-              alt="Remote Video"
-              className="h-full w-full object-cover"
-            />
-            {/* Local Video Inset */}
-            <div className="absolute top-4 right-4 h-28 w-20 overflow-hidden rounded-2xl border border-white/20 bg-black shadow-lg">
-              <img
-                src="https://images.unsplash.com/photo-1539571696357-5a69c17a67c6?w=300"
-                alt="My Video"
-                className="h-full w-full object-cover"
-              />
-            </div>
-            {/* Top Timer */}
-            <div className="absolute top-4 left-4 rounded-full bg-black/60 px-3 py-1 text-xs font-bold text-emerald-400 backdrop-blur-md border border-emerald-500/30 flex items-center gap-1.5">
-              <span className="h-2 w-2 rounded-full bg-emerald-400 animate-ping" />
-              <span>02:44 · WebRTC Encrypted</span>
-            </div>
-            {/* Bottom Controls */}
-            <div className="absolute inset-x-0 bottom-0 bg-gradient-to-t from-black via-black/70 to-transparent p-6 text-center">
-              <h3 className="text-lg font-bold text-white">{activeCallPartner}</h3>
-              <p className="text-xs text-zinc-300">3-Minute Video Vibe Check</p>
-              <button
-                onClick={() => setActiveCallPartner(null)}
-                className="mt-4 mx-auto flex h-14 w-14 items-center justify-center rounded-full bg-red-600 text-white shadow-xl shadow-red-600/40 hover:scale-105 active:scale-90 transition-all cursor-pointer"
-              >
-                <PhoneOff className="h-6 w-6" />
-              </button>
-            </div>
-          </div>
-        </div>
-      )}
-
-      {/* FILTER MODAL */}
-      <DiscoveryFilterModal
-        isOpen={isFilterOpen}
-        onClose={() => setIsFilterOpen(false)}
-        onApply={(f) => console.log('Filters applied:', f)}
-      />
-
-      {/* VIP MEMBERSHIP MODAL */}
-      <VipMembershipModal
-        isOpen={isVipOpen}
-        onClose={() => setIsVipOpen(false)}
-      />
-
-      {/* CHAT MODAL */}
-      <ChatModal
-        chat={activeChat}
-        onClose={() => setActiveChat(null)}
-        onTriggerVideoCall={(p) => {
-          setActiveChat(null);
-          handleTriggerVideoCall(p);
-        }}
-      />
-
-      {/* AUTH MODAL */}
-      <AuthModal
-        isOpen={isAuthOpen}
-        onClose={() => setIsAuthOpen(false)}
-        onSuccess={(u) => {
-          setLocalUser(u);
-          loadProfiles();
-        }}
-      />
     </div>
   );
 }
