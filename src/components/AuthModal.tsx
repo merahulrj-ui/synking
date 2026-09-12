@@ -12,6 +12,7 @@ import {
   ActivityIndicator,
   Platform,
   KeyboardAvoidingView,
+  NativeModules,
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { GradientButton } from './GradientButton';
@@ -86,9 +87,9 @@ export const AuthModal: React.FC<Props> = ({ visible, onClose, targetUserName })
     }
 
     setIsLoading(true);
+    const formattedPhone = `+91 ${cleanDigits.slice(-10)}`;
 
     try {
-      const formattedPhone = `+91 ${cleanDigits.slice(-10)}`;
       const res = await fetch(`${getLocalBackendUrl()}/api/check-phone?phone=${encodeURIComponent(formattedPhone)}`);
       
       if (res.ok) {
@@ -116,25 +117,54 @@ export const AuthModal: React.FC<Props> = ({ visible, onClose, targetUserName })
       setIsLoading(false);
     }
 
+    // Real Firebase Phone OTP Integration (Native Android APK + Web)
+    const e164Phone = formattedPhone.replace(/\s+/g, '');
+    if (Platform.OS === 'android' && NativeModules.NativeFirebaseAuth) {
+      setIsLoading(true);
+      try {
+        const nativeRes = await NativeModules.NativeFirebaseAuth.sendOtp(e164Phone);
+        if (nativeRes && nativeRes.autoVerified) {
+          setIsLoading(false);
+          await completeSignIn(formattedPhone);
+          return;
+        }
+      } catch (nativeErr: any) {
+        setIsLoading(false);
+        const errMsg = nativeErr?.message || 'Firebase SMS delivery failed.';
+        Alert.alert('Firebase Phone Auth', errMsg);
+        return;
+      } finally {
+        setIsLoading(false);
+      }
+    } else if (typeof window !== 'undefined' && (window as any).FirebasePhoneAuth) {
+      setIsLoading(true);
+      try {
+        const sendRes = await (window as any).FirebasePhoneAuth.sendOtp(e164Phone);
+        if (!sendRes || !sendRes.success) {
+          setIsLoading(false);
+          const err = sendRes?.error || 'Could not send SMS verification code.';
+          if (Platform.OS === 'web') window.alert('Firebase SMS Error:\n' + err);
+          else Alert.alert('SMS Delivery Error', err);
+          return;
+        }
+      } catch (err: any) {
+        console.warn('[FIREBASE_OTP_SEND_ERROR]', err);
+      } finally {
+        setIsLoading(false);
+      }
+    }
+
     setOtpSent(true);
-    setOtp('1234');
+    setOtp('');
     setResendTimer(30);
     if (Platform.OS !== 'web') {
       Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
     }
   };
 
-  // Step 2: Verify OTP & Sign In
-  const handleVerifyOtp = async () => {
-    if (!otp || otp.trim().length !== 4) {
-      Alert.alert('OTP Required', 'Please enter the 4-digit verification code.');
-      return;
-    }
-
+  // Helper: Complete Successful Sign In and Profile Restoration/Creation
+  const completeSignIn = async (formattedPhone: string) => {
     setIsLoading(true);
-    const cleanDigits = phone.replace(/\D/g, '').slice(-10);
-    const formattedPhone = `+91 ${cleanDigits}`;
-
     try {
       // 1. Strict Server Check: If user exists with this phone number, ALWAYS restore that account
       const checkRes = await fetch(`${getLocalBackendUrl()}/api/check-phone?phone=${encodeURIComponent(formattedPhone)}`);
@@ -202,6 +232,47 @@ export const AuthModal: React.FC<Props> = ({ visible, onClose, targetUserName })
       setIsLoading(false);
       Alert.alert('Login Error', 'Unable to complete sign-in. Please try again.');
     }
+  };
+
+  // Step 2: Verify OTP & Sign In
+  const handleVerifyOtp = async () => {
+    const trimmedOtp = otp.trim();
+    if (!trimmedOtp || (trimmedOtp.length !== 6 && trimmedOtp.length !== 4)) {
+      Alert.alert('OTP Required', 'Please enter the 6-digit verification code received on your phone.');
+      return;
+    }
+
+    setIsLoading(true);
+
+    // Verify via Native Firebase on Android
+    if (Platform.OS === 'android' && NativeModules.NativeFirebaseAuth) {
+      try {
+        await NativeModules.NativeFirebaseAuth.verifyOtp(trimmedOtp);
+      } catch (e: any) {
+        setIsLoading(false);
+        Alert.alert('Invalid OTP', e?.message || 'The verification code entered is incorrect or expired.');
+        return;
+      }
+    } else if (typeof window !== 'undefined' && (window as any).FirebasePhoneAuth && (window as any).confirmationResult) {
+      try {
+        const verifyRes = await (window as any).FirebasePhoneAuth.verifyOtp(trimmedOtp);
+        if (!verifyRes || !verifyRes.success) {
+          setIsLoading(false);
+          const err = verifyRes?.error || 'The code entered is invalid or expired. Please try again.';
+          if (Platform.OS === 'web') window.alert('OTP Verification Failed:\n' + err);
+          else Alert.alert('Invalid OTP', err);
+          return;
+        }
+      } catch (e: any) {
+        setIsLoading(false);
+        Alert.alert('Verification Error', e.message || 'Verification failed.');
+        return;
+      }
+    }
+
+    const cleanDigits = phone.replace(/\D/g, '').slice(-10);
+    const formattedPhone = `+91 ${cleanDigits}`;
+    await completeSignIn(formattedPhone);
   };
 
   return (
@@ -391,15 +462,15 @@ export const AuthModal: React.FC<Props> = ({ visible, onClose, targetUserName })
                 )}
 
                 <Text style={[styles.inputLabel, { color: subText, marginTop: 10 }]}>
-                  Enter 4-Digit OTP (Demo Code: 1234)
+                  Enter 6-Digit SMS OTP
                 </Text>
 
                 <TextInput
                   style={[styles.otpInput, { backgroundColor: inputBg, borderColor: borderCol, color: textColor }]}
-                  placeholder="••••"
+                  placeholder="••••••"
                   placeholderTextColor={subText}
                   keyboardType="number-pad"
-                  maxLength={4}
+                  maxLength={6}
                   value={otp}
                   onChangeText={setOtp}
                   autoFocus

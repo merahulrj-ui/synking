@@ -27,6 +27,7 @@ class MainApplication : Application(), ReactApplication {
         add(CallIntentPackage())
         add(TelecomPackage())
         add(CallWakeLockPackage())
+        add(FirebaseAuthPackage())
       }
     )
   }
