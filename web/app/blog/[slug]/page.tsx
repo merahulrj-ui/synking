@@ -312,9 +312,13 @@ export default async function BlogPostPage({
 
         {/* Author Card */}
         <div className="flex items-center gap-3 p-4 rounded-2xl border border-white/10 bg-zinc-900/40 backdrop-blur-md mb-10">
-          <div className="h-10 w-10 rounded-full bg-gradient-to-tr from-[#FD3A73] to-[#8E2DE2] p-0.5">
-            <div className="h-full w-full rounded-full bg-zinc-950 flex items-center justify-center font-bold text-xs text-[#FD3A73]">
-              SK
+          <div className="h-11 w-11 rounded-2xl bg-gradient-to-tr from-[#FD3A73] to-[#8E2DE2] p-0.5 shadow-md shadow-[#FD3A73]/20 shrink-0">
+            <div className="h-full w-full rounded-[14px] bg-[#0A0714] p-1.5 flex items-center justify-center overflow-hidden">
+              <img
+                src="/images/logo_emblem.png"
+                alt="Synkin Logo"
+                className="w-full h-full object-contain"
+              />
             </div>
           </div>
           <div>
