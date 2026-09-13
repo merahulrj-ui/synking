@@ -404,6 +404,8 @@ function GlobalCallOverlay() {
   );
 }
 
+import OnboardingScreen from './onboarding';
+
 function RootLayoutContent() {
   const { isDarkMode, isLoggedIn, currentUser } = useApp();
 
@@ -441,9 +443,7 @@ function RootLayoutContent() {
           translucent={false}
         />
         <StatusBar style="light" />
-        <Stack screenOptions={{ headerShown: false, animation: 'fade' }}>
-          <Stack.Screen name="onboarding" />
-        </Stack>
+        <OnboardingScreen />
       </>
     );
   }
