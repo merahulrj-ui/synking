@@ -25,7 +25,7 @@ interface Props {
   targetUserName?: string;
 }
 
-type AuthMode = 'landing' | 'phone' | 'email' | 'help';
+type AuthMode = 'landing' | 'phone' | 'email' | 'help' | 'phone_verify';
 
 export const AuthLandingScreen: React.FC<Props> = ({
   onSuccess,
@@ -36,6 +36,7 @@ export const AuthLandingScreen: React.FC<Props> = ({
   const { loginUser } = useApp();
   const [mode, setMode] = useState<AuthMode>('landing');
   const [isLoading, setIsLoading] = useState(false);
+  const [pendingGoogleUser, setPendingGoogleUser] = useState<any>(null);
 
   // Email Flow States
   const [email, setEmail] = useState('');
@@ -73,12 +74,10 @@ export const AuthLandingScreen: React.FC<Props> = ({
           if (match && match[1]) {
             const parsedUser = JSON.parse(decodeURIComponent(match[1]));
             if (parsedUser && parsedUser.id) {
-              loginUser(parsedUser);
+              setPendingGoogleUser(parsedUser);
+              setMode('phone_verify');
               setIsLoading(false);
               Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
-              Alert.alert('Signed in with Google! 🎉', `Welcome, ${parsedUser.name}! You are ready to Synk.`);
-              onSuccess && onSuccess();
-              onClose && onClose();
             }
           }
         }
@@ -288,6 +287,15 @@ export const AuthLandingScreen: React.FC<Props> = ({
 
       const data = await res.json();
       if (res.ok && data.success && data.user) {
+        if (!data.user.phoneNumber) {
+          // Send to phone linking
+          setPendingGoogleUser(data.user); // Reusing this for any pending user
+          setMode('phone');
+          setIsLoading(false);
+          if (Platform.OS !== 'web') Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
+          return;
+        }
+
         await loginUser(data.user);
         setIsLoading(false);
         if (Platform.OS !== 'web') Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
@@ -359,54 +367,68 @@ export const AuthLandingScreen: React.FC<Props> = ({
 
     try {
       const checkRes = await fetch(getLocalBackendUrl() + '/api/check-phone?phone=' + encodeURIComponent(formatted));
+      let dbUser = null;
       if (checkRes.ok) {
         const checkData = await checkRes.json();
         if (checkData.exists && checkData.user) {
-          await loginUser(checkData.user);
-          setIsLoading(false);
-          onSuccess && onSuccess();
-          onClose && onClose();
-          Alert.alert('Welcome Back! 🎉', 'Signed in as ' + checkData.user.name + '.');
-          return;
+          dbUser = checkData.user;
         }
       }
 
-      const defaultPhoto = phoneGender === 'female'
-        ? 'https://images.unsplash.com/photo-1494790108377-be9c29b29330?w=800'
-        : 'https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?w=800';
+      let finalUser;
 
-      const newUser = {
-        id: 'usr_' + Math.random().toString(16).slice(2, 18),
-        name: phoneName.trim() || (phoneGender === 'female' ? 'Priya' : 'Rahul'),
-        age: parseInt(phoneAge, 10) || 22,
-        gender: phoneGender,
-        occupation: phoneGender === 'female' ? 'UI/UX Designer' : 'Software Engineer',
-        location: 'Roorkee',
-        phoneNumber: formatted,
-        distance: '0 km',
-        bio: 'Coffee lover & great conversations ☕ Looking to meet genuine people!',
-        photo: defaultPhoto,
-        photos: [defaultPhoto],
-        interests: ['☕ Specialty Coffee', '🎸 Indie Music', '🚗 Road Trips', '🤖 Tech & AI'],
-        lookingFor: '💘 Long-term partner',
-        zodiac: phoneGender === 'female' ? 'Virgo ♍' : 'Leo ♌',
-        workout: 'Often 🏃',
-        drinking: 'Socially 🥂',
-        smoking: 'Non-smoker 🚭',
-        dietary: 'Vegetarian 🥦',
-        pets: phoneGender === 'female' ? 'Cat Person 🐱' : 'Dog Lover 🐶',
-        height: phoneGender === 'female' ? '5 ft 5 in' : '5 ft 10 in',
-        hometown: 'Roorkee, UK',
-        compatibility: 100,
-        isVerified: true,
-        isVip: false,
-      };
+      if (pendingGoogleUser) {
+        // We are linking a phone to a Google login
+        finalUser = {
+          ...pendingGoogleUser,
+          phoneNumber: formatted,
+          isVerified: true,
+        };
+        // if dbUser exists, maybe merge them here. For now, prefer Google data + verified phone
+        if (dbUser) {
+          finalUser = { ...dbUser, ...finalUser }; // Google data overwrites db user data slightly
+        }
+      } else if (dbUser) {
+        finalUser = dbUser;
+      } else {
+        const defaultPhoto = phoneGender === 'female'
+          ? 'https://images.unsplash.com/photo-1494790108377-be9c29b29330?w=800'
+          : 'https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?w=800';
 
-      await loginUser(newUser);
+        finalUser = {
+          id: 'usr_' + Math.random().toString(16).slice(2, 18),
+          name: phoneName.trim() || (phoneGender === 'female' ? 'Priya' : 'Rahul'),
+          age: parseInt(phoneAge, 10) || 22,
+          gender: phoneGender,
+          occupation: phoneGender === 'female' ? 'UI/UX Designer' : 'Software Engineer',
+          location: 'Roorkee',
+          phoneNumber: formatted,
+          distance: '0 km',
+          bio: 'Coffee lover & great conversations ☕ Looking to meet genuine people!',
+          photo: defaultPhoto,
+          photos: [defaultPhoto],
+          interests: ['☕ Specialty Coffee', '🎸 Indie Music', '🚗 Road Trips', '🤖 Tech & AI'],
+          lookingFor: '💘 Long-term partner',
+          zodiac: phoneGender === 'female' ? 'Virgo ♍' : 'Leo ♌',
+          workout: 'Often 🏃',
+          drinking: 'Socially 🥂',
+          smoking: 'Non-smoker 🚭',
+          dietary: 'Vegetarian 🥦',
+          pets: phoneGender === 'female' ? 'Cat Person 🐱' : 'Dog Lover 🐶',
+          height: phoneGender === 'female' ? '5 ft 5 in' : '5 ft 10 in',
+          hometown: 'Roorkee, UK',
+          compatibility: 100,
+          isVerified: true,
+          isVip: false,
+          isOnboardingComplete: false, // Force new users to onboard
+        };
+      }
+
+      await loginUser(finalUser);
       setIsLoading(false);
       onSuccess && onSuccess();
       onClose && onClose();
-      Alert.alert('Welcome to Synkin! 🎉', 'Welcome, ' + newUser.name + '! Your verified profile is active.');
+      Alert.alert(pendingGoogleUser ? 'Phone Linked! 🔗' : 'Welcome to Synkin! 🎉', 'Your verified profile is active.');
     } catch (e: any) {
       Alert.alert('Login Error', e?.message || 'Could not verify code');
     } finally {
@@ -666,6 +688,7 @@ export const AuthLandingScreen: React.FC<Props> = ({
               onPress={() => {
                 setPhoneOtpSent(false);
                 setMode('landing');
+                setPendingGoogleUser(null);
               }}
               activeOpacity={0.7}
             >
@@ -674,7 +697,7 @@ export const AuthLandingScreen: React.FC<Props> = ({
             </TouchableOpacity>
 
             <Text style={styles.formTitle}>
-              {phoneOtpSent ? 'Verify OTP 📲' : 'Mobile Sign In 📱'}
+              {phoneOtpSent ? 'Verify OTP 📲' : pendingGoogleUser ? 'Step 2: Link Phone 📱' : 'Mobile Sign In 📱'}
             </Text>
             <Text style={styles.formSubtitle}>
               {phoneOtpSent

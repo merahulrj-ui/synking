@@ -405,7 +405,7 @@ function GlobalCallOverlay() {
 }
 
 function RootLayoutContent() {
-  const { isDarkMode, isLoggedIn } = useApp();
+  const { isDarkMode, isLoggedIn, currentUser } = useApp();
 
   useEffect(() => {
     if (Platform.OS === 'android') {
@@ -427,6 +427,23 @@ function RootLayoutContent() {
         />
         <StatusBar style="light" />
         <AuthLandingScreen showCloseButton={false} />
+      </>
+    );
+  }
+
+  // Logged in but onboarding incomplete → show Onboarding full screen
+  if (currentUser && currentUser.isOnboardingComplete === false) {
+    return (
+      <>
+        <RNStatusBar
+          barStyle="light-content"
+          backgroundColor="#000000"
+          translucent={false}
+        />
+        <StatusBar style="light" />
+        <Stack screenOptions={{ headerShown: false, animation: 'fade' }}>
+          <Stack.Screen name="onboarding" />
+        </Stack>
       </>
     );
   }

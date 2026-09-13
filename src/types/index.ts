@@ -30,6 +30,7 @@ export interface UserProfile {
   languages?: string[];
   prompts?: { question: string; answer: string }[];
   completionPercentage?: number;
+  isOnboardingComplete?: boolean;
 }
 
 export interface SynkRequest {
