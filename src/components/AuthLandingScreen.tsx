@@ -17,7 +17,6 @@ import { LinearGradient } from 'expo-linear-gradient';
 import { useApp } from '../contexts/AppContext';
 import { getLocalBackendUrl } from '../services/firebase';
 import * as Haptics from 'expo-haptics';
-import AsyncStorage from '@react-native-async-storage/async-storage';
 
 interface Props {
   onSuccess?: () => void;
@@ -26,7 +25,7 @@ interface Props {
   targetUserName?: string;
 }
 
-type AuthMode = 'landing' | 'phone' | 'email' | 'help' | 'google';
+type AuthMode = 'landing' | 'phone' | 'email' | 'help';
 
 export const AuthLandingScreen: React.FC<Props> = ({
   onSuccess,
@@ -37,27 +36,6 @@ export const AuthLandingScreen: React.FC<Props> = ({
   const { loginUser } = useApp();
   const [mode, setMode] = useState<AuthMode>('landing');
   const [isLoading, setIsLoading] = useState(false);
-
-  // Google In-App Flow States
-  const [googleEmail, setGoogleEmail] = useState('');
-  const [googleName, setGoogleName] = useState('');
-  const [savedGoogleUser, setSavedGoogleUser] = useState<{ email: string; name: string } | null>(null);
-
-  // Load saved Google user for instant 1-tap sign-in
-  useEffect(() => {
-    AsyncStorage.getItem('synking_saved_google_user').then((val) => {
-      if (val) {
-        try {
-          const parsed = JSON.parse(val);
-          if (parsed && parsed.email) {
-            setSavedGoogleUser(parsed);
-            setGoogleEmail(parsed.email);
-            setGoogleName(parsed.name || '');
-          }
-        } catch (e) {}
-      }
-    });
-  }, []);
 
   // Email Flow States
   const [email, setEmail] = useState('');
@@ -120,70 +98,9 @@ export const AuthLandingScreen: React.FC<Props> = ({
     };
   }, []);
 
-  // --- SUBMIT GOOGLE LOGIN (IN-APP NATIVE) ---
-  const submitGoogleLogin = async (targetEmail: string, targetName: string) => {
-    const cleanEmail = (targetEmail || '').trim().toLowerCase();
-    if (!cleanEmail || !cleanEmail.includes('@')) {
-      Alert.alert('Google Sign-In', 'Please enter a valid Google email address.');
-      return;
-    }
-    const cleanName = (targetName || '').trim() || cleanEmail.split('@')[0].replace(/[._]/g, ' ');
-    const capitalizedName = cleanName.charAt(0).toUpperCase() + cleanName.slice(1);
-
-    triggerHaptic();
-    setIsLoading(true);
-
-    try {
-      await AsyncStorage.setItem(
-        'synking_saved_google_user',
-        JSON.stringify({
-          email: cleanEmail,
-          name: capitalizedName,
-        })
-      );
-
-      const res = await fetch(getLocalBackendUrl() + '/api/auth/google', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          googleId: 'goog_' + cleanEmail.replace(/[^a-zA-Z0-9]/g, '_'),
-          email: cleanEmail,
-          name: capitalizedName,
-          photo: 'https://images.unsplash.com/photo-1535713875002-d1d0cf377fde?w=800',
-        }),
-      });
-
-      if (res.ok) {
-        const data = await res.json();
-        if (data.success && data.user) {
-          await loginUser(data.user);
-          setIsLoading(false);
-          if (Platform.OS !== 'web') Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
-          Alert.alert('Signed in to Synkin! 🎉', `Welcome, ${data.user.name}! You are ready to Synk.`);
-          onSuccess && onSuccess();
-          onClose && onClose();
-          return;
-        }
-      }
-      Alert.alert('Google Sign-In', 'Could not complete sign-in with server. Please try again.');
-    } catch (err: any) {
-      Alert.alert('Google Sign-In Error', err?.message || 'Network error');
-    } finally {
-      setIsLoading(false);
-    }
-  };
-
   // --- OFFICIAL GOOGLE SIGN IN ---
   const handleGoogleSignIn = async () => {
     triggerHaptic();
-
-    // Native Mobile (Android APK / iOS): Open in-app Google Sign-In Sheet directly inside APK
-    if (Platform.OS !== 'web') {
-      setIsLoading(false);
-      setMode('google');
-      return;
-    }
-
     setIsLoading(true);
 
     const GOOGLE_CLIENT_ID = '816527505911-9aoc1h8930b42cpqi4eo8dlutk3ndcv9.apps.googleusercontent.com';
@@ -317,7 +234,17 @@ export const AuthLandingScreen: React.FC<Props> = ({
         }
       }
 
-
+      // Native Mobile: Open Google Auth Bridge
+      if (Platform.OS !== 'web') {
+        const bridgeUrl = 'https://synkin.in/auth/google';
+        try {
+          await Linking.openURL(bridgeUrl);
+        } catch (linkErr) {
+          Alert.alert('Google Sign-In', 'Please continue using your phone number or email.');
+        }
+        setIsLoading(false);
+        return;
+      }
     } catch (e: any) {
       Alert.alert('Google Sign-In Error', e?.message || 'Network error');
     } finally {
@@ -604,142 +531,6 @@ export const AuthLandingScreen: React.FC<Props> = ({
             >
               <Text style={styles.troubleText}>Trouble signing in?</Text>
             </TouchableOpacity>
-          </View>
-        )}
-
-        {mode === 'google' && (
-          <View style={styles.subFormWrapper}>
-            <TouchableOpacity
-              style={styles.backBtn}
-              onPress={() => setMode('landing')}
-              activeOpacity={0.7}
-            >
-              <Ionicons name="arrow-back" size={22} color="#FFFFFF" />
-              <Text style={styles.backBtnText}>All Sign-in Options</Text>
-            </TouchableOpacity>
-
-            <View style={{ alignItems: 'center', marginBottom: 24, marginTop: 8 }}>
-              <View style={{
-                width: 58,
-                height: 58,
-                borderRadius: 29,
-                backgroundColor: 'rgba(255, 255, 255, 0.08)',
-                borderWidth: 1,
-                borderColor: 'rgba(255, 255, 255, 0.15)',
-                alignItems: 'center',
-                justifyContent: 'center',
-                marginBottom: 14
-              }}>
-                <Ionicons name="logo-google" size={30} color="#EA4335" />
-              </View>
-              <Text style={[styles.formTitle, { textAlign: 'center', marginBottom: 6 }]}>
-                Sign in with Google
-              </Text>
-              <Text style={[styles.formSubtitle, { textAlign: 'center', maxWidth: 300 }]}>
-                Choose an account to continue to <Text style={{ color: '#FFFFFF', fontWeight: '800' }}>Synkin</Text>
-              </Text>
-            </View>
-
-            {savedGoogleUser && !!savedGoogleUser.email && (
-              <View style={{ marginBottom: 22 }}>
-                <Text style={styles.inputLabel}>Saved Google Account</Text>
-                <TouchableOpacity
-                  style={{
-                    flexDirection: 'row',
-                    alignItems: 'center',
-                    backgroundColor: 'rgba(255, 255, 255, 0.06)',
-                    borderWidth: 1.5,
-                    borderColor: '#FD3A73',
-                    borderRadius: 18,
-                    padding: 14,
-                  }}
-                  onPress={() => submitGoogleLogin(savedGoogleUser.email, savedGoogleUser.name)}
-                  activeOpacity={0.8}
-                  disabled={isLoading}
-                >
-                  <View style={{
-                    width: 42,
-                    height: 42,
-                    borderRadius: 21,
-                    backgroundColor: '#FD3A73',
-                    alignItems: 'center',
-                    justifyContent: 'center',
-                    marginRight: 12
-                  }}>
-                    <Text style={{ color: '#FFFFFF', fontSize: 18, fontWeight: '800' }}>
-                      {(savedGoogleUser.name || savedGoogleUser.email)[0].toUpperCase()}
-                    </Text>
-                  </View>
-                  <View style={{ flex: 1 }}>
-                    <Text style={{ color: '#FFFFFF', fontSize: 15, fontWeight: '700' }}>
-                      {savedGoogleUser.name || 'Google Member'}
-                    </Text>
-                    <Text style={{ color: '#94A3B8', fontSize: 13 }} numberOfLines={1}>
-                      {savedGoogleUser.email}
-                    </Text>
-                  </View>
-                  <View style={{
-                    backgroundColor: '#FD3A73',
-                    paddingHorizontal: 12,
-                    paddingVertical: 7,
-                    borderRadius: 20
-                  }}>
-                    <Text style={{ color: '#FFFFFF', fontSize: 12, fontWeight: '800' }}>1-Tap</Text>
-                  </View>
-                </TouchableOpacity>
-
-                <View style={{ flexDirection: 'row', alignItems: 'center', marginVertical: 20 }}>
-                  <View style={{ flex: 1, height: 1, backgroundColor: 'rgba(255, 255, 255, 0.1)' }} />
-                  <Text style={{ color: '#64748B', fontSize: 11, marginHorizontal: 12, fontWeight: '600' }}>OR ENTER ANOTHER ACCOUNT</Text>
-                  <View style={{ flex: 1, height: 1, backgroundColor: 'rgba(255, 255, 255, 0.1)' }} />
-                </View>
-              </View>
-            )}
-
-            <Text style={styles.inputLabel}>Google / Gmail Address</Text>
-            <View style={styles.inputRow}>
-              <Ionicons name="mail-outline" size={18} color="#94A3B8" style={{ marginRight: 10 }} />
-              <TextInput
-                style={styles.textInput}
-                placeholder="e.g. rahul@gmail.com"
-                placeholderTextColor="#64748B"
-                keyboardType="email-address"
-                autoCapitalize="none"
-                value={googleEmail}
-                onChangeText={setGoogleEmail}
-              />
-            </View>
-
-            <Text style={[styles.inputLabel, { marginTop: 14 }]}>Your Name</Text>
-            <View style={styles.inputRow}>
-              <Ionicons name="person-outline" size={18} color="#94A3B8" style={{ marginRight: 10 }} />
-              <TextInput
-                style={styles.textInput}
-                placeholder="e.g. Rahul"
-                placeholderTextColor="#64748B"
-                value={googleName}
-                onChangeText={setGoogleName}
-              />
-            </View>
-
-            {isLoading ? (
-              <ActivityIndicator size="large" color="#FD3A73" style={{ marginVertical: 24 }} />
-            ) : (
-              <TouchableOpacity
-                style={[styles.solidSubmitBtn, { marginTop: 24, backgroundColor: '#FFFFFF' }]}
-                onPress={() => submitGoogleLogin(googleEmail, googleName)}
-                activeOpacity={0.88}
-              >
-                <Ionicons name="logo-google" size={18} color="#1F2937" style={{ marginRight: 8 }} />
-                <Text style={[styles.solidSubmitBtnText, { color: '#1F2937' }]}>
-                  Continue to Synkin ⚡
-                </Text>
-              </TouchableOpacity>
-            )}
-
-            <Text style={{ color: '#64748B', fontSize: 12, textAlign: 'center', marginTop: 18, lineHeight: 18 }}>
-              Official Google Sign-In for Synkin · Instant Verified Profile
-            </Text>
           </View>
         )}
 
