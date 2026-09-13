@@ -1318,6 +1318,21 @@ const server = http.createServer((req, res) => {
     }
   }
 
+  // 0.0435 GET /test or /apk (Dedicated APK Testing & Download Portal)
+  if ((req.method === 'GET' || req.method === 'HEAD') && (pathname === '/test' || pathname === '/test/' || pathname === '/apk' || pathname === '/apk/' || pathname === '/testing' || pathname === '/testing/')) {
+    const testPath = path.join(__dirname, 'public', 'test.html');
+    if (fs.existsSync(testPath)) {
+      res.writeHead(200, {
+        'Content-Type': 'text/html; charset=utf-8',
+        'Cache-Control': 'no-cache, no-store, must-revalidate',
+        'Access-Control-Allow-Origin': '*',
+      });
+      if (req.method === 'HEAD') { res.end(); return; }
+      fs.createReadStream(testPath).pipe(res);
+      return;
+    }
+  }
+
   // 0.044 GET /download/apk or /synkin.apk (Direct Android APK Download)
   if ((req.method === 'GET' || req.method === 'HEAD') && (pathname === '/download/apk' || pathname === '/download/apk/' || pathname === '/synkin.apk' || pathname === '/Synkin.apk')) {
     const localApkPath = path.join(__dirname, 'public', 'Synkin.apk');
