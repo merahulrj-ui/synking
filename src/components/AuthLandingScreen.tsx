@@ -62,8 +62,9 @@ export const AuthLandingScreen: React.FC<Props> = ({
     }
   };
 
-  // Catch deep link callback from Google Auth mobile bridge
+  // Catch deep link callback from Google Auth mobile bridge (Native only)
   useEffect(() => {
+    if (Platform.OS === 'web') return;
     const handleDeepLink = (event: { url: string }) => {
       if (!event.url) return;
       try {
@@ -74,7 +75,7 @@ export const AuthLandingScreen: React.FC<Props> = ({
             if (parsedUser && parsedUser.id) {
               loginUser(parsedUser);
               setIsLoading(false);
-              if (Platform.OS !== 'web') Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
+              Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
               Alert.alert('Signed in with Google! 🎉', `Welcome, ${parsedUser.name}! You are ready to Synk.`);
               onSuccess && onSuccess();
               onClose && onClose();
@@ -91,7 +92,9 @@ export const AuthLandingScreen: React.FC<Props> = ({
       if (initialUrl) handleDeepLink({ url: initialUrl });
     });
     return () => {
-      sub.remove();
+      if (sub && typeof sub.remove === 'function') {
+        sub.remove();
+      }
     };
   }, []);
 
