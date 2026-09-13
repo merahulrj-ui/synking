@@ -425,13 +425,21 @@ export const AuthLandingScreen: React.FC<Props> = ({
           ...pendingGoogleUser,
           phoneNumber: formatted,
           isVerified: true,
+          isOnboardingComplete: dbUser?.isOnboardingComplete === true ? true : false,
         };
         // if dbUser exists, maybe merge them here. For now, prefer Google data + verified phone
         if (dbUser) {
-          finalUser = { ...dbUser, ...finalUser }; // Google data overwrites db user data slightly
+          finalUser = {
+            ...dbUser,
+            ...finalUser,
+            isOnboardingComplete: dbUser.isOnboardingComplete === true ? true : false,
+          };
         }
       } else if (dbUser) {
-        finalUser = dbUser;
+        finalUser = {
+          ...dbUser,
+          isOnboardingComplete: dbUser.isOnboardingComplete === true ? true : false,
+        };
       } else {
         const defaultPhoto = phoneGender === 'female'
           ? 'https://images.unsplash.com/photo-1494790108377-be9c29b29330?w=800'
