@@ -266,6 +266,12 @@ async function initTursoTables() {
     try {
       await queryTurso('ALTER TABLE users ADD COLUMN phone_number TEXT;');
     } catch (e) {}
+    try {
+      await queryTurso('ALTER TABLE users ADD COLUMN email TEXT;');
+    } catch (e) {}
+    try {
+      await queryTurso('ALTER TABLE users ADD COLUMN google_id TEXT;');
+    } catch (e) {}
     await queryTurso(`
       CREATE TABLE IF NOT EXISTS synk_requests (
         id TEXT PRIMARY KEY,
@@ -347,6 +353,8 @@ async function initTursoTables() {
           try { u.preferences = JSON.parse(u.preferences); } catch (e) {}
           try { u.safetyContact = JSON.parse(u.safety_contact); } catch (e) {}
           if (u.phone_number) u.phoneNumber = u.phone_number;
+          if (u.email) u.email = u.email;
+          if (u.google_id) u.googleId = u.google_id;
           db.profiles[u.id] = { ...db.profiles[u.id], ...u };
         }
       });
@@ -437,7 +445,9 @@ async function initTursoTables() {
 function syncUserToTurso(user) {
   if (!user || !user.id) return;
   const phoneVal = user.phoneNumber || user.phone || user.phone_number || '';
-  const sql = `INSERT OR REPLACE INTO users (id, name, age, bio, photo, photos, location, gender, preferences, safety_contact, phone_number) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`;
+  const emailVal = user.email || '';
+  const googleIdVal = user.googleId || user.google_id || '';
+  const sql = `INSERT OR REPLACE INTO users (id, name, age, bio, photo, photos, location, gender, preferences, safety_contact, phone_number, email, google_id) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`;
   const args = [
     { type: 'text', value: String(user.id) },
     { type: 'text', value: String(user.name || '') },
@@ -449,7 +459,9 @@ function syncUserToTurso(user) {
     { type: 'text', value: String(user.gender || '') },
     { type: 'text', value: JSON.stringify(user.preferences || {}) },
     { type: 'text', value: JSON.stringify(user.safetyContact || {}) },
-    { type: 'text', value: String(phoneVal) }
+    { type: 'text', value: String(phoneVal) },
+    { type: 'text', value: String(emailVal) },
+    { type: 'text', value: String(googleIdVal) }
   ];
   queryTurso(sql, args).catch(() => {});
 }
