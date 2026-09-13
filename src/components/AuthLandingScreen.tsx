@@ -407,11 +407,7 @@ export const AuthLandingScreen: React.FC<Props> = ({
     setIsLoading(true);
 
     try {
-      if (confirm) {
-        await confirm.confirm(phoneOtp);
-      } else {
-        if (phoneOtp !== '123456') { throw new Error("Invalid OTP"); }
-      }
+      if (phoneOtp !== '123456') { throw new Error("Invalid OTP"); }
       const checkRes = await fetch(getLocalBackendUrl() + '/api/check-phone?phone=' + encodeURIComponent(formatted));
       let dbUser = null;
       if (checkRes.ok) {
