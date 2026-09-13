@@ -418,36 +418,6 @@ function RootLayoutContent() {
     }
   }, [isDarkMode]);
 
-  // Not logged in → show AuthLandingScreen full screen (no tabs, no Stack)
-  if (!isLoggedIn) {
-    return (
-      <>
-        <RNStatusBar
-          barStyle="light-content"
-          backgroundColor="#000000"
-          translucent={false}
-        />
-        <StatusBar style="light" />
-        <AuthLandingScreen showCloseButton={false} />
-      </>
-    );
-  }
-
-  // Logged in but onboarding incomplete → show Onboarding full screen
-  if (currentUser && currentUser.isOnboardingComplete === false) {
-    return (
-      <>
-        <RNStatusBar
-          barStyle="light-content"
-          backgroundColor="#000000"
-          translucent={false}
-        />
-        <StatusBar style="light" />
-        <OnboardingScreen />
-      </>
-    );
-  }
-
   return (
     <>
       <RNStatusBar
@@ -466,6 +436,7 @@ function RootLayoutContent() {
             }}
           >
             <Stack.Screen name="(tabs)" options={{ headerShown: false }} />
+            <Stack.Screen name="onboarding" options={{ headerShown: false }} />
             <Stack.Screen
               name="vip-membership"
               options={{
@@ -511,6 +482,20 @@ function RootLayoutContent() {
           </Stack>
           <GlobalCallOverlay />
           <InAppNotificationBanner />
+
+          {/* AUTH GATE OVERLAY */}
+          {!isLoggedIn && (
+            <View style={[StyleSheet.absoluteFill, { zIndex: 99999, elevation: 99999, backgroundColor: '#000' }]}>
+              <AuthLandingScreen showCloseButton={false} />
+            </View>
+          )}
+
+          {/* ONBOARDING GATE OVERLAY */}
+          {isLoggedIn && currentUser && currentUser.isOnboardingComplete === false && (
+            <View style={[StyleSheet.absoluteFill, { zIndex: 99999, elevation: 99999, backgroundColor: '#000' }]}>
+              <OnboardingScreen />
+            </View>
+          )}
         </View>
       </View>
     </>
