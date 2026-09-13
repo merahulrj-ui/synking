@@ -747,16 +747,36 @@ export const AuthLandingScreen: React.FC<Props> = ({
             </TouchableOpacity>
 
             <Text style={styles.formTitle}>
-              {phoneOtpSent ? 'Verify OTP 📲' : pendingGoogleUser ? 'Step 2: Link Phone 📱' : 'Mobile Sign In 📱'}
+              {phoneOtpSent
+                ? 'Verify OTP 📲'
+                : pendingGoogleUser
+                ? `Welcome, ${pendingGoogleUser.name || 'there'}! 👋`
+                : 'Mobile Sign In 📱'}
             </Text>
             <Text style={styles.formSubtitle}>
               {phoneOtpSent
-                ? 'Enter the code sent to +91 ' + phone.replace(/\D/g, '').slice(-10)
+                ? 'Enter the 6-digit code sent to +91 ' + phone.replace(/\D/g, '').slice(-10)
+                : pendingGoogleUser
+                ? 'Enter your mobile number to link your account & continue'
                 : 'Enter your 10-digit Indian mobile number'}
             </Text>
 
             {!phoneOtpSent ? (
               <>
+                {pendingGoogleUser && (
+                  <View style={styles.googleUserBadge}>
+                    <Image
+                      source={{ uri: pendingGoogleUser.photo }}
+                      style={styles.googleUserAvatar}
+                    />
+                    <View style={{ flex: 1 }}>
+                      <Text style={styles.googleUserName}>{pendingGoogleUser.name}</Text>
+                      <Text style={styles.googleUserEmail}>{pendingGoogleUser.email}</Text>
+                    </View>
+                    <Ionicons name="logo-google" size={18} color="#EA4335" />
+                  </View>
+                )}
+
                 <Text style={styles.inputLabel}>Mobile Number</Text>
                 <View style={styles.inputRow}>
                   <Text style={styles.countryCodeText}>🇮🇳 +91</Text>
@@ -771,17 +791,21 @@ export const AuthLandingScreen: React.FC<Props> = ({
                   />
                 </View>
 
-                <Text style={[styles.inputLabel, { marginTop: 12 }]}>Your Name</Text>
-                <View style={styles.inputRow}>
-                  <Ionicons name="person-outline" size={18} color="#94A3B8" style={{ marginRight: 10 }} />
-                  <TextInput
-                    style={styles.textInput}
-                    placeholder="e.g. Rahul Sharma"
-                    placeholderTextColor="#64748B"
-                    value={phoneName}
-                    onChangeText={setPhoneName}
-                  />
-                </View>
+                {!pendingGoogleUser && (
+                  <>
+                    <Text style={[styles.inputLabel, { marginTop: 12 }]}>Your Name</Text>
+                    <View style={styles.inputRow}>
+                      <Ionicons name="person-outline" size={18} color="#94A3B8" style={{ marginRight: 10 }} />
+                      <TextInput
+                        style={styles.textInput}
+                        placeholder="e.g. Rahul Sharma"
+                        placeholderTextColor="#64748B"
+                        value={phoneName}
+                        onChangeText={setPhoneName}
+                      />
+                    </View>
+                  </>
+                )}
 
                 <TouchableOpacity
                   style={styles.safetyRow}
@@ -1208,5 +1232,33 @@ const styles = StyleSheet.create({
     color: 'rgba(255, 255, 255, 0.65)',
     marginTop: 2,
     lineHeight: 16,
+  },
+  googleUserBadge: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 12,
+    backgroundColor: 'rgba(255, 255, 255, 0.07)',
+    borderRadius: 16,
+    padding: 12,
+    marginBottom: 16,
+    borderWidth: 1,
+    borderColor: 'rgba(255, 255, 255, 0.12)',
+  },
+  googleUserAvatar: {
+    width: 44,
+    height: 44,
+    borderRadius: 22,
+    borderWidth: 1.5,
+    borderColor: '#FD3A73',
+  },
+  googleUserName: {
+    fontSize: 14,
+    fontFamily: 'Poppins_700Bold',
+    color: '#FFFFFF',
+  },
+  googleUserEmail: {
+    fontSize: 11.5,
+    fontFamily: 'Poppins_400Regular',
+    color: 'rgba(255, 255, 255, 0.6)',
   },
 });

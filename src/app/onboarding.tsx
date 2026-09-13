@@ -29,7 +29,11 @@ export default function OnboardingScreen() {
   const [name, setName] = useState(currentUser?.name || '');
   const [dob, setDob] = useState(''); // e.g. DD/MM/YYYY
   const [gender, setGender] = useState<'male' | 'female' | 'nonbinary' | 'other'>(currentUser?.gender || 'male');
-  const [photos, setPhotos] = useState<string[]>(currentUser?.photos?.length ? currentUser.photos : []);
+  const [photos, setPhotos] = useState<string[]>(() => {
+    if (currentUser?.photos?.length) return currentUser.photos;
+    if (currentUser?.photo) return [currentUser.photo];
+    return [];
+  });
   const [bio, setBio] = useState(currentUser?.bio || '');
   const [interests, setInterests] = useState<string[]>(() =>
     (currentUser?.interests || []).filter(i => ALL_INTERESTS.includes(i))
