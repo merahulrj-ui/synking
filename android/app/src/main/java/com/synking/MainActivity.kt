@@ -68,11 +68,11 @@ class MainActivity : ReactActivity() {
     setTheme(R.style.AppTheme);
     super.onCreate(null)
     instance = this
-    // 🔒 Privacy DRM: Block screenshots and screen recording across the app
-    window.setFlags(
-      android.view.WindowManager.LayoutParams.FLAG_SECURE,
-      android.view.WindowManager.LayoutParams.FLAG_SECURE
-    )
+    // 🔒 Privacy DRM: Block screenshots    // Screenshot block removed for debugging
+    // window.setFlags(
+    //  android.view.WindowManager.LayoutParams.FLAG_SECURE,
+    //  android.view.WindowManager.LayoutParams.FLAG_SECURE
+    // )
     // 🔒 Lock orientation strictly to Portrait (no rotation)
     try {
       requestedOrientation = android.content.pm.ActivityInfo.SCREEN_ORIENTATION_PORTRAIT

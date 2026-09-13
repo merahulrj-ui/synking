@@ -1,8 +1,8 @@
-name: Build Android Standalone APK
-
 on:
+  push:
+    branches:
+      - main
   workflow_dispatch:
-
 jobs:
   build-apk:
     runs-on: ubuntu-latest
