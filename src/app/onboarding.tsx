@@ -47,7 +47,9 @@ export default function OnboardingScreen() {
   const [gender, setGender] = useState<'male' | 'female' | 'nonbinary' | 'other'>(currentUser?.gender || 'male');
   const [photos, setPhotos] = useState<string[]>(currentUser?.photos?.length ? currentUser.photos : []);
   const [bio, setBio] = useState(currentUser?.bio || '');
-  const [interests, setInterests] = useState<string[]>(currentUser?.interests || []);
+  const [interests, setInterests] = useState<string[]>(() =>
+    (currentUser?.interests || []).filter(i => ALL_INTERESTS.includes(i))
+  );
   const [lookingFor, setLookingFor] = useState(currentUser?.lookingFor || '');
 
   const triggerHaptic = () => {
@@ -133,14 +135,15 @@ export default function OnboardingScreen() {
 
   const toggleInterest = (i: string) => {
     triggerHaptic();
-    if (interests.includes(i)) {
-      setInterests(interests.filter(x => x !== i));
+    const cleanInterests = interests.filter(x => ALL_INTERESTS.includes(x));
+    if (cleanInterests.includes(i)) {
+      setInterests(cleanInterests.filter(x => x !== i));
     } else {
-      if (interests.length >= 5) {
+      if (cleanInterests.length >= 5) {
         Alert.alert('Limit Reached', 'You can select up to 5 interests.');
         return;
       }
-      setInterests([...interests, i]);
+      setInterests([...cleanInterests, i]);
     }
   };
 
