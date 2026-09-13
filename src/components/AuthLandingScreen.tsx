@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import {
   View,
   Text,
@@ -61,6 +61,39 @@ export const AuthLandingScreen: React.FC<Props> = ({
       } catch (e) {}
     }
   };
+
+  // Catch deep link callback from Google Auth mobile bridge
+  useEffect(() => {
+    const handleDeepLink = (event: { url: string }) => {
+      if (!event.url) return;
+      try {
+        if (event.url.startsWith('synking://auth')) {
+          const match = event.url.match(/[?&]user=([^&#]+)/);
+          if (match && match[1]) {
+            const parsedUser = JSON.parse(decodeURIComponent(match[1]));
+            if (parsedUser && parsedUser.id) {
+              loginUser(parsedUser);
+              setIsLoading(false);
+              if (Platform.OS !== 'web') Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
+              Alert.alert('Signed in with Google! 🎉', `Welcome, ${parsedUser.name}! You are ready to Synk.`);
+              onSuccess && onSuccess();
+              onClose && onClose();
+            }
+          }
+        }
+      } catch (err) {
+        console.warn('Google Auth deep link parse error:', err);
+      }
+    };
+
+    const sub = Linking.addEventListener('url', handleDeepLink);
+    Linking.getInitialURL().then((initialUrl) => {
+      if (initialUrl) handleDeepLink({ url: initialUrl });
+    });
+    return () => {
+      sub.remove();
+    };
+  }, []);
 
   // --- OFFICIAL GOOGLE SIGN IN ---
   const handleGoogleSignIn = async () => {
@@ -198,31 +231,17 @@ export const AuthLandingScreen: React.FC<Props> = ({
         }
       }
 
-      // Native fallback
-      const res = await fetch(getLocalBackendUrl() + '/api/auth/google', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          googleId: 'goog_' + Date.now(),
-          email: 'google.member.' + Math.floor(Math.random() * 10000) + '@gmail.com',
-          name: 'Google Member',
-          photo: 'https://images.unsplash.com/photo-1535713875002-d1d0cf377fde?w=800',
-        }),
-      });
-
-      if (res.ok) {
-        const data = await res.json();
-        if (data.success && data.user) {
-          await loginUser(data.user);
-          setIsLoading(false);
-          if (Platform.OS !== 'web') Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
-          Alert.alert('Signed in with Google! 🎉', 'Welcome, ' + data.user.name + '! You are ready to Synk.');
-          onSuccess && onSuccess();
-          onClose && onClose();
-          return;
+      // Native Mobile: Open Google Auth Bridge
+      if (Platform.OS !== 'web') {
+        const bridgeUrl = 'https://synkin.in/auth/google';
+        try {
+          await Linking.openURL(bridgeUrl);
+        } catch (linkErr) {
+          Alert.alert('Google Sign-In', 'Please continue using your phone number or email.');
         }
+        setIsLoading(false);
+        return;
       }
-      Alert.alert('Google Sign-In', 'Could not complete Google sign-in.');
     } catch (e: any) {
       Alert.alert('Google Sign-In Error', e?.message || 'Network error');
     } finally {
@@ -444,19 +463,12 @@ export const AuthLandingScreen: React.FC<Props> = ({
                 >
                   Terms
                 </Text>
-                . Learn how we process your data in our{' '}
+                {' '}and{' '}
                 <Text
                   style={styles.legalLink}
                   onPress={() => Linking.openURL('https://synkin.in/privacy')}
                 >
                   Privacy Policy
-                </Text>{' '}
-                and{' '}
-                <Text
-                  style={styles.legalLink}
-                  onPress={() => Linking.openURL('https://synkin.in/cookies')}
-                >
-                  Cookies Policy
                 </Text>
                 .
               </Text>

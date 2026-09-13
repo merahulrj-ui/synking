@@ -1141,9 +1141,9 @@ const server = http.createServer((req, res) => {
       return;
     }
 
-    const indexPath = path.join(__dirname, 'public', 'index.html');
     const websitePath = path.join(__dirname, 'public', 'website.html');
-    const targetPath = fs.existsSync(indexPath) ? indexPath : (fs.existsSync(websitePath) ? websitePath : null);
+    const marketingPath = path.join(__dirname, 'public', 'website-marketing.html');
+    const targetPath = fs.existsSync(websitePath) ? websitePath : (fs.existsSync(marketingPath) ? marketingPath : null);
     if (targetPath) {
       res.writeHead(200, {
         'Content-Type': 'text/html; charset=utf-8',
@@ -1258,6 +1258,20 @@ const server = http.createServer((req, res) => {
     return;
   }
 
+  // 0.041 GET /auth/google or /auth/google-mobile (Mobile OAuth Bridge for Google Sign-In)
+  if ((req.method === 'GET' || req.method === 'HEAD') && (pathname === '/auth/google' || pathname === '/auth/google-mobile' || pathname === '/auth/google/' || pathname === '/auth/google-mobile/')) {
+    const authGooglePath = path.join(__dirname, 'public', 'auth-google.html');
+    if (fs.existsSync(authGooglePath)) {
+      res.writeHead(200, {
+        'Content-Type': 'text/html; charset=utf-8',
+        'Access-Control-Allow-Origin': '*',
+        'Cache-Control': 'no-cache, no-store, must-revalidate',
+      });
+      if (req.method === 'HEAD') { res.end(); return; }
+      fs.createReadStream(authGooglePath).pipe(res);
+      return;
+    }
+  }
   // 0.042 GET /dating/* (Programmatic City SEO Landing Pages)
   if ((req.method === 'GET' || req.method === 'HEAD') && pathname.startsWith('/dating/')) {
     const citySlug = pathname.replace(/^\/dating\//, '').replace(/\/$/, '').toLowerCase().replace(/[^a-z0-9-]/g, '');
