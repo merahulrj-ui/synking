@@ -139,21 +139,21 @@ export default function WebAppPortal() {
       <aside className="hidden lg:flex flex-col fixed right-8 xl:right-16 top-1/2 -translate-y-1/2 w-[300px] xl:w-[340px] z-20 gap-5">
         {/* QR Code Card */}
         <div className="rounded-3xl border border-white/10 bg-zinc-950/70 p-5 backdrop-blur-xl shadow-2xl text-center">
-          <div className="text-sm font-bold text-white">Open on Your Phone 📲</div>
+          <div className="text-sm font-bold text-white">Download on Your Phone 📲</div>
           <div className="text-xs text-zinc-400 mt-1">
-            Scan with your mobile camera to launch Synkin Web directly
+            Scan with your phone camera to download APK directly
           </div>
 
           <div className="mx-auto my-3.5 flex h-44 w-44 items-center justify-center rounded-2xl border-2 border-[#FD3A73]/40 bg-[#0d0817] p-2.5 shadow-lg shadow-[#FD3A73]/25">
             <img
-              src="https://api.qrserver.com/v1/create-qr-code/?size=220x220&data=http://3.108.217.155:8082/app&color=FD3A73&bgcolor=0D0817"
-              alt="Scan QR code for Synkin mobile web"
+              src="https://api.qrserver.com/v1/create-qr-code/?size=220x220&data=https://synkin.in/download/apk&color=FD3A73&bgcolor=0D0817"
+              alt="Scan QR code to download Synkin APK"
               className="h-full w-full rounded-xl object-contain"
             />
           </div>
 
           <a
-            href="/#download"
+            href="/download/apk"
             className="flex items-center justify-center gap-2 w-full rounded-xl bg-gradient-to-r from-[#FD3A73] to-[#b81855] py-3 text-xs font-bold text-white shadow-lg shadow-[#FD3A73]/30 hover:brightness-110 active:scale-95 transition-all"
           >
             <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5">
