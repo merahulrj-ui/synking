@@ -256,7 +256,7 @@ export const AuthLandingScreen: React.FC<Props> = ({
             
             // Set pending user and ask for phone verify (just like deep link)
             setPendingGoogleUser(parsedUser);
-            setMode('phone_verify' as any);
+            setMode('phone');
             setIsLoading(false);
             if (Platform.OS !== 'web') Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
           }
