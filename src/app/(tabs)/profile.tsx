@@ -472,12 +472,9 @@ export default function ProfileScreen() {
       <Header />
 
       <ScrollView style={styles.container} showsVerticalScrollIndicator={false}>
-        {!isLoggedIn ? (
-          <AuthLandingScreen showCloseButton={false} />
-        ) : (
-          // =========================================================================
+          {/* =========================================================================
           // 💎 LUXURY PREMIUM DATING PROFILE VIEW (TINDER PLATINUM / RAYA STYLE)
-          // =========================================================================
+          // ========================================================================= */}
           <View style={styles.contentWrap}>
             {/* ⚠️ System Suspension Banner (Only visible if account is suspended) */}
             {isSuspended && (
@@ -1028,7 +1025,6 @@ export default function ProfileScreen() {
 
             <View style={{ height: 40 }} />
           </View>
-        )}
       </ScrollView>
 
       {/* ========================================================================= */}
