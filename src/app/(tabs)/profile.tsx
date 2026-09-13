@@ -22,6 +22,7 @@ import { useApp } from '../../contexts/AppContext';
 import { Header } from '../../components/Header';
 import { GradientButton } from '../../components/GradientButton';
 import { AuthModal } from '../../components/AuthModal';
+import { AuthLandingScreen } from '../../components/AuthLandingScreen';
 import { UnlockAppealModal } from '../../components/UnlockAppealModal';
 import { UserProfile } from '../../types';
 import { useRouter } from 'expo-router';
@@ -472,41 +473,7 @@ export default function ProfileScreen() {
 
       <ScrollView style={styles.container} showsVerticalScrollIndicator={false}>
         {!isLoggedIn ? (
-          // Unified Auth Login Card
-          <View style={[styles.guestCard, { backgroundColor: cardBg, borderColor, padding: 24, gap: 14 }]}>
-            <View style={{ alignItems: 'center', marginBottom: 4 }}>
-              <Image
-                source={require('../../../assets/images/logo_emblem.png')}
-                style={{ width: 64, height: 64, borderRadius: 18, marginBottom: 12 }}
-                resizeMode="contain"
-              />
-              <Text style={[styles.guestTitle, { color: textColor, fontSize: 22, fontFamily: 'Poppins_900Black' }]}>
-                Sign In with Phone ⚡
-              </Text>
-              <Text style={[styles.guestSub, { color: subText, textAlign: 'center', marginTop: 4, marginBottom: 12 }]}>
-                Sign in to view your profile, edit your photos, and start matching!
-              </Text>
-            </View>
-
-            <GradientButton 
-              title="Login / Create Account 📲" 
-              onPress={() => setAuthModalVisible(true)} 
-            />
-
-            <View style={{ alignItems: 'center', justifyContent: 'center', marginTop: 10, gap: 3 }}>
-              <Text style={{ color: subText, fontSize: 9.5, fontFamily: 'Poppins_700Bold', letterSpacing: 1.2, textTransform: 'uppercase' }}>
-                A Product of
-              </Text>
-              <Text style={{ color: textColor, fontSize: 12, fontFamily: 'Poppins_900Black', letterSpacing: 1.2 }}>
-                ⚡ JAYANTI CYBERNETICS ⚡
-              </Text>
-            </View>
-
-            <AuthModal 
-              visible={authModalVisible}
-              onClose={() => setAuthModalVisible(false)}
-            />
-          </View>
+          <AuthLandingScreen showCloseButton={false} />
         ) : (
           // =========================================================================
           // 💎 LUXURY PREMIUM DATING PROFILE VIEW (TINDER PLATINUM / RAYA STYLE)

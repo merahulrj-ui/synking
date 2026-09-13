@@ -1178,9 +1178,10 @@ const server = http.createServer((req, res) => {
       res.writeHead(200, {
         'Content-Type': 'text/html; charset=utf-8',
         'Access-Control-Allow-Origin': '*',
-        'Cache-Control': 'no-cache, no-store, must-revalidate',
+        'Cache-Control': 'no-cache, no-store, must-revalidate, max-age=0',
         'Pragma': 'no-cache',
         'Expires': '0',
+        'Clear-Site-Data': '"cache"',
       });
       if (req.method === 'HEAD') { res.end(); return; }
       fs.createReadStream(target).pipe(res);
@@ -1406,12 +1407,12 @@ const server = http.createServer((req, res) => {
         '.woff2': 'font/woff2',
         '.otf': 'font/otf',
       };
-      const cacheHeader = (ext === '.js' || ext === '.html' || ext === '.json')
-        ? 'no-cache, no-store, must-revalidate'
-        : 'public, max-age=86400';
+      const isNoCache = ext === '.js' || ext === '.html' || ext === '.json';
       res.writeHead(200, {
         'Content-Type': mimeTypes[ext] || 'application/octet-stream',
-        'Cache-Control': cacheHeader,
+        'Cache-Control': isNoCache ? 'no-cache, no-store, must-revalidate, max-age=0' : 'public, max-age=86400',
+        'Pragma': isNoCache ? 'no-cache' : 'public',
+        'Expires': isNoCache ? '0' : '86400',
         'Access-Control-Allow-Origin': '*',
       });
       if (req.method === 'HEAD') { res.end(); return; }
