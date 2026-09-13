@@ -768,12 +768,30 @@ export default function ProfileScreen() {
                 }}
                 style={[styles.intentionCapsule, { backgroundColor: innerBg, borderColor }]}
               >
-                <Text style={{ fontSize: 18 }}>
-                  {LOOKING_FOR_OPTIONS.find(o => o.label === currentUser?.lookingFor || o.title === currentUser?.lookingFor)?.emoji || '💘'}
-                </Text>
-                <Text style={[styles.intentionText, { color: textColor, flex: 1 }]}>
-                  {LOOKING_FOR_OPTIONS.find(o => o.label === currentUser?.lookingFor || o.title === currentUser?.lookingFor)?.title || currentUser?.lookingFor || 'Long-term relationship'}
-                </Text>
+                {(() => {
+                  const val = currentUser?.lookingFor || '';
+                  const match = LOOKING_FOR_OPTIONS.find(o =>
+                    o.label === val ||
+                    o.title === val ||
+                    o.key === val ||
+                    (val && (o.label.toLowerCase().includes(val.toLowerCase()) || val.toLowerCase().includes(o.title.toLowerCase())))
+                  );
+                  return (
+                    <>
+                      <Text style={{ fontSize: 22, marginRight: 8 }}>{match?.emoji || '💘'}</Text>
+                      <View style={{ flex: 1 }}>
+                        <Text style={[styles.intentionText, { color: textColor }]}>
+                          {match?.title || val || 'Long-term relationship'}
+                        </Text>
+                        {match?.description ? (
+                          <Text style={{ fontSize: 11, color: subText, fontFamily: 'Poppins_400Regular', marginTop: 2 }}>
+                            {match.description}
+                          </Text>
+                        ) : null}
+                      </View>
+                    </>
+                  );
+                })()}
                 <Feather name="chevron-right" size={15} color={subText} />
               </TouchableOpacity>
             </View>

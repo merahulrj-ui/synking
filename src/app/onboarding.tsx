@@ -18,23 +18,7 @@ import * as Haptics from 'expo-haptics';
 import * as ImagePicker from 'expo-image-picker';
 import * as Location from 'expo-location';
 
-const ALL_INTERESTS = [
-  '☕ Specialty Coffee', '🎸 Indie Music', '🚗 Road Trips', '🏋️ Gym & Fitness',
-  '🤖 Tech & AI', '🍜 Anime & Ramen', '🍕 Sourdough Pizza', '✈️ Solo Travel',
-  '📸 Photography', '🎲 Board Games', '🎨 Art & Museums', '🎤 Live Concerts',
-  '🌲 Hiking & Nature', '🐶 Dog Lover', '🐱 Cat Person', '📚 Reading Books',
-  '🍷 Wine & Dine', '🎬 Cinema & Movies', '🏸 Badminton', '🧘 Yoga & Mindfulness',
-];
-
-const LOOKING_FOR_OPTIONS = [
-  { key: 'marriage', label: '💍 Marriage / Matrimony' },
-  { key: 'long_term', label: '💘 Long-term partner' },
-  { key: 'short_term', label: '🥂 Long-term, open to short' },
-  { key: 'short_open_long', label: '🍷 Short-term, open to long' },
-  { key: 'casual', label: '🎉 Casual dating' },
-  { key: 'friends', label: '👋 New friends' },
-  { key: 'figuring_out', label: '🤔 Still figuring it out' },
-];
+import { ALL_INTERESTS, LOOKING_FOR_OPTIONS } from './(tabs)/profile';
 
 export default function OnboardingScreen() {
   const { currentUser, updateCurrentUser } = useApp();
@@ -51,6 +35,9 @@ export default function OnboardingScreen() {
     (currentUser?.interests || []).filter(i => ALL_INTERESTS.includes(i))
   );
   const [lookingFor, setLookingFor] = useState(currentUser?.lookingFor || '');
+  const [userLocation, setUserLocation] = useState<string>(
+    typeof currentUser?.location === 'string' ? currentUser.location : 'Roorkee'
+  );
 
   const triggerHaptic = () => {
     if (Platform.OS !== 'web') Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
@@ -89,6 +76,21 @@ export default function OnboardingScreen() {
           Alert.alert('Location Required', 'We need your location to show nearby people.');
           return;
         }
+        try {
+          const loc = await Location.getCurrentPositionAsync({ accuracy: Location.Accuracy.Balanced });
+          if (loc?.coords) {
+            const geocoded = await Location.reverseGeocodeAsync({
+              latitude: loc.coords.latitude,
+              longitude: loc.coords.longitude,
+            });
+            if (geocoded && geocoded.length > 0) {
+              const detectedCity = geocoded[0].city || geocoded[0].subregion || geocoded[0].district;
+              if (detectedCity) setUserLocation(detectedCity);
+            }
+          }
+        } catch (locErr) {
+          console.log('Location geocode error:', locErr);
+        }
       } catch (e) {
         console.log(e);
       }
@@ -96,15 +98,30 @@ export default function OnboardingScreen() {
 
     // Final Step 9: Notifications & Save
     if (step === 9) {
-      // Complete Onboarding
+      // Calculate age from dob
+      let userAge = currentUser?.age || 22;
+      if (dob) {
+        const cleanDigits = dob.replace(/\D/g, '');
+        if (cleanDigits.length >= 4) {
+          const year = parseInt(cleanDigits.slice(-4), 10);
+          const currentYear = new Date().getFullYear();
+          if (year > 1920 && year <= currentYear) {
+            userAge = currentYear - year;
+          }
+        }
+      }
+
+      // Complete Onboarding & Sync with Profile
       updateCurrentUser({
         name: name.trim(),
+        age: userAge,
         gender,
         bio: bio.trim(),
         photos,
-        photo: photos[0],
+        photo: photos[0] || currentUser?.photo,
         interests,
         lookingFor,
+        location: userLocation || currentUser?.location || 'Roorkee',
         isOnboardingComplete: true,
       });
       return;
@@ -266,17 +283,30 @@ export default function OnboardingScreen() {
             <Text style={styles.title}>What are you looking for?</Text>
             <Text style={styles.subtitle}>Be honest, it helps find the right match.</Text>
             <View style={styles.optionsList}>
-              {LOOKING_FOR_OPTIONS.map(opt => (
-                <TouchableOpacity
-                  key={opt.key}
-                  style={[styles.optionCard, lookingFor === opt.label && styles.optionCardActive]}
-                  onPress={() => { triggerHaptic(); setLookingFor(opt.label); }}
-                >
-                  <Text style={[styles.optionText, lookingFor === opt.label && styles.optionTextActive]}>
-                    {opt.label}
-                  </Text>
-                </TouchableOpacity>
-              ))}
+              {LOOKING_FOR_OPTIONS.map(opt => {
+                const isSelected = lookingFor === opt.label || lookingFor === opt.title || lookingFor === opt.key;
+                return (
+                  <TouchableOpacity
+                    key={opt.key}
+                    style={[styles.lookingForCard, isSelected && styles.lookingForCardActive]}
+                    onPress={() => { triggerHaptic(); setLookingFor(opt.label); }}
+                    activeOpacity={0.8}
+                  >
+                    <Text style={{ fontSize: 24, marginRight: 12 }}>{opt.emoji}</Text>
+                    <View style={{ flex: 1 }}>
+                      <Text style={[styles.lookingForTitle, isSelected && styles.lookingForTitleActive]}>
+                        {opt.title}
+                      </Text>
+                      {opt.description ? (
+                        <Text style={styles.lookingForDesc}>{opt.description}</Text>
+                      ) : null}
+                    </View>
+                    {isSelected && (
+                      <Ionicons name="checkmark-circle" size={20} color="#FD3A73" />
+                    )}
+                  </TouchableOpacity>
+                );
+              })}
             </View>
           </View>
         );
@@ -452,6 +482,33 @@ const styles = StyleSheet.create({
   },
   optionTextActive: {
     color: '#FFF',
+  },
+  lookingForCard: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    borderWidth: 1.5,
+    borderColor: '#222',
+    borderRadius: 16,
+    padding: 16,
+    backgroundColor: '#111',
+  },
+  lookingForCardActive: {
+    borderColor: '#FD3A73',
+    backgroundColor: 'rgba(253, 58, 115, 0.15)',
+  },
+  lookingForTitle: {
+    fontSize: 16,
+    fontFamily: 'Poppins_600SemiBold',
+    color: '#FFF',
+  },
+  lookingForTitleActive: {
+    color: '#FD3A73',
+  },
+  lookingForDesc: {
+    fontSize: 12,
+    fontFamily: 'Poppins_400Regular',
+    color: 'rgba(255, 255, 255, 0.5)',
+    marginTop: 2,
   },
   photoGrid: {
     flexDirection: 'row',
