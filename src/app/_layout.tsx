@@ -503,6 +503,7 @@ function RootLayoutContent() {
 }
 
 export default function RootLayout() {
+
   const [fontsLoaded] = useFonts({
     Poppins_400Regular,
     Poppins_500Medium,
@@ -547,6 +548,8 @@ export default function RootLayout() {
     }
   }, []);
 
+  if (!fontsLoaded) return null;
+
   return (
     <AppProvider>
       <RootLayoutContent />
@@ -564,9 +567,9 @@ const styles = StyleSheet.create({
   mobileFrame: {
     flex: 1,
     width: '100%',
-    maxWidth: Platform.OS === 'web' ? 440 : '100%',
+    maxWidth: Platform.OS === 'web' ? 440 : undefined,
     backgroundColor: '#000000',
-    overflow: 'hidden',
+    
     borderLeftWidth: Platform.OS === 'web' ? 1 : 0,
     borderRightWidth: Platform.OS === 'web' ? 1 : 0,
     borderColor: 'rgba(255, 255, 255, 0.08)',

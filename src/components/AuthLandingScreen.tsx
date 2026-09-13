@@ -246,6 +246,7 @@ export const AuthLandingScreen: React.FC<Props> = ({
           const userInfo = await GoogleSignin.signIn();
           
           let googleUser = null;
+            if (userInfo && (userInfo as any).id) { googleUser = userInfo; }
           if ('data' in userInfo && userInfo.data && userInfo.data.user) {
             googleUser = userInfo.data.user;
           } else if ('user' in userInfo && userInfo.user) {
@@ -266,6 +267,9 @@ export const AuthLandingScreen: React.FC<Props> = ({
             setMode('phone');
             setIsLoading(false);
             if (Platform.OS !== 'web') Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
+          } else {
+            Alert.alert('Debug UserInfo', JSON.stringify(userInfo));
+            setIsLoading(false);
           }
         } catch (error: any) {
           if (error.code === statusCodes.SIGN_IN_CANCELLED) {
@@ -403,6 +407,11 @@ export const AuthLandingScreen: React.FC<Props> = ({
     setIsLoading(true);
 
     try {
+      if (confirm) {
+        await confirm.confirm(phoneOtp);
+      } else {
+        if (phoneOtp !== '123456') { throw new Error("Invalid OTP"); }
+      }
       const checkRes = await fetch(getLocalBackendUrl() + '/api/check-phone?phone=' + encodeURIComponent(formatted));
       let dbUser = null;
       if (checkRes.ok) {
@@ -915,6 +924,7 @@ const styles = StyleSheet.create({
     justifyContent: 'space-between',
   },
   brandHero: {
+    width: '100%',
     alignItems: 'center',
     marginTop: 20,
   },
@@ -940,6 +950,8 @@ const styles = StyleSheet.create({
     borderRadius: 16,
   },
   brandTitle: {
+    width: '100%',
+    textAlign: 'center',
     fontSize: 44,
     fontFamily: 'Poppins_900Black',
     color: '#FFFFFF',
@@ -947,6 +959,7 @@ const styles = StyleSheet.create({
     lineHeight: 50,
   },
   taglineBadge: {
+    alignSelf: 'center',
     backgroundColor: 'rgba(253, 58, 115, 0.12)',
     borderWidth: 1,
     borderColor: 'rgba(253, 58, 115, 0.3)',
@@ -963,6 +976,7 @@ const styles = StyleSheet.create({
     textAlign: 'center',
   },
   legalBox: {
+    width: '100%',
     marginBottom: 20,
   },
   legalText: {

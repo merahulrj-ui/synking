@@ -640,13 +640,6 @@ export default function DiscoverScreen() {
         onApply={handleApplyFilter}
         onReset={handleResetFilter}
       />
-
-      {/* 🔐 Auth Modal for Unauthenticated Guests */}
-      <AuthModal
-        visible={authModalVisible}
-        onClose={() => setAuthModalVisible(false)}
-        targetUserName={currentProfile?.name}
-      />
     </SafeAreaView>
   );
 }
