@@ -1350,18 +1350,20 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
         if (stored && !currentUser) {
           const parsed = JSON.parse(stored);
           if (parsed && parsed.id && parsed.name) {
-            // Verify if user was deleted on server (e.g. admin reset database)
-            const exists = await checkUserExistsOnBackend(parsed.id);
-            if (!exists) {
-              console.log('🧹 [STALE_USER_PURGED] User does not exist on server. Clearing local storage.');
-              await AsyncStorage.removeItem('synking_my_user');
-              setCurrentUser(null);
-              setIsLoggedIn(false);
-              return;
-            }
-
+            // Immediate native restore - zero delay, no login flash
             setCurrentUser(parsed);
             setIsLoggedIn(true);
+
+            // Verify if user was deleted on server in background
+            checkUserExistsOnBackend(parsed.id).then((exists) => {
+              if (!exists) {
+                console.log('🧹 [STALE_USER_PURGED] User does not exist on server. Clearing local storage.');
+                AsyncStorage.removeItem('synking_my_user');
+                setCurrentUser(null);
+                setIsLoggedIn(false);
+              }
+            }).catch(() => {});
+            return;
           }
         }
       } catch (e) {}

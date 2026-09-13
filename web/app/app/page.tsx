@@ -10,8 +10,17 @@ export default function WebAppPortal() {
     if (!document.getElementById(scriptId)) {
       const script = document.createElement('script');
       script.id = scriptId;
-      script.src = '/app/_expo/static/js/web/index-91dc49b0979d50b0fa990b2eb3b0bcad.js';
+      const isLocalDev = typeof window !== 'undefined' && (window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1');
+      script.src = isLocalDev
+        ? '/index.bundle?platform=web&dev=true&hot=false&transform.routerRoot=src%2Fapp'
+        : '/app/_expo/static/js/web/index-91dc49b0979d50b0fa990b2eb3b0bcad.js';
       script.defer = true;
+      script.onload = () => {
+        setTimeout(() => {
+          const l = document.getElementById('spark-radar-loader');
+          if (l) l.remove();
+        }, 150);
+      };
       document.body.appendChild(script);
     }
   }, []);

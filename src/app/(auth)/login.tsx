@@ -1,17 +1,17 @@
-import React, { useEffect } from 'react';
-import { View, ActivityIndicator } from 'react-native';
+import React from 'react';
 import { useRouter } from 'expo-router';
+import { AuthLandingScreen } from '../../components/AuthLandingScreen';
 
 export default function LoginScreen() {
   const router = useRouter();
 
-  useEffect(() => {
-    router.replace('/(tabs)');
-  }, []);
-
   return (
-    <View style={{ flex: 1, backgroundColor: '#000000', justifyContent: 'center', alignItems: 'center' }}>
-      <ActivityIndicator size="large" color="#FD3A73" />
-    </View>
+    <AuthLandingScreen
+      onSuccess={() => {
+        router.replace('/(tabs)');
+      }}
+      showCloseButton={false}
+    />
   );
 }
+

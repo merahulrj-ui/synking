@@ -12,7 +12,12 @@
           "package_name": "com.synking"
         }
       },
-      "oauth_client": [],
+      "oauth_client": [
+        {
+          "client_id": "816527505911-9aoc1h8930b42cpqi4eo8dlutk3ndcv9.apps.googleusercontent.com",
+          "client_type": 3
+        }
+      ],
       "api_key": [
         {
           "current_key": "AIzaSyDB4xkCnhYps-b3DYd1gLe1wuTNpsT7TJI"
@@ -31,7 +36,12 @@
           "package_name": "com.synkon.app"
         }
       },
-      "oauth_client": [],
+      "oauth_client": [
+        {
+          "client_id": "816527505911-9aoc1h8930b42cpqi4eo8dlutk3ndcv9.apps.googleusercontent.com",
+          "client_type": 3
+        }
+      ],
       "api_key": [
         {
           "current_key": "AIzaSyDB4xkCnhYps-b3DYd1gLe1wuTNpsT7TJI"

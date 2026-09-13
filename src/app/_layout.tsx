@@ -11,6 +11,7 @@ import { useFonts, Poppins_400Regular, Poppins_500Medium, Poppins_600SemiBold, P
 
 import { CallModal } from '../components/CallModal';
 import { InAppNotificationBanner } from '../components/InAppNotificationBanner';
+import { AuthLandingScreen } from '../components/AuthLandingScreen';
 import { WebRTCService } from '../services/webrtcService';
 import { NativeRTCView } from '../services/webrtcCore';
 import { CallSession } from '../types';
@@ -404,7 +405,7 @@ function GlobalCallOverlay() {
 }
 
 function RootLayoutContent() {
-  const { isDarkMode } = useApp();
+  const { isDarkMode, isLoggedIn } = useApp();
 
   useEffect(() => {
     if (Platform.OS === 'android') {
@@ -433,6 +434,7 @@ function RootLayoutContent() {
             }}
           >
             <Stack.Screen name="(tabs)" options={{ headerShown: false }} />
+            <Stack.Screen name="app" options={{ headerShown: false }} />
             <Stack.Screen
               name="vip-membership"
               options={{
@@ -478,6 +480,11 @@ function RootLayoutContent() {
           </Stack>
           <GlobalCallOverlay />
           <InAppNotificationBanner />
+          {!isLoggedIn && (
+            <View style={[StyleSheet.absoluteFill, { zIndex: 99999 }]}>
+              <AuthLandingScreen showCloseButton={false} />
+            </View>
+          )}
         </View>
       </View>
     </>

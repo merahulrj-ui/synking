@@ -1983,6 +1983,202 @@ const server = http.createServer((req, res) => {
     return;
   }
 
+  // 1.6 GET /api/check-email (For Email Login & Auto Account Detection)
+  if (req.method === 'GET' && pathname === '/api/check-email') {
+    const email = (url.searchParams.get('email') || '').trim().toLowerCase();
+    if (!email) {
+      res.writeHead(400, { 'Content-Type': 'application/json' });
+      res.end(JSON.stringify({ error: 'Email required' }));
+      return;
+    }
+
+    const memUser = Object.values(db.profiles || {}).find(p => (p.email || '').toLowerCase() === email);
+    if (memUser) {
+      res.writeHead(200, { 'Content-Type': 'application/json' });
+      res.end(JSON.stringify({ exists: true, user: memUser }));
+      return;
+    }
+
+    queryTurso('SELECT * FROM users WHERE email = ?', [{ type: 'text', value: email }]).then(resTurso => {
+      const rows = resTurso?.results?.[0]?.response?.result?.rows;
+      const cols = resTurso?.results?.[0]?.response?.result?.cols;
+      if (Array.isArray(rows) && rows.length > 0 && Array.isArray(cols)) {
+        const item = {};
+        cols.forEach((col, idx) => {
+          const colName = (col && typeof col === 'object' && col.name) ? col.name : String(col);
+          const rawVal = rows[0][idx]?.value !== undefined ? rows[0][idx].value : rows[0][idx];
+          item[colName] = extractPlain(rawVal);
+        });
+        const existingUser = {
+          id: item.id || '',
+          name: item.name || 'Member',
+          email: item.email || email,
+          age: parseInt(item.age, 10) || 22,
+          gender: item.gender || 'male',
+          phoneNumber: item.phone_number || '',
+          occupation: item.occupation || 'Member',
+          location: item.location || 'Roorkee',
+          distance: '0 km',
+          bio: item.bio || 'Active on Synking ✨',
+          photo: item.photo || (item.gender === 'female' ? 'https://images.unsplash.com/photo-1494790108377-be9c29b29330?w=800' : 'https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?w=800'),
+          photos: [item.photo || (item.gender === 'female' ? 'https://images.unsplash.com/photo-1494790108377-be9c29b29330?w=800' : 'https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?w=800')],
+          interests: ['Coffee', 'Music', 'Travel'],
+          compatibility: 100,
+          isVerified: true,
+          isVip: false,
+        };
+        try { existingUser.location = JSON.parse(existingUser.location); } catch(e){}
+        db.profiles[existingUser.id] = existingUser;
+        res.writeHead(200, { 'Content-Type': 'application/json' });
+        res.end(JSON.stringify({ exists: true, user: existingUser }));
+      } else {
+        res.writeHead(200, { 'Content-Type': 'application/json' });
+        res.end(JSON.stringify({ exists: false }));
+      }
+    }).catch(err => {
+      res.writeHead(200, { 'Content-Type': 'application/json' });
+      res.end(JSON.stringify({ exists: false }));
+    });
+    return;
+  }
+
+  // 1.7 POST /api/auth/google (Google 1-Tap Sign-In / Account Provisioning)
+  if (req.method === 'POST' && pathname === '/api/auth/google') {
+    let body = '';
+    req.on('data', chunk => { body += chunk; });
+    req.on('end', () => {
+      try {
+        const { googleId, email, name, photo } = JSON.parse(body);
+        if (!email && !googleId) {
+          res.writeHead(400, { 'Content-Type': 'application/json' });
+          res.end(JSON.stringify({ success: false, error: 'Email or Google ID required' }));
+          return;
+        }
+
+        const cleanEmail = (email || '').trim().toLowerCase();
+        let existing = Object.values(db.profiles || {}).find(p => 
+          (p.email && p.email.toLowerCase() === cleanEmail) || (p.googleId && p.googleId === googleId)
+        );
+
+        if (existing) {
+          console.log(`[GOOGLE_AUTH_LOGIN] Welcome back existing user: ${existing.name} (${existing.id})`);
+          res.writeHead(200, { 'Content-Type': 'application/json' });
+          res.end(JSON.stringify({ success: true, isNewUser: false, user: existing }));
+          return;
+        }
+
+        const newId = `usr_${googleId ? googleId.slice(-14) : Math.random().toString(16).slice(2, 16)}`;
+        const newUser = {
+          id: newId,
+          googleId: googleId || '',
+          email: cleanEmail,
+          name: name || 'Google Member',
+          age: 22,
+          gender: 'male',
+          occupation: 'Member',
+          location: 'Roorkee',
+          distance: '0 km',
+          bio: 'Coffee lover & genuine connections ☕ Catch A Spark!',
+          photo: photo || 'https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?w=800',
+          photos: [photo || 'https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?w=800'],
+          interests: ['☕ Coffee', '🎵 Music', '✈️ Travel', '🤖 Tech'],
+          compatibility: 100,
+          isVerified: true,
+          isVip: false,
+          authProvider: 'google',
+          createdAt: new Date().toISOString(),
+          updatedAt: new Date().toISOString()
+        };
+
+        db.profiles[newId] = newUser;
+        saveDb();
+        syncUserToTurso(newUser);
+        console.log(`[GOOGLE_AUTH_SIGNUP] New user registered: ${newUser.name} (${newId})`);
+        res.writeHead(200, { 'Content-Type': 'application/json' });
+        res.end(JSON.stringify({ success: true, isNewUser: true, user: newUser }));
+      } catch (e) {
+        res.writeHead(500, { 'Content-Type': 'application/json' });
+        res.end(JSON.stringify({ success: false, error: e.message }));
+      }
+    });
+    return;
+  }
+
+  // 1.8 POST /api/auth/email (Email & Password Login / Signup)
+  if (req.method === 'POST' && pathname === '/api/auth/email') {
+    let body = '';
+    req.on('data', chunk => { body += chunk; });
+    req.on('end', () => {
+      try {
+        const { email, password, name, age, gender, isSignUp } = JSON.parse(body);
+        const cleanEmail = (email || '').trim().toLowerCase();
+        if (!cleanEmail) {
+          res.writeHead(400, { 'Content-Type': 'application/json' });
+          res.end(JSON.stringify({ success: false, error: 'Valid email address required' }));
+          return;
+        }
+
+        let existing = Object.values(db.profiles || {}).find(p => (p.email || '').toLowerCase() === cleanEmail);
+
+        if (!isSignUp) {
+          if (existing) {
+            console.log(`[EMAIL_AUTH_LOGIN] User signed in: ${existing.name} (${existing.id})`);
+            res.writeHead(200, { 'Content-Type': 'application/json' });
+            res.end(JSON.stringify({ success: true, isNewUser: false, user: existing }));
+            return;
+          } else {
+            res.writeHead(404, { 'Content-Type': 'application/json' });
+            res.end(JSON.stringify({ success: false, error: 'No account found with this email. Please sign up.' }));
+            return;
+          }
+        }
+
+        if (existing) {
+          res.writeHead(200, { 'Content-Type': 'application/json' });
+          res.end(JSON.stringify({ success: true, isNewUser: false, user: existing }));
+          return;
+        }
+
+        const newId = `usr_${Math.random().toString(16).slice(2, 18)}`;
+        const defaultPhoto = gender === 'female'
+          ? 'https://images.unsplash.com/photo-1494790108377-be9c29b29330?w=800'
+          : 'https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?w=800';
+
+        const newUser = {
+          id: newId,
+          email: cleanEmail,
+          name: name?.trim() || (gender === 'female' ? 'Priya' : 'Rahul'),
+          age: parseInt(age, 10) || 22,
+          gender: gender || 'male',
+          occupation: gender === 'female' ? 'UI/UX Designer' : 'Software Engineer',
+          location: 'Roorkee',
+          distance: '0 km',
+          bio: 'Coffee lover & great conversations ☕ Looking to meet genuine people!',
+          photo: defaultPhoto,
+          photos: [defaultPhoto],
+          interests: ['☕ Coffee', '🎵 Indie Music', '🚗 Road Trips', '🤖 Tech'],
+          compatibility: 100,
+          isVerified: true,
+          isVip: false,
+          authProvider: 'email',
+          createdAt: new Date().toISOString(),
+          updatedAt: new Date().toISOString()
+        };
+
+        db.profiles[newId] = newUser;
+        saveDb();
+        syncUserToTurso(newUser);
+        console.log(`[EMAIL_AUTH_SIGNUP] New user signed up: ${newUser.name} (${newId})`);
+        res.writeHead(200, { 'Content-Type': 'application/json' });
+        res.end(JSON.stringify({ success: true, isNewUser: true, user: newUser }));
+      } catch (e) {
+        res.writeHead(500, { 'Content-Type': 'application/json' });
+        res.end(JSON.stringify({ success: false, error: e.message }));
+      }
+    });
+    return;
+  }
+
   // 2. POST /api/profiles (Save / Update User Profile)
   if (req.method === 'POST' && pathname === '/api/profiles') {
     let body = '';
