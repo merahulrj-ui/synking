@@ -62,3 +62,9 @@ The following core modules are cryptographically and strictly locked:
 ## 4. Enforcement
 - Any proposed change violating this policy must be rejected immediately by the AI agent with a notification to the user.
 - Any new features must be presented as separate, standalone files.
+
+---
+
+## 5. Background Task Management
+- Always kill/terminate any subagents immediately after their specific task is completed.
+- DO NOT build APKs or run heavy compilation tasks locally on the user's PC, always use external/cloud CI (like Github Actions) to avoid freezing the system.
