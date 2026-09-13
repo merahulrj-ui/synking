@@ -16,7 +16,13 @@ import { Ionicons } from '@expo/vector-icons';
 import { LinearGradient } from 'expo-linear-gradient';
 import { useApp } from '../contexts/AppContext';
 import { getLocalBackendUrl } from '../services/firebase';
+import { GoogleSignin, statusCodes } from '@react-native-google-signin/google-signin';
 import * as Haptics from 'expo-haptics';
+
+GoogleSignin.configure({
+  webClientId: '816527505911-9aoc1h8930b42cpqi4eo8dlutk3ndcv9.apps.googleusercontent.com',
+  offlineAccess: true,
+});
 
 interface Props {
   onSuccess?: () => void;
@@ -233,13 +239,37 @@ export const AuthLandingScreen: React.FC<Props> = ({
         }
       }
 
-      // Native Mobile: Open Google Auth Bridge
+      // Native Mobile: Native Google Sign-In
       if (Platform.OS !== 'web') {
-        const bridgeUrl = 'https://synkin.in/auth/google';
         try {
-          await Linking.openURL(bridgeUrl);
-        } catch (linkErr) {
-          Alert.alert('Google Sign-In', 'Please continue using your phone number or email.');
+          await GoogleSignin.hasPlayServices({ showPlayServicesUpdateDialog: true });
+          const userInfo = await GoogleSignin.signIn();
+          const googleUser = userInfo.user;
+          
+          if (googleUser && googleUser.id) {
+            const parsedUser = {
+              id: 'usr_' + googleUser.id.substring(0, 14), // mock a synking ID format
+              name: googleUser.name || 'Google Member',
+              email: googleUser.email,
+              photo: googleUser.photo || 'https://images.unsplash.com/photo-1535713875002-d1d0cf377fde?w=800',
+            };
+            
+            // Set pending user and ask for phone verify (just like deep link)
+            setPendingGoogleUser(parsedUser);
+            setMode('phone_verify' as any);
+            setIsLoading(false);
+            if (Platform.OS !== 'web') Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
+          }
+        } catch (error: any) {
+          if (error.code === statusCodes.SIGN_IN_CANCELLED) {
+            // user cancelled the login flow
+          } else if (error.code === statusCodes.IN_PROGRESS) {
+            // operation (e.g. sign in) is in progress already
+          } else if (error.code === statusCodes.PLAY_SERVICES_NOT_AVAILABLE) {
+            Alert.alert('Google Play Services', 'Play Services not available or outdated.');
+          } else {
+            Alert.alert('Google Sign-In Error', error.message || 'Something went wrong');
+          }
         }
         setIsLoading(false);
         return;
