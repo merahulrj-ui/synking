@@ -1,0 +1,105 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Synkin APK — Live Testing Portal ⚡</title>
+  <link rel="icon" href="/images/favicon.png" type="image/png" />
+  <link rel="apple-touch-icon" href="/images/icon.png" />
+  <meta name="theme-color" content="#000000" />
+  <style>
+    * { box-sizing: border-box; margin: 0; padding: 0; font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif; }
+    body { background-color: #000000; color: #FFFFFF; min-height: 100vh; display: flex; flex-direction: column; align-items: center; justify-content: center; padding: 24px 16px; position: relative; overflow-x: hidden; }
+    .glow-top { position: fixed; top: -120px; left: 50%; transform: translateX(-50%); width: 500px; height: 350px; background: radial-gradient(circle, rgba(253, 58, 115, 0.25) 0%, rgba(142, 45, 226, 0.15) 50%, transparent 80%); filter: blur(60px); pointer-events: none; z-index: 0; }
+    .container { position: relative; z-index: 10; width: 100%; max-width: 460px; background: rgba(12, 7, 20, 0.85); border: 1px solid rgba(255, 255, 255, 0.12); border-radius: 28px; padding: 32px 24px; box-shadow: 0 20px 60px rgba(0, 0, 0, 0.9), 0 0 30px rgba(253, 58, 115, 0.18); backdrop-filter: blur(20px); text-align: center; }
+    .badge { display: inline-flex; align-items: center; gap: 6px; padding: 6px 14px; background: rgba(253, 58, 115, 0.12); border: 1px solid rgba(253, 58, 115, 0.3); border-radius: 20px; color: #FD3A73; font-size: 11px; font-weight: 700; letter-spacing: 0.5px; text-transform: uppercase; margin-bottom: 20px; }
+    .pulse-dot { width: 8px; height: 8px; border-radius: 4px; background: #22C55E; box-shadow: 0 0 10px #22C55E; animation: pulse 2s infinite; }
+    @keyframes pulse { 0%, 100% { opacity: 1; transform: scale(1); } 50% { opacity: 0.5; transform: scale(0.85); } }
+    .logo-box { width: 88px; height: 88px; margin: 0 auto 16px; background: radial-gradient(circle, rgba(253, 58, 115, 0.2) 0%, #000 80%); border: 2px solid rgba(253, 58, 115, 0.5); border-radius: 24px; display: flex; align-items: center; justify-content: center; padding: 10px; box-shadow: 0 0 25px rgba(253, 58, 115, 0.35); }
+    .logo-box img { width: 100%; height: 100%; object-fit: contain; }
+    h1 { font-size: 26px; font-weight: 900; letter-spacing: -0.5px; margin-bottom: 6px; }
+    h1 span { color: #FD3A73; }
+    p.subtitle { font-size: 13px; color: #94A3B8; margin-bottom: 24px; line-height: 1.5; }
+    .qr-card { background: #050308; border: 1px solid rgba(255, 255, 255, 0.08); border-radius: 20px; padding: 18px; margin-bottom: 24px; display: flex; flex-direction: column; align-items: center; gap: 12px; }
+    .qr-box { width: 200px; height: 200px; background: #0A0714; border: 2px solid rgba(253, 58, 115, 0.4); border-radius: 18px; padding: 10px; box-shadow: 0 0 20px rgba(253, 58, 115, 0.2); }
+    .qr-box img { width: 100%; height: 100%; border-radius: 10px; object-fit: contain; }
+    .qr-hint { font-size: 12px; color: #CBD5E1; font-weight: 600; }
+    .download-btn { display: flex; align-items: center; justify-content: center; gap: 10px; width: 100%; padding: 16px 20px; background: linear-gradient(135deg, #FD3A73 0%, #E11D48 100%); color: #FFFFFF; text-decoration: none; font-size: 15px; font-weight: 800; border-radius: 18px; box-shadow: 0 10px 30px rgba(253, 58, 115, 0.4); transition: all 0.2s ease; margin-bottom: 14px; border: none; cursor: pointer; }
+    .download-btn:hover { transform: translateY(-2px); box-shadow: 0 14px 36px rgba(253, 58, 115, 0.55); }
+    .download-btn:active { transform: scale(0.98); }
+    .copy-box { display: flex; align-items: center; background: #050308; border: 1px solid rgba(255, 255, 255, 0.1); border-radius: 12px; padding: 6px 6px 6px 12px; gap: 8px; margin-bottom: 24px; }
+    .copy-text { flex: 1; font-size: 12px; color: #94A3B8; font-family: monospace; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; text-align: left; }
+    .copy-btn { background: rgba(255, 255, 255, 0.1); border: 1px solid rgba(255, 255, 255, 0.15); color: #FFF; padding: 8px 14px; border-radius: 8px; font-size: 11px; font-weight: 700; cursor: pointer; }
+    .copy-btn:hover { background: rgba(253, 58, 115, 0.3); }
+    .steps { text-align: left; background: rgba(255, 255, 255, 0.03); border: 1px solid rgba(255, 255, 255, 0.06); border-radius: 16px; padding: 16px; gap: 10px; display: flex; flex-direction: column; }
+    .step-item { display: flex; align-items: flex-start; gap: 10px; font-size: 12px; color: #CBD5E1; line-height: 1.4; }
+    .step-num { background: rgba(253, 58, 115, 0.2); color: #FD3A73; font-weight: 800; width: 20px; height: 20px; border-radius: 10px; display: flex; align-items: center; justify-content: center; font-size: 10px; flex-shrink: 0; margin-top: 1px; }
+    footer { margin-top: 24px; font-size: 11px; color: #64748B; text-align: center; }
+    footer a { color: #FD3A73; text-decoration: none; }
+  </style>
+</head>
+<body>
+  <div class="glow-top"></div>
+  <div class="container">
+    <div class="badge">
+      <span class="pulse-dot"></span>
+      <span>Official Testing Portal</span>
+    </div>
+    <div class="logo-box">
+      <img src="/images/logo_emblem.png" alt="Synkin Emblem" />
+    </div>
+    <h1>Synkin<span>.</span> APK</h1>
+    <p class="subtitle">Direct Android Test Build with Real Google Sign-In &amp; Instant Over-The-Air Updates</p>
+    <div class="qr-card">
+      <div class="qr-box">
+        <img src="https://api.qrserver.com/v1/create-qr-code/?size=260x260&data=https://synkin.in/download/apk&color=FD3A73&bgcolor=0A0714" alt="Scan QR to Download Synkin APK" />
+      </div>
+      <div class="qr-hint">📷 Camera se scan karke direct phone pe download karein</div>
+    </div>
+    <a href="/download/apk" class="download-btn">
+      <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5">
+        <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path>
+        <polyline points="7 10 12 15 17 10"></polyline>
+        <line x1="12" y1="15" x2="12" y2="3"></line>
+      </svg>
+      Download Synkin APK (Direct)
+    </a>
+    <div class="copy-box">
+      <span class="copy-text" id="linkText">https://synkin.in/download/apk</span>
+      <button class="copy-btn" onclick="copyLink()">Copy Link</button>
+    </div>
+    <div class="steps">
+      <div class="step-item">
+        <div class="step-num">1</div>
+        <div>Button tap karein ya camera se QR code scan karke APK download karein.</div>
+      </div>
+      <div class="step-item">
+        <div class="step-num">2</div>
+        <div>Agar prompt aaye to <b>Settings &gt; Allow from this source</b> enable karke install karein.</div>
+      </div>
+      <div class="step-item">
+        <div class="step-num">3</div>
+        <div>App open karein — <b>Continue with Google</b> ya <b>Sign In with Phone</b> se direct test karein!</div>
+      </div>
+    </div>
+    <footer>
+      A Product of <b>⚡ JAYANTI CYBERNETICS ⚡</b><br />
+      <span style="opacity: 0.7;">Web Version: <a href="/app">synkin.in/app</a></span>
+    </footer>
+  </div>
+  <script>
+    function copyLink() {
+      const link = document.getElementById('linkText').innerText;
+      navigator.clipboard.writeText(link).then(() => {
+        const btn = document.querySelector('.copy-btn');
+        btn.innerText = 'Copied! ✓';
+        btn.style.background = '#22C55E';
+        setTimeout(() => {
+          btn.innerText = 'Copy Link';
+          btn.style.background = 'rgba(255, 255, 255, 0.1)';
+        }, 2000);
+      });
+    }
+  </script>
+</body>
+</html>
