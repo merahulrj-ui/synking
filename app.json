@@ -2,7 +2,7 @@
   "expo": {
     "name": "Synkin",
     "slug": "synking",
-    "version": "1.0.71",
+    "version": "1.0.72",
     "orientation": "portrait",
     "icon": "./assets/images/icon.png",
     "scheme": "synking",
@@ -30,6 +30,7 @@
     },
     "android": {
       "package": "com.synking",
+      "versionCode": 72,
       "googleServicesFile": "./google-services.json",
       "adaptiveIcon": {
         "backgroundColor": "#FFFFFF",
