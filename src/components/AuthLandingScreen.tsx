@@ -53,9 +53,13 @@ export const AuthLandingScreen: React.FC<Props> = ({
   const [isEmailSignUp, setIsEmailSignUp] = useState(false);
 
   // Phone Flow States
+  type PhoneAuthStep = 'phone_input' | 'phone_otp' | 'email_input' | 'email_otp';
+  const [phoneStep, setPhoneStep] = useState<PhoneAuthStep>('phone_input');
   const [phone, setPhone] = useState('');
   const [phoneOtp, setPhoneOtp] = useState('');
   const [phoneOtpSent, setPhoneOtpSent] = useState(false);
+  const [phoneEmail, setPhoneEmail] = useState('');
+  const [emailOtp, setEmailOtp] = useState('');
   const [phoneName, setPhoneName] = useState('');
   const [phoneAge, setPhoneAge] = useState('22');
   const [phoneGender, setPhoneGender] = useState<'male' | 'female'>('male');
@@ -358,10 +362,16 @@ export const AuthLandingScreen: React.FC<Props> = ({
   };
 
   // --- PHONE OTP SENDER ---
+  // --- PHONE OTP SENDER ---
   const handleSendPhoneOtp = async () => {
     const cleanDigits = phone.replace(/\D/g, '').slice(-10);
     if (!cleanDigits || cleanDigits.length !== 10) {
       Alert.alert('Invalid Mobile', 'Please enter a valid 10-digit Indian mobile number.');
+      return;
+    }
+
+    if (!pendingGoogleUser && phoneName.trim().length < 2) {
+      Alert.alert('Name Required', 'Please enter your name to continue.');
       return;
     }
 
@@ -379,14 +389,17 @@ export const AuthLandingScreen: React.FC<Props> = ({
       if (checkRes.ok) {
         const checkData = await checkRes.json();
         if (checkData.exists && checkData.user) {
-          setPhoneName(checkData.user.name || '');
+          setPhoneName(checkData.user.name || phoneName);
           setPhoneGender(checkData.user.gender || 'male');
           setPhoneAge(String(checkData.user.age || 22));
+          if (checkData.user.email) setPhoneEmail(checkData.user.email);
         }
       }
+      setPhoneStep('phone_otp');
       setPhoneOtpSent(true);
       setPhoneOtp('');
     } catch (e) {
+      setPhoneStep('phone_otp');
       setPhoneOtpSent(true);
     } finally {
       setIsLoading(false);
@@ -417,17 +430,14 @@ export const AuthLandingScreen: React.FC<Props> = ({
         }
       }
 
-      let finalUser;
-
       if (pendingGoogleUser) {
         // We are linking a phone to a Google login
-        finalUser = {
+        let finalUser = {
           ...pendingGoogleUser,
           phoneNumber: formatted,
           isVerified: true,
           isOnboardingComplete: dbUser?.isOnboardingComplete === true ? true : false,
         };
-        // if dbUser exists, maybe merge them here. For now, prefer Google data + verified phone
         if (dbUser) {
           finalUser = {
             ...dbUser,
@@ -435,52 +445,116 @@ export const AuthLandingScreen: React.FC<Props> = ({
             isOnboardingComplete: dbUser.isOnboardingComplete === true ? true : false,
           };
         }
-      } else if (dbUser) {
-        finalUser = {
-          ...dbUser,
-          isOnboardingComplete: dbUser.isOnboardingComplete === true ? true : false,
-        };
-      } else {
-        const defaultPhoto = phoneGender === 'female'
-          ? 'https://images.unsplash.com/photo-1494790108377-be9c29b29330?w=800'
-          : 'https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?w=800';
-
-        finalUser = {
-          id: 'usr_' + Math.random().toString(16).slice(2, 18),
-          name: phoneName.trim() || (phoneGender === 'female' ? 'Priya' : 'Rahul'),
-          age: parseInt(phoneAge, 10) || 22,
-          gender: phoneGender,
-          occupation: phoneGender === 'female' ? 'UI/UX Designer' : 'Software Engineer',
-          location: 'Roorkee',
-          phoneNumber: formatted,
-          distance: '0 km',
-          bio: 'Coffee lover & great conversations ☕ Looking to meet genuine people!',
-          photo: defaultPhoto,
-          photos: [defaultPhoto],
-          interests: ['☕ Specialty Coffee', '🎸 Indie Music', '🚗 Road Trips', '🤖 Tech & AI'],
-          lookingFor: '💘 Long-term partner',
-          zodiac: phoneGender === 'female' ? 'Virgo ♍' : 'Leo ♌',
-          workout: 'Often 🏃',
-          drinking: 'Socially 🥂',
-          smoking: 'Non-smoker 🚭',
-          dietary: 'Vegetarian 🥦',
-          pets: phoneGender === 'female' ? 'Cat Person 🐱' : 'Dog Lover 🐶',
-          height: phoneGender === 'female' ? '5 ft 5 in' : '5 ft 10 in',
-          hometown: 'Roorkee, UK',
-          compatibility: 100,
-          isVerified: true,
-          isVip: false,
-          isOnboardingComplete: false, // Force new users to onboard
-        };
+        await loginUser(finalUser);
+        setIsLoading(false);
+        onSuccess && onSuccess();
+        onClose && onClose();
+        Alert.alert('Phone Linked! 🔗', 'Your verified profile is active.');
+        return;
       }
+
+      // Returning user who already completed onboarding and has email
+      if (dbUser && dbUser.isOnboardingComplete === true && dbUser.email) {
+        await loginUser(dbUser);
+        setIsLoading(false);
+        onSuccess && onSuccess();
+        onClose && onClose();
+        Alert.alert('Welcome Back! 🎉', 'Logged in as ' + dbUser.name);
+        return;
+      }
+
+      // Fresh mobile flow: advance to Email step
+      setPhoneStep('email_input');
+      setIsLoading(false);
+      if (Platform.OS !== 'web') Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
+    } catch (e: any) {
+      Alert.alert('Login Error', e?.message || 'Could not verify code');
+      setIsLoading(false);
+    }
+  };
+
+  // --- EMAIL OTP SENDER FOR MOBILE FLOW ---
+  const handleSendEmailOtp = async () => {
+    const cleanEmail = phoneEmail.trim().toLowerCase();
+    if (!cleanEmail || !cleanEmail.includes('@') || !cleanEmail.includes('.')) {
+      Alert.alert('Invalid Email', 'Please enter a valid email address.');
+      return;
+    }
+
+    triggerHaptic();
+    setIsLoading(true);
+
+    try {
+      setEmailOtp('');
+      setPhoneStep('email_otp');
+      if (Platform.OS !== 'web') Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
+    } catch (e: any) {
+      Alert.alert('Error', e?.message || 'Could not send verification code');
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  // --- EMAIL OTP VERIFIER FOR MOBILE FLOW ---
+  const handleVerifyEmailOtp = async () => {
+    if (!emailOtp || (emailOtp.length !== 4 && emailOtp.length !== 6)) {
+      Alert.alert('OTP Required', 'Please enter the verification code sent to your email.');
+      return;
+    }
+
+    if (emailOtp !== '123456') {
+      Alert.alert('Invalid Code', 'The verification code is incorrect. Use 123456 for testing.');
+      return;
+    }
+
+    triggerHaptic();
+    setIsLoading(true);
+
+    try {
+      const cleanDigits = phone.replace(/\D/g, '').slice(-10);
+      const formatted = '+91 ' + cleanDigits;
+      const cleanEmail = phoneEmail.trim().toLowerCase();
+
+      const defaultPhoto = phoneGender === 'female'
+        ? 'https://images.unsplash.com/photo-1494790108377-be9c29b29330?w=800'
+        : 'https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?w=800';
+
+      const finalUser = {
+        id: 'usr_' + Math.random().toString(16).slice(2, 18),
+        name: phoneName.trim() || (phoneGender === 'female' ? 'Priya' : 'Rahul'),
+        email: cleanEmail,
+        age: parseInt(phoneAge, 10) || 22,
+        gender: phoneGender,
+        occupation: phoneGender === 'female' ? 'UI/UX Designer' : 'Software Engineer',
+        location: 'Roorkee',
+        phoneNumber: formatted,
+        distance: '0 km',
+        bio: 'Coffee lover & great conversations ☕ Looking to meet genuine people!',
+        photo: defaultPhoto,
+        photos: [defaultPhoto],
+        interests: ['☕ Specialty Coffee', '🎸 Indie Music', '🚗 Road Trips', '🤖 Tech & AI'],
+        lookingFor: '💘 Long-term partner',
+        zodiac: phoneGender === 'female' ? 'Virgo ♍' : 'Leo ♌',
+        workout: 'Often 🏃',
+        drinking: 'Socially 🥂',
+        smoking: 'Non-smoker 🚭',
+        dietary: 'Vegetarian 🥦',
+        pets: phoneGender === 'female' ? 'Cat Person 🐱' : 'Dog Lover 🐶',
+        height: phoneGender === 'female' ? '5 ft 5 in' : '5 ft 10 in',
+        hometown: 'Roorkee, UK',
+        compatibility: 100,
+        isVerified: true,
+        isVip: false,
+        isOnboardingComplete: false, // Forces immediate 9-step onboarding
+      };
 
       await loginUser(finalUser);
       setIsLoading(false);
       onSuccess && onSuccess();
       onClose && onClose();
-      Alert.alert(pendingGoogleUser ? 'Phone Linked! 🔗' : 'Welcome to Synkin! 🎉', 'Your verified profile is active.');
+      Alert.alert('Verified! 🎉', 'Welcome ' + finalUser.name + '! Let us complete your profile.');
     } catch (e: any) {
-      Alert.alert('Login Error', e?.message || 'Could not verify code');
+      Alert.alert('Verification Error', e?.message || 'Could not verify email');
     } finally {
       setIsLoading(false);
     }
@@ -736,6 +810,7 @@ export const AuthLandingScreen: React.FC<Props> = ({
             <TouchableOpacity
               style={styles.backBtn}
               onPress={() => {
+                setPhoneStep('phone_input');
                 setPhoneOtpSent(false);
                 setMode('landing');
                 setPendingGoogleUser(null);
@@ -746,22 +821,30 @@ export const AuthLandingScreen: React.FC<Props> = ({
               <Text style={styles.backBtnText}>All Sign-in Options</Text>
             </TouchableOpacity>
 
+            {/* STAGE HEADER */}
             <Text style={styles.formTitle}>
-              {phoneOtpSent
-                ? 'Verify OTP 📲'
-                : pendingGoogleUser
-                ? `Welcome, ${pendingGoogleUser.name || 'there'}! 👋`
-                : 'Mobile Sign In 📱'}
+              {phoneStep === 'phone_input'
+                ? (pendingGoogleUser ? `Welcome, ${pendingGoogleUser.name || 'there'}! 👋` : 'Mobile Sign In 📱')
+                : phoneStep === 'phone_otp'
+                ? 'Verify Mobile OTP 📲'
+                : phoneStep === 'email_input'
+                ? 'Link your Email ✉️'
+                : 'Verify Email Code 📩'}
             </Text>
             <Text style={styles.formSubtitle}>
-              {phoneOtpSent
-                ? 'Enter the 6-digit code sent to +91 ' + phone.replace(/\D/g, '').slice(-10)
-                : pendingGoogleUser
-                ? 'Enter your mobile number to link your account & continue'
-                : 'Enter your 10-digit Indian mobile number'}
+              {phoneStep === 'phone_input'
+                ? (pendingGoogleUser
+                    ? 'Enter your mobile number to link your account & continue'
+                    : 'Enter your name and mobile number to get started')
+                : phoneStep === 'phone_otp'
+                ? `Enter the 6-digit code sent to +91 ${phone.replace(/\D/g, '').slice(-10)}`
+                : phoneStep === 'email_input'
+                ? `Phone verified! Enter your email address to secure your profile`
+                : `Enter the 6-digit code sent to ${phoneEmail}`}
             </Text>
 
-            {!phoneOtpSent ? (
+            {/* STAGE 1: PHONE & NAME INPUT */}
+            {phoneStep === 'phone_input' && (
               <>
                 {pendingGoogleUser && (
                   <View style={styles.googleUserBadge}>
@@ -834,9 +917,12 @@ export const AuthLandingScreen: React.FC<Props> = ({
                   </TouchableOpacity>
                 )}
               </>
-            ) : (
+            )}
+
+            {/* STAGE 2: PHONE OTP */}
+            {phoneStep === 'phone_otp' && (
               <>
-                <Text style={styles.inputLabel}>Enter Verification Code</Text>
+                <Text style={styles.inputLabel}>Enter 6-Digit SMS Code</Text>
                 <View style={styles.inputRow}>
                   <TextInput
                     style={[styles.textInput, { textAlign: 'center', fontSize: 24, letterSpacing: 8, fontFamily: 'Poppins_900Black' }]}
@@ -849,6 +935,9 @@ export const AuthLandingScreen: React.FC<Props> = ({
                     autoFocus
                   />
                 </View>
+                <Text style={{ fontSize: 11.5, color: '#94A3B8', fontFamily: 'Poppins_400Regular', textAlign: 'center', marginTop: 6 }}>
+                  Testing OTP: <Text style={{ color: '#FD3A73', fontFamily: 'Poppins_700Bold' }}>123456</Text>
+                </Text>
 
                 {isLoading ? (
                   <ActivityIndicator size="large" color="#FFFFFF" style={{ marginVertical: 24 }} />
@@ -858,16 +947,110 @@ export const AuthLandingScreen: React.FC<Props> = ({
                     onPress={handleVerifyPhoneOtp}
                     activeOpacity={0.88}
                   >
-                    <Text style={styles.solidSubmitBtnText}>Verify & Enter Synkin 🔥</Text>
+                    <Text style={styles.solidSubmitBtnText}>
+                      {pendingGoogleUser ? 'Verify & Enter Synkin 🔥' : 'Verify Phone Code ⚡'}
+                    </Text>
                   </TouchableOpacity>
                 )}
 
                 <TouchableOpacity
                   style={{ alignSelf: 'center', marginTop: 14 }}
-                  onPress={() => setPhoneOtpSent(false)}
+                  onPress={() => setPhoneStep('phone_input')}
                 >
                   <Text style={{ color: '#FFFFFF', fontFamily: 'Poppins_700Bold', fontSize: 13 }}>
                     ← Change Phone Number
+                  </Text>
+                </TouchableOpacity>
+              </>
+            )}
+
+            {/* STAGE 3: EMAIL INPUT (FOR MOBILE FLOW) */}
+            {phoneStep === 'email_input' && (
+              <>
+                <View style={[styles.googleUserBadge, { borderColor: '#22C55E' }]}>
+                  <Ionicons name="checkmark-circle" size={24} color="#22C55E" />
+                  <View style={{ flex: 1 }}>
+                    <Text style={styles.googleUserName}>Phone Verified</Text>
+                    <Text style={styles.googleUserEmail}>+91 {phone.replace(/\D/g, '').slice(-10)}</Text>
+                  </View>
+                </View>
+
+                <Text style={styles.inputLabel}>Your Email Address</Text>
+                <View style={styles.inputRow}>
+                  <Ionicons name="mail-outline" size={18} color="#94A3B8" style={{ marginRight: 10 }} />
+                  <TextInput
+                    style={styles.textInput}
+                    placeholder="name@example.com"
+                    placeholderTextColor="#64748B"
+                    keyboardType="email-address"
+                    autoCapitalize="none"
+                    value={phoneEmail}
+                    onChangeText={setPhoneEmail}
+                    autoFocus
+                  />
+                </View>
+
+                {isLoading ? (
+                  <ActivityIndicator size="large" color="#FFFFFF" style={{ marginVertical: 24 }} />
+                ) : (
+                  <TouchableOpacity
+                    style={styles.solidSubmitBtn}
+                    onPress={handleSendEmailOtp}
+                    activeOpacity={0.88}
+                  >
+                    <Text style={styles.solidSubmitBtnText}>Send Email Verification Code 🚀</Text>
+                  </TouchableOpacity>
+                )}
+
+                <TouchableOpacity
+                  style={{ alignSelf: 'center', marginTop: 14 }}
+                  onPress={() => setPhoneStep('phone_otp')}
+                >
+                  <Text style={{ color: '#FFFFFF', fontFamily: 'Poppins_700Bold', fontSize: 13 }}>
+                    ← Back to Phone Verification
+                  </Text>
+                </TouchableOpacity>
+              </>
+            )}
+
+            {/* STAGE 4: EMAIL OTP (FOR MOBILE FLOW) */}
+            {phoneStep === 'email_otp' && (
+              <>
+                <Text style={styles.inputLabel}>Enter 6-Digit Email Code</Text>
+                <View style={styles.inputRow}>
+                  <TextInput
+                    style={[styles.textInput, { textAlign: 'center', fontSize: 24, letterSpacing: 8, fontFamily: 'Poppins_900Black' }]}
+                    placeholder="••••••"
+                    placeholderTextColor="#64748B"
+                    keyboardType="number-pad"
+                    maxLength={6}
+                    value={emailOtp}
+                    onChangeText={setEmailOtp}
+                    autoFocus
+                  />
+                </View>
+                <Text style={{ fontSize: 11.5, color: '#94A3B8', fontFamily: 'Poppins_400Regular', textAlign: 'center', marginTop: 6 }}>
+                  Testing OTP: <Text style={{ color: '#FD3A73', fontFamily: 'Poppins_700Bold' }}>123456</Text>
+                </Text>
+
+                {isLoading ? (
+                  <ActivityIndicator size="large" color="#FFFFFF" style={{ marginVertical: 24 }} />
+                ) : (
+                  <TouchableOpacity
+                    style={styles.solidSubmitBtn}
+                    onPress={handleVerifyEmailOtp}
+                    activeOpacity={0.88}
+                  >
+                    <Text style={styles.solidSubmitBtnText}>Verify & Start 9-Step Setup 🔥</Text>
+                  </TouchableOpacity>
+                )}
+
+                <TouchableOpacity
+                  style={{ alignSelf: 'center', marginTop: 14 }}
+                  onPress={() => setPhoneStep('email_input')}
+                >
+                  <Text style={{ color: '#FFFFFF', fontFamily: 'Poppins_700Bold', fontSize: 13 }}>
+                    ← Change Email Address
                   </Text>
                 </TouchableOpacity>
               </>
