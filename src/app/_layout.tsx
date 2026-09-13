@@ -11,6 +11,7 @@ import { useFonts, Poppins_400Regular, Poppins_500Medium, Poppins_600SemiBold, P
 
 import { CallModal } from '../components/CallModal';
 import { InAppNotificationBanner } from '../components/InAppNotificationBanner';
+import { AuthLandingScreen } from '../components/AuthLandingScreen';
 import { WebRTCService } from '../services/webrtcService';
 import { NativeRTCView } from '../services/webrtcCore';
 import { CallSession } from '../types';
@@ -404,7 +405,7 @@ function GlobalCallOverlay() {
 }
 
 function RootLayoutContent() {
-  const { isDarkMode } = useApp();
+  const { isDarkMode, isLoggedIn } = useApp();
 
   useEffect(() => {
     if (Platform.OS === 'android') {
@@ -414,6 +415,21 @@ function RootLayoutContent() {
       } catch (e) {}
     }
   }, [isDarkMode]);
+
+  // Not logged in → show AuthLandingScreen full screen (no tabs, no Stack)
+  if (!isLoggedIn) {
+    return (
+      <>
+        <RNStatusBar
+          barStyle="light-content"
+          backgroundColor="#000000"
+          translucent={false}
+        />
+        <StatusBar style="light" />
+        <AuthLandingScreen showCloseButton={false} />
+      </>
+    );
+  }
 
   return (
     <>
