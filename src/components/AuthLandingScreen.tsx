@@ -244,8 +244,15 @@ export const AuthLandingScreen: React.FC<Props> = ({
         try {
           await GoogleSignin.hasPlayServices({ showPlayServicesUpdateDialog: true });
           const userInfo = await GoogleSignin.signIn();
-          const googleUser = userInfo.user;
           
+          let googleUser = null;
+          if ('data' in userInfo && userInfo.data && userInfo.data.user) {
+            googleUser = userInfo.data.user;
+          } else if ('user' in userInfo && userInfo.user) {
+            // Fallback for older versions just in case
+            googleUser = (userInfo as any).user;
+          }
+
           if (googleUser && googleUser.id) {
             const parsedUser = {
               id: 'usr_' + googleUser.id.substring(0, 14), // mock a synking ID format
