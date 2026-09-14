@@ -1040,7 +1040,7 @@ Return strictly valid JSON:
                       )}
                     </View>
                     <Text style={[styles.stepLabel, isCurrent && styles.stepLabelActive, isDone && styles.stepLabelDone]}>
-                      {pose.label.replace('Turn Head ', '')}
+                      {pose.key === 'center' ? 'Center' : pose.key === 'left' ? 'Left' : 'Right'}
                     </Text>
                   </View>
                 );
