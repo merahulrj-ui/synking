@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useRef } from 'react';
+import React, { useState, useEffect, useRef, useCallback } from 'react';
 import {
   View,
   Text,
@@ -14,6 +14,8 @@ import {
   Animated,
   NativeModules,
 } from 'react-native';
+import Svg, { Circle } from 'react-native-svg';
+const AnimatedCircle = Animated.createAnimatedComponent(Circle);
 import { Ionicons } from '@expo/vector-icons';
 import { LinearGradient } from 'expo-linear-gradient';
 import { useApp } from '../contexts/AppContext';
@@ -220,6 +222,7 @@ export default function OnboardingScreen() {
   const autoCaptureTimerRef = useRef<any>(null);
   const consecutiveFailsRef = useRef<number>(0);
   const lastAutoCaptureTimeRef = useRef<number>(0);
+  const arcProgressAnim = useRef(new Animated.Value(0)).current;
   const [biometricPoses, setBiometricPoses] = useState<BiometricPose[]>(getRandomPoseSequence);
   const [currentPoseIdx, setCurrentPoseIdx] = useState(0);
   const currentPose = biometricPoses[currentPoseIdx] || biometricPoses[0];
@@ -583,7 +586,7 @@ Return STRICT JSON only:
     }
   };
 
-  // 🎯 Auto-Capture Engine: Hands-free automatic snap when face aligns and oval turns green
+  // 🎯 Auto-Capture Engine: Smooth circular arc fills up → auto-snap when complete
   useEffect(() => {
     if (
       step !== 8 ||
@@ -594,52 +597,57 @@ Return STRICT JSON only:
       capturedPoses.length >= 3 ||
       sessionCompletedRef.current
     ) {
-      if (autoCaptureTimerRef.current) {
-        clearInterval(autoCaptureTimerRef.current);
-        autoCaptureTimerRef.current = null;
-      }
+      arcProgressAnim.stopAnimation();
+      arcProgressAnim.setValue(0);
       setAutoCountdown(null);
       return;
     }
 
-    // Cooldown: Wait 3.5s after last auto-capture before starting next timer
+    // Cooldown: Wait 3s after last auto-capture before starting next arc
     const timeSinceLast = Date.now() - lastAutoCaptureTimeRef.current;
-    if (timeSinceLast < 3500) {
-      const cooldownRemaining = 3500 - timeSinceLast;
+    if (timeSinceLast < 3000) {
+      const cooldownRemaining = 3000 - timeSinceLast;
       const cooldownTimer = setTimeout(() => {
-        // Trigger re-render to re-evaluate this effect after cooldown
-        setAutoCountdown(null);
+        setAutoCountdown(null); // re-trigger effect
       }, cooldownRemaining);
       return () => clearTimeout(cooldownTimer);
     }
 
-    // Auto-countdown: 2s positioning hold, then ring turns GREEN and auto-snaps!
-    let remaining = 2;
-    setAutoCountdown(2);
+    // Start smooth arc fill: 0 → 1 over 2.4 seconds
+    setAutoCountdown(1); // signals arc is active
     setSensorStatus('searching');
+    arcProgressAnim.setValue(0);
 
-    const timer = setInterval(() => {
-      remaining -= 1;
-      if (remaining === 1) {
-        setAutoCountdown(1);
-        setSensorStatus('locked'); // Turns oval ring GREEN!
+    // Listener to turn green at 70%
+    const listenerId = arcProgressAnim.addListener(({ value }) => {
+      if (value >= 0.7 && sensorStatus !== 'locked') {
+        setSensorStatus('locked');
         if (Platform.OS !== 'web') {
           Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
         }
-      } else if (remaining <= 0) {
-        clearInterval(timer);
-        autoCaptureTimerRef.current = null;
+      }
+    });
+
+    Animated.timing(arcProgressAnim, {
+      toValue: 1,
+      duration: 2400,
+      useNativeDriver: false,
+    }).start(({ finished }) => {
+      arcProgressAnim.removeListener(listenerId);
+      if (finished) {
+        // Arc complete → auto-snap!
         setAutoCountdown(0);
-        lastAutoCaptureTimeRef.current = Date.now(); // Stamp cooldown
+        lastAutoCaptureTimeRef.current = Date.now();
+        if (Platform.OS !== 'web') {
+          Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
+        }
         snapAndVerifyPose();
       }
-    }, 1200);
-
-    autoCaptureTimerRef.current = timer;
+    });
 
     return () => {
-      clearInterval(timer);
-      autoCaptureTimerRef.current = null;
+      arcProgressAnim.removeListener(listenerId);
+      arcProgressAnim.stopAnimation();
     };
   }, [
     step,
@@ -1190,6 +1198,54 @@ Return strictly valid JSON:
               </View>
             ) : (
               <View style={styles.ovalWrapper}>
+                {/* SVG Progress Arc Ring around Oval */}
+                {autoCountdown !== null && !isBiometricVerified && !isAiScanning && (() => {
+                  const ovalW = 228; // oval width + padding
+                  const ovalH = 298; // oval height + padding
+                  const strokeW = 4;
+                  const rx = (ovalW / 2) - (strokeW / 2);
+                  const ry = (ovalH / 2) - (strokeW / 2);
+                  // Approximate ellipse circumference
+                  const circumference = Math.PI * (3 * (rx + ry) - Math.sqrt((3 * rx + ry) * (rx + 3 * ry)));
+                  const animatedOffset = arcProgressAnim.interpolate({
+                    inputRange: [0, 1],
+                    outputRange: [circumference, 0],
+                  });
+                  const arcColor = arcProgressAnim.interpolate({
+                    inputRange: [0, 0.69, 0.7, 1],
+                    outputRange: ['#00F2FE', '#00F2FE', '#22C55E', '#22C55E'],
+                  });
+                  return (
+                    <View style={{ position: 'absolute', zIndex: 10 }} pointerEvents="none">
+                      <Svg width={ovalW} height={ovalH}>
+                        {/* Background track */}
+                        <Circle
+                          cx={ovalW / 2}
+                          cy={ovalH / 2}
+                          r={(rx + ry) / 2}
+                          stroke="rgba(255,255,255,0.1)"
+                          strokeWidth={strokeW}
+                          fill="none"
+                        />
+                        {/* Animated progress arc */}
+                        <AnimatedCircle
+                          cx={ovalW / 2}
+                          cy={ovalH / 2}
+                          r={(rx + ry) / 2}
+                          stroke={arcColor}
+                          strokeWidth={strokeW}
+                          fill="none"
+                          strokeDasharray={circumference}
+                          strokeDashoffset={animatedOffset}
+                          strokeLinecap="round"
+                          rotation="-90"
+                          origin={`${ovalW / 2}, ${ovalH / 2}`}
+                        />
+                      </Svg>
+                    </View>
+                  );
+                })()}
+
                 <View
                   style={[
                     styles.ovalViewport,
@@ -1224,30 +1280,6 @@ Return strictly valid JSON:
                       },
                     ]}
                   />
-
-                  {/* Auto-Capture Badge inside Oval */}
-                  {autoCountdown !== null && !isBiometricVerified && !isAiScanning && (
-                    <View
-                      style={[
-                        styles.autoCountdownBadge,
-                        sensorStatus === 'locked' && styles.autoCountdownBadgeLocked,
-                      ]}
-                    >
-                      <Ionicons
-                        name={sensorStatus === 'locked' ? 'checkmark-circle' : 'scan-outline'}
-                        size={13}
-                        color={sensorStatus === 'locked' ? '#22C55E' : '#00F2FE'}
-                      />
-                      <Text
-                        style={[
-                          styles.autoCountdownBadgeText,
-                          sensorStatus === 'locked' && { color: '#22C55E' },
-                        ]}
-                      >
-                        {sensorStatus === 'locked' ? 'ALIGNED! AUTO-SNAPPING 📸' : `ALIGN & HOLD (${autoCountdown}s)`}
-                      </Text>
-                    </View>
-                  )}
 
                   {/* Specular Strobe Flash Overlay */}
                   {isStrobeActive && (
@@ -1384,9 +1416,11 @@ Return strictly valid JSON:
                 handleRetryVerification();
                 return;
               }
-              if (autoCaptureTimerRef.current) {
-                clearInterval(autoCaptureTimerRef.current);
-                autoCaptureTimerRef.current = null;
+              if (autoCountdown !== null) {
+                // Manual override: stop arc and snap now
+                arcProgressAnim.stopAnimation();
+                arcProgressAnim.setValue(0);
+                lastAutoCaptureTimeRef.current = Date.now();
               }
               snapAndVerifyPose();
               return;
@@ -1408,10 +1442,8 @@ Return strictly valid JSON:
                     ? 'Retry Biometric Scan 🔄'
                     : isCapturingPose
                     ? 'Verifying Pose... ⏳'
-                    : autoCountdown !== null && autoCountdown > 0
-                    ? `Auto-Snap in ${autoCountdown}s (or Tap Now) 📸`
-                    : sensorStatus === 'locked'
-                    ? 'Auto-Snapping... 📸'
+                    : autoCountdown !== null
+                    ? 'Auto-Capturing... (Tap to Snap Now) 📸'
                     : `Snap Pose ${currentPoseIdx + 1}/3: ${currentPose?.label || 'Snap'} 📸`)
                 : 'Continue'}
             </Text>
