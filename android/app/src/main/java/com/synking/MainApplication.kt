@@ -28,7 +28,6 @@ class MainApplication : Application(), ReactApplication {
         add(TelecomPackage())
         add(CallWakeLockPackage())
         add(FirebaseAuthPackage())
-        add(FaceDetectionPackage())
       }
     )
   }
