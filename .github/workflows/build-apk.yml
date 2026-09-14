@@ -30,7 +30,9 @@ jobs:
           java-version: '17'
 
       - name: 📱 Setup Android SDK
-        uses: android-actions/setup-android@v4
+        run: |
+          echo "sdk.dir=$ANDROID_HOME" > android/local.properties
+          yes | sdkmanager --licenses || true
 
       - name: 📦 Install Dependencies
         run: npm install --legacy-peer-deps
