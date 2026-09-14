@@ -219,6 +219,7 @@ export default function OnboardingScreen() {
   const [autoCountdown, setAutoCountdown] = useState<number | null>(null);
   const autoCaptureTimerRef = useRef<any>(null);
   const consecutiveFailsRef = useRef<number>(0);
+  const lastAutoCaptureTimeRef = useRef<number>(0);
   const [biometricPoses, setBiometricPoses] = useState<BiometricPose[]>(getRandomPoseSequence);
   const [currentPoseIdx, setCurrentPoseIdx] = useState(0);
   const currentPose = biometricPoses[currentPoseIdx] || biometricPoses[0];
@@ -601,7 +602,18 @@ Return STRICT JSON only:
       return;
     }
 
-    // Auto-countdown: 1.2s positioning hold, then ring turns GREEN for 1.2s and auto-snaps!
+    // Cooldown: Wait 3.5s after last auto-capture before starting next timer
+    const timeSinceLast = Date.now() - lastAutoCaptureTimeRef.current;
+    if (timeSinceLast < 3500) {
+      const cooldownRemaining = 3500 - timeSinceLast;
+      const cooldownTimer = setTimeout(() => {
+        // Trigger re-render to re-evaluate this effect after cooldown
+        setAutoCountdown(null);
+      }, cooldownRemaining);
+      return () => clearTimeout(cooldownTimer);
+    }
+
+    // Auto-countdown: 2s positioning hold, then ring turns GREEN and auto-snaps!
     let remaining = 2;
     setAutoCountdown(2);
     setSensorStatus('searching');
@@ -618,6 +630,7 @@ Return STRICT JSON only:
         clearInterval(timer);
         autoCaptureTimerRef.current = null;
         setAutoCountdown(0);
+        lastAutoCaptureTimeRef.current = Date.now(); // Stamp cooldown
         snapAndVerifyPose();
       }
     }, 1200);
@@ -636,6 +649,7 @@ Return STRICT JSON only:
     isAiScanning,
     isBiometricVerified,
     capturedPoses.length,
+    autoCountdown,
   ]);
 
   const runDualAiVerification = async (refPhotoUri: string, livePoseUris: string[]) => {
