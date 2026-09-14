@@ -382,38 +382,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
           }
         } catch (e) {}
       }
-      // Initial seed demo report so admin immediately sees how reports and unlock appeals appear
-      const initialSeed: BlockReport[] = [
-        {
-          id: 'report_sample_1',
-          blockedUserId: 'user_aman_77',
-          blockedUserName: 'Aman Gupta',
-          blockedUserPhone: '+91 98111 22334',
-          blockedUserPhoto: 'https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?w=500',
-          reportedByUserId: 'system_shield',
-          reportedByUserName: 'Synkin Safety Shield 🛡️',
-          reason: 'Contact Sharing Violation: Attempted to share Instagram ID & Phone number in chat',
-          timestamp: Date.now() - 3600000 * 5,
-          status: 'appeal_pending',
-          appealNote: 'Galti se chat me Instagram handle type ho gaya tha, aage se rules strictly follow karunga. Please account unblock kar dijiye.',
-          appealTimestamp: Date.now() - 3600000 * 2,
-        },
-        {
-          id: 'report_sample_2',
-          blockedUserId: 'user_rahul_99',
-          blockedUserName: 'Rahul Sharma',
-          blockedUserPhone: '+91 98765 43210',
-          blockedUserPhoto: 'https://images.unsplash.com/photo-1500648767791-00dcc994a43e?w=500',
-          reportedByUserId: 'user_ananya_22',
-          reportedByUserName: 'Ananya Verma',
-          reason: 'Inappropriate / Abusive messages in chat',
-          timestamp: Date.now() - 3600000 * 24,
-          status: 'blocked',
-          appealNote: undefined,
-        },
-      ];
-      setBlockReports(initialSeed);
-      AsyncStorage.setItem('@synkin_block_reports', JSON.stringify(initialSeed)).catch(() => {});
+      setBlockReports([]);
     });
   }, []);
 
@@ -690,8 +659,8 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
   }, [messages, readChatTimestamps, currentUser?.id]);
 
   const [safetyContact, setSafetyContact] = useState<SafetyContact>({
-    name: 'Emergency Contact',
-    phone: '+91 98765 43210'
+    name: '',
+    phone: ''
   });
 
   const [strikeCount, setStrikeCount] = useState(0);
@@ -1230,23 +1199,12 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
 
   // 2. Sync Real User Profiles & Incoming/Sent Requests from Cloud Firestore
   const syncCloudState = async () => {
-    // 0. Auto-Validate: Check if current logged-in user still exists on server
+    // 0. Auto-Validate & Self-Heal: Ensure current logged-in user profile exists on server
     if (currentUser && currentUser.id) {
       const exists = await checkUserExistsOnBackend(currentUser.id);
       if (!exists) {
-        console.log('🚨 [USER_NOT_FOUND_ON_SERVER] User was deleted by admin or database wiped. Auto-logging out.');
-        logoutUser();
-        setProfiles([]);
-        setMatches([]);
-        setIncomingRequests([]);
-        setSentRequests([]);
-        setMessages({});
-        if (Platform.OS === 'web') {
-          window.alert('Session Expired: Your profile is no longer active. Please sign in.');
-        } else {
-          Alert.alert('Session Expired', 'Your profile is no longer active. Please sign in again.');
-        }
-        return;
+        console.log('🔄 [USER_SYNC_RECOVER] Ensuring local user profile is synced to backend:', currentUser.id);
+        saveUserProfileToFirestore(currentUser).catch(() => {});
       }
     }
 
@@ -1354,15 +1312,8 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
             setCurrentUser(parsed);
             setIsLoggedIn(true);
 
-            // Verify if user was deleted on server in background
-            checkUserExistsOnBackend(parsed.id).then((exists) => {
-              if (!exists) {
-                console.log('🧹 [STALE_USER_PURGED] User does not exist on server. Clearing local storage.');
-                AsyncStorage.removeItem('synking_my_user');
-                setCurrentUser(null);
-                setIsLoggedIn(false);
-              }
-            }).catch(() => {});
+            // Ensure local user profile is synced with server on startup
+            saveUserProfileToFirestore(parsed).catch(() => {});
             return;
           }
         }
@@ -1418,7 +1369,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     }
     setTimeout(() => {
       syncCloudState();
-    }, 100);
+    }, 1500);
   };
 
   const logoutUser = () => {

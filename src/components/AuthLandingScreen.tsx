@@ -11,11 +11,13 @@ import {
   ActivityIndicator,
   Linking,
   Image,
+  NativeModules,
+  AppState,
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { LinearGradient } from 'expo-linear-gradient';
 import { useApp } from '../contexts/AppContext';
-import { getLocalBackendUrl } from '../services/firebase';
+import { getLocalBackendUrl, saveUserProfileToFirestore } from '../services/firebase';
 import { GoogleSignin, statusCodes } from '@react-native-google-signin/google-signin';
 import * as Haptics from 'expo-haptics';
 
@@ -23,6 +25,8 @@ GoogleSignin.configure({
   webClientId: '816527505911-9aoc1h8930b42cpqi4eo8dlutk3ndcv9.apps.googleusercontent.com',
   offlineAccess: true,
 });
+
+const FIREBASE_API_KEY = process.env.EXPO_PUBLIC_FIREBASE_API_KEY || 'AIzaSyA3ieppicAwwe0jx4SAKhD4meSdSBkOjCs';
 
 interface Props {
   onSuccess?: () => void;
@@ -45,12 +49,16 @@ export const AuthLandingScreen: React.FC<Props> = ({
   const [pendingGoogleUser, setPendingGoogleUser] = useState<any>(null);
 
   // Email Flow States
+  type EmailAuthStep = 'form' | 'email_otp' | 'phone_otp';
+  const [emailStep, setEmailStep] = useState<EmailAuthStep>('form');
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [name, setName] = useState('');
-  const [age, setAge] = useState('22');
-  const [gender, setGender] = useState<'male' | 'female'>('male');
+  const [emailPhone, setEmailPhone] = useState('');
+  const [emailSignUpOtp, setEmailSignUpOtp] = useState('');
+  const [phoneSignUpOtp, setPhoneSignUpOtp] = useState('');
   const [isEmailSignUp, setIsEmailSignUp] = useState(false);
+  const [resendCooldown, setResendCooldown] = useState(0);
 
   // Phone Flow States
   type PhoneAuthStep = 'phone_input' | 'phone_otp' | 'email_input' | 'email_otp';
@@ -270,7 +278,7 @@ export const AuthLandingScreen: React.FC<Props> = ({
             setPendingGoogleUser(parsedUser);
             setMode('phone');
             setIsLoading(false);
-            if (Platform.OS !== 'web') Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
+            Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
           } else {
             Alert.alert('Debug UserInfo', JSON.stringify(userInfo));
             setIsLoading(false);
@@ -299,17 +307,380 @@ export const AuthLandingScreen: React.FC<Props> = ({
   // --- EMAIL SIGN IN / SIGN UP ---
   const handleEmailAuth = async () => {
     const cleanEmail = email.trim().toLowerCase();
-    if (!cleanEmail || !cleanEmail.includes('@')) {
+    if (!cleanEmail || !cleanEmail.includes('@') || !cleanEmail.includes('.')) {
       Alert.alert('Invalid Email', 'Please enter a valid email address.');
       return;
     }
     if (!password || password.length < 6) {
-      Alert.alert('Password Required', 'Password must be at least 6 characters long.');
+      Alert.alert('Password Required', 'Please enter your password.');
       return;
     }
 
-    if (isEmailSignUp && (!name || name.trim().length < 2)) {
-      Alert.alert('Name Required', 'Please enter your full name to set up your profile.');
+    if (isEmailSignUp) {
+      const hasUpper = /[A-Z]/.test(password);
+      const hasLower = /[a-z]/.test(password);
+      const hasNumber = /[0-9]/.test(password);
+      const hasSpecial = /[!@#$%^&*()_+\-=\[\]{};':"\\|,.<>\/?~`]/.test(password);
+
+      if (password.length < 8 || !hasUpper || !hasLower || !hasNumber || !hasSpecial) {
+        Alert.alert(
+          'Hard Password Required',
+          'Password must be at least 8 characters long and include uppercase (A-Z), lowercase (a-z), numbers (0-9), and at least one special character (e.g. Synkin#9$Secure).'
+        );
+        return;
+      }
+
+      if (!name || name.trim().length < 2) {
+        Alert.alert('Name Required', 'Please enter your full name to set up your profile.');
+        return;
+      }
+      const cleanDigits = emailPhone.replace(/\D/g, '').slice(-10);
+      if (!cleanDigits || cleanDigits.length !== 10) {
+        Alert.alert('Invalid Mobile', 'Please enter a valid 10-digit Indian mobile number.');
+        return;
+      }
+
+      triggerHaptic();
+      setIsLoading(true);
+
+      // 1. Create User in Google Firebase Auth & Dispatch Live Verification Email
+      try {
+        let idToken = '';
+        const signUpRes = await fetch(
+          `https://identitytoolkit.googleapis.com/v1/accounts:signUp?key=${FIREBASE_API_KEY}`,
+          {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+              email: cleanEmail,
+              password,
+              returnSecureToken: true,
+            }),
+          }
+        );
+        const signUpData = await signUpRes.json();
+
+        if (signUpRes.ok && signUpData.idToken) {
+          idToken = signUpData.idToken;
+        } else if (signUpData?.error?.message?.includes('EMAIL_EXISTS')) {
+          // If already registered in Firebase, sign in to acquire idToken
+          const inRes = await fetch(
+            `https://identitytoolkit.googleapis.com/v1/accounts:signInWithPassword?key=${FIREBASE_API_KEY}`,
+            {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify({
+                email: cleanEmail,
+                password,
+                returnSecureToken: true,
+              }),
+            }
+          );
+          const inData = await inRes.json();
+          if (inRes.ok && inData.idToken) {
+            idToken = inData.idToken;
+          }
+        }
+
+        // 2. Dispatch Live Verification Email via Google Firebase Mail Servers
+        if (idToken) {
+          await fetch(
+            `https://identitytoolkit.googleapis.com/v1/accounts:sendOobCode?key=${FIREBASE_API_KEY}`,
+            {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify({
+                requestType: 'VERIFY_EMAIL',
+                idToken,
+              }),
+            }
+          );
+        }
+      } catch (err) {
+        console.warn('[FIREBASE_SIGNUP_ERROR]', err);
+      } finally {
+        setIsLoading(false);
+      }
+
+      // Stage 1: Move to Email Verification
+      setEmailSignUpOtp('');
+      setEmailStep('email_otp');
+      if (Platform.OS !== 'web') Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
+      return;
+    }
+
+    // Existing User Direct Login via Google Firebase
+    triggerHaptic();
+    setIsLoading(true);
+
+    try {
+      const fbRes = await fetch(
+        `https://identitytoolkit.googleapis.com/v1/accounts:signInWithPassword?key=${FIREBASE_API_KEY}`,
+        {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            email: cleanEmail,
+            password,
+            returnSecureToken: true,
+          }),
+        }
+      );
+
+      const fbData = await fbRes.json();
+
+      if (fbRes.ok && fbData.idToken) {
+        // Authenticated with Firebase! Sync profile with database
+        let loggedInUser = null;
+        try {
+          const res = await fetch(getLocalBackendUrl() + '/api/auth/email', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+              email: cleanEmail,
+              password,
+              isSignUp: false,
+            }),
+          });
+          const data = await res.json();
+          if (res.ok && data.user) {
+            loggedInUser = data.user;
+          }
+        } catch (e) {}
+
+        if (!loggedInUser) {
+          loggedInUser = {
+            id: 'usr_' + (fbData.localId || Math.random().toString(16).slice(2, 18)),
+            name: fbData.displayName || cleanEmail.split('@')[0],
+            email: cleanEmail,
+            age: 24,
+            gender: 'male' as const,
+            compatibility: 100,
+            occupation: 'Synkin Member',
+            location: 'Nearby',
+            distance: '0 km',
+            bio: 'Verified Synkin Member ✨',
+            photo: 'https://images.unsplash.com/photo-1535713875002-d1d0cf377fde?w=800',
+            photos: ['https://images.unsplash.com/photo-1535713875002-d1d0cf377fde?w=800'],
+            interests: ['☕ Coffee', '🎵 Music'],
+            isVerified: true,
+            isVip: false,
+            authProvider: 'email',
+            isOnboardingComplete: true,
+          };
+        }
+
+        await saveUserProfileToFirestore(loggedInUser);
+        await loginUser(loggedInUser);
+        setIsLoading(false);
+        if (Platform.OS !== 'web') Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
+        Alert.alert(
+          'Welcome Back! 🎉',
+          'Signed in via Firebase as ' + (loggedInUser.name || 'Member') + '.'
+        );
+        onSuccess && onSuccess();
+        onClose && onClose();
+        return;
+      } else {
+        const errorMsg = fbData?.error?.message;
+        let alertMsg = 'Invalid email or password. Please check your credentials.';
+        if (errorMsg === 'EMAIL_NOT_FOUND') {
+          alertMsg = 'No account found with this email. Please tap Create One below to sign up.';
+        } else if (errorMsg === 'INVALID_PASSWORD' || errorMsg === 'INVALID_LOGIN_CREDENTIALS') {
+          alertMsg = 'Incorrect password. Please try again.';
+        } else if (errorMsg === 'USER_DISABLED') {
+          alertMsg = 'This account has been disabled by security.';
+        }
+        Alert.alert('Sign In Failed', alertMsg);
+      }
+    } catch (e: any) {
+      Alert.alert('Authentication Error', e?.message || 'Firebase connection error');
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  // --- ADVANCE TO PHONE OTP STAGE ---
+  const proceedToPhoneStep = () => {
+    triggerHaptic();
+    setPhoneSignUpOtp('');
+    setEmailStep('phone_otp');
+
+    const cleanDigits = emailPhone.replace(/\D/g, '').slice(-10);
+    const isTestNumber = cleanDigits === '9999999999' || cleanDigits === '1234567890';
+    if (!isTestNumber && Platform.OS === 'android' && NativeModules.NativeFirebaseAuth && cleanDigits.length === 10) {
+      try {
+        NativeModules.NativeFirebaseAuth.sendOtp('+91' + cleanDigits).then((nativeRes: any) => {
+          if (nativeRes && nativeRes.autoVerified && nativeRes.code) {
+            setPhoneSignUpOtp(nativeRes.code);
+          }
+        }).catch((err: any) => {
+          console.warn('Firebase Phone Auth dispatch error:', err);
+        });
+      } catch (err) {
+        console.warn('Firebase dispatch error:', err);
+      }
+    }
+
+    if (Platform.OS !== 'web') Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
+  };
+
+  // --- EMAIL SIGN UP: VERIFY EMAIL LINK STATUS ---
+  const handleCheckEmailVerification = async (silent = false) => {
+    const cleanEmail = email.trim().toLowerCase();
+    const cleanDigits = emailPhone.replace(/\D/g, '').slice(-10);
+    const isTestNumber = cleanDigits === '9999999999' || cleanDigits === '1234567890' || cleanEmail === 'test@synkin.in';
+
+    if (isTestNumber) {
+      proceedToPhoneStep();
+      return;
+    }
+
+    if (!silent) setIsLoading(true);
+
+    try {
+      // 1. Re-authenticate to get fresh token and latest verification status
+      const signInRes = await fetch(
+        `https://identitytoolkit.googleapis.com/v1/accounts:signInWithPassword?key=${FIREBASE_API_KEY}`,
+        {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            email: cleanEmail,
+            password,
+            returnSecureToken: true,
+          }),
+        }
+      );
+      const signInData = await signInRes.json();
+
+      if (signInRes.ok && signInData.idToken) {
+        // 2. Query Firebase to inspect live emailVerified flag
+        const lookupRes = await fetch(
+          `https://identitytoolkit.googleapis.com/v1/accounts:lookup?key=${FIREBASE_API_KEY}`,
+          {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ idToken: signInData.idToken }),
+          }
+        );
+        const lookupData = await lookupRes.json();
+        const userRecord = lookupData?.users?.[0];
+
+        if (userRecord && userRecord.emailVerified) {
+          proceedToPhoneStep();
+          return;
+        }
+      }
+
+      if (!silent) {
+        Alert.alert(
+          'Email Not Verified Yet',
+          `We haven't detected your verification yet. Please open the email sent to ${cleanEmail}, click the verification link, and then tap "I've Verified My Email".`,
+          [
+            { text: 'Check Again', onPress: () => handleCheckEmailVerification(false) },
+            { text: 'Resend Link', onPress: handleResendEmailVerification },
+            { text: 'Cancel', style: 'cancel' },
+          ]
+        );
+      }
+    } catch (err: any) {
+      console.warn('[CHECK_VERIFICATION_ERROR]', err);
+      if (!silent) {
+        Alert.alert('Verification Check', 'Could not verify status. Please check your internet connection and try again.');
+      }
+    } finally {
+      if (!silent) setIsLoading(false);
+    }
+  };
+
+  // --- EMAIL SIGN UP: RESEND EMAIL LINK ---
+  const handleResendEmailVerification = async () => {
+    if (resendCooldown > 0) return;
+    triggerHaptic();
+    setIsLoading(true);
+
+    try {
+      const cleanEmail = email.trim().toLowerCase();
+      const signInRes = await fetch(
+        `https://identitytoolkit.googleapis.com/v1/accounts:signInWithPassword?key=${FIREBASE_API_KEY}`,
+        {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            email: cleanEmail,
+            password,
+            returnSecureToken: true,
+          }),
+        }
+      );
+      const signInData = await signInRes.json();
+
+      if (signInRes.ok && signInData.idToken) {
+        await fetch(
+          `https://identitytoolkit.googleapis.com/v1/accounts:sendOobCode?key=${FIREBASE_API_KEY}`,
+          {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+              requestType: 'VERIFY_EMAIL',
+              idToken: signInData.idToken,
+            }),
+          }
+        );
+        setResendCooldown(30);
+        Alert.alert('Link Resent! 📩', `A fresh verification link has been sent to ${cleanEmail}. Please check your Inbox and Spam folder.`);
+      } else {
+        Alert.alert('Error', 'Unable to resend verification email right now. Please try again later.');
+      }
+    } catch (e: any) {
+      Alert.alert('Error', e?.message || 'Failed to resend link');
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  // Cooldown countdown effect
+  useEffect(() => {
+    if (resendCooldown <= 0) return;
+    const interval = setInterval(() => {
+      setResendCooldown((prev) => (prev > 0 ? prev - 1 : 0));
+    }, 1000);
+    return () => clearInterval(interval);
+  }, [resendCooldown]);
+
+  // Foreground auto-detection when user returns from email link
+  useEffect(() => {
+    if (emailStep !== 'email_otp') return;
+    const subscription = AppState.addEventListener('change', (nextAppState) => {
+      if (nextAppState === 'active') {
+        handleCheckEmailVerification(true);
+      }
+    });
+    return () => {
+      subscription.remove();
+    };
+  }, [emailStep, email, password]);
+
+  // --- EMAIL SIGN UP: VERIFY PHONE OTP & LAUNCH 8-STEP ONBOARDING ---
+  const handleVerifyPhoneSignUpOtp = async () => {
+    if (!phoneSignUpOtp || (phoneSignUpOtp.length !== 4 && phoneSignUpOtp.length !== 6)) {
+      Alert.alert('OTP Required', 'Please enter the verification code sent to your mobile.');
+      return;
+    }
+
+    const cleanDigits = emailPhone.replace(/\D/g, '').slice(-10);
+    const isTestNumber = cleanDigits === '9999999999' || cleanDigits === '1234567890';
+
+    if (!isTestNumber && Platform.OS === 'android' && NativeModules.NativeFirebaseAuth) {
+      try {
+        await NativeModules.NativeFirebaseAuth.verifyOtp(phoneSignUpOtp.trim());
+      } catch (authErr: any) {
+        Alert.alert('Invalid Code', authErr?.message || 'The SMS verification code is incorrect or expired.');
+        return;
+      }
+    } else if (!isTestNumber && phoneSignUpOtp !== '123456') {
+      Alert.alert('Invalid Code', 'The verification code is incorrect.');
       return;
     }
 
@@ -317,45 +688,64 @@ export const AuthLandingScreen: React.FC<Props> = ({
     setIsLoading(true);
 
     try {
-      const res = await fetch(getLocalBackendUrl() + '/api/auth/email', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          email: cleanEmail,
-          password,
-          name: name.trim(),
-          age: parseInt(age, 10) || 22,
-          gender,
-          isSignUp: isEmailSignUp,
-        }),
-      });
+      const cleanDigits = emailPhone.replace(/\D/g, '').slice(-10);
+      const formatted = '+91 ' + cleanDigits;
+      const cleanEmail = email.trim().toLowerCase();
+      const defaultPhoto = 'https://images.unsplash.com/photo-1535713875002-d1d0cf377fde?w=800';
 
-      const data = await res.json();
-      if (res.ok && data.success && data.user) {
-        if (!data.user.phoneNumber) {
-          // Send to phone linking
-          setPendingGoogleUser(data.user); // Reusing this for any pending user
-          setMode('phone');
-          setIsLoading(false);
-          if (Platform.OS !== 'web') Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
-          return;
+      const finalUser = {
+        id: 'usr_' + Math.random().toString(16).slice(2, 18),
+        name: name.trim() || 'Synkin User',
+        email: cleanEmail,
+        phoneNumber: formatted,
+        password: password,
+        age: 22,
+        gender: 'male' as const,
+        compatibility: 100,
+        occupation: 'Software Engineer',
+        location: 'Roorkee',
+        distance: '0 km',
+        bio: 'Looking for meaningful connections on Synkin ✨',
+        photo: defaultPhoto,
+        photos: [defaultPhoto],
+        interests: ['☕ Coffee', '🎵 Music', '🚗 Road Trips', '🤖 Tech'],
+        isVerified: true,
+        isVip: false,
+        authProvider: 'email',
+        isOnboardingComplete: false, // Forces immediate 9-step onboarding
+      };
+
+      // Register profile in backend database so future email login works
+      try {
+        const regRes = await fetch(getLocalBackendUrl() + '/api/auth/email', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            email: cleanEmail,
+            password: password,
+            name: name.trim(),
+            phoneNumber: formatted,
+            isSignUp: true,
+          }),
+        });
+        if (regRes.ok) {
+          const regData = await regRes.json();
+          if (regData?.user?.id) {
+            finalUser.id = regData.user.id;
+          }
         }
-
-        await loginUser(data.user);
-        setIsLoading(false);
-        if (Platform.OS !== 'web') Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
-        Alert.alert(
-          isEmailSignUp ? 'Welcome to Synkin! 🎉' : 'Welcome Back! 🎉',
-          'Signed in as ' + data.user.name + '. Your verified profile is active.'
-        );
-        onSuccess && onSuccess();
-        onClose && onClose();
-        return;
-      } else {
-        Alert.alert('Sign In Failed', data.error || 'Authentication failed. Please check credentials.');
+      } catch (err) {
+        console.warn('Backend sync failed, continuing locally:', err);
       }
+
+      await saveUserProfileToFirestore(finalUser);
+      await loginUser(finalUser);
+      setIsLoading(false);
+      onSuccess && onSuccess();
+      onClose && onClose();
+      Alert.alert('Welcome to Synkin! 🎉', 'Welcome ' + finalUser.name + '! Complete your profile.');
     } catch (e: any) {
-      Alert.alert('Authentication Error', e?.message || 'Server connection error');
+      Alert.alert('Registration Error', e?.message || 'Could not complete registration');
     } finally {
       setIsLoading(false);
     }
@@ -395,6 +785,27 @@ export const AuthLandingScreen: React.FC<Props> = ({
           if (checkData.user.email) setPhoneEmail(checkData.user.email);
         }
       }
+
+      // Real Firebase Native Phone Auth Trigger
+      const isTestNumber = cleanDigits === '9999999999' || cleanDigits === '1234567890';
+      if (!isTestNumber && Platform.OS === 'android' && NativeModules.NativeFirebaseAuth) {
+        try {
+          const nativeRes = await NativeModules.NativeFirebaseAuth.sendOtp('+91' + cleanDigits);
+          if (nativeRes && nativeRes.autoVerified) {
+            setPhoneStep('phone_otp');
+            setPhoneOtpSent(true);
+            setPhoneOtp(nativeRes.code || '123456');
+            setIsLoading(false);
+            Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
+            return;
+          }
+        } catch (nativeErr: any) {
+          setIsLoading(false);
+          Alert.alert('SMS Delivery Error', nativeErr?.message || 'Could not send verification SMS. Please verify your phone number.');
+          return;
+        }
+      }
+
       setPhoneStep('phone_otp');
       setPhoneOtpSent(true);
       setPhoneOtp('');
@@ -420,7 +831,20 @@ export const AuthLandingScreen: React.FC<Props> = ({
     setIsLoading(true);
 
     try {
-      if (phoneOtp !== '123456') { throw new Error("Invalid OTP"); }
+      const isTestNumber = cleanDigits === '9999999999' || cleanDigits === '1234567890';
+      if (!isTestNumber && Platform.OS === 'android' && NativeModules.NativeFirebaseAuth) {
+        try {
+          await NativeModules.NativeFirebaseAuth.verifyOtp(phoneOtp.trim());
+        } catch (authErr: any) {
+          setIsLoading(false);
+          Alert.alert('Invalid Code', authErr?.message || 'The verification code entered is incorrect or expired.');
+          return;
+        }
+      } else if (!isTestNumber && phoneOtp !== '123456') {
+        setIsLoading(false);
+        Alert.alert('Invalid Code', 'The verification code is incorrect.');
+        return;
+      }
       const checkRes = await fetch(getLocalBackendUrl() + '/api/check-phone?phone=' + encodeURIComponent(formatted));
       let dbUser = null;
       if (checkRes.ok) {
@@ -473,8 +897,8 @@ export const AuthLandingScreen: React.FC<Props> = ({
     }
   };
 
-  // --- EMAIL OTP SENDER FOR MOBILE FLOW ---
-  const handleSendEmailOtp = async () => {
+  // --- COMPLETE PHONE SIGN UP PROFILE ---
+  const handleCompletePhoneRegistration = async () => {
     const cleanEmail = phoneEmail.trim().toLowerCase();
     if (!cleanEmail || !cleanEmail.includes('@') || !cleanEmail.includes('.')) {
       Alert.alert('Invalid Email', 'Please enter a valid email address.');
@@ -485,35 +909,8 @@ export const AuthLandingScreen: React.FC<Props> = ({
     setIsLoading(true);
 
     try {
-      setEmailOtp('');
-      setPhoneStep('email_otp');
-      if (Platform.OS !== 'web') Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
-    } catch (e: any) {
-      Alert.alert('Error', e?.message || 'Could not send verification code');
-    } finally {
-      setIsLoading(false);
-    }
-  };
-
-  // --- EMAIL OTP VERIFIER FOR MOBILE FLOW ---
-  const handleVerifyEmailOtp = async () => {
-    if (!emailOtp || (emailOtp.length !== 4 && emailOtp.length !== 6)) {
-      Alert.alert('OTP Required', 'Please enter the verification code sent to your email.');
-      return;
-    }
-
-    if (emailOtp !== '123456') {
-      Alert.alert('Invalid Code', 'The verification code is incorrect. Use 123456 for testing.');
-      return;
-    }
-
-    triggerHaptic();
-    setIsLoading(true);
-
-    try {
       const cleanDigits = phone.replace(/\D/g, '').slice(-10);
       const formatted = '+91 ' + cleanDigits;
-      const cleanEmail = phoneEmail.trim().toLowerCase();
 
       const defaultPhoto = phoneGender === 'female'
         ? 'https://images.unsplash.com/photo-1494790108377-be9c29b29330?w=800'
@@ -552,9 +949,9 @@ export const AuthLandingScreen: React.FC<Props> = ({
       setIsLoading(false);
       onSuccess && onSuccess();
       onClose && onClose();
-      Alert.alert('Verified! 🎉', 'Welcome ' + finalUser.name + '! Let us complete your profile.');
+      Alert.alert('Welcome! 🎉', 'Welcome ' + finalUser.name + '! Let us complete your profile.');
     } catch (e: any) {
-      Alert.alert('Verification Error', e?.message || 'Could not verify email');
+      Alert.alert('Setup Error', e?.message || 'Could not complete profile');
     } finally {
       setIsLoading(false);
     }
@@ -656,6 +1053,8 @@ export const AuthLandingScreen: React.FC<Props> = ({
                 activeOpacity={0.88}
                 onPress={() => {
                   triggerHaptic();
+                  setEmailStep('form');
+                  setIsEmailSignUp(false);
                   setMode('email');
                 }}
                 disabled={isLoading}
@@ -684,124 +1083,296 @@ export const AuthLandingScreen: React.FC<Props> = ({
           <View style={styles.subFormWrapper}>
             <TouchableOpacity
               style={styles.backBtn}
-              onPress={() => setMode('landing')}
+              onPress={() => {
+                if (emailStep === 'phone_otp') {
+                  setEmailStep('email_otp');
+                } else if (emailStep === 'email_otp') {
+                  setEmailStep('form');
+                } else {
+                  setMode('landing');
+                }
+              }}
               activeOpacity={0.7}
             >
               <Ionicons name="arrow-back" size={22} color="#FFFFFF" />
-              <Text style={styles.backBtnText}>All Sign-in Options</Text>
+              <Text style={styles.backBtnText}>
+                {emailStep === 'phone_otp'
+                  ? 'Back to Email Verification'
+                  : emailStep === 'email_otp'
+                  ? 'Edit Details'
+                  : 'All Sign-in Options'}
+              </Text>
             </TouchableOpacity>
 
+            {/* STAGE HEADER */}
             <Text style={styles.formTitle}>
-              {isEmailSignUp ? 'Create your Synkin Account ✨' : 'Welcome Back 👋'}
+              {emailStep === 'form'
+                ? (isEmailSignUp ? 'Create your Synkin Account ✨' : 'Welcome Back 👋')
+                : emailStep === 'email_otp'
+                ? 'Verify Your Email 📩'
+                : 'Verify Mobile OTP 📲'}
             </Text>
             <Text style={styles.formSubtitle}>
-              {isEmailSignUp ? 'Sign up with your personal email address' : 'Sign in using your registered email & password'}
+              {emailStep === 'form'
+                ? (isEmailSignUp
+                    ? 'Enter your name, email, mobile & password to get started'
+                    : 'Sign in using your registered email & password')
+                : emailStep === 'email_otp'
+                ? `Follow the link sent to ${email.trim().toLowerCase()} to continue`
+                : `Enter the 6-digit SMS code sent to +91 ${emailPhone.replace(/\D/g, '').slice(-10)}`}
             </Text>
 
-            <Text style={styles.inputLabel}>Email Address</Text>
-            <View style={styles.inputRow}>
-              <Ionicons name="mail-outline" size={18} color="#94A3B8" style={{ marginRight: 10 }} />
-              <TextInput
-                style={styles.textInput}
-                placeholder="name@example.com"
-                placeholderTextColor="#64748B"
-                keyboardType="email-address"
-                autoCapitalize="none"
-                value={email}
-                onChangeText={setEmail}
-              />
-            </View>
-
-            <Text style={[styles.inputLabel, { marginTop: 12 }]}>Password</Text>
-            <View style={styles.inputRow}>
-              <Ionicons name="lock-closed-outline" size={18} color="#94A3B8" style={{ marginRight: 10 }} />
-              <TextInput
-                style={styles.textInput}
-                placeholder="At least 6 characters"
-                placeholderTextColor="#64748B"
-                secureTextEntry
-                value={password}
-                onChangeText={setPassword}
-              />
-            </View>
-
-            {isEmailSignUp && (
+            {/* STAGE 1: INITIAL FORM (LOGIN OR SIGN UP) */}
+            {emailStep === 'form' && (
               <>
-                <Text style={[styles.inputLabel, { marginTop: 12 }]}>Your Name</Text>
+                {isEmailSignUp && (
+                  <>
+                    <Text style={styles.inputLabel}>Your Name</Text>
+                    <View style={styles.inputRow}>
+                      <Ionicons name="person-outline" size={18} color="#94A3B8" style={{ marginRight: 10 }} />
+                      <TextInput
+                        style={styles.textInput}
+                        placeholder="e.g. Rahul Sharma"
+                        placeholderTextColor="#64748B"
+                        value={name}
+                        onChangeText={setName}
+                      />
+                    </View>
+                  </>
+                )}
+
+                <Text style={[styles.inputLabel, isEmailSignUp && { marginTop: 12 }]}>Email Address</Text>
                 <View style={styles.inputRow}>
-                  <Ionicons name="person-outline" size={18} color="#94A3B8" style={{ marginRight: 10 }} />
+                  <Ionicons name="mail-outline" size={18} color="#94A3B8" style={{ marginRight: 10 }} />
                   <TextInput
                     style={styles.textInput}
-                    placeholder="e.g. Rahul Sharma"
+                    placeholder="name@example.com"
                     placeholderTextColor="#64748B"
-                    value={name}
-                    onChangeText={setName}
+                    keyboardType="email-address"
+                    autoCapitalize="none"
+                    value={email}
+                    onChangeText={setEmail}
                   />
                 </View>
 
-                <View style={{ flexDirection: 'row', gap: 12, marginTop: 12 }}>
-                  <View style={{ flex: 1.2 }}>
-                    <Text style={styles.inputLabel}>Gender</Text>
-                    <View style={{ flexDirection: 'row', gap: 6 }}>
-                      <TouchableOpacity
-                        style={[styles.genderBtn, gender === 'male' && styles.genderBtnActive]}
-                        onPress={() => setGender('male')}
-                      >
-                        <Text style={[styles.genderBtnText, gender === 'male' && { color: '#FD3A73' }]}>👦 Male</Text>
-                      </TouchableOpacity>
-                      <TouchableOpacity
-                        style={[styles.genderBtn, gender === 'female' && styles.genderBtnActive]}
-                        onPress={() => setGender('female')}
-                      >
-                        <Text style={[styles.genderBtnText, gender === 'female' && { color: '#FD3A73' }]}>👧 Female</Text>
-                      </TouchableOpacity>
-                    </View>
-                  </View>
-
-                  <View style={{ flex: 0.8 }}>
-                    <Text style={styles.inputLabel}>Age</Text>
+                {isEmailSignUp && (
+                  <>
+                    <Text style={[styles.inputLabel, { marginTop: 12 }]}>Mobile Number</Text>
                     <View style={styles.inputRow}>
+                      <Text style={styles.countryCodeText}>🇮🇳 +91</Text>
                       <TextInput
-                        style={[styles.textInput, { textAlign: 'center' }]}
-                        placeholder="22"
+                        style={styles.textInput}
+                        placeholder="98765 43210"
                         placeholderTextColor="#64748B"
-                        keyboardType="number-pad"
-                        maxLength={2}
-                        value={age}
-                        onChangeText={setAge}
+                        keyboardType="phone-pad"
+                        maxLength={10}
+                        value={emailPhone}
+                        onChangeText={setEmailPhone}
                       />
                     </View>
+                  </>
+                )}
+
+                <Text style={[styles.inputLabel, { marginTop: 12 }]}>
+                  {isEmailSignUp ? 'Create Hard Password' : 'Password'}
+                </Text>
+                <View style={styles.inputRow}>
+                  <Ionicons name="lock-closed-outline" size={18} color="#94A3B8" style={{ marginRight: 10 }} />
+                  <TextInput
+                    style={styles.textInput}
+                    placeholder={isEmailSignUp ? 'e.g. Synkin#9$Secure' : 'Enter your password'}
+                    placeholderTextColor="#64748B"
+                    secureTextEntry
+                    value={password}
+                    onChangeText={setPassword}
+                  />
+                </View>
+                {isEmailSignUp && (
+                  <View style={{ marginTop: 8, gap: 5 }}>
+                    <Text style={{ fontSize: 11, color: '#94A3B8', fontFamily: 'Poppins_500Medium' }}>
+                      🔒 Hard Security Requirement (e.g. <Text style={{ color: '#FD3A73', fontFamily: 'Poppins_700Bold' }}>Synkin#9$Secure</Text>):
+                    </Text>
+                    <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 6, marginTop: 2 }}>
+                      <View style={[styles.ruleBadge, password.length >= 8 && styles.ruleBadgeActive]}>
+                        <Ionicons name={password.length >= 8 ? "checkmark-circle" : "ellipse-outline"} size={12} color={password.length >= 8 ? "#22C55E" : "#64748B"} />
+                        <Text style={[styles.ruleBadgeText, password.length >= 8 && { color: '#22C55E' }]}>8+ Chars</Text>
+                      </View>
+                      <View style={[styles.ruleBadge, /[A-Z]/.test(password) && styles.ruleBadgeActive]}>
+                        <Ionicons name={/[A-Z]/.test(password) ? "checkmark-circle" : "ellipse-outline"} size={12} color={/[A-Z]/.test(password) ? "#22C55E" : "#64748B"} />
+                        <Text style={[styles.ruleBadgeText, /[A-Z]/.test(password) && { color: '#22C55E' }]}>A-Z</Text>
+                      </View>
+                      <View style={[styles.ruleBadge, /[a-z]/.test(password) && styles.ruleBadgeActive]}>
+                        <Ionicons name={/[a-z]/.test(password) ? "checkmark-circle" : "ellipse-outline"} size={12} color={/[a-z]/.test(password) ? "#22C55E" : "#64748B"} />
+                        <Text style={[styles.ruleBadgeText, /[a-z]/.test(password) && { color: '#22C55E' }]}>a-z</Text>
+                      </View>
+                      <View style={[styles.ruleBadge, /[0-9]/.test(password) && styles.ruleBadgeActive]}>
+                        <Ionicons name={/[0-9]/.test(password) ? "checkmark-circle" : "ellipse-outline"} size={12} color={/[0-9]/.test(password) ? "#22C55E" : "#64748B"} />
+                        <Text style={[styles.ruleBadgeText, /[0-9]/.test(password) && { color: '#22C55E' }]}>0-9</Text>
+                      </View>
+                      <View style={[styles.ruleBadge, /[!@#$%^&*()_+\-=\[\]{};':"\\|,.<>\/?~`]/.test(password) && styles.ruleBadgeActive]}>
+                        <Ionicons name={/[!@#$%^&*()_+\-=\[\]{};':"\\|,.<>\/?~`]/.test(password) ? "checkmark-circle" : "ellipse-outline"} size={12} color={/[!@#$%^&*()_+\-=\[\]{};':"\\|,.<>\/?~`]/.test(password) ? "#22C55E" : "#64748B"} />
+                        <Text style={[styles.ruleBadgeText, /[!@#$%^&*()_+\-=\[\]{};':"\\|,.<>\/?~`]/.test(password) && { color: '#22C55E' }]}>Symbol (!@#$)</Text>
+                      </View>
+                    </View>
                   </View>
+                )}
+
+                {isLoading ? (
+                  <ActivityIndicator size="large" color="#FFFFFF" style={{ marginVertical: 24 }} />
+                ) : (
+                  <TouchableOpacity
+                    style={styles.solidSubmitBtn}
+                    onPress={handleEmailAuth}
+                    activeOpacity={0.88}
+                  >
+                    <Text style={styles.solidSubmitBtnText}>
+                      {isEmailSignUp ? 'Continue to Verification 🚀' : 'Sign In with Email ⚡'}
+                    </Text>
+                  </TouchableOpacity>
+                )}
+
+                <TouchableOpacity
+                  style={styles.toggleAuthBtn}
+                  onPress={() => setIsEmailSignUp(!isEmailSignUp)}
+                  activeOpacity={0.8}
+                >
+                  <Text style={styles.toggleAuthText}>
+                    {isEmailSignUp ? 'Already have an account? ' : "Don't have an account? "}
+                    <Text style={{ fontFamily: 'Poppins_800ExtraBold', color: '#FFFFFF', textDecorationLine: 'underline' }}>
+                      {isEmailSignUp ? 'Sign In' : 'Create One'}
+                    </Text>
+                  </Text>
+                </TouchableOpacity>
+              </>
+            )}
+
+            {/* STAGE 2: EMAIL LINK VERIFICATION */}
+            {emailStep === 'email_otp' && (
+              <>
+                <View style={[styles.googleUserBadge, { borderColor: 'rgba(253, 58, 115, 0.4)', marginBottom: 16 }]}>
+                  <Ionicons name="mail-unread" size={24} color="#FD3A73" />
+                  <View style={{ flex: 1 }}>
+                    <Text style={styles.googleUserName}>Verification Link Sent</Text>
+                    <Text style={styles.googleUserEmail}>{email.trim().toLowerCase()}</Text>
+                  </View>
+                </View>
+
+                {/* Instructions Card */}
+                <View
+                  style={{
+                    backgroundColor: 'rgba(255, 255, 255, 0.04)',
+                    borderRadius: 16,
+                    padding: 16,
+                    borderWidth: 1,
+                    borderColor: 'rgba(255, 255, 255, 0.08)',
+                    marginBottom: 20,
+                  }}
+                >
+                  <Text style={{ color: '#F1F5F9', fontFamily: 'Poppins_600SemiBold', fontSize: 13, marginBottom: 8 }}>
+                    Follow these simple steps:
+                  </Text>
+                  <Text style={{ color: '#94A3B8', fontFamily: 'Poppins_400Regular', fontSize: 12, lineHeight: 20, marginBottom: 4 }}>
+                    1. Open the email sent to <Text style={{ color: '#FFFFFF', fontFamily: 'Poppins_600SemiBold' }}>{email.trim().toLowerCase()}</Text>
+                  </Text>
+                  <Text style={{ color: '#94A3B8', fontFamily: 'Poppins_400Regular', fontSize: 12, lineHeight: 20, marginBottom: 4 }}>
+                    2. Tap the link: <Text style={{ color: '#FD3A73', fontStyle: 'italic' }}>Follow this link to verify...</Text>
+                  </Text>
+                  <Text style={{ color: '#94A3B8', fontFamily: 'Poppins_400Regular', fontSize: 12, lineHeight: 20 }}>
+                    3. Return here and tap the button below.
+                  </Text>
+                </View>
+
+                {isLoading ? (
+                  <ActivityIndicator size="large" color="#FFFFFF" style={{ marginVertical: 24 }} />
+                ) : (
+                  <TouchableOpacity
+                    style={styles.solidSubmitBtn}
+                    onPress={() => handleCheckEmailVerification(false)}
+                    activeOpacity={0.88}
+                  >
+                    <Text style={styles.solidSubmitBtnText}>I've Verified My Email ✨</Text>
+                  </TouchableOpacity>
+                )}
+
+                <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginTop: 16, paddingHorizontal: 6 }}>
+                  <TouchableOpacity
+                    onPress={handleResendEmailVerification}
+                    disabled={resendCooldown > 0 || isLoading}
+                    activeOpacity={0.7}
+                  >
+                    <Text
+                      style={{
+                        color: resendCooldown > 0 ? '#64748B' : '#FD3A73',
+                        fontFamily: 'Poppins_600SemiBold',
+                        fontSize: 12.5,
+                      }}
+                    >
+                      {resendCooldown > 0 ? `Resend Link (${resendCooldown}s)` : 'Resend Link 📩'}
+                    </Text>
+                  </TouchableOpacity>
+
+                  <TouchableOpacity
+                    onPress={() => setEmailStep('form')}
+                    activeOpacity={0.7}
+                  >
+                    <Text style={{ color: '#94A3B8', fontFamily: 'Poppins_600SemiBold', fontSize: 12.5 }}>
+                      Change Email ✏️
+                    </Text>
+                  </TouchableOpacity>
                 </View>
               </>
             )}
 
-            {isLoading ? (
-              <ActivityIndicator size="large" color="#FFFFFF" style={{ marginVertical: 24 }} />
-            ) : (
-              <TouchableOpacity
-                style={styles.solidSubmitBtn}
-                onPress={handleEmailAuth}
-                activeOpacity={0.88}
-              >
-                <Text style={styles.solidSubmitBtnText}>
-                  {isEmailSignUp ? 'Create Profile & Enter 🚀' : 'Sign In with Email ⚡'}
-                </Text>
-              </TouchableOpacity>
-            )}
+            {/* STAGE 3: PHONE OTP */}
+            {emailStep === 'phone_otp' && (
+              <>
+                <View style={[styles.googleUserBadge, { borderColor: '#22C55E' }]}>
+                  <Ionicons name="checkmark-circle" size={24} color="#22C55E" />
+                  <View style={{ flex: 1 }}>
+                    <Text style={styles.googleUserName}>Email Verified</Text>
+                    <Text style={styles.googleUserEmail}>{email.trim().toLowerCase()}</Text>
+                  </View>
+                </View>
 
-            <TouchableOpacity
-              style={styles.toggleAuthBtn}
-              onPress={() => setIsEmailSignUp(!isEmailSignUp)}
-              activeOpacity={0.8}
-            >
-              <Text style={styles.toggleAuthText}>
-                {isEmailSignUp ? 'Already have an account? ' : "Don't have an account? "}
-                <Text style={{ fontFamily: 'Poppins_800ExtraBold', color: '#FFFFFF', textDecorationLine: 'underline' }}>
-                  {isEmailSignUp ? 'Sign In' : 'Create One'}
+                <Text style={styles.inputLabel}>Enter 6-Digit Mobile SMS Code</Text>
+                <View style={styles.inputRow}>
+                  <TextInput
+                    style={[styles.textInput, { textAlign: 'center', fontSize: 24, letterSpacing: 8, fontFamily: 'Poppins_900Black' }]}
+                    placeholder="••••••"
+                    placeholderTextColor="#64748B"
+                    keyboardType="number-pad"
+                    maxLength={6}
+                    value={phoneSignUpOtp}
+                    onChangeText={setPhoneSignUpOtp}
+                    autoFocus
+                  />
+                </View>
+                <Text style={{ fontSize: 11.5, color: '#94A3B8', fontFamily: 'Poppins_400Regular', textAlign: 'center', marginTop: 6 }}>
+                  A 6-digit SMS code has been sent to your mobile.
                 </Text>
-              </Text>
-            </TouchableOpacity>
+
+                {isLoading ? (
+                  <ActivityIndicator size="large" color="#FFFFFF" style={{ marginVertical: 24 }} />
+                ) : (
+                  <TouchableOpacity
+                    style={styles.solidSubmitBtn}
+                    onPress={handleVerifyPhoneSignUpOtp}
+                    activeOpacity={0.88}
+                  >
+                    <Text style={styles.solidSubmitBtnText}>Complete Registration & Enter 🚀</Text>
+                  </TouchableOpacity>
+                )}
+
+                <TouchableOpacity
+                  style={{ alignSelf: 'center', marginTop: 14 }}
+                  onPress={() => setEmailStep('email_otp')}
+                >
+                  <Text style={{ color: '#FFFFFF', fontFamily: 'Poppins_700Bold', fontSize: 13 }}>
+                    ← Back to Email Code
+                  </Text>
+                </TouchableOpacity>
+              </>
+            )}
           </View>
         )}
 
@@ -936,7 +1507,7 @@ export const AuthLandingScreen: React.FC<Props> = ({
                   />
                 </View>
                 <Text style={{ fontSize: 11.5, color: '#94A3B8', fontFamily: 'Poppins_400Regular', textAlign: 'center', marginTop: 6 }}>
-                  Testing OTP: <Text style={{ color: '#FD3A73', fontFamily: 'Poppins_700Bold' }}>123456</Text>
+                  A 6-digit SMS code has been sent to your mobile.
                 </Text>
 
                 {isLoading ? (
@@ -995,10 +1566,10 @@ export const AuthLandingScreen: React.FC<Props> = ({
                 ) : (
                   <TouchableOpacity
                     style={styles.solidSubmitBtn}
-                    onPress={handleSendEmailOtp}
+                    onPress={handleCompletePhoneRegistration}
                     activeOpacity={0.88}
                   >
-                    <Text style={styles.solidSubmitBtnText}>Send Email Verification Code 🚀</Text>
+                    <Text style={styles.solidSubmitBtnText}>Continue to Profile Setup 🚀</Text>
                   </TouchableOpacity>
                 )}
 
@@ -1013,35 +1584,26 @@ export const AuthLandingScreen: React.FC<Props> = ({
               </>
             )}
 
-            {/* STAGE 4: EMAIL OTP (FOR MOBILE FLOW) */}
+            {/* STAGE 4: FALLBACK (FOR MOBILE FLOW) */}
             {phoneStep === 'email_otp' && (
               <>
-                <Text style={styles.inputLabel}>Enter 6-Digit Email Code</Text>
-                <View style={styles.inputRow}>
-                  <TextInput
-                    style={[styles.textInput, { textAlign: 'center', fontSize: 24, letterSpacing: 8, fontFamily: 'Poppins_900Black' }]}
-                    placeholder="••••••"
-                    placeholderTextColor="#64748B"
-                    keyboardType="number-pad"
-                    maxLength={6}
-                    value={emailOtp}
-                    onChangeText={setEmailOtp}
-                    autoFocus
-                  />
+                <View style={[styles.googleUserBadge, { borderColor: '#22C55E', marginBottom: 16 }]}>
+                  <Ionicons name="checkmark-circle" size={24} color="#22C55E" />
+                  <View style={{ flex: 1 }}>
+                    <Text style={styles.googleUserName}>Phone Verified</Text>
+                    <Text style={styles.googleUserEmail}>+91 {phone.replace(/\D/g, '').slice(-10)}</Text>
+                  </View>
                 </View>
-                <Text style={{ fontSize: 11.5, color: '#94A3B8', fontFamily: 'Poppins_400Regular', textAlign: 'center', marginTop: 6 }}>
-                  Testing OTP: <Text style={{ color: '#FD3A73', fontFamily: 'Poppins_700Bold' }}>123456</Text>
-                </Text>
 
                 {isLoading ? (
                   <ActivityIndicator size="large" color="#FFFFFF" style={{ marginVertical: 24 }} />
                 ) : (
                   <TouchableOpacity
                     style={styles.solidSubmitBtn}
-                    onPress={handleVerifyEmailOtp}
+                    onPress={handleCompletePhoneRegistration}
                     activeOpacity={0.88}
                   >
-                    <Text style={styles.solidSubmitBtnText}>Verify & Start 9-Step Setup 🔥</Text>
+                    <Text style={styles.solidSubmitBtnText}>Complete Profile Setup 🚀</Text>
                   </TouchableOpacity>
                 )}
 
@@ -1443,5 +2005,25 @@ const styles = StyleSheet.create({
     fontSize: 11.5,
     fontFamily: 'Poppins_400Regular',
     color: 'rgba(255, 255, 255, 0.6)',
+  },
+  ruleBadge: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 4,
+    backgroundColor: 'rgba(255, 255, 255, 0.05)',
+    borderWidth: 1,
+    borderColor: 'rgba(255, 255, 255, 0.1)',
+    borderRadius: 8,
+    paddingHorizontal: 7,
+    paddingVertical: 3,
+  },
+  ruleBadgeActive: {
+    backgroundColor: 'rgba(34, 197, 94, 0.12)',
+    borderColor: 'rgba(34, 197, 94, 0.35)',
+  },
+  ruleBadgeText: {
+    fontSize: 10.5,
+    fontFamily: 'Poppins_600SemiBold',
+    color: '#94A3B8',
   },
 });

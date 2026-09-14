@@ -219,6 +219,7 @@ export default function OnboardingScreen() {
   const [sensorStatus, setSensorStatus] = useState<'idle' | 'searching' | 'locked' | 'mismatch'>('searching');
   const [sensorGuidance, setSensorGuidance] = useState<string>('Align face inside oval');
   const [autoCountdown, setAutoCountdown] = useState<number | null>(null);
+  const [isAutoScanActive, setIsAutoScanActive] = useState<boolean>(false);
   const autoCaptureTimerRef = useRef<any>(null);
   const consecutiveFailsRef = useRef<number>(0);
   const lastAutoCaptureTimeRef = useRef<number>(0);
@@ -338,6 +339,7 @@ export default function OnboardingScreen() {
       autoCaptureTimerRef.current = null;
     }
     setAutoCountdown(null);
+    setIsAutoScanActive(false);
     capturedPosesRef.current = [];
     setCapturedPoses([]);
     setCurrentPoseIdx(0);
@@ -370,6 +372,13 @@ export default function OnboardingScreen() {
     setDebugError('');
 
     try {
+      // ⚡ Camera Shutter White Splash Flash on every photo click
+      setIsStrobeActive(true);
+      if (Platform.OS !== 'web') {
+        Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Heavy);
+      }
+      setTimeout(() => setIsStrobeActive(false), 200);
+
       // Single snapshot: shutterSound disabled to eliminate loud clicks on supported devices
       const photo = await cameraRef.current.takePictureAsync({
         quality: 0.5,
@@ -512,11 +521,12 @@ Return STRICT JSON only:
         consecutiveFailsRef.current += 1;
         setSensorStatus('mismatch');
         setSensorGuidance('⚠️ No face detected. Hold phone directly in front of your face.');
+        arcProgressAnim.stopAnimation();
+        arcProgressAnim.setValue(0);
+        setAutoCountdown(null);
+        setIsAutoScanActive(false); // ⏸️ Safe Pause: Faltu blind loop turant band!
         if (Platform.OS !== 'web') {
           Haptics.notificationAsync(Haptics.NotificationFeedbackType.Warning);
-        }
-        if (consecutiveFailsRef.current >= 4) {
-          Alert.alert('No Face Detected ⚠️', 'Camera ke samne aapka chehra nahi dikh raha hai. Kripya phone ko chehre ke samne rakhein.');
         }
         return;
       }
@@ -525,11 +535,12 @@ Return STRICT JSON only:
         consecutiveFailsRef.current += 1;
         setSensorStatus('mismatch');
         setSensorGuidance(guidance || `⚠️ Please: ${currentPose.label}`);
+        arcProgressAnim.stopAnimation();
+        arcProgressAnim.setValue(0);
+        setAutoCountdown(null);
+        setIsAutoScanActive(false); // ⏸️ Safe Pause: Faltu blind loop turant band!
         if (Platform.OS !== 'web') {
           Haptics.notificationAsync(Haptics.NotificationFeedbackType.Warning);
-        }
-        if (consecutiveFailsRef.current >= 4) {
-          Alert.alert('Pose Mismatch ⚠️', guidance || `Aapka pose match nahi hua. Kripya: ${currentPose.label}`);
         }
         return;
       }
@@ -565,16 +576,16 @@ Return STRICT JSON only:
         setSensorGuidance('All 3 Poses Authenticated! Running Craniofacial Match...');
         setDebugApiStatus('🔒 3 Poses Complete. Running Full Biometric Forensics...');
 
-        // Specular Strobe Flash
+        // Specular White Strobe Flash (Anti-spoof specular reflection check)
         setIsStrobeActive(true);
-        setStrobeColor('#00F2FE');
-        setTimeout(() => setStrobeColor('#FD3A73'), 80);
-        setTimeout(() => setStrobeColor('#FFFFFF'), 160);
+        if (Platform.OS !== 'web') {
+          Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Heavy);
+        }
         setTimeout(() => {
           setIsStrobeActive(false);
           const refPhoto = photos[0] || currentUser?.photo || (currentUser?.photos && currentUser.photos[0]) || '';
           runDualAiVerification(refPhoto, capturedPosesRef.current);
-        }, 240);
+        }, 300);
       }
     } catch (err: any) {
       console.warn('Pose capture error:', err);
@@ -586,12 +597,13 @@ Return STRICT JSON only:
     }
   };
 
-  // 🎯 Auto-Capture Engine: Smooth circular arc fills up → auto-snap when complete
+  // 🎯 Auto-Capture Engine: Smooth circular arc fills up → auto-snaps automatically when complete!
   const [arcTrigger, setArcTrigger] = useState(0);
   useEffect(() => {
     if (
       step !== 8 ||
       !cameraPermission?.granted ||
+      !isAutoScanActive ||
       isCapturingPose ||
       isAiScanning ||
       isBiometricVerified ||
@@ -604,17 +616,17 @@ Return STRICT JSON only:
       return;
     }
 
-    // Cooldown: Wait 3s after last auto-capture before starting next arc
+    // Cooldown: 0.5s between poses (Automatic 0.5s pause ke baad)
     const timeSinceLast = Date.now() - lastAutoCaptureTimeRef.current;
-    if (timeSinceLast < 3000) {
-      const cooldownRemaining = 3000 - timeSinceLast;
+    if (timeSinceLast < 500) {
+      const cooldownRemaining = 500 - timeSinceLast;
       const cooldownTimer = setTimeout(() => {
-        setArcTrigger(t => t + 1); // force re-evaluate
+        setArcTrigger((t) => t + 1);
       }, cooldownRemaining);
       return () => clearTimeout(cooldownTimer);
     }
 
-    // Start smooth arc fill: 0 → 1 over 2.4 seconds
+    // Start arc fill: 0 -> 1 over 2.2 seconds
     setAutoCountdown(1);
     setSensorStatus('searching');
     arcProgressAnim.setValue(0);
@@ -633,11 +645,12 @@ Return STRICT JSON only:
 
     Animated.timing(arcProgressAnim, {
       toValue: 1,
-      duration: 2400,
+      duration: 2200,
       useNativeDriver: false,
     }).start(({ finished }) => {
       arcProgressAnim.removeListener(listenerId);
       if (finished) {
+        // Arc complete → AUTOMATIC SNAP!
         setAutoCountdown(null);
         lastAutoCaptureTimeRef.current = Date.now();
         if (Platform.OS !== 'web') {
@@ -660,6 +673,7 @@ Return STRICT JSON only:
     isAiScanning,
     isBiometricVerified,
     capturedPoses.length,
+    isAutoScanActive,
     arcTrigger,
   ]);
 
@@ -841,12 +855,12 @@ Return strictly valid JSON:
       }
     }
 
-    // Ensure all uploaded photos are compressed WebP format (~80KB each)
+    // Ensure all uploaded photos are compressed WebP format (~30-40KB each)
     const compressedPhotos = await Promise.all(
       photos.map(async (p) => {
         if (p && !p.endsWith('.webp') && (p.startsWith('file://') || p.startsWith('content://'))) {
           try {
-            const opt = await convertToWebP(p, 720, 0.65);
+            const opt = await convertToWebP(p, 480, 0.55);
             return opt.uri;
           } catch (e) {
             return p;
@@ -944,8 +958,8 @@ Return strictly valid JSON:
       if (!result.canceled && result.assets && result.assets.length > 0) {
         setCompressingIdx(index);
         const rawUri = result.assets[0].uri;
-        // Instantly compress photo on-device to ultra-lightweight WebP (5MB -> ~75KB)
-        const opt = await convertToWebP(rawUri, 720, 0.65);
+        // Instantly compress photo on-device to ultra-lightweight WebP (~30-40KB)
+        const opt = await convertToWebP(rawUri, 480, 0.55);
         const newPhotos = [...photos];
         newPhotos[index] = opt.uri;
         setPhotos(newPhotos);
@@ -1249,7 +1263,14 @@ Return strictly valid JSON:
                   );
                 })()}
 
-                <View
+                <TouchableOpacity
+                  activeOpacity={0.95}
+                  onPress={() => {
+                    if (!isAutoScanActive && capturedPoses.length < 3 && !isBiometricVerified && !isAiScanning) {
+                      setIsAutoScanActive(true);
+                      consecutiveFailsRef.current = 0;
+                    }
+                  }}
                   style={[
                     styles.ovalViewport,
                     isBiometricVerified || sensorStatus === 'locked'
@@ -1283,17 +1304,7 @@ Return strictly valid JSON:
                       },
                     ]}
                   />
-
-                  {/* Specular Strobe Flash Overlay */}
-                  {isStrobeActive && (
-                    <View
-                      style={[
-                        StyleSheet.absoluteFill,
-                        { backgroundColor: strobeColor, opacity: 0.9, zIndex: 99 },
-                      ]}
-                    />
-                  )}
-                </View>
+                </TouchableOpacity>
 
                 {/* Floating Glass Guidance Pill */}
                 <View
@@ -1318,6 +1329,8 @@ Return strictly valid JSON:
                       ? '🟢 Perfect! Snapping automatically...'
                       : sensorStatus === 'mismatch'
                       ? (sensorGuidance || '⚠️ Pose mismatch, hold steady...')
+                      : !isAutoScanActive
+                      ? '🎯 Center face in oval & tap Start'
                       : `${currentPose.emoji} ${currentPose.sub}`}
                   </Text>
                 </View>
@@ -1419,6 +1432,12 @@ Return strictly valid JSON:
                 handleRetryVerification();
                 return;
               }
+              consecutiveFailsRef.current = 0;
+              if (!isAutoScanActive) {
+                // User is ready and tapped to start hands-free 3D auto-capture
+                setIsAutoScanActive(true);
+                return;
+              }
               if (autoCountdown !== null) {
                 // Manual override: stop arc and snap now
                 arcProgressAnim.stopAnimation();
@@ -1445,14 +1464,27 @@ Return strictly valid JSON:
                     ? 'Retry Biometric Scan 🔄'
                     : isCapturingPose
                     ? 'Verifying Pose... ⏳'
+                    : !isAutoScanActive
+                    ? (sensorStatus === 'mismatch' ? `Resume 3D Auto-Scan (${currentPoseIdx + 1}/3) 📸` : 'Start 3D Face Scan 🚀')
                     : autoCountdown !== null
-                    ? 'Auto-Capturing... (Tap to Snap Now) 📸'
+                    ? `Auto-Capturing ${currentPoseIdx + 1}/3... (Tap to Snap) 📸`
                     : `Snap Pose ${currentPoseIdx + 1}/3: ${currentPose?.label || 'Snap'} 📸`)
                 : 'Continue'}
             </Text>
           </LinearGradient>
         </TouchableOpacity>
       </View>
+
+      {/* Full-Screen Pure White Specular Strobe Flash (Anti-Spoof Check) */}
+      {isStrobeActive && (
+        <View
+          pointerEvents="none"
+          style={[
+            StyleSheet.absoluteFill,
+            { backgroundColor: '#FFFFFF', zIndex: 99999, opacity: 0.96 },
+          ]}
+        />
+      )}
     </View>
   );
 }

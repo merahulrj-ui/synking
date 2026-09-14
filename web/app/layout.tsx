@@ -185,7 +185,7 @@ export default function RootLayout({
           />
         ))}
       </head>
-      <body className="min-h-screen bg-[#07050d] text-slate-100 antialiased selection:bg-[#FD3A73] selection:text-white">
+      <body className="min-h-screen bg-[#000000] text-slate-100 antialiased selection:bg-[#ec4899] selection:text-white">
         {children}
       </body>
     </html>

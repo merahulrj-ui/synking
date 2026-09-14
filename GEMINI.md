@@ -56,12 +56,18 @@ The following core modules are cryptographically and strictly locked:
 - **Navigation & Layout**: `src/app/_layout.tsx`, `src/app/(tabs)/*`, `src/app/chat/*`.
 - **Native Android Module Layer**: `android/app/src/main/java/com/synking/*` (`CallWakeLockModule`, `AudioRouteModule`, `TelecomModule`, `MainActivity`, `CallActivity`, `SynkingConnectionService`).
 - **Encryption & Security**: `src/utils/encryption.ts`, `src/services/firebase.ts`, `src/services/radarService.ts`.
+- **OTA & EAS Updates Engine (100% LOCKED & FROZEN)**:
+  - `android/app/src/main/AndroidManifest.xml` Updates metadata: `UPDATES_CONFIGURATION_REQUEST_HEADERS_KEY` (`{"expo-channel-name":"preview"}`), `EXPO_UPDATE_URL` (`?channel-name=preview&runtime-version=1.0.0`), `ENABLED`, `LAUNCH_WAIT_MS`, `EXPO_RUNTIME_VERSION`.
+  - `app.json` updates block: `url`, `enabled`, `fallbackToCacheTimeout: 3000`, `requestHeaders: {"expo-channel-name": "preview"}`.
+  - `src/app/_layout.tsx` `checkOTA()` lifecycle function.
+  - **ABSOLUTE RULE**: These files and blocks must NEVER be altered, deleted, or reverted.
 
 ---
 
 ## 4. Enforcement
 - Any proposed change violating this policy must be rejected immediately by the AI agent with a notification to the user.
 - Any new features must be presented as separate, standalone files.
+- **🚨 NO AUTOMATIC GIT PUSH**: The AI agent must NEVER run `git push origin main` or trigger APK builds without explicit user permission.
 
 ---
 
