@@ -995,91 +995,54 @@ Return strictly valid JSON:
       case 8:
         return (
           <View style={styles.biometricContainer}>
-            {/* Header Badge */}
-            <View style={styles.badgeRow}>
-              <View style={[styles.verifHeaderBadge, isBiometricVerified && styles.verifHeaderBadgeSuccess]}>
+            {/* Elegant Header Capsule */}
+            <View style={styles.premiumBadgeRow}>
+              <View style={[styles.premiumBadge, isBiometricVerified && styles.premiumBadgeSuccess]}>
                 <Ionicons
-                  name={isBiometricVerified ? 'shield-checkmark' : 'shield-outline'}
-                  size={16}
+                  name={isBiometricVerified ? 'shield-checkmark' : 'shield-half'}
+                  size={14}
                   color={isBiometricVerified ? '#22C55E' : '#00F2FE'}
                 />
-                <Text style={[styles.verifBadgeText, isBiometricVerified && { color: '#22C55E' }]}>
-                  {isBiometricVerified ? '3D BIOMETRIC VERIFIED 🛡️✓' : 'SYNKIN 3D FACE LIVENESS'}
+                <Text style={[styles.premiumBadgeText, isBiometricVerified && { color: '#22C55E' }]}>
+                  {isBiometricVerified ? 'VERIFIED PROFILE 🛡️✓' : 'PHOTO VERIFICATION'}
                 </Text>
               </View>
             </View>
 
-            <Text style={styles.titleCentered}>Get Photo Verified 🛡️✓</Text>
-            <Text style={styles.subtitleCentered}>
-              Earn your Blue Checkmark badge. Live in-app front camera check proves authentic human identity.
+            <Text style={styles.premiumTitle}>
+              {isBiometricVerified ? 'You’re Verified!' : 'Face Verification'}
+            </Text>
+            <Text style={styles.premiumSubtitle}>
+              {isBiometricVerified
+                ? 'Your profile now has the official verified blue badge.'
+                : 'Center your face and follow the 3 quick cues to get verified.'}
             </Text>
 
-            {/* 🛠️ LIVE GEMINI & SENSOR DEBUGGER CARD */}
-            <View style={styles.debugCard}>
-              <View style={styles.debugTopRow}>
-                <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
-                  <Ionicons name="bug-outline" size={16} color="#00F2FE" />
-                  <Text style={styles.debugTitle}>GEMINI SENSOR & API DEBUGGER</Text>
-                </View>
-                <TouchableOpacity onPress={runManualGeminiPing} style={styles.debugPingBtn} activeOpacity={0.7}>
-                  <Text style={styles.debugPingText}>🧪 Ping Gemini</Text>
-                </TouchableOpacity>
-              </View>
-
-              <Text style={styles.debugLine}>
-                • <Text style={{ color: '#888' }}>Gemini API: </Text>
-                <Text style={{ color: debugApiStatus.startsWith('🟢') ? '#22C55E' : debugApiStatus.startsWith('🔴') ? '#FF453A' : '#00F2FE' }}>
-                  {debugApiStatus}
-                </Text>
-              </Text>
-              <Text style={styles.debugLine}>
-                • <Text style={{ color: '#888' }}>Ref Profile Photo: </Text>
-                <Text style={{ color: '#FFF' }}>{debugRefPhotoInfo}</Text>
-              </Text>
-              <Text style={styles.debugLine}>
-                • <Text style={{ color: '#888' }}>Poses: </Text>
-                <Text style={{ color: '#FFF' }}>
-                  P1: {capturedPoses[0] ? '✅' : '⏳'} | P2: {capturedPoses[1] ? '✅' : '⏳'} | P3: {capturedPoses[2] ? '✅' : '⏳'}
-                </Text>
-              </Text>
-              {debugLastVerdict ? (
-                <Text style={styles.debugLine} numberOfLines={2}>
-                  • <Text style={{ color: '#888' }}>Verdict: </Text>
-                  <Text style={{ color: '#E2E8F0' }}>{debugLastVerdict}</Text>
-                </Text>
-              ) : null}
-              {debugError ? (
-                <Text style={styles.debugErrorLine} numberOfLines={2}>
-                  ⚠️ {debugError}
-                </Text>
-              ) : null}
-            </View>
-
-            {/* 3-Pose Challenge Track (Center, Left, Right) */}
-            <View style={styles.posePillsRow}>
+            {/* Sleek Step Progress Track */}
+            <View style={styles.poseStepsRow}>
               {biometricPoses.map((pose, idx) => {
                 const isDone = idx < currentPoseIdx || isBiometricVerified;
                 const isCurrent = idx === currentPoseIdx && !isBiometricVerified;
                 return (
-                  <TouchableOpacity
+                  <View
                     key={pose.id}
                     style={[
-                      styles.posePill,
-                      isDone && styles.posePillDone,
-                      isCurrent && styles.posePillActive,
+                      styles.poseStepItem,
+                      isCurrent && styles.poseStepItemActive,
+                      isDone && styles.poseStepItemDone,
                     ]}
-                    onPress={() => {
-                      // BUG 3+6 FIX: Pose pills are display-only progress indicators
-                      // No manual jumping — sequential flow only to prevent session lock & race conditions
-                    }}
-                    disabled={true}
-                    activeOpacity={1.0}
                   >
-                    <Text style={styles.posePillEmoji}>{isDone ? '✓' : pose.emoji}</Text>
-                    <Text style={[styles.posePillText, isDone && { color: '#22C55E' }, isCurrent && { color: '#00F2FE' }]}>
-                      {pose.label}
+                    <View style={[styles.stepDot, isDone && styles.stepDotDone, isCurrent && styles.stepDotActive]}>
+                      {isDone ? (
+                        <Ionicons name="checkmark" size={11} color="#FFF" />
+                      ) : (
+                        <Text style={[styles.stepDotNum, isCurrent && styles.stepDotNumActive]}>{idx + 1}</Text>
+                      )}
+                    </View>
+                    <Text style={[styles.stepLabel, isCurrent && styles.stepLabelActive, isDone && styles.stepLabelDone]}>
+                      {pose.label.replace('Turn Head ', '')}
                     </Text>
-                  </TouchableOpacity>
+                  </View>
                 );
               })}
             </View>
@@ -1087,13 +1050,13 @@ Return strictly valid JSON:
             {/* In-App Live Camera Viewport with Oval Mask */}
             {!cameraPermission?.granted ? (
               <View style={styles.permCard}>
-                <Ionicons name="camera-outline" size={48} color="#FD3A73" />
-                <Text style={styles.permCardTitle}>Camera Permission Required</Text>
+                <Ionicons name="camera-outline" size={44} color="#FD3A73" />
+                <Text style={styles.permCardTitle}>Camera Access Required</Text>
                 <Text style={styles.permCardDesc}>
-                  Synkin streams your front camera directly inside this oval frame to perform 3D liveness checks.
+                  Synkin requires camera access to verify your live face against your profile photos.
                 </Text>
                 <TouchableOpacity style={styles.permBtn} onPress={requestCameraPermission} activeOpacity={0.8}>
-                  <Text style={styles.permBtnText}>Enable Front Camera 📸</Text>
+                  <Text style={styles.permBtnText}>Enable Camera 📸</Text>
                 </TouchableOpacity>
               </View>
             ) : (
@@ -1137,108 +1100,66 @@ Return strictly valid JSON:
                   )}
                 </View>
 
-                {/* Status / Step badge placed neatly below oval */}
-                <View style={[styles.ovalOverlayPill, (isBiometricVerified || sensorStatus === 'locked') && styles.ovalOverlayPillSuccess]}>
-                  <Text style={[styles.ovalOverlayPillText, (isBiometricVerified || sensorStatus === 'locked') && { color: '#22C55E' }]}>
+                {/* Floating Glass Guidance Pill */}
+                <View style={[styles.floatingGuidancePill, (isBiometricVerified || sensorStatus === 'locked') && styles.floatingGuidancePillSuccess]}>
+                  <Text style={styles.floatingGuidanceText}>
                     {isAiScanning
-                      ? '🤖 AI Analyzing Facial Geometry...'
+                      ? '⚡ Authenticating 3D facial landmarks...'
                       : isBiometricVerified
-                      ? `MATCH CONFIRMED: ${biometricScore || 0}% 🛡️✓`
+                      ? `✓ Match Confirmed (${biometricScore || 96}%)`
                       : capturedPoses.length >= 3
-                      ? 'VERIFICATION FAILED ❌'
-                      : `📡 SENSOR: ${sensorGuidance}`}
+                      ? '❌ Verification Mismatch'
+                      : `${currentPose.emoji} ${currentPose.sub}`}
                   </Text>
                 </View>
               </View>
             )}
 
-            {/* Dedicated Snap Button Card for Current Pose */}
-            {!isBiometricVerified && capturedPoses.length < 3 && cameraPermission?.granted && (
-              <View style={styles.targetPoseCard}>
-                <View style={styles.targetPoseHeader}>
-                  <Text style={styles.targetPoseEmoji}>{currentPose.emoji}</Text>
-                  <View style={{ flex: 1, marginLeft: 10 }}>
-                    <Text style={styles.targetPoseTitle}>
-                      Pose {currentPoseIdx + 1}/3: {currentPose.label}
-                    </Text>
-                    <Text style={styles.targetPoseSub}>{currentPose.sub}</Text>
-                  </View>
-                </View>
-
-                <TouchableOpacity
-                  style={[styles.snapPoseBtn, isCapturingPose && { opacity: 0.6 }]}
-                  disabled={isCapturingPose || isAiScanning}
-                  onPress={snapAndVerifyPose}
-                  activeOpacity={0.85}
-                >
-                  <LinearGradient
-                    colors={['#00F2FE', '#4FACFE']}
-                    style={styles.snapPoseBtnGradient}
-                    start={{ x: 0, y: 0 }}
-                    end={{ x: 1, y: 0 }}
-                  >
-                    <Ionicons name="camera" size={20} color="#000" />
-                    <Text style={styles.snapPoseBtnText}>
-                      {isCapturingPose
-                        ? 'Verifying Pose with Gemini... ⏳'
-                        : `Snap Pose ${currentPoseIdx + 1}/3: ${currentPose.label} 📸`}
-                    </Text>
-                  </LinearGradient>
-                </TouchableOpacity>
-              </View>
-            )}
-
-            {/* Instruction / Status Cards */}
+            {/* Verification Success or Failure Feedback */}
             {isAiScanning ? (
-              <View style={styles.scanStatusCard}>
+              <View style={styles.premiumScanCard}>
                 <ActivityIndicator size="small" color="#00F2FE" />
-                <Text style={styles.scanStatusText}>
-                  Google Gemini analyzing 3D facial bone geometry and skin texture...
+                <Text style={styles.premiumScanText}>
+                  AI comparing craniofacial landmarks with profile photo...
                 </Text>
               </View>
             ) : isBiometricVerified ? (
-              <View style={styles.verifiedCard}>
+              <View style={styles.premiumVerifiedCard}>
                 <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8, marginBottom: 4 }}>
                   <Ionicons name="checkmark-circle" size={20} color="#22C55E" />
-                  <Text style={styles.verifiedCardTitle}>
-                    {biometricScore || 0}% Biometric Consensus Confirmed!
+                  <Text style={styles.premiumVerifiedTitle}>
+                    Profile Authenticated 🛡️✓
                   </Text>
                 </View>
-                <Text style={styles.verifiedCardDesc}>
-                  {biometricVerdict || '3D face geometry successfully matched with your profile photo. Official Blue Badge awarded!'}
+                <Text style={styles.premiumVerifiedDesc}>
+                  Your selfie successfully matched your profile photos. Your verified badge is now active.
                 </Text>
               </View>
-            ) : (
-              <View style={styles.infoCard}>
-                <Ionicons name="scan-outline" size={18} color={sensorStatus === 'locked' ? '#22C55E' : '#00F2FE'} />
-                <Text style={styles.infoCardText}>
-                  {capturedPoses.length >= 3 && !isBiometricVerified
-                    ? biometricVerdict || 'Face did not match profile photo. Tap Retry below.'
-                    : `${currentPose.sub}. Tap Snap button above to authenticate each pose.`}
+            ) : capturedPoses.length >= 3 ? (
+              <View style={styles.premiumErrorCard}>
+                <Ionicons name="alert-circle-outline" size={20} color="#FF453A" />
+                <Text style={styles.premiumErrorText}>
+                  {biometricVerdict || 'Face did not match profile photos. Please ensure good lighting and try again.'}
                 </Text>
+                <TouchableOpacity
+                  style={styles.premiumRetryBtn}
+                  onPress={handleRetryVerification}
+                  activeOpacity={0.85}
+                >
+                  <Ionicons name="refresh-outline" size={16} color="#00F2FE" />
+                  <Text style={styles.premiumRetryText}>Try Again 🔄</Text>
+                </TouchableOpacity>
               </View>
-            )}
+            ) : null}
 
-            {/* Retry Button if verification didn't match or failed */}
-            {!isBiometricVerified && capturedPoses.length >= 3 && (
-              <TouchableOpacity
-                style={styles.retryBtn}
-                onPress={handleRetryVerification}
-                activeOpacity={0.85}
-              >
-                <Ionicons name="refresh-circle" size={20} color="#00F2FE" />
-                <Text style={styles.retryBtnText}>Retry 3D Verification 🔄</Text>
-              </TouchableOpacity>
-            )}
-
-            {/* Secondary Skip button */}
+            {/* Secondary Skip link */}
             {!isBiometricVerified && (
               <TouchableOpacity
                 style={styles.skipBtn}
                 onPress={() => handleFinishOnboarding(false)}
                 activeOpacity={0.7}
               >
-                <Text style={styles.skipBtnText}>Skip for Now (Verify Later in Profile) →</Text>
+                <Text style={styles.skipBtnText}>I'll verify later in settings →</Text>
               </TouchableOpacity>
             )}
           </View>
@@ -1659,223 +1580,216 @@ const styles = StyleSheet.create({
     borderRadius: 110,
     borderWidth: 2,
   },
-  ovalOverlayPill: {
-    marginTop: 12,
-    backgroundColor: 'rgba(15, 23, 42, 0.85)',
-    paddingHorizontal: 16,
-    paddingVertical: 6,
-    borderRadius: 20,
+  floatingGuidancePill: {
+    marginTop: 14,
+    backgroundColor: 'rgba(15, 23, 42, 0.88)',
+    paddingHorizontal: 18,
+    paddingVertical: 8,
+    borderRadius: 24,
     borderWidth: 1,
-    borderColor: 'rgba(0, 242, 254, 0.35)',
+    borderColor: 'rgba(0, 242, 254, 0.3)',
     alignSelf: 'center',
+    shadowColor: '#00F2FE',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.25,
+    shadowRadius: 8,
+    elevation: 4,
   },
-  ovalOverlayPillSuccess: {
-    borderColor: 'rgba(34, 197, 94, 0.5)',
+  floatingGuidancePillSuccess: {
+    borderColor: 'rgba(34, 197, 94, 0.6)',
     backgroundColor: 'rgba(34, 197, 94, 0.15)',
+    shadowColor: '#22C55E',
   },
-  ovalOverlayPillText: {
-    color: '#FFF',
-    fontSize: 12,
+  floatingGuidanceText: {
+    color: '#F8FAFC',
+    fontSize: 13,
     fontFamily: 'Poppins_600SemiBold',
     textAlign: 'center',
+    letterSpacing: 0.2,
   },
-  scanStatusCard: {
+  premiumBadgeRow: {
+    alignItems: 'center',
+    marginBottom: 8,
+  },
+  premiumBadge: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+    backgroundColor: 'rgba(0, 242, 254, 0.08)',
+    borderWidth: 1,
+    borderColor: 'rgba(0, 242, 254, 0.25)',
+    paddingHorizontal: 12,
+    paddingVertical: 5,
+    borderRadius: 20,
+  },
+  premiumBadgeSuccess: {
+    backgroundColor: 'rgba(34, 197, 94, 0.1)',
+    borderColor: 'rgba(34, 197, 94, 0.35)',
+  },
+  premiumBadgeText: {
+    color: '#00F2FE',
+    fontSize: 11,
+    fontFamily: 'Poppins_600SemiBold',
+    letterSpacing: 0.8,
+  },
+  premiumTitle: {
+    fontSize: 24,
+    fontFamily: 'Poppins_700Bold',
+    color: '#FFFFFF',
+    textAlign: 'center',
+    marginBottom: 4,
+  },
+  premiumSubtitle: {
+    fontSize: 13,
+    fontFamily: 'Poppins_400Regular',
+    color: '#94A3B8',
+    textAlign: 'center',
+    lineHeight: 19,
+    paddingHorizontal: 16,
+    marginBottom: 16,
+  },
+  poseStepsRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 12,
+    marginBottom: 16,
+    paddingHorizontal: 12,
+  },
+  poseStepItem: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+    paddingVertical: 6,
+    paddingHorizontal: 12,
+    borderRadius: 18,
+    backgroundColor: 'rgba(255, 255, 255, 0.04)',
+    borderWidth: 1,
+    borderColor: 'rgba(255, 255, 255, 0.08)',
+  },
+  poseStepItemActive: {
+    backgroundColor: 'rgba(0, 242, 254, 0.12)',
+    borderColor: '#00F2FE',
+  },
+  poseStepItemDone: {
+    backgroundColor: 'rgba(34, 197, 94, 0.12)',
+    borderColor: 'rgba(34, 197, 94, 0.5)',
+  },
+  stepDot: {
+    width: 18,
+    height: 18,
+    borderRadius: 9,
+    backgroundColor: 'rgba(255, 255, 255, 0.1)',
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  stepDotActive: {
+    backgroundColor: '#00F2FE',
+  },
+  stepDotDone: {
+    backgroundColor: '#22C55E',
+  },
+  stepDotNum: {
+    color: '#94A3B8',
+    fontSize: 10,
+    fontFamily: 'Poppins_600SemiBold',
+  },
+  stepDotNumActive: {
+    color: '#000000',
+  },
+  stepLabel: {
+    color: '#64748B',
+    fontSize: 11.5,
+    fontFamily: 'Poppins_600SemiBold',
+  },
+  stepLabelActive: {
+    color: '#FFFFFF',
+  },
+  stepLabelDone: {
+    color: '#22C55E',
+  },
+  premiumScanCard: {
     flexDirection: 'row',
     alignItems: 'center',
     gap: 10,
-    backgroundColor: 'rgba(0, 242, 254, 0.1)',
+    backgroundColor: 'rgba(0, 242, 254, 0.08)',
     borderWidth: 1,
-    borderColor: 'rgba(0, 242, 254, 0.3)',
-    borderRadius: 12,
+    borderColor: 'rgba(0, 242, 254, 0.25)',
+    borderRadius: 14,
     padding: 12,
+    marginVertical: 12,
     width: '100%',
-    marginBottom: 12,
   },
-  scanStatusText: {
-    color: '#FFF',
+  premiumScanText: {
+    color: '#E2E8F0',
     fontSize: 12,
     fontFamily: 'Poppins_500Medium',
     flex: 1,
   },
-  verifiedCard: {
-    backgroundColor: 'rgba(34, 197, 94, 0.1)',
+  premiumVerifiedCard: {
+    backgroundColor: 'rgba(34, 197, 94, 0.08)',
     borderWidth: 1,
     borderColor: 'rgba(34, 197, 94, 0.35)',
-    borderRadius: 14,
+    borderRadius: 16,
     padding: 14,
+    marginVertical: 12,
     width: '100%',
-    marginBottom: 12,
   },
-  verifiedCardTitle: {
+  premiumVerifiedTitle: {
     color: '#22C55E',
-    fontSize: 14,
+    fontSize: 14.5,
     fontFamily: 'Poppins_700Bold',
   },
-  verifiedCardDesc: {
+  premiumVerifiedDesc: {
     color: 'rgba(255, 255, 255, 0.8)',
     fontSize: 12,
     fontFamily: 'Poppins_400Regular',
     lineHeight: 18,
   },
-  infoCard: {
-    flexDirection: 'row',
-    alignItems: 'flex-start',
-    gap: 8,
-    backgroundColor: 'rgba(255, 255, 255, 0.04)',
+  premiumErrorCard: {
+    backgroundColor: 'rgba(255, 69, 58, 0.08)',
     borderWidth: 1,
-    borderColor: 'rgba(255, 255, 255, 0.08)',
-    borderRadius: 12,
-    padding: 12,
+    borderColor: 'rgba(255, 69, 58, 0.35)',
+    borderRadius: 16,
+    padding: 14,
+    marginVertical: 12,
     width: '100%',
-    marginBottom: 12,
-  },
-  infoCardText: {
-    color: '#94A3B8',
-    fontSize: 11.5,
-    fontFamily: 'Poppins_400Regular',
-    flex: 1,
-    lineHeight: 16,
-  },
-  manualSnapBtn: {
-    width: '100%',
-    height: 46,
-    borderRadius: 23,
-    overflow: 'hidden',
-    marginBottom: 10,
-  },
-  manualSnapBtnGradient: {
-    flex: 1,
-    flexDirection: 'row',
     alignItems: 'center',
-    justifyContent: 'center',
     gap: 8,
   },
-  manualSnapBtnText: {
-    color: '#000',
-    fontSize: 14,
-    fontFamily: 'Poppins_700Bold',
-  },
-  skipBtn: {
-    paddingVertical: 8,
-  },
-  skipBtnText: {
-    color: 'rgba(255, 255, 255, 0.5)',
+  premiumErrorText: {
+    color: '#FCA5A5',
     fontSize: 12,
     fontFamily: 'Poppins_500Medium',
-    textDecorationLine: 'underline',
+    textAlign: 'center',
+    lineHeight: 18,
   },
-  retryBtn: {
+  premiumRetryBtn: {
     flexDirection: 'row',
     alignItems: 'center',
-    justifyContent: 'center',
-    gap: 8,
-    paddingVertical: 12,
-    paddingHorizontal: 20,
-    borderRadius: 22,
+    gap: 6,
+    paddingHorizontal: 16,
+    paddingVertical: 8,
+    borderRadius: 20,
     backgroundColor: 'rgba(0, 242, 254, 0.12)',
     borderWidth: 1,
     borderColor: 'rgba(0, 242, 254, 0.4)',
-    marginVertical: 10,
-    width: '100%',
-  },
-  retryBtnText: {
-    color: '#00F2FE',
-    fontSize: 13,
-    fontFamily: 'Poppins_600SemiBold',
-  },
-  debugCard: {
-    backgroundColor: '#0F172A',
-    borderWidth: 1,
-    borderColor: '#1E293B',
-    borderRadius: 12,
-    padding: 12,
-    marginBottom: 14,
-    width: '100%',
-  },
-  debugTopRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-    marginBottom: 8,
-    borderBottomWidth: 1,
-    borderBottomColor: '#1E293B',
-    paddingBottom: 6,
-  },
-  debugTitle: {
-    fontSize: 11,
-    fontFamily: 'Poppins_600SemiBold',
-    color: '#00F2FE',
-    letterSpacing: 0.5,
-  },
-  debugPingBtn: {
-    backgroundColor: 'rgba(0, 242, 254, 0.15)',
-    borderWidth: 1,
-    borderColor: '#00F2FE',
-    paddingHorizontal: 8,
-    paddingVertical: 3,
-    borderRadius: 6,
-  },
-  debugPingText: {
-    color: '#00F2FE',
-    fontSize: 10,
-    fontFamily: 'Poppins_600SemiBold',
-  },
-  debugLine: {
-    fontSize: 11,
-    fontFamily: Platform.OS === 'ios' ? 'Courier' : 'monospace',
-    color: '#CBD5E1',
-    marginVertical: 1.5,
-  },
-  debugErrorLine: {
-    fontSize: 11,
-    fontFamily: Platform.OS === 'ios' ? 'Courier' : 'monospace',
-    color: '#FF453A',
     marginTop: 4,
   },
-  targetPoseCard: {
-    backgroundColor: '#111827',
-    borderWidth: 1,
-    borderColor: '#374151',
-    borderRadius: 16,
-    padding: 14,
-    width: '100%',
-    marginVertical: 12,
-  },
-  targetPoseHeader: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    marginBottom: 12,
-  },
-  targetPoseEmoji: {
-    fontSize: 28,
-  },
-  targetPoseTitle: {
-    fontSize: 15,
-    fontFamily: 'Poppins_600SemiBold',
-    color: '#FFFFFF',
-  },
-  targetPoseSub: {
+  premiumRetryText: {
+    color: '#00F2FE',
     fontSize: 12,
-    fontFamily: 'Poppins_400Regular',
-    color: '#9CA3AF',
-    marginTop: 2,
-  },
-  snapPoseBtn: {
-    borderRadius: 12,
-    overflow: 'hidden',
-  },
-  snapPoseBtnGradient: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'center',
-    gap: 8,
-    paddingVertical: 13,
-    paddingHorizontal: 16,
-  },
-  snapPoseBtnText: {
-    color: '#000000',
-    fontSize: 14,
     fontFamily: 'Poppins_600SemiBold',
+  },
+  skipBtn: {
+    paddingVertical: 10,
+    alignItems: 'center',
+    marginTop: 4,
+  },
+  skipBtnText: {
+    color: 'rgba(255, 255, 255, 0.4)',
+    fontSize: 12,
+    fontFamily: 'Poppins_500Medium',
   },
 });
 
