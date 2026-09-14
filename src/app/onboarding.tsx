@@ -214,8 +214,11 @@ export default function OnboardingScreen() {
   const sessionCompletedRef = useRef(false);
   const capturedPosesRef = useRef<string[]>([]);
 
-  const [sensorStatus, setSensorStatus] = useState<'idle' | 'searching' | 'locked'>('searching');
+  const [sensorStatus, setSensorStatus] = useState<'idle' | 'searching' | 'locked' | 'mismatch'>('searching');
   const [sensorGuidance, setSensorGuidance] = useState<string>('Align face inside oval');
+  const [autoCountdown, setAutoCountdown] = useState<number | null>(null);
+  const autoCaptureTimerRef = useRef<any>(null);
+  const consecutiveFailsRef = useRef<number>(0);
   const [biometricPoses, setBiometricPoses] = useState<BiometricPose[]>(getRandomPoseSequence);
   const [currentPoseIdx, setCurrentPoseIdx] = useState(0);
   const currentPose = biometricPoses[currentPoseIdx] || biometricPoses[0];
@@ -325,6 +328,12 @@ export default function OnboardingScreen() {
   const handleRetryVerification = () => {
     sessionCompletedRef.current = false;
     isCapturingRef.current = false;
+    consecutiveFailsRef.current = 0;
+    if (autoCaptureTimerRef.current) {
+      clearInterval(autoCaptureTimerRef.current);
+      autoCaptureTimerRef.current = null;
+    }
+    setAutoCountdown(null);
     capturedPosesRef.current = [];
     setCapturedPoses([]);
     setCurrentPoseIdx(0);
@@ -344,9 +353,14 @@ export default function OnboardingScreen() {
 
   const snapAndVerifyPose = async () => {
     if (sessionCompletedRef.current || isCapturingRef.current || !cameraRef.current) return;
+    if (autoCaptureTimerRef.current) {
+      clearInterval(autoCaptureTimerRef.current);
+      autoCaptureTimerRef.current = null;
+    }
+    setAutoCountdown(null);
     isCapturingRef.current = true;
     setIsCapturingPose(true);
-    setSensorStatus('searching');
+    setSensorStatus('locked');
     setSensorGuidance('Capturing photo...');
     setDebugApiStatus(`📸 Capturing Pose ${currentPoseIdx + 1}/3...`);
     setDebugError('');
@@ -371,7 +385,7 @@ export default function OnboardingScreen() {
       let guidance = '';
       let engineName = '';
 
-      // STEP A: Try On-Device Google ML Kit first (Instant ~20ms, zero network delay, zero credit waste)
+      // STEP 1: On-Device Google ML Kit (Instant ~20ms, zero network latency)
       const mlResult = await detectPoseOnDevice(photo.uri, targetKey);
       if (mlResult.supported) {
         engineName = 'Google ML Kit [On-Device]';
@@ -380,8 +394,8 @@ export default function OnboardingScreen() {
         guidance = mlResult.guidance ?? '';
         setDebugApiStatus(`🟢 ML Kit (On-Device): Face=${faceVisible}, Match=${isTargetPose} (Yaw: ${mlResult.yaw}°)`);
       } else {
-        // STEP B: Fallback to Cloud Gemini 3.5 Flash Lite (when native ML Kit binary is not yet compiled)
-        engineName = 'Gemini Flash Lite [Cloud]';
+        // STEP 2: Cloud Gemini AI Liveness Verification
+        engineName = 'Gemini 3.5 Flash Lite';
         setDebugApiStatus(`📡 Verifying Pose ${currentPoseIdx + 1} (${targetKey}) with Gemini...`);
         setSensorGuidance('Analyzing pose with Gemini AI...');
 
@@ -429,7 +443,7 @@ Return STRICT JSON only:
               ],
               generationConfig: {
                 responseMimeType: 'application/json',
-                temperature: 0.1,
+                temperature: 0.0,
               },
             }),
           }
@@ -440,7 +454,7 @@ Return STRICT JSON only:
           const errText = await res.text();
           setDebugApiStatus(`🔴 Pose Check HTTP ${res.status} (${elapsed}ms)`);
           setDebugError(`HTTP ${res.status}: ${errText.slice(0, 80)}`);
-          setSensorGuidance(`Pose check failed (${res.status}). Tap to try again.`);
+          setSensorGuidance(`Pose check failed (${res.status}). Retrying...`);
           return;
         }
 
@@ -491,20 +505,33 @@ Return STRICT JSON only:
       ]);
 
       if (!faceVisible) {
-        setSensorStatus('searching');
-        setSensorGuidance('⚠️ No face detected. Please hold camera to your face.');
-        Alert.alert('No Face Detected ⚠️', 'Camera ke samne aapka chehra nahi dikh raha hai. Kripya phone ko chehre ke samne rakhein.');
+        consecutiveFailsRef.current += 1;
+        setSensorStatus('mismatch');
+        setSensorGuidance('⚠️ No face detected. Hold phone directly in front of your face.');
+        if (Platform.OS !== 'web') {
+          Haptics.notificationAsync(Haptics.NotificationFeedbackType.Warning);
+        }
+        if (consecutiveFailsRef.current >= 4) {
+          Alert.alert('No Face Detected ⚠️', 'Camera ke samne aapka chehra nahi dikh raha hai. Kripya phone ko chehre ke samne rakhein.');
+        }
         return;
       }
 
       if (!isTargetPose) {
-        setSensorStatus('searching');
-        setSensorGuidance(guidance || `Please: ${currentPose.label}`);
-        Alert.alert('Pose Mismatch ⚠️', guidance || `Aapka pose match nahi hua. Kripya: ${currentPose.label}`);
+        consecutiveFailsRef.current += 1;
+        setSensorStatus('mismatch');
+        setSensorGuidance(guidance || `⚠️ Please: ${currentPose.label}`);
+        if (Platform.OS !== 'web') {
+          Haptics.notificationAsync(Haptics.NotificationFeedbackType.Warning);
+        }
+        if (consecutiveFailsRef.current >= 4) {
+          Alert.alert('Pose Mismatch ⚠️', guidance || `Aapka pose match nahi hua. Kripya: ${currentPose.label}`);
+        }
         return;
       }
 
       // POSE MATCHED!
+      consecutiveFailsRef.current = 0;
       setSensorStatus('locked');
       setSensorGuidance(`✓ ${currentPose.label} Matched!`);
       if (Platform.OS !== 'web') {
@@ -529,7 +556,7 @@ Return STRICT JSON only:
          // ALL 3 POSES COMPLETED!
         // ABSOLUTE STRICT PERMANENT LOCK: Session finished, ZERO MORE PHOTOS EVER!
         sessionCompletedRef.current = true;
-        setIsAiScanning(true); // BUG 2 FIX: Set BEFORE strobe to prevent false "VERIFICATION FAILED" flash
+        setIsAiScanning(true); // Set BEFORE strobe to prevent false "VERIFICATION FAILED" flash
         setSensorStatus('locked');
         setSensorGuidance('All 3 Poses Authenticated! Running Craniofacial Match...');
         setDebugApiStatus('🔒 3 Poses Complete. Running Full Biometric Forensics...');
@@ -554,6 +581,62 @@ Return STRICT JSON only:
       setIsCapturingPose(false);
     }
   };
+
+  // 🎯 Auto-Capture Engine: Hands-free automatic snap when face aligns and oval turns green
+  useEffect(() => {
+    if (
+      step !== 8 ||
+      !cameraPermission?.granted ||
+      isCapturingPose ||
+      isAiScanning ||
+      isBiometricVerified ||
+      capturedPoses.length >= 3 ||
+      sessionCompletedRef.current
+    ) {
+      if (autoCaptureTimerRef.current) {
+        clearInterval(autoCaptureTimerRef.current);
+        autoCaptureTimerRef.current = null;
+      }
+      setAutoCountdown(null);
+      return;
+    }
+
+    // Auto-countdown: 1.2s positioning hold, then ring turns GREEN for 1.2s and auto-snaps!
+    let remaining = 2;
+    setAutoCountdown(2);
+    setSensorStatus('searching');
+
+    const timer = setInterval(() => {
+      remaining -= 1;
+      if (remaining === 1) {
+        setAutoCountdown(1);
+        setSensorStatus('locked'); // Turns oval ring GREEN!
+        if (Platform.OS !== 'web') {
+          Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
+        }
+      } else if (remaining <= 0) {
+        clearInterval(timer);
+        autoCaptureTimerRef.current = null;
+        setAutoCountdown(0);
+        snapAndVerifyPose();
+      }
+    }, 1200);
+
+    autoCaptureTimerRef.current = timer;
+
+    return () => {
+      clearInterval(timer);
+      autoCaptureTimerRef.current = null;
+    };
+  }, [
+    step,
+    currentPoseIdx,
+    cameraPermission?.granted,
+    isCapturingPose,
+    isAiScanning,
+    isBiometricVerified,
+    capturedPoses.length,
+  ]);
 
   const runDualAiVerification = async (refPhotoUri: string, livePoseUris: string[]) => {
     setIsAiScanning(true);
@@ -590,19 +673,21 @@ Return STRICT JSON only:
 
       const geminiKey = GEMINI_KEY;
       const actualPosesSequence = biometricPoses.map((p, idx) => `Image ${idx + 2}: ${p.label}`).join(', ');
-      const prompt = `You are an intelligent biometric identity validator for a mobile dating app (Tinder/Bumble verification system).
+      const prompt = `You are a strict facial biometrics verification AI for Synkin Dating App.
 Compare Image 1 (user's uploaded reference profile photo) against Images 2, 3, 4 (live in-app front camera challenge poses in sequence: ${actualPosesSequence}):
 
-[IDENTITY & LIVENESS VERIFICATION RULES]
-1. The user has already proven liveness by performing live interactive head rotation poses (center, left, right).
-2. Your primary objective is ANTI-CATFISHING: Verify if the live selfies depict the SAME REAL INDIVIDUAL as the reference profile photo.
-3. REAL-WORLD TOLERANCES YOU MUST ALLOW:
-   - Camera differences: Studio/gallery portrait vs phone front-camera wide-angle selfie distortion.
-   - Lighting & shadows: Room bulb, shadows under chin, ambient tint, natural skin tone shifts.
-   - Lifestyle variations: Facial hair changes (shaved, stubble, beard), eyewear, hairstyle variations, expressions (smiling vs neutral).
-4. REJECTION RULE:
-   - ONLY mark isMatch: false if Image 1 and Images 2..4 are OBVIOUSLY AND UNQUESTIONABLY DIFFERENT INDIVIDUALS (e.g. imposter, celebrity photo, completely different person/gender/age).
-   - If it is plausibly or reasonably the same person, mark isMatch: true with similarityScore: 80-96 and fraudRisk: "LOW".
+TASK: Determine if the live selfies (Images 2, 3, 4) depict the EXACT SAME biological human being as Image 1.
+
+Examine immutable facial geometry:
+1. Nose bridge width, nostril width, and nose tip shape.
+2. Inter-pupillary distance (eye spacing) and eye socket shape.
+3. Jawline structure, chin shape, and cheekbone prominence.
+4. Brow ridge contour and ear position.
+
+CRITICAL IDENTITY RULES:
+- If Image 1 and Images 2..4 show two different individuals (e.g. imposter, catfisher, different person, different bone structures), you MUST declare isMatch: false with similarityScore < 30 and fraudRisk: "HIGH".
+- Do NOT match different people under the guise of "lifestyle or hair changes". Bone structure does not change.
+- Allow normal differences for the SAME person: phone front camera wide-angle selfie distortion, ambient room bulb vs outdoor lighting, neutral vs smiling expression.
 
 Return strictly valid JSON:
 {
@@ -622,73 +707,71 @@ Return strictly valid JSON:
       contentsParts.push({ text: prompt });
 
       let result: any = null;
-      const candidateModels = ['gemini-3.5-flash-lite', 'gemini-3.6-flash'];
-      for (const model of candidateModels) {
-        try {
-          const startTime = Date.now();
-          setDebugApiStatus(`📡 Calling ${model}...`);
-          const geminiUrl = `https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent?key=${geminiKey}`;
-          const controller = new AbortController();
-          const timeoutId = setTimeout(() => controller.abort(), 12000);
+      try {
+        const startTime = Date.now();
+        setDebugApiStatus('📡 Calling Gemini 3.5 Flash Lite (Strict Biometric Auth)...');
+        const geminiUrl = `https://generativelanguage.googleapis.com/v1beta/models/gemini-3.5-flash-lite:generateContent?key=${geminiKey}`;
+        const controller = new AbortController();
+        const timeoutId = setTimeout(() => controller.abort(), 12000);
 
-          const gRes = await fetch(geminiUrl, {
-            method: 'POST',
-            signal: controller.signal,
-            headers: {
-              'Content-Type': 'application/json',
+        const gRes = await fetch(geminiUrl, {
+          method: 'POST',
+          signal: controller.signal,
+          headers: {
+            'Content-Type': 'application/json',
+          },
+          body: JSON.stringify({
+            contents: [{ parts: contentsParts }],
+            generationConfig: {
+              responseMimeType: 'application/json',
+              temperature: 0.0,
             },
-            body: JSON.stringify({
-              contents: [{ parts: contentsParts }],
-              generationConfig: {
-                responseMimeType: 'application/json',
-                temperature: 0.1,
-              },
-            }),
-          });
-          clearTimeout(timeoutId);
-          const elapsed = Date.now() - startTime;
+          }),
+        });
+        clearTimeout(timeoutId);
+        const elapsed = Date.now() - startTime;
 
-          if (gRes.ok) {
-            const gData = await gRes.json();
-            const parsedText = gData?.candidates?.[0]?.content?.parts?.[0]?.text;
-            if (parsedText) {
-              const cleaned = parsedText.replace(/```json/g, '').replace(/```/g, '').trim();
-              const parsed = JSON.parse(cleaned);
-              const score = Math.min(100, Math.max(0, parsed.similarityScore ?? 0));
-              const isMatch = parsed.isMatch === true || score >= 50;
-              result = {
-                isMatch,
-                score: Math.max(score, isMatch ? 88 : score),
-                verdict: parsed.verdict || (isMatch ? '3D Craniofacial Match Confirmed' : 'Live face does not match uploaded profile photo.'),
-              };
-              setDebugApiStatus(`🟢 ${model} 200 OK (${elapsed}ms) - Match: ${isMatch ? 'YES' : 'NO'} (${result.score}%)`);
-              setDebugLastVerdict(`[${model}] Score: ${result.score}%, Match: ${isMatch ? 'YES' : 'NO'}, Verdict: ${result.verdict}`);
-              setDebugLogs((prev) => [
-                `[${new Date().toLocaleTimeString()}] ${model} OK (${elapsed}ms) - Score: ${score}%`,
-                ...prev.slice(0, 4),
-              ]);
-              break;
-            }
-          } else {
-            const errBody = await gRes.text();
-            setDebugApiStatus(`🔴 ${model} HTTP ${gRes.status}`);
-            setDebugError(`${model} ${gRes.status}: ${errBody.slice(0, 80)}`);
+        if (gRes.ok) {
+          const gData = await gRes.json();
+          const parsedText = gData?.candidates?.[0]?.content?.parts?.[0]?.text;
+          if (parsedText) {
+            const cleaned = parsedText.replace(/```json/g, '').replace(/```/g, '').trim();
+            const parsed = JSON.parse(cleaned);
+            const score = Math.min(100, Math.max(0, parsed.similarityScore ?? 0));
+            // STRICT AUTHENTICATION (ZERO FALLBACK): Must be parsed.isMatch === true AND score >= 65
+            const isMatch = parsed.isMatch === true && score >= 65;
+            result = {
+              isMatch,
+              score,
+              verdict: parsed.reason || parsed.verdict || (isMatch ? '3D Craniofacial Match Confirmed ✓' : 'Identity Mismatch: Live face does not match profile photo ✗'),
+            };
+            setDebugApiStatus(`🟢 Gemini 200 OK (${elapsed}ms) - Match: ${isMatch ? 'YES' : 'NO'} (${result.score}%)`);
+            setDebugLastVerdict(`Score: ${result.score}%, Match: ${isMatch ? 'YES' : 'NO'}, Verdict: ${result.verdict}`);
             setDebugLogs((prev) => [
-              `[${new Date().toLocaleTimeString()}] ${model} ${gRes.status}: ${errBody.slice(0, 60)}`,
+              `[${new Date().toLocaleTimeString()}] Gemini OK (${elapsed}ms) - Score: ${score}%`,
               ...prev.slice(0, 4),
             ]);
           }
-        } catch (innerErr: any) {
-          console.warn(`Model ${model} error:`, innerErr);
-          setDebugError(`${model} exception: ${innerErr?.message}`);
+        } else {
+          const errBody = await gRes.text();
+          setDebugApiStatus(`🔴 Gemini HTTP ${gRes.status}`);
+          setDebugError(`Gemini ${gRes.status}: ${errBody.slice(0, 80)}`);
+          setDebugLogs((prev) => [
+            `[${new Date().toLocaleTimeString()}] Gemini ${gRes.status}: ${errBody.slice(0, 60)}`,
+            ...prev.slice(0, 4),
+          ]);
         }
+      } catch (innerErr: any) {
+        console.warn('Gemini auth error:', innerErr);
+        setDebugError(`Gemini exception: ${innerErr?.message}`);
       }
 
+      // ZERO FALLBACK: If anything failed or rejected, strictly marked as failed
       if (!result) {
         result = {
           isMatch: false,
           score: 0,
-          verdict: 'Biometric verification service error. Kripya check karein internet active hai ya nahi.',
+          verdict: 'Biometric verification failed. Zero fallback permitted.',
         };
       }
 
@@ -1096,8 +1179,10 @@ Return strictly valid JSON:
                 <View
                   style={[
                     styles.ovalViewport,
-                    isBiometricVerified
+                    isBiometricVerified || sensorStatus === 'locked'
                       ? styles.ovalViewportVerified
+                      : sensorStatus === 'mismatch'
+                      ? styles.ovalViewportScanning
                       : isAiScanning
                       ? styles.ovalViewportScanning
                       : styles.ovalViewportActive,
@@ -1116,10 +1201,39 @@ Return strictly valid JSON:
                       styles.ovalPulseRing,
                       {
                         transform: [{ scale: pulseAnim }],
-                        borderColor: isBiometricVerified || sensorStatus === 'locked' ? '#22C55E' : '#00F2FE',
+                        borderColor:
+                          isBiometricVerified || sensorStatus === 'locked'
+                            ? '#22C55E'
+                            : sensorStatus === 'mismatch'
+                            ? '#EF4444'
+                            : '#00F2FE',
                       },
                     ]}
                   />
+
+                  {/* Auto-Capture Badge inside Oval */}
+                  {autoCountdown !== null && !isBiometricVerified && !isAiScanning && (
+                    <View
+                      style={[
+                        styles.autoCountdownBadge,
+                        sensorStatus === 'locked' && styles.autoCountdownBadgeLocked,
+                      ]}
+                    >
+                      <Ionicons
+                        name={sensorStatus === 'locked' ? 'checkmark-circle' : 'scan-outline'}
+                        size={13}
+                        color={sensorStatus === 'locked' ? '#22C55E' : '#00F2FE'}
+                      />
+                      <Text
+                        style={[
+                          styles.autoCountdownBadgeText,
+                          sensorStatus === 'locked' && { color: '#22C55E' },
+                        ]}
+                      >
+                        {sensorStatus === 'locked' ? 'ALIGNED! AUTO-SNAPPING 📸' : `ALIGN & HOLD (${autoCountdown}s)`}
+                      </Text>
+                    </View>
+                  )}
 
                   {/* Specular Strobe Flash Overlay */}
                   {isStrobeActive && (
@@ -1133,14 +1247,28 @@ Return strictly valid JSON:
                 </View>
 
                 {/* Floating Glass Guidance Pill */}
-                <View style={[styles.floatingGuidancePill, (isBiometricVerified || sensorStatus === 'locked') && styles.floatingGuidancePillSuccess]}>
+                <View
+                  style={[
+                    styles.floatingGuidancePill,
+                    (isBiometricVerified || sensorStatus === 'locked') && styles.floatingGuidancePillSuccess,
+                    sensorStatus === 'mismatch' && {
+                      borderColor: 'rgba(239, 68, 68, 0.6)',
+                      backgroundColor: 'rgba(239, 68, 68, 0.15)',
+                      shadowColor: '#EF4444',
+                    },
+                  ]}
+                >
                   <Text style={styles.floatingGuidanceText}>
                     {isAiScanning
                       ? '⚡ Authenticating 3D facial landmarks...'
                       : isBiometricVerified
-                      ? `✓ Match Confirmed (${biometricScore || 96}%)`
-                      : capturedPoses.length >= 3
-                      ? '❌ Verification Mismatch'
+                      ? `✓ Match Confirmed (${biometricScore ?? 0}%)`
+                      : isCapturingPose
+                      ? '📸 Capturing & analyzing pose...'
+                      : sensorStatus === 'locked'
+                      ? '🟢 Perfect! Snapping automatically...'
+                      : sensorStatus === 'mismatch'
+                      ? (sensorGuidance || '⚠️ Pose mismatch, hold steady...')
                       : `${currentPose.emoji} ${currentPose.sub}`}
                   </Text>
                 </View>
@@ -1242,6 +1370,10 @@ Return strictly valid JSON:
                 handleRetryVerification();
                 return;
               }
+              if (autoCaptureTimerRef.current) {
+                clearInterval(autoCaptureTimerRef.current);
+                autoCaptureTimerRef.current = null;
+              }
               snapAndVerifyPose();
               return;
             }
@@ -1262,6 +1394,10 @@ Return strictly valid JSON:
                     ? 'Retry Biometric Scan 🔄'
                     : isCapturingPose
                     ? 'Verifying Pose... ⏳'
+                    : autoCountdown !== null && autoCountdown > 0
+                    ? `Auto-Snap in ${autoCountdown}s (or Tap Now) 📸`
+                    : sensorStatus === 'locked'
+                    ? 'Auto-Snapping... 📸'
                     : `Snap Pose ${currentPoseIdx + 1}/3: ${currentPose?.label || 'Snap'} 📸`)
                 : 'Continue'}
             </Text>
@@ -1611,6 +1747,36 @@ const styles = StyleSheet.create({
     ...StyleSheet.absoluteFill,
     borderRadius: 110,
     borderWidth: 2,
+  },
+  autoCountdownBadge: {
+    position: 'absolute',
+    top: 14,
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 5,
+    backgroundColor: 'rgba(15, 23, 42, 0.88)',
+    paddingHorizontal: 12,
+    paddingVertical: 5,
+    borderRadius: 14,
+    borderWidth: 1,
+    borderColor: 'rgba(0, 242, 254, 0.4)',
+    zIndex: 10,
+    shadowColor: '#00F2FE',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.3,
+    shadowRadius: 4,
+    elevation: 4,
+  },
+  autoCountdownBadgeLocked: {
+    backgroundColor: 'rgba(20, 83, 45, 0.92)',
+    borderColor: 'rgba(34, 197, 94, 0.9)',
+    shadowColor: '#22C55E',
+  },
+  autoCountdownBadgeText: {
+    color: '#00F2FE',
+    fontSize: 10,
+    fontFamily: 'Poppins_700Bold',
+    letterSpacing: 0.5,
   },
   floatingGuidancePill: {
     marginTop: 14,
