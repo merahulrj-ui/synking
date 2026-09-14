@@ -136,28 +136,36 @@ async function detectPoseOnDevice(photoUri: string, targetKey: string): Promise<
     let guidance = '';
 
     if (targetKey === 'center') {
-      // Look straight: head facing camera directly (yaw within ±14°, pitch within ±18°)
-      if (Math.abs(yaw) <= 14 && Math.abs(pitch) <= 18) {
+      // Look straight: head facing camera directly (yaw within ±12°, pitch within ±18°)
+      if (Math.abs(yaw) <= 12 && Math.abs(pitch) <= 18) {
         isTargetPose = true;
         guidance = 'Straight pose verified ✓';
-      } else if (yaw > 14) {
-        guidance = 'Turn slightly to face center';
-      } else if (yaw < -14) {
-        guidance = 'Turn slightly to face center';
       } else {
-        guidance = 'Hold face straight ahead';
+        guidance = 'Hold face straight ahead at the camera';
       }
     } else if (targetKey === 'left') {
-      if (yaw < -12 || yaw > 14) {
+      // User must turn head to THEIR LEFT.
+      // In front camera capture: nose moves to camera right (yaw > 12)
+      // If user turned to their right (yaw < -12), REJECT immediately.
+      if (yaw > 12) {
         isTargetPose = true;
         guidance = 'Left turn verified ✓';
+      } else if (yaw < -12) {
+        isTargetPose = false;
+        guidance = 'Wrong direction! You turned right. Please turn your head to your LEFT.';
       } else {
         guidance = 'Turn head further to the left';
       }
     } else if (targetKey === 'right') {
-      if (yaw > 12 || yaw < -14) {
+      // User must turn head to THEIR RIGHT.
+      // In front camera capture: nose moves to camera left (yaw < -12)
+      // If user turned to their left (yaw > 12), REJECT immediately.
+      if (yaw < -12) {
         isTargetPose = true;
         guidance = 'Right turn verified ✓';
+      } else if (yaw > 12) {
+        isTargetPose = false;
+        guidance = 'Wrong direction! You turned left. Please turn your head to your RIGHT.';
       } else {
         guidance = 'Turn head further to the right';
       }
@@ -383,18 +391,23 @@ export default function OnboardingScreen() {
         }
 
         const geminiKey = GEMINI_KEY;
-        const prompt = `You are a real-time mobile biometric liveness pose sensor.
-Target Expected Pose: "${targetKey}".
-- "center": A human face is clearly visible inside the oval frame looking directly straight at the camera.
-- "left": User has rotated their head towards their left side (or camera right).
-- "right": User has rotated their head towards their right side (or camera left).
+        const prompt = `You are an ultra-strict mobile biometric liveness validator.
+Target Required Pose: "${targetKey}".
 
-Examine this camera image carefully:
-1. Is a real human face visible? (If table, wall, ceiling, darkness, or no face -> faceVisible: false).
-2. Does the face posture match the target pose "${targetKey}"?
+Analyze the person's head direction in this selfie photo:
+- "center": Person is looking directly straight forward at the camera lens. Both eyes and both ears are symmetrically visible.
+- "left": Person has rotated their head towards THEIR LEFT SHOULDER. Their nose clearly points towards the user's left side. Their RIGHT cheek and RIGHT ear are prominently visible to the camera.
+- "right": Person has rotated their head towards THEIR RIGHT SHOULDER. Their nose clearly points towards the user's right side. Their LEFT cheek and LEFT ear are prominently visible to the camera.
+
+CRITICAL OPPOSITE CHECK:
+- If target is "center", but person turned left or right -> isTargetPose MUST BE FALSE.
+- If target is "left", but person turned towards their right shoulder -> isTargetPose MUST BE FALSE. Guidance: "Wrong direction! You turned right. Please turn your head to your LEFT."
+- If target is "right", but person turned towards their left shoulder -> isTargetPose MUST BE FALSE. Guidance: "Wrong direction! You turned left. Please turn your head to your RIGHT."
+
 Return STRICT JSON only:
 {
   "faceVisible": boolean,
+  "actualPoseDetected": "center" | "left" | "right" | "none",
   "isTargetPose": boolean,
   "guidance": string
 }`;
@@ -440,9 +453,34 @@ Return STRICT JSON only:
         const cleaned = text.replace(/```json/g, '').replace(/```/g, '').trim();
         const parsed = JSON.parse(cleaned);
 
-        faceVisible = parsed.faceVisible;
-        isTargetPose = parsed.isTargetPose;
-        guidance = parsed.guidance || '';
+        faceVisible = parsed.faceVisible === true;
+        const actualPose = String(parsed.actualPoseDetected || '').toLowerCase().trim();
+
+        // STRICT PROGRAMMATIC VERIFICATION
+        if (targetKey === 'center') {
+          isTargetPose = faceVisible && actualPose === 'center';
+          guidance = isTargetPose
+            ? 'Straight pose verified ✓'
+            : (parsed.guidance || 'Please look straight at the camera.');
+        } else if (targetKey === 'left') {
+          isTargetPose = faceVisible && actualPose === 'left';
+          if (!isTargetPose) {
+            guidance = actualPose === 'right'
+              ? 'Wrong direction! You turned right. Please turn your head to your LEFT.'
+              : (parsed.guidance || 'Please turn your head to your left.');
+          } else {
+            guidance = 'Left turn verified ✓';
+          }
+        } else if (targetKey === 'right') {
+          isTargetPose = faceVisible && actualPose === 'right';
+          if (!isTargetPose) {
+            guidance = actualPose === 'left'
+              ? 'Wrong direction! You turned left. Please turn your head to your RIGHT.'
+              : (parsed.guidance || 'Please turn your head to your right.');
+          } else {
+            guidance = 'Right turn verified ✓';
+          }
+        }
         setDebugApiStatus(`🟢 Pose Check: Face=${faceVisible}, Match=${isTargetPose} (${elapsed}ms)`);
       }
 
