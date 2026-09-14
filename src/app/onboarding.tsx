@@ -1047,7 +1047,7 @@ Return strictly valid JSON:
             <Text style={styles.premiumSubtitle}>
               {isBiometricVerified
                 ? 'Your profile now has the official verified blue badge.'
-                : 'Center your face and follow the 3 quick cues to get verified.'}
+                : '💡 Kripya achhi roshni (Room Light) on rakhein aur 3 cues follow karein.'}
             </Text>
 
             {/* Sleek Step Progress Track */}
