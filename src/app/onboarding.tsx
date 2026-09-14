@@ -587,6 +587,7 @@ Return STRICT JSON only:
   };
 
   // 🎯 Auto-Capture Engine: Smooth circular arc fills up → auto-snap when complete
+  const [arcTrigger, setArcTrigger] = useState(0);
   useEffect(() => {
     if (
       step !== 8 ||
@@ -608,19 +609,21 @@ Return STRICT JSON only:
     if (timeSinceLast < 3000) {
       const cooldownRemaining = 3000 - timeSinceLast;
       const cooldownTimer = setTimeout(() => {
-        setAutoCountdown(null); // re-trigger effect
+        setArcTrigger(t => t + 1); // force re-evaluate
       }, cooldownRemaining);
       return () => clearTimeout(cooldownTimer);
     }
 
     // Start smooth arc fill: 0 → 1 over 2.4 seconds
-    setAutoCountdown(1); // signals arc is active
+    setAutoCountdown(1);
     setSensorStatus('searching');
     arcProgressAnim.setValue(0);
 
-    // Listener to turn green at 70%
+    let hasGoneGreen = false;
+
     const listenerId = arcProgressAnim.addListener(({ value }) => {
-      if (value >= 0.7 && sensorStatus !== 'locked') {
+      if (value >= 0.7 && !hasGoneGreen) {
+        hasGoneGreen = true;
         setSensorStatus('locked');
         if (Platform.OS !== 'web') {
           Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
@@ -635,8 +638,7 @@ Return STRICT JSON only:
     }).start(({ finished }) => {
       arcProgressAnim.removeListener(listenerId);
       if (finished) {
-        // Arc complete → auto-snap!
-        setAutoCountdown(0);
+        setAutoCountdown(null);
         lastAutoCaptureTimeRef.current = Date.now();
         if (Platform.OS !== 'web') {
           Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
@@ -649,6 +651,7 @@ Return STRICT JSON only:
       arcProgressAnim.removeListener(listenerId);
       arcProgressAnim.stopAnimation();
     };
+  // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [
     step,
     currentPoseIdx,
@@ -657,7 +660,7 @@ Return STRICT JSON only:
     isAiScanning,
     isBiometricVerified,
     capturedPoses.length,
-    autoCountdown,
+    arcTrigger,
   ]);
 
   const runDualAiVerification = async (refPhotoUri: string, livePoseUris: string[]) => {
