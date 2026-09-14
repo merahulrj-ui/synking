@@ -590,7 +590,7 @@ Return strictly valid JSON:
       contentsParts.push({ text: prompt });
 
       let result: any = null;
-      const candidateModels = ['gemini-3.5-flash', 'gemini-3.5-flash-lite'];
+      const candidateModels = ['gemini-3.5-flash-lite', 'gemini-3.6-flash'];
       for (const model of candidateModels) {
         try {
           const startTime = Date.now();
