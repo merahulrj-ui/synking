@@ -313,7 +313,7 @@ export default function NextLandingPage() {
                     </p>
 
                     <Link
-                      href="/app"
+                      href="/download/apk"
                       className="mt-3 flex items-center justify-center gap-1.5 w-full rounded-xl bg-gradient-to-r from-[#FD3A73] to-[#8E2DE2] py-2.5 text-xs font-bold text-white shadow-lg shadow-[#FD3A73]/35 hover:brightness-110 transition-all"
                     >
                       <Video className="h-3.5 w-3.5" />
@@ -420,7 +420,7 @@ export default function NextLandingPage() {
 
               <div className="mt-6 pt-4 border-t border-white/5 flex items-center justify-between text-xs text-zinc-400">
                 <span>Privacy-fuzzed coordinates</span>
-                <Link href="/app" className="text-[#FD3A73] font-bold hover:underline flex items-center gap-1">
+                <Link href="/download/apk" className="text-[#FD3A73] font-bold hover:underline flex items-center gap-1">
                   Scan Radar <ArrowRight className="h-3 w-3" />
                 </Link>
               </div>
@@ -464,7 +464,7 @@ export default function NextLandingPage() {
                   </div>
                   <div className="flex items-center gap-1.5">
                     <Link
-                      href="/app"
+                      href="/download/apk"
                       className="rounded-lg bg-emerald-500/20 border border-emerald-500/30 px-2.5 py-1.5 text-[11px] font-bold text-emerald-400 hover:bg-emerald-500/30"
                     >
                       Coffee ☕
@@ -475,7 +475,7 @@ export default function NextLandingPage() {
 
               <div className="mt-6 pt-4 border-t border-white/5 flex items-center justify-between text-xs text-zinc-400">
                 <span>Automatic conclude timer</span>
-                <Link href="/app" className="text-purple-400 font-bold hover:underline flex items-center gap-1">
+                <Link href="/download/apk" className="text-purple-400 font-bold hover:underline flex items-center gap-1">
                   Try Vibe Call <ArrowRight className="h-3 w-3" />
                 </Link>
               </div>
@@ -558,7 +558,7 @@ export default function NextLandingPage() {
 
               <div className="mt-6 pt-4 border-t border-white/5 flex items-center justify-between text-xs text-zinc-400">
                 <span>Verified well-lit public spots</span>
-                <Link href="/app" className="text-amber-400 font-bold hover:underline flex items-center gap-1">
+                <Link href="/download/apk" className="text-amber-400 font-bold hover:underline flex items-center gap-1">
                   View Date Cafes <ArrowRight className="h-3 w-3" />
                 </Link>
               </div>
@@ -722,7 +722,7 @@ export default function NextLandingPage() {
             <div className="mt-7 pt-5 border-t border-white/5 flex items-center justify-between">
               <span className="text-xs text-zinc-400">Discover sparks active right now in {cityHubs[activeCity].name}</span>
               <Link
-                href="/app"
+                href="/download/apk"
                 className="rounded-xl bg-gradient-to-r from-[#FD3A73] to-[#8E2DE2] px-5 py-2 text-xs font-bold text-white shadow-md shadow-[#FD3A73]/25 hover:brightness-110 transition-all"
               >
                 Scan City Radar →
@@ -803,7 +803,7 @@ export default function NextLandingPage() {
 
           <div className="mt-5 flex flex-col sm:flex-row items-center justify-center gap-4">
             <Link
-              href="/app"
+              href="/download/apk"
               className="flex items-center justify-center gap-2 w-full sm:w-auto rounded-xl bg-gradient-to-r from-[#FD3A73] to-[#8E2DE2] px-8 py-4 text-sm font-bold text-white shadow-xl shadow-[#FD3A73]/35 hover:brightness-110 active:scale-95 transition-all text-center"
             >
               <Zap className="h-4 w-4" />
@@ -864,7 +864,7 @@ export default function NextLandingPage() {
       <div className="fixed bottom-4 inset-x-4 z-40 md:hidden">
         <div className="rounded-2xl border border-white/15 bg-[#07050d]/90 p-2.5 backdrop-blur-2xl shadow-2xl flex items-center gap-2">
           <Link
-            href="/app"
+            href="/download/apk"
             className="flex-1 flex items-center justify-center gap-2 rounded-xl bg-gradient-to-r from-[#FD3A73] to-[#8E2DE2] py-3 text-xs font-bold text-white shadow-lg shadow-[#FD3A73]/30 active:scale-95 transition-all"
           >
             <Zap className="h-3.5 w-3.5" />

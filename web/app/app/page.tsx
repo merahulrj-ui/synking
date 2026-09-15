@@ -5,12 +5,20 @@ import Link from 'next/link';
 
 export default function WebAppPortal() {
   useEffect(() => {
+    // Purge any legacy fake dummy user from localStorage so real current app flow runs
+    try {
+      var stored = localStorage.getItem('synking_my_user');
+      if (stored && (stored.includes('synkin_member_') || stored.includes('Synkin Member') || stored.includes('web_guest_'))) {
+        localStorage.removeItem('synking_my_user');
+      }
+    } catch (e) {}
+
     // Dynamically inject the exact Expo React Native Web application bundle
     const scriptId = 'expo-web-bundle';
     if (!document.getElementById(scriptId)) {
       const script = document.createElement('script');
       script.id = scriptId;
-      script.src = '/_expo/static/js/web/index-d546e796ffec41ca12d06b44e1e2be3d.js';
+      script.src = '/_expo/static/js/web/index-7fd3db3bbbf4a15944ef626864eebe96.js?v=20260915_v4';
       script.defer = true;
       script.onload = () => {
         setTimeout(() => {
@@ -126,7 +134,7 @@ export default function WebAppPortal() {
           className="relative w-full h-full bg-black overflow-hidden lg:rounded-[36px] lg:border lg:border-white/10 flex"
         >
           {/* Fallback loader before Expo JS bundle executes */}
-          <div className="absolute inset-0 flex flex-col items-center justify-center bg-black text-white gap-3 pointer-events-none">
+          <div id="spark-radar-loader" className="absolute inset-0 flex flex-col items-center justify-center bg-black text-white gap-3 pointer-events-none">
             <img
               src="/images/logo_emblem.png"
               alt="Synkin Loading"
