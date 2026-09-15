@@ -10,10 +10,7 @@ export default function WebAppPortal() {
     if (!document.getElementById(scriptId)) {
       const script = document.createElement('script');
       script.id = scriptId;
-      const isLocalDev = typeof window !== 'undefined' && (window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1');
-      script.src = isLocalDev
-        ? '/index.bundle?platform=web&dev=true&hot=false&transform.routerRoot=src%2Fapp'
-        : '/app/_expo/static/js/web/index-91dc49b0979d50b0fa990b2eb3b0bcad.js';
+      script.src = '/_expo/static/js/web/index-d546e796ffec41ca12d06b44e1e2be3d.js';
       script.defer = true;
       script.onload = () => {
         setTimeout(() => {
